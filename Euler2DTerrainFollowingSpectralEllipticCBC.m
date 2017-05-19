@@ -12,14 +12,13 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 200;
+NX = 120;
 NZ = 80;
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case
 TestCase = 'ShearJetSchar'; BC = 1;
-%TestCase = 'HydroMtn'; BC = 1;
 %TestCase = 'NonhydroMtn'; BC = 1;
 %TestCase = 'ClassicalSchar'; BC = 1;
 
@@ -55,29 +54,6 @@ if strcmp(TestCase,'ShearJetSchar') == true
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
-elseif strcmp(TestCase,'HydroMtn') == true
-    zH = 25000.0;
-    l1 = -60000.0;
-    l2 = 60000.0;
-    L = abs(l2 - l1);
-    GAMT = 0.0;
-    HT = 0.0;
-    GAMS = 0.0;
-    HML = 0.0;
-    HS = 0.0;
-    T0 = 250.0;
-    BVF = ga / sqrt(cp * T0);
-    depth = 5000.0;
-    width = 5000.0;
-    nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
-    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
-    applyLateralRL = true;
-    aC = 10000.0;
-    lC = 0.0;
-    hC = 1.0;
-    u0 = 20.0;
-    uj = 0.0;
-    b = 0.0;
 elseif strcmp(TestCase,'NonhydroMtn') == true
     zH = 25000.0;
     l1 = -40000.0;
@@ -138,7 +114,9 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC);
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
-[LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ,applyLateralRL);
+[LD,FF,REFS] = ...
+computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyLateralRL);
+
 
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
@@ -150,42 +128,37 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
+%A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
+%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
 clear LD FF FFBC;
 sol = A \ b;
 clear A b;
 toc
 %}
 
-%% Solve the system using residual non-linear line search solver
-%{
-disp('Solve the system with a La Cruz Raydan Algorithm.');
-tic
-x0 = 0.0 * FFBC(sysDex,1);
-A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
-[sol,rseq] = ResidualMtSolve((A'*A),(A'*b),x0,1.0E-6,100);
-clear A b;
-toc
-%}
-%% Solve the system with an iterative solver
-%{
-tic
-A = LD(sysDex,sysDex);%' * LD(sysDex,sysDex);
-%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
-b = FFBC(sysDex,1);
-disp('Solve the raw system with iterative solver.');
-[L,U] = ilu(A,struct('type','ilutp','udiag',1,'droptol',1.0e-2));
-sol = gmres(A,b,[],1.0E-4,50,L,U);
-toc
-%}
-%% Plot the solution
+%% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
-%%
+
+%% Interpolate to a regular grid using Hermite and Legendre transforms'
+NXI = 500;
+NZI = 300;
+[uxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(uxz), NXI, NZI, 0, 0);
+[wxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(wxz), NXI, NZI, 0, 0);
+[rxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(rxz), NXI, NZI, 0, 0);
+[pxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(pxz), NXI, NZI, 0, 0);
+
+XI = l2 * XINT;
+ZI = ZINT;
+
+%% Plot the solution in the native and interpolated grids
+%{
+% NATIVE GRID PLOTS
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(REFS.ujref + uxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
@@ -193,11 +166,11 @@ disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('Total Horizontal Velocity U (m/s)');
 subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(wxz),31); colorbar;
-%subplot(1,2,2); pcolor(REFS.XL,REFS.ZTL,real(wxz)); colorbar; shading faceted;
 xlim([l1 l2]);
 ylim([0.0 zH]);
 title('Vertical Velocity W (m/s)');
-figure
+
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(rxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
@@ -207,8 +180,46 @@ xlim([l1 l2]);
 ylim([0.0 zH]);
 title('Perturbation Log Pressure (Pa)');
 drawnow
+%}
+
+% INTERPOLATED GRID PLOTS
+%% Compute the reference state initialization
+if strcmp(TestCase,'ShearJetSchar') == true
+    [lpref, lrref, dlpref, ~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT);
+    [ujref, ~] = computeJetProfile(UJ, p0, lpref, dlpref);
+elseif strcmp(TestCase,'ClassicalSchar') == true
+    [lpref, lerref, ~, ~] = computeBackgroundPressureCBVF(BS, ZTL, spye(NZI));
+    [ujref, ~] = computeJetProfileUniform(UJ, lpref);
+elseif strcmp(TestCase,'NonhydroMtn') == true
+    [lpref, lrref, ~, ~] = computeBackgroundPressureCBVF(BS, ZTL, spye(NZI));
+    [ujref, ~] = computeJetProfileUniform(UJ, lpref);
+end
+
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(1,2,1); contourf(XI,ZI,ujref + uxzint,31); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+disp(['U MAX: ' num2str(max(max(uxz)))]);
+disp(['U MIN: ' num2str(min(min(uxz)))]);
+title('Total Horizontal Velocity U (m/s)');
+subplot(1,2,2); contourf(XI,ZI,wxzint,31); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Vertical Velocity W (m/s)');
+
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(1,2,1); contourf(XI,ZI,rxzint,31); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Perturbation Log Density (kg/m^3)');
+subplot(1,2,2); contourf(XI,ZI,pxzint,31); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Perturbation Log Pressure (Pa)');
+drawnow
 
 %% Compute the local Ri number and plot ...
+%
 lrho = REFS.lrref + real(rxz);
 dlrho = REFS.sig .* (REFS.DDZ * lrho);
 uj = REFS.ujref + real(uxz);
@@ -236,7 +247,7 @@ semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',1.5);
 hold off;
 grid on;
 xlabel('Ri','FontSize',30);
-ylabel('','FontSize',30);
+ylabel(' ','FontSize',30);
 ylim([5.0 1.0E-3*zH]);
 xlim([0.01 1.0E3]);
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
@@ -249,19 +260,20 @@ fname = [dirname 'RI_TEST_' num2str(hC)];
 drawnow;
 screen2png(fname);
 %}
-%{
-subplot(2,2,1); surf(REFS.XL,REFS.ZTL,uxz); colorbar; xlim([-20000.0 20000.0]); ylim([0.0 15000.0]);
+
+%% Debug
+%
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Total Horizontal Velocity U (m/s)');
-subplot(2,2,2); surf(REFS.XL,REFS.ZTL,wxz); colorbar; xlim([-20000.0 20000.0]); ylim([0.0 15000.0]);
+subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Vertical Velocity W (m/s)');
-subplot(2,2,3); surf(REFS.XL,REFS.ZTL,exp(rxz)); colorbar; xlim([-20000.0 20000.0]); ylim([0.0 15000.0]);
+subplot(2,2,3); surf(XI,ZI,exp(rxzint)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Perturbation Density (kg/m^3)');
-subplot(2,2,4); surf(REFS.XL,REFS.ZTL,exp(pxz)); colorbar; xlim([-20000.0 20000.0]); ylim([0.0 15000.0]);
+subplot(2,2,4); surf(XI,ZI,exp(pxzint)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Perturbation Pressure (Pa)');
 drawnow
 %}
-
-%% Debug
 %{
 subplot(2,2,1); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS)),NZ,NX)); colorbar; xlim([-15000.0 15000.0]); ylim([0.0 1000.0]);
 title('Total Horizontal Velocity U (m/s)');

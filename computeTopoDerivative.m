@@ -6,8 +6,12 @@ function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS)
     if ((strcmp(TestCase,'ShearJetSchar') == true) || (strcmp(TestCase,'ClassicalSchar') == true))
         ht = DS.hC * exp(-xh.^2/DS.aC^2) .* (cos(pi * xh / DS.lC)).^2;
         
-        dhdx = -2.0 * DS.hC * exp(-xh.^2/DS.aC^2) .* cos(pi * xh / DS.lC) .*...
-           (pi/DS.lC * sin(pi * xh / DS.lC) + xh / (DS.aC^2) .* cos(pi * xh / DS.lC));
+        %dhdx = -2.0 * DS.hC * exp(-xh.^2/DS.aC^2) .* cos(pi * xh / DS.lC) .*...
+        %   (pi/DS.lC * sin(pi * xh / DS.lC) + xh / (DS.aC^2) .* cos(pi * xh / DS.lC));
+       
+        dhdx = -DS.hC * exp(-xh.^2/DS.aC^2) .* ( ...
+            2.0 * xh / (DS.aC^2) .* (cos(pi * xh / DS.lC)).^2 + ...
+            pi/DS.lC * sin(2.0 * pi * xh / DS.lC));
     elseif ((strcmp(TestCase,'HydroMtn') == true) || (strcmp(TestCase,'NonhydroMtn') == true))
         ht = DS.hC * (1.0 + xh.^2 / DS.aC).^(-1);
         

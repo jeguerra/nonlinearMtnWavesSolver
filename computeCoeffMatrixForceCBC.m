@@ -4,7 +4,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     % fix the diagonal
     DDX_H(1:NX+1:end) = 1.0E-8 * ones(NX,1);
     
-    [zlc,~] = chebdif(NZ,1);
+    [zlc, ~] = chebdif(NZ, 1);
+    %DDZ_L = (1.0 / DS.zH) * DDZ_L;
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
@@ -65,9 +66,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL, DDZ_L);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
     elseif strcmp(TestCase,'NonhydroMtn') == true
-        [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL, DDZ_L);
-        [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
-    elseif strcmp(TestCase,'HydroMtn') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL, DDZ_L);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
     end
@@ -133,7 +131,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     
     REFS = struct('ujref',ujref,'dujref',dujref, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref, ...
-        'pref',pref,'rref',rref,'XL',XL,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L,'sig',sigma);
+        'pref',pref,'rref',rref,'XL',XL,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
+        'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase);
     
     %% Compute the Rayleigh field
     rayField = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyLateralRL);
@@ -208,20 +207,18 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     B41 = sparse(OPS,OPS);
     B42 = SIGMA * (DLPDZ - BS.gam * DLRDZ);
     B43 = sparse(OPS,OPS) - BS.gam * B33;
-    B44 = sparse(OPS,OPS) + BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
 
     %% Adjust the operator for the coupled BC
     bdex = 1:NZ:OPS;
-    slope = spdiags(DZT(1,:)', 0, NX, NX);
-    B11(bdex,bdex) = -slope;
-    B12(bdex,bdex) = speye(NX,NX);
-    B13(bdex,bdex) = sparse(NX,NX);
-    B14(bdex,bdex) = sparse(NX,NX);
+    GPHI = spdiags(DZT(1,:)', 0, NX, NX);
     
-    B21(bdex,bdex) = -slope;
-    B22(bdex,bdex) = speye(NX,NX);
-    B23(bdex,bdex) = sparse(NX,NX);
-    B24(bdex,bdex) = sparse(NX,NX);
+    % THE BOUNDARY CONDITION MUST BE ON W AND LN(RHO)...
+    %B21(bdex,bdex) = (-GPHI);
+    %B22(bdex,bdex) = speye(NX,NX);
+    
+    B31(bdex,bdex) = (-GPHI);
+    B32(bdex,bdex) = speye(NX,NX);
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -244,7 +241,10 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     LD43 = L43 + B43;
     LD44 = L44 + B44;
 
-    LD = [LD11 LD12 LD13 LD14 ; LD21 LD22 LD23 LD24 ; LD31 LD32 LD33 LD34 ; LD41 LD42 LD43 LD44];
+    LD = [LD11 LD12 LD13 LD14 ; ...
+          LD21 LD22 LD23 LD24 ; ...
+          LD31 LD32 LD33 LD34 ; ...
+          LD41 LD42 LD43 LD44];
 
     %% Assemble the force vector
     U0 = reshape(ujref,OPS,1);
@@ -253,15 +253,15 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     DLRDZ = reshape(dlrref,OPS,1);
     h_hat = 1.0 / DS.L * reshape(dzdh .* DZT,OPS,1);
     SIGMA = reshape(sigma,OPS,1);
-    %ROP = reshape(rref ./ pref,OPS,1);
-
+    
     F11 = h_hat .* (SIGMA .* U0 .* DU0DZ - BS.ga);
     F21 = zeros(OPS,1);
     F31 = h_hat .* SIGMA .* (U0 .* DLRDZ + DU0DZ);
     F41 = U0 .* h_hat .* SIGMA .* (DLPDZ - BS.gam * DLRDZ);
     
     %% Adjust the force vector for the coupled BC
-    F11(bdex) = ujref(1,:) .* DZT(1,:);
-    F21(bdex) = ujref(1,:) .* DZT(1,:);
+    %F21(bdex) = (ujref(1,:) .* DZT(1,:))';
+    F31(bdex) = (ujref(1,:) .* DZT(1,:))';
+    
     FF = [F11 ; F21 ; F31 ; F41];
 end

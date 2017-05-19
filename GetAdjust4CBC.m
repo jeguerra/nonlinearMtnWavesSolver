@@ -25,6 +25,7 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     if BC == 1
         % Only apply the BC on W at the top
         disp('BC on W top only.');
+        %rowsOut = [utdex wtdex];
         rowsOut = wtdex;
     elseif BC == 2
         % Apply BC on W and U for no wave flow across boundaries
