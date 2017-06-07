@@ -73,6 +73,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %% Compute the vertical profiles of density and pressure
     pref = exp(lpref);
     rref = exp(lrref);
+    rref0 = max(max(rref));
+    rsc = sqrt(rref0) * rref.^(-0.5);
 
 %{
     %% Plot background fields including mean Ri number
@@ -132,7 +134,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     REFS = struct('ujref',ujref,'dujref',dujref, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref, ...
         'pref',pref,'rref',rref,'XL',XL,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
-        'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase);
+        'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0);
     
     %% Compute the Rayleigh field
     rayField = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyLateralRL);
@@ -162,6 +164,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
+    RSC = spdiags(reshape(rsc,OPS,1), 0, OPS, OPS);
     U0DX = U0 * DDX_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
@@ -173,12 +176,12 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     L14 = POR * DDX_OP;
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
-    L22 = U0DX;
+    L22 = RSC * U0DX;
     L23 = sparse(OPS,OPS);
     L24 = POR * SIGMA * DDZ_OP;
     % Continuity LHS
     L31 = DDX_OP;
-    L32 = SIGMA * DDZ_OP;
+    L32 = SIGMA * RSC * DDZ_OP;
     L33 = U0DX;
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
@@ -190,35 +193,38 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
     B11 = sparse(OPS,OPS) + RAY.nu1 * spdiags(RL,0, OPS, OPS);
-    B12 = SIGMA * DU0DZ;
+    B12 = SIGMA * RSC * DU0DZ;
     B13 = sparse(OPS,OPS);
     B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
     B21 = sparse(OPS,OPS);
-    B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * RSC * spdiags(RL,0, OPS, OPS);
     B23 = BS.ga * unit;
     B24 = -BS.ga * unit;
     % Continuity LHS
     B31 = sparse(OPS,OPS);
-    B32 = SIGMA * DLRDZ;
+    %B32 = sparse(OPS,OPS);
+    B32 = SIGMA * 0.5 * RSC * DLRDZ;
     B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
-    B42 = SIGMA * (DLPDZ - BS.gam * DLRDZ);
+    B42 = SIGMA * RSC * (DLPDZ - BS.gam * DLRDZ);
     B43 = sparse(OPS,OPS) - BS.gam * B33;
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
 
     %% Adjust the operator for the coupled BC
     bdex = 1:NZ:OPS;
     GPHI = spdiags(DZT(1,:)', 0, NX, NX);
+    RSBC = spdiags(rsc(1,:)', 0, NX, NX);
     
     % THE BOUNDARY CONDITION MUST BE ON W AND LN(RHO)...
     %B21(bdex,bdex) = (-GPHI);
     %B22(bdex,bdex) = speye(NX,NX);
     
     B31(bdex,bdex) = (-GPHI);
-    B32(bdex,bdex) = speye(NX,NX);
+    %B32(bdex,bdex) = speye(NX,NX);
+    B32(bdex,bdex) = RSBC;
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;

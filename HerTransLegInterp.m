@@ -24,6 +24,10 @@ b = max(xn) / DS.l2;
 % If the input xint grid is a scalar or all zeros make a regular grid with NXI
 if (length(xint) == 1 || norm(xint) == 0.0)
     xint = linspace(min(xn), max(xn), NXI);
+else
+    % Rescale the interpolation grid to the native Hermite node scale
+    xint = (xint / max(xint)) * max(xn);
+    
 end
 
 % Get the vertical Chebyshev nodes

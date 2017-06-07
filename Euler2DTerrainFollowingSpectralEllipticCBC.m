@@ -12,7 +12,7 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 120;
+NX = 100;
 NZ = 80;
 OPS = NX * NZ;
 numVar = 4;
@@ -32,9 +32,9 @@ cv = cp - Rd;
 ga = 9.80616;
 p0 = 1.0E5;
 if strcmp(TestCase,'ShearJetSchar') == true
-    zH = 41000.0;
-    l1 = -56000.0;
-    l2 = 56000.0;
+    zH = 33000.0;
+    l1 = -50000.0;
+    l2 = 50000.0;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -43,21 +43,22 @@ if strcmp(TestCase,'ShearJetSchar') == true
     HS = 20000.0;
     T0 = 292.15;
     BVF = 0.0;
-    depth = 6000.0;
-    width = 6000.0;
+    depth = 8000.0;
+    width = 8000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 250.0;
+    hC = 100.0;
+    mtnh = '100m';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
 elseif strcmp(TestCase,'NonhydroMtn') == true
     zH = 25000.0;
-    l1 = -40000.0;
-    l2 = 40000.0;
+    l1 = -50000.0;
+    l2 = 50000.0;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -73,6 +74,7 @@ elseif strcmp(TestCase,'NonhydroMtn') == true
     applyLateralRL = true;
     aC = 1000.0;
     lC = 0.0;
+    mtnh = '1m';
     hC = 1.0;
     u0 = 10.0;
     uj = 0.0;
@@ -96,6 +98,7 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     applyLateralRL = true;
     aC = 5000.0;
     lC = 4000.0;
+    mtnh = '250m';
     hC = 250.0;
     u0 = 10.0;
     uj = 0.0;
@@ -140,9 +143,14 @@ toc
 SOL(sysDex) = sol;
 clear sol;
 uxz = reshape(SOL((1:OPS)),NZ,NX);
-wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+whxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
+
+%% Convert \hat{w} to w using the reference density profile
+wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
+wxz = wf .* whxz;
+%wxz = whxz;
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 NXI = 500;
@@ -188,10 +196,10 @@ if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, ~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT);
     [ujref, ~] = computeJetProfile(UJ, p0, lpref, dlpref);
 elseif strcmp(TestCase,'ClassicalSchar') == true
-    [lpref, lerref, ~, ~] = computeBackgroundPressureCBVF(BS, ZTL, spye(NZI));
+    [lpref, lerref, ~, ~] = computeBackgroundPressureCBVF(BS, ZINT, speye(NZI));
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 elseif strcmp(TestCase,'NonhydroMtn') == true
-    [lpref, lrref, ~, ~] = computeBackgroundPressureCBVF(BS, ZTL, spye(NZI));
+    [lpref, lrref, ~, ~] = computeBackgroundPressureCBVF(BS, ZINT, speye(NZI));
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 end
 
@@ -227,7 +235,8 @@ duj = REFS.sig .* (REFS.DDZ * uj);
 Ri = -ga * dlrho ./ (duj.^2);
 
 xdex = 1:1:NX;
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
+%{
 subplot(1,2,1);
 semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:, xdex),'ks','LineWidth',1.5); grid on;
 hold on;
@@ -241,25 +250,53 @@ fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 %drawnow;
 
 subplot(1,2,2);
+%}
 semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 hold on;
 semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',1.5);
 hold off;
 grid on;
 xlabel('Ri','FontSize',30);
-ylabel(' ','FontSize',30);
-ylim([5.0 1.0E-3*zH]);
-xlim([0.01 1.0E3]);
+ylabel('Altitude (km)','FontSize',30);
+ylim([0.0 1.0E-3*zH]);
+xlim([0.1 1.0E3]);
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
 
-pt = mtit('Local Ri Number - 250m Mountain','FontSize',36,'FontWeight','normal','Interpreter','tex');
+pt = mtit(['Local Ri Number - ' mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
 
 dirname = '../ShearJetSchar/';
 fname = [dirname 'RI_TEST_' num2str(hC)];
 drawnow;
 screen2png(fname);
 %}
+
+%% Compute the local potential temperature and plot...
+rho = exp(lrho);
+lp = REFS.lpref + real(pxz);
+p = exp(lp);
+pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
+dpt = REFS.sig .* (REFS.DDZ * pt);
+temp = p ./ (Rd * rho);
+conv = (pt ./ temp) .* dpt;
+
+xdex = 1:1:NX;
+fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
+plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+grid on;
+xlabel('$\frac{T}{\theta} \frac{d \theta}{d z}$','FontSize',30,'Interpreter','latex');
+ylabel('Altitude (km)','FontSize',30);
+ylim([0.0 1.0E-3*zH]);
+%xlim([0.1 1.0E3]);
+fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+drawnow;
+
+pt = mtit(['Convective Stability - ' mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
+
+dirname = '../ShearJetSchar/';
+fname = [dirname 'CONV_TEST_' num2str(hC)];
+drawnow;
+screen2png(fname);
 
 %% Debug
 %
@@ -289,6 +326,6 @@ drawnow
 %% Save the data
 %
 close all;
-fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER' char(TestCase) int2str(hC) '.mat'];
+fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER' char(TestCase) int2str(hC) '_8KRL.mat'];
 save(fileStore);
 %}
