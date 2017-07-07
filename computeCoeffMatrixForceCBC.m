@@ -260,10 +260,13 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     h_hat = 1.0 / DS.L * reshape(dzdh .* DZT,OPS,1);
     SIGMA = reshape(sigma,OPS,1);
     
-    F11 = h_hat .* (SIGMA .* U0 .* DU0DZ - BS.ga);
+    %F11 = h_hat .* (SIGMA .* U0 .* DU0DZ - BS.ga);
+    F11 = h_hat .* BS.ga;
     F21 = zeros(OPS,1);
-    F31 = h_hat .* SIGMA .* (U0 .* DLRDZ + DU0DZ);
-    F41 = U0 .* h_hat .* SIGMA .* (DLPDZ - BS.gam * DLRDZ);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
+    %F31 = h_hat .* SIGMA .* (U0 .* DLRDZ + DU0DZ);
+    %F41 = U0 .* h_hat .* SIGMA .* (DLPDZ - BS.gam * DLRDZ);
     
     %% Adjust the force vector for the coupled BC
     %F21(bdex) = (ujref(1,:) .* DZT(1,:))';

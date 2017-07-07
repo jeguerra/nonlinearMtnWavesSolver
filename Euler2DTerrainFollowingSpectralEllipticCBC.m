@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100;
-NZ = 80;
+NX = 80;
+NZ = 60;
 OPS = NX * NZ;
 numVar = 4;
 
@@ -224,6 +224,12 @@ subplot(1,2,2); contourf(XI,ZI,pxzint,31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
 title('Perturbation Log Pressure (Pa)');
+
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+contourf(XI,ZI,abs(uxzint) ./ abs(ujref),31,'LineStyle','none'); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Nonlinearity Ratio $\left| \frac{u}{\bar{u}} \right|$','FontSize',32,'FontWeight','normal','Interpreter','latex');
 drawnow
 
 %% Compute the local Ri number and plot ...
@@ -233,6 +239,9 @@ dlrho = REFS.sig .* (REFS.DDZ * lrho);
 uj = REFS.ujref + real(uxz);
 duj = REFS.sig .* (REFS.DDZ * uj);
 Ri = -ga * dlrho ./ (duj.^2);
+
+RiREF = -BS.ga * REFS.dlrref(:,1);
+RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
 xdex = 1:1:NX;
 fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
@@ -254,12 +263,13 @@ subplot(1,2,2);
 semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 hold on;
 semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',1.5);
+semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on;
 xlabel('Ri','FontSize',30);
 ylabel('Altitude (km)','FontSize',30);
 ylim([0.0 1.0E-3*zH]);
-xlim([0.1 1.0E3]);
+xlim([0.1 1.0E4]);
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
 
@@ -324,7 +334,7 @@ drawnow
 %}
 
 %% Save the data
-%
+%{
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER' char(TestCase) int2str(hC) '_8KRL.mat'];
 save(fileStore);
