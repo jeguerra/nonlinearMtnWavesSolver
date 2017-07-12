@@ -5,7 +5,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     DDX_H(1:NX+1:end) = 1.0E-8 * ones(NX,1);
     
     [zlc, ~] = chebdif(NZ, 1);
-    %DDZ_L = (1.0 / DS.zH) * DDZ_L;
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
@@ -37,15 +36,15 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %}
     %% High Order Improved Guellrich coordinate
     % 3 parameter function
-    eta = ZL / DS.zH;
-    ang = 0.5 * pi * eta;
+    xi = ZL / DS.zH;
+    ang = 0.5 * pi * xi;
     AR = 1.0E-3;
     p = 20;
     q = 5;
-    fxi = exp(-p/q * eta) .* cos(ang).^p + AR * eta .* (1.0 - eta);
-    dfdxi = -p/q * exp(-p/q * eta) .* cos(ang).^p ...
-            -(0.5 * p) * pi * exp(-p/q * eta) .* sin(ang) .* cos(ang).^(p-1) ...
-            -AR * (1.0 - 2 * eta);
+    fxi = exp(-p/q * xi) .* cos(ang).^p + AR * xi .* (1.0 - xi);
+    dfdxi = -p/q * exp(-p/q * xi) .* cos(ang).^p ...
+            -(0.5 * p) * pi * exp(-p/q * xi) .* sin(ang) .* cos(ang).^(p-1) ...
+            -AR * (1.0 - 2 * xi);
     dzdh = fxi;
     dxidz = DS.zH + HTZL .* (dfdxi - fxi);
     sigma = DS.zH * dxidz.^(-1);
@@ -61,7 +60,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ClassicalSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL, DDZ_L);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
@@ -116,6 +116,14 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     screen2png(fname);
     
     fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
+    plot(dujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
+    xlabel('Shear (s^{-1})','FontSize',30);
+    ylabel('Altitude (km)','FontSize',30);
+    ylim([0.0 30.0]);
+    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+    drawnow;
+    
+    fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
     Ri = -BS.ga * dlrref(:,1);
     Ri = Ri ./ (dujref(:,1).^2);
     semilogx(Ri,1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
@@ -133,7 +141,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     
     REFS = struct('ujref',ujref,'dujref',dujref, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref, ...
-        'pref',pref,'rref',rref,'XL',XL,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
+        'pref',pref,'rref',rref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
         'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0);
     
     %% Compute the Rayleigh field
@@ -253,20 +261,17 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
           LD41 LD42 LD43 LD44];
 
     %% Assemble the force vector
-    U0 = reshape(ujref,OPS,1);
-    DU0DZ = reshape(dujref,OPS,1);
-    DLPDZ = reshape(dlpref,OPS,1);
-    DLRDZ = reshape(dlrref,OPS,1);
-    h_hat = 1.0 / DS.L * reshape(dzdh .* DZT,OPS,1);
-    SIGMA = reshape(sigma,OPS,1);
+    %U0 = reshape(ujref,OPS,1);
+    %DU0DZ = reshape(dujref,OPS,1);
+    %DLPDZ = reshape(dlpref,OPS,1);
+    %DLRDZ = reshape(dlrref,OPS,1);
+    h_hat = reshape(dzdh .* DZT ./ dxidz,OPS,1);
+    %SIGMA = reshape(sigma,OPS,1);
     
-    %F11 = h_hat .* (SIGMA .* U0 .* DU0DZ - BS.ga);
-    F11 = h_hat .* BS.ga;
+    F11 = - h_hat .* BS.ga;
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
-    %F31 = h_hat .* SIGMA .* (U0 .* DLRDZ + DU0DZ);
-    %F41 = U0 .* h_hat .* SIGMA .* (DLPDZ - BS.gam * DLRDZ);
     
     %% Adjust the force vector for the coupled BC
     %F21(bdex) = (ujref(1,:) .* DZT(1,:))';

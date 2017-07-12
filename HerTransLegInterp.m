@@ -1,4 +1,4 @@
-function [qxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, qxz, NXI, NZI, xint, zint)
+function [qxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, qxz, NXI, NZI, xint, zint)
 
 %{
 Interpolates the 2D field qxz by applying Hermite function transform in the
@@ -50,16 +50,17 @@ end
 
 %% High Order Improved Guellrich coordinate
 % 3 parameter function
-eta = ZI;
-ang = 0.5 * pi * eta;
+xi = ZI;
+ang = 0.5 * pi * xi;
 AR = 1.0E-3;
 p = 20;
 q = 5;
-fxi = exp(-p/q * eta) .* cos(ang).^p + AR * eta .* (1.0 - eta);
+fxi = exp(-p/q * xi) .* cos(ang).^p + AR * xi .* (1.0 - xi);
 dzdh = fxi;
 
 % Adjust Z with terrain following coords
 ZINT = (dzdh .* HTZL) + ZI * DS.zH;
+ZLINT = ZI * DS.zH;
 
 %% Get the modal (NX polynomial coefficients) Hermite transform of qxz (NX+1 X NZ)
 HT = hefunm(REFS.NX-1, xn);

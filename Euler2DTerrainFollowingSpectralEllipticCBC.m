@@ -12,15 +12,15 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80;
-NZ = 60;
+NX = 100;
+NZ = 80;
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case
-TestCase = 'ShearJetSchar'; BC = 1;
+%TestCase = 'ShearJetSchar'; BC = 1;
 %TestCase = 'NonhydroMtn'; BC = 1;
-%TestCase = 'ClassicalSchar'; BC = 1;
+TestCase = 'ClassicalSchar'; BC = 1;
 
 z0 = 0.0;
 nu = 1.0;
@@ -32,9 +32,9 @@ cv = cp - Rd;
 ga = 9.80616;
 p0 = 1.0E5;
 if strcmp(TestCase,'ShearJetSchar') == true
-    zH = 33000.0;
-    l1 = -50000.0;
-    l2 = 50000.0;
+    zH = 43000.0;
+    l1 = -60000.0;
+    l2 = 60000.0;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -50,11 +50,14 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyLateralRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
-    mtnh = '100m';
+    hC = 250.0;
+    mtnh = '250m';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
+    % Jet parameters (see notes)
+    %uj1 = 204.0;
+    %uj2 = 5.0;
 elseif strcmp(TestCase,'NonhydroMtn') == true
     zH = 25000.0;
     l1 = -50000.0;
@@ -111,6 +114,7 @@ BS = struct('gam',gam,'Rd',Rd,'cp',cp,'cv',cv,'GAMT',GAMT,'HT',HT,'GAMS', ...
 
 %% Set up the jet and mountain profile parameters
 UJ = struct('u0',u0,'uj',uj,'b',b,'ga',ga);
+%UJ = struct('u0',u0,'uj1',uj1,'uj2',uj2,'ga',ga);
 DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC);
 
 %% Set up the Rayleigh Layer with a coefficient one order of magnitude less than the order of the wave field
@@ -119,7 +123,6 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF,REFS] = ...
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyLateralRL);
-
 
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
@@ -155,10 +158,10 @@ wxz = wf .* whxz;
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 NXI = 500;
 NZI = 300;
-[uxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(uxz), NXI, NZI, 0, 0);
-[wxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(wxz), NXI, NZI, 0, 0);
-[rxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(rxz), NXI, NZI, 0, 0);
-[pxzint, XINT, ZINT] = HerTransLegInterp(REFS, DS, real(pxz), NXI, NZI, 0, 0);
+[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, real(uxz), NXI, NZI, 0, 0);
+[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(wxz), NXI, NZI, 0, 0);
+[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(rxz), NXI, NZI, 0, 0);
+[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(pxz), NXI, NZI, 0, 0);
 
 XI = l2 * XINT;
 ZI = ZINT;
@@ -194,7 +197,8 @@ drawnow
 %% Compute the reference state initialization
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, ~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT);
-    [ujref, ~] = computeJetProfile(UJ, p0, lpref, dlpref);
+    [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT);
+    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ClassicalSchar') == true
     [lpref, lerref, ~, ~] = computeBackgroundPressureCBVF(BS, ZINT, speye(NZI));
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
@@ -334,7 +338,7 @@ drawnow
 %}
 
 %% Save the data
-%{
+%
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER' char(TestCase) int2str(hC) '_8KRL.mat'];
 save(fileStore);

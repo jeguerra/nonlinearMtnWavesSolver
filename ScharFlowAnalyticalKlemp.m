@@ -94,7 +94,7 @@ end
 eta = real(ifft(ETA,[],1));
 w = real(ifft(W,[],1));
 wf = sqrt(rho0) * RHO.^(-0.5);
-w = w ./ wf;
+%w = w ./ wf;
 %%
 figure
 contourf(X,Z,fftshift(eta',2),40); colorbar; grid on;
@@ -108,4 +108,10 @@ ylim([0.0 28000.0]);
 title('Vertical Velocity (m/s) - Schar Mountain Flow');
 xlabel('Longitude (m)');
 ylabel('Elevation (m)');
+%}
+%% Save the data
+%
+close all;
+fileStore = 'AnalyticalSchar_8KRL.mat';
+save(fileStore);
 %}
