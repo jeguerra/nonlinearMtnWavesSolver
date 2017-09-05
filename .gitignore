@@ -6,3 +6,7 @@ testInterpolate.m
 testTransform.m
 
 ResidualMtSolve.m
+
+*.mat
+
+*.png

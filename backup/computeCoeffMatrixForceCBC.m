@@ -1,49 +1,15 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
-    %
-    % Set the domain scale
-    dscale = 0.5 * DS.L;
-    
-    [xo,~] = herdif(NX, 2, dscale, false);
-    [xh,~] = herdif(NX, 2, dscale, true);
-
-    [~,~,w]=hegs(NX);
-    W = spdiags(w, 0, NX, NX);
-
-    [~, HT] = hefunm(NXO-1, xo);
-    [~, HTD] = hefunm(NXO, xo);
-    
-    %% Compute the coefficients of spectral derivative in matrix form
-    SDIFF = zeros(NXO+1,NXO);
-    SDIFF(1,2) = sqrt(0.5);
-    SDIFF(NXO + 1,NXO) = -sqrt(NXO * 0.5);
-    SDIFF(NXO,NXO-1) = -sqrt((NXO - 1) * 0.5);
-
-    for cc = NXO-2:-1:1
-        SDIFF(cc+1,cc+2) = sqrt((cc + 1) * 0.5);
-        SDIFF(cc+1,cc) = -sqrt(cc * 0.5);
-    end
-
-    b = max(xo) / dscale;
-    DDX_H = b * HTD' * SDIFF * (HT * W);
-    rcond(DDX_H)
-    rank(DDX_H)
-    surf(DDX_H);
-    figure;
-    surf(QO);
-    figure;
-    %}
-    %
-    [xh,DDX_H] = herdif(NX, 1, dscale, true);
+    [xh,DDX_H] = herdif(NX, 1, 0.5 * DS.L);
     % fix the diagonal
-    %DDX_H(1:NX+1:end) = 1.0E-8 * ones(NX,1);
-    %}
+    DDX_H(1:NX+1:end) = 1.0E-8 * ones(NX,1);
+    
+    %
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
     %}
-    
     %[zl, DDZ_L] = lagdifJEG(NZ, 1, 2.0 * DS.zH);
        
     %% Compute the terrain and derivatives
@@ -95,9 +61,9 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     end
     
     %% Compute the Rayleigh field
-    %[rayField, ~] = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyTopRL,applyLateralRL);
-    %[rayField, ~] = computeRayleighPolar(DS,1.0,RAY.depth,XL,ZL);
-    [rayField, ~] = computeRayleighEllipse(DS,1.0,RAY.depth,RAY.width,XL,ZL);
+    %[rayField, BR] = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyTopRL,applyLateralRL);
+    %[rayField, BR] = computeRayleighPolar(DS,1.0,RAY.depth,XL,ZL);
+    [rayField, BR] = computeRayleighEllipse(DS,1.0,RAY.depth,RAY.width,XL,ZL);
     RL = reshape(rayField,NX*NZ,1);
     %BRV = reshape(BR,NX*NZ,1);
 

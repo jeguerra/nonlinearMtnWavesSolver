@@ -8,13 +8,13 @@
 
 clc
 clear
-%close all
+close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 200;
-NXO = 60; % Expansion order
-NZ = 60; % Expansion order matches physical grid
+NX = 500;
+NXO = 80;
+NZ = 60;
 OPS = NX * NZ;
 numVar = 4;
 
@@ -84,35 +84,34 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     uj = 16.822;
     b = 1.386;
 elseif strcmp(TestCase,'ClassicalSchar') == true
-    zH = 25000.0;
-    l1 = -50000.0;
-    l2 = 50000.0;
+    zH = 35000.0;
+    l1 = -60000.0;
+    l2 = 60000.0;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
     GAMS = 0.0;
     HML = 0.0;
     HS = 0.0;
-    T0 = 280.0;
+    T0 = 300.0;
     BVF = 0.01;
     depth = 10000.0;
-    width = 10000.0;
-    hfactor = 1.0;
+    width = 15000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
-    nu3 = hfactor * 20 * 1.0E-2; nu4 = hfactor * 1.0E-2;
+    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 250.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     u0 = 10.0;
     uj = 0.0;
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 35000.0;
-    l1 = -150000.0;
-    l2 = 150000.0;
+    l1 = -200000.0;
+    l2 = 200000.0;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -121,7 +120,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     HS = 20000.0;
     T0 = 300.0;
     BVF = 0.0;
-    hfactor = 2.0;
+    hfactor = 5.0;
     depth = 10000.0;
     width = 30000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
@@ -151,7 +150,7 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
@@ -163,7 +162,6 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
-%spy(A); pause;
 %A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
 %b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
 clear LD FF FFBC;
@@ -255,7 +253,7 @@ title('Background Horizontal Velocity U (m/s)');
 %}
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref + uxzint,31); colorbar; grid on;
+subplot(2,1,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref + uxzint,31); colorbar; grid on;
 %subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
@@ -265,10 +263,7 @@ title('Total Horizontal Velocity U $(m~s^{-1})$','FontWeight','normal','Interpre
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
-colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on;
+subplot(2,1,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('Vertical Velocity W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');

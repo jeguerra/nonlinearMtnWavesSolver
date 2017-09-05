@@ -1,13 +1,50 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
-    [xh,DDX_H] = herdif(NX, 1, 0.5 * DS.L);
-    % fix the diagonal
-    DDX_H(1:NX+1:end) = 1.0E-8 * ones(NX,1);
     
+    % Set the domain scale
+    dscale = 0.5 * DS.L;
+    %{
+    [xo,~] = herdif(NX, 2, dscale, false);
+    [xh,~] = herdif(NX, 2, dscale, true);
+
+    [~,~,w]=hegs(NX);
+    W = spdiags(w, 0, NX, NX);
+
+    [~, HT] = hefunm(NXO-1, xo);
+    [~, HTD] = hefunm(NXO, xo);
+    
+    %% Compute the coefficients of spectral derivative in matrix form
+    SDIFF = zeros(NXO+1,NXO);
+    SDIFF(1,2) = sqrt(0.5);
+    SDIFF(NXO + 1,NXO) = -sqrt(NXO * 0.5);
+    SDIFF(NXO,NXO-1) = -sqrt((NXO - 1) * 0.5);
+
+    for cc = NXO-2:-1:1
+        SDIFF(cc+1,cc+2) = sqrt((cc + 1) * 0.5);
+        SDIFF(cc+1,cc) = -sqrt(cc * 0.5);
+    end
+
+    b = max(xo) / dscale;
+    DDX_H = b * HTD' * SDIFF * (HT * W);
+    rcond(DDX_H)
+    rank(DDX_H)
+    surf(DDX_H);
+    figure;
+    surf(QO);
+    figure;
+    %}
+    %
+    [xh,DDX_H] = herdif(NX, 1, dscale, true);
+    % fix the diagonal
+    %DDX_H(1:NX+1:end) = 1.0E-8 * ones(NX,1);
+    %}
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    %}
+    
+    %[zl, DDZ_L] = lagdifJEG(NZ, 1, 2.0 * DS.zH);
        
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS);
@@ -56,25 +93,40 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     for rr=1:size(DZT,1)
         DZT(rr,:) = dhdx;
     end
+    
+    %% Compute the Rayleigh field
+    %[rayField, ~] = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyTopRL,applyLateralRL);
+    %[rayField, ~] = computeRayleighPolar(DS,1.0,RAY.depth,XL,ZL);
+    [rayField, ~] = computeRayleighEllipse(DS,1.0,RAY.depth,RAY.width,XL,ZL);
+    RL = reshape(rayField,NX*NZ,1);
+    %BRV = reshape(BR,NX*NZ,1);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
-        [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL);
+        [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
+        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+    elseif strcmp(TestCase,'ShearJetScharCBVF') == true
+        [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL, DDZ_L);
+        [lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL, DDZ_L);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ClassicalSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL, DDZ_L);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
-    elseif strcmp(TestCase,'NonhydroMtn') == true
-        [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL, DDZ_L);
-        [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
+    elseif strcmp(TestCase,'AndesMtn') == true
+        [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
+        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     end
     
     %% Compute the vertical profiles of density and pressure
     pref = exp(lpref);
     rref = exp(lrref);
     rref0 = max(max(rref));
+    % Density weighted change of variable
     rsc = sqrt(rref0) * rref.^(-0.5);
+    % Background potential temperature profile
+    thref = exp(1.0 / BS.gam * lpref - lrref + log(BS.p0 / BS.Rd));
 
 %{
     %% Plot background fields including mean Ri number
@@ -83,7 +135,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     plot(ujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
     xlabel('Speed (m s^{-1})','FontSize',30);
     ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 30.0]);
+    ylim([0.0 35.0]);
     fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
@@ -92,7 +144,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %title('Temperature Profile','FontSize',30);
     xlabel('Temperature (K)','FontSize',30);
     ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 30.0]);
+    ylim([0.0 35.0]);
     fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
@@ -100,7 +152,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     plot(0.01*pref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
     xlabel('Pressure (hPa)','FontSize',30);
     ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 30.0]);
+    ylim([0.0 35.0]);
     fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
@@ -108,7 +160,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     plot(rref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
     xlabel('Density (kg m^{-3})','FontSize',30);
     ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 30.0]);
+    ylim([0.0 35.0]);
     fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     dirname = '../ShearJetSchar/';
@@ -119,7 +171,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     plot(dujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
     xlabel('Shear (s^{-1})','FontSize',30);
     ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 30.0]);
+    ylim([0.0 35.0]);
     fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
@@ -142,11 +194,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     REFS = struct('ujref',ujref,'dujref',dujref, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref, ...
         'pref',pref,'rref',rref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
-        'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0);
-    
-    %% Compute the Rayleigh field
-    rayField = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyLateralRL);
-    RL = reshape(rayField,NX*NZ,1);
+        'DDX_H',DDX_H,'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0);
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
@@ -173,6 +221,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
     RSC = spdiags(reshape(rsc,OPS,1), 0, OPS, OPS);
+    THT = spdiags(reshape(thref / BS.gam,OPS,1), 0, OPS, OPS);
     U0DX = U0 * DDX_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
@@ -195,8 +244,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     % Thermodynamic LHS
     L41 = sparse(OPS,OPS);
     L42 = sparse(OPS,OPS);
-    L43 = -BS.gam * U0DX;
-    L44 = U0DX;
+    L43 = -BS.gam * U0DX * THT;
+    L44 = U0DX * THT;
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
@@ -209,29 +258,25 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     B22 = sparse(OPS,OPS) + RAY.nu2 * RSC * spdiags(RL,0, OPS, OPS);
     B23 = BS.ga * unit;
     B24 = -BS.ga * unit;
-    % Continuity LHS
+    % Continuity LHS (using density weighted change of variable in W)
     B31 = sparse(OPS,OPS);
-    %B32 = sparse(OPS,OPS);
     B32 = SIGMA * 0.5 * RSC * DLRDZ;
     B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
     B34 = sparse(OPS,OPS);
-    % Thermodynamic LHS
+    % Thermodynamic LHS (CHECK WHY 3RD TERM SHOULD NOT BE MULTIPLIED BY
+    % GAMMA FROM SUBTRACTING THE DENSITY EQUATION)
     B41 = sparse(OPS,OPS);
-    B42 = SIGMA * RSC * (DLPDZ - BS.gam * DLRDZ);
-    B43 = sparse(OPS,OPS) - BS.gam * B33;
-    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    B42 = SIGMA * RSC * (DLPDZ - BS.gam * DLRDZ) * THT;
+    B43 = sparse(OPS,OPS) - BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS) * THT;
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS) * THT;
 
     %% Adjust the operator for the coupled BC
     bdex = 1:NZ:OPS;
     GPHI = spdiags(DZT(1,:)', 0, NX, NX);
     RSBC = spdiags(rsc(1,:)', 0, NX, NX);
     
-    % THE BOUNDARY CONDITION MUST BE ON W AND LN(RHO)...
-    %B21(bdex,bdex) = (-GPHI);
-    %B22(bdex,bdex) = speye(NX,NX);
-    
+    % THE BOUNDARY CONDITION MUST BE ON LN(RHO)...
     B31(bdex,bdex) = (-GPHI);
-    %B32(bdex,bdex) = speye(NX,NX);
     B32(bdex,bdex) = RSBC;
     
     %% Assemble the left hand side operator
@@ -261,12 +306,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
           LD41 LD42 LD43 LD44];
 
     %% Assemble the force vector
-    %U0 = reshape(ujref,OPS,1);
-    %DU0DZ = reshape(dujref,OPS,1);
-    %DLPDZ = reshape(dlpref,OPS,1);
-    %DLRDZ = reshape(dlrref,OPS,1);
     h_hat = reshape(dzdh .* DZT ./ dxidz,OPS,1);
-    %SIGMA = reshape(sigma,OPS,1);
     
     F11 = - h_hat .* BS.ga;
     F21 = zeros(OPS,1);
@@ -274,7 +314,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     F41 = zeros(OPS,1);
     
     %% Adjust the force vector for the coupled BC
-    %F21(bdex) = (ujref(1,:) .* DZT(1,:))';
     F31(bdex) = (ujref(1,:) .* DZT(1,:))';
     
     FF = [F11 ; F21 ; F31 ; F41];
