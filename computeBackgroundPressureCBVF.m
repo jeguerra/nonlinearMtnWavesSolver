@@ -1,10 +1,12 @@
-function [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(prs, Z, ddz)
+function [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(prs, Z)
     % Computes a background log pressure profile based on uniform
     % stratification.
     
     NBF = prs.BVF;
     
-    %% Compute the potential temperature profile
+    %% Compute the potential temperature profile and gradient
+    dlthref = NBF^2 / prs.ga;
+    
     tref = prs.T0 * exp(NBF^2 / prs.ga * Z);
     epref = 1.0 + prs.ga^2 / (prs.cp * prs.T0 * NBF^2) * ...
         (exp(-NBF^2 / prs.ga * Z) - 1.0);
@@ -15,7 +17,8 @@ function [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(prs, Z, ddz
     lpref = log(pref);
     lrref = log(rref);
     
-    dlpref = ddz * lpref;
-    dlrref = ddz * lrref;
+    %% Compute the background log gradients... all constants in the CBVF case
+    dlpref = -prs.ga * rref ./ pref;
+    dlrref = 1.0 / prs.gam * dlpref - dlthref;
 end
 

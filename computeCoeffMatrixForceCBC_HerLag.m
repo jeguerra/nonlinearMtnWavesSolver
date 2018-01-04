@@ -1,4 +1,4 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceCBC_HerLag(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     
     % Set the domain scale
@@ -27,23 +27,16 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
 
     b = max(xo) / dscale;
     DDX_H = b * HTD' * SDIFF * (HT * W);
-    %rcond(DDX_H)
-    %rank(DDX_H)
+    rcond(DDX_H)
+    rank(DDX_H)
     surf(DDX_H);
-    figure;
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
-    %}
-    [zlc, ~] = chebdif(NZ, 1);
-    zl = DS.zH * 0.5 * (zlc + 1.0);
-    zlc = 0.5 * (zlc + 1.0);
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %}
-          
+    [zl,DDZ_L] = lagdifJEG(NZ, 1, DS.zH);
+       
     %% Compute the terrain and derivatives
-    [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
+    [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS);
     
     %% XZ grid for Legendre nodes in the vertical
     [HTZL,~] = meshgrid(ht,zl);
@@ -53,6 +46,18 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %{
     dzdh = (1.0 - ZL / DS.zH);
     dxidz = (DS.zH - HTZL);
+    sigma = DS.zH * dxidz.^(-1);
+    %}
+    %% 8th Order Guellrich coordinate
+    %{
+    eta = ZL / DS.zH;
+    ang = 0.5 * pi * eta;
+    AR = 0.1;
+    power = 8;
+    fxi = cos(ang).^power + AR * eta;
+    dfdxi = -(0.5 * power) * pi * sin(ang) .* cos(ang).^(power-1) + AR;
+    dzdh = (1.0 - eta) .* fxi;
+    dxidz = DS.zH + HTZL .* ((1.0 - eta) .* dfdxi - fxi);
     sigma = DS.zH * dxidz.^(-1);
     %}
     %% High Order Improved Guellrich coordinate
@@ -85,11 +90,11 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %[rayField, ~] = computeRayleighPolar(DS,1.0,RAY.depth,XL,ZL);
     %[rayField, ~] = computeRayleighEllipse(DS,1.0,RAY.depth,RAY.width,XL,ZL);
     RL = reshape(rayField,NX*NZ,1);
+    %BRV = reshape(BR,NX*NZ,1);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
         [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ShearJetScharCBVF') == true
@@ -105,7 +110,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     end
     
-    %% Compute the vertical profiles of density and pressure
+   %% Compute the vertical profiles of density and pressure
     pref = exp(lpref);
     rref = exp(lrref);
     rref0 = max(max(rref));
@@ -284,28 +289,18 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     B31(bdex,bdex) = (-GPHI);
     B32(bdex,bdex) = RSBC;
     
-    %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
+    %% Neumann Boundary Conditions
+    %{
     tdex = NZ:NZ:OPS;
-    mbc = 1.0 * sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
+    mbc = sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
     UNIT = spdiags(ones(NX,1), 0, NX, NX);
+    %L11(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
     L31(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    %L22(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
     L32(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
     L33(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    %L44(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    
-    %% Neumann Boundary Conditions LATERAL BOUNDARY TO INFINITY
-    ldex = 1:NZ;
-    rdex = (NX-1)*NZ+1:OPS;
-    UNIT = spdiags(ones(NZ,1), 0, NZ, NZ);
-    % Left side
-    L31(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L32(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L33(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    % Right side
-    L31(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L32(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L33(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    
+    %L34(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    %}
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
     LD12 = L12 + B12;

@@ -1,34 +1,30 @@
-function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
-    numVar = 4;
+function [FFBC,SOL,sysDex] = GetAdjust4CBC_WRP(BC,NX,NZ,OPS,FF)
+    numVar = 3;
     SOL = 0.0 * FF;
     % Adjust for the boundary forcing
     FFBC = FF;
 
     %% Create boundary condition indices
     %
-    ubdex = 1:NZ:OPS;
-    wbdex = ubdex + OPS;
-    rbdex = ubdex + 2*OPS;
-    pbdex = ubdex + 3*OPS;
-    BotOut = [ubdex wbdex rbdex pbdex];
+    wbdex = 1:NZ:OPS;
+    rbdex = wbdex + OPS;
+    pbdex = wbdex + 2*OPS;
+    BotOut = [wbdex rbdex pbdex];
     %
-    utdex = NZ:NZ:OPS;
-    wtdex = utdex + OPS;
-    rtdex = utdex + 2*OPS;
-    ptdex = utdex + 3*OPS;
-    TopOut = [utdex wtdex rtdex ptdex];
+    wtdex = NZ:NZ:OPS;
+    rtdex = wtdex + OPS;
+    ptdex = wtdex + 2*OPS;
+    TopOut = [wtdex rtdex ptdex];
     %
-    uldex = 1:NZ;
-    urdex = (NX-1)*NZ+1:OPS;
-    wldex = uldex + OPS;
-    wrdex = urdex + OPS;
-    rldex = uldex + 2*OPS;
-    rrdex = urdex + 2*OPS;
-    pldex = uldex + 3*OPS;
-    prdex = urdex + 3*OPS;
+    wldex = 1:NZ;
+    wrdex = (NX-1)*NZ+1:OPS;
+    rldex = wldex + OPS;
+    rrdex = wrdex + OPS;
+    pldex = wldex + 2*OPS;
+    prdex = wrdex + 2*OPS;
     %}
-    LeftRightOut = [uldex urdex wldex wrdex rldex rrdex pldex prdex];
-    RightOut = [urdex wrdex rrdex prdex];
+    LeftRightOut = [wldex wrdex rldex rrdex pldex prdex];
+    RightOut = [wrdex rrdex prdex];
 
     if BC == 0
         disp('No Specific BC`s Set');

@@ -106,6 +106,6 @@ ylabel('Elevation (m)');
 %% Save the data
 %
 close all;
-fileStore = 'AnalyticalSchar_8KRL.mat';
+fileStore = 'AnalyticalSchar.mat';
 save(fileStore);
 %}

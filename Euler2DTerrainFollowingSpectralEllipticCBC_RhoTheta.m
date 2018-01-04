@@ -12,17 +12,20 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
+NX = 100; % Expansion order matches physical grid
 NXO = 80; % Expansion order
-NZ = 60; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
+TestCase = 'ShearJetSchar'; BC = 1;
+%TestCase = 'ShearJetScharCBVF'; BC = 1;
 %TestCase = 'ClassicalSchar'; BC = 1;
-%TestCase = 'AndesMtn'; BC = 0;
+%TestCase = 'AndesMtn'; BC = 1;
+
+%config = 'HYDRO';
+config = 'NONHYDRO';
 
 z0 = 0.0;
 gam = 1.4;
@@ -47,12 +50,12 @@ if strcmp(TestCase,'ShearJetSchar') == true
     depth = 10000.0;
     width = 15000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
-    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
+    nu3 = hfactor * 1.0 * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -73,8 +76,8 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     hfactor = 1.0;
     depth = 10000.0;
     width = 15000.0;
-    nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
-    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
+    nu1 = hfactor * 1.0 * 1.0E-2; nu2 = hfactor * 1.0 * 1.0E-2;
+    nu3 = hfactor * 1.0 * 1.0E-2; nu4 = hfactor * 1.0 * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
@@ -114,8 +117,8 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 40000.0;
-    l1 = -300000.0;
-    l2 = 300000.0;
+    l1 = -250000.0;
+    l2 = 250000.0;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -126,16 +129,16 @@ elseif strcmp(TestCase,'AndesMtn') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 15000.0;
-    width = 100000.0;
+    width = 40000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 1000.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '100m';
+    hfilt = '25km';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -154,7 +157,10 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+computeCoeffMatrixForceCBC_RhoTheta(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+
+%[LD,FF,REFS] = ...
+%computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
 %[LD,FF,REFS] = ...
 %computeCoeffMatrixForceCBC_HerLag(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
@@ -180,7 +186,7 @@ toc
 %% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
-%%
+%
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 whxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
@@ -199,27 +205,30 @@ wxz = wf .* whxz;
 %
 NXI = 600;
 NZI = 300;
-[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
-[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
-[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
-[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NXI, NZI, 0, 0);
+[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, real(uxz), NXI, NZI, 0, 0);
+[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(wxz), NXI, NZI, 0, 0);
+[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(rxz), NXI, NZI, 0, 0);
+[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(pxz), NXI, NZI, 0, 0);
 
 XI = l2 * XINT;
 ZI = ZINT;
 %}
 %% Interpolate to a regular grid using Hermite and Laguerre transforms'
 %{
-NXI = 600;
-NZI = 300;
-[uxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, real(uxz), NXI, NZI, 0, 0);
-[wxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(wxz), NXI, NZI, 0, 0);
-[rxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(rxz), NXI, NZI, 0, 0);
-[pxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(pxz), NXI, NZI, 0, 0);
+DXI = 100.0;
+DZI = 50.0;
+xint = l1:DXI:l2; NXI = length(xint);
+zint = 0.0:DZI:zH; NZI = length(zint);
+%[zint, ~] = lagdifJEG(NZI, 1, 2.0 * DS.zH);
+[uxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, real(uxz), NXI, NZI, xint, zint);
+[wxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(wxz), NXI, NZI, xint, zint);
+[rxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(rxz), NXI, NZI, xint, zint);
+[pxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(pxz), NXI, NZI, xint, zint);
 
 XI = l2 * XINT;
 ZI = ZINT;
 %}
-% Plot the solution in the native grids
+%% Plot the solution in the native grids
 %{
 % NATIVE GRID PLOTS
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
@@ -238,11 +247,11 @@ fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(rxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Perturbation Log Density (kg/m^3)');
+title('Perturbation Density (kg/m^3)');
 subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(pxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Perturbation Log Pressure (Pa)');
+title('Perturbation Theta (K)');
 drawnow
 %}
 
@@ -254,11 +263,10 @@ cmap = cmap(:,1:3);
 %
 width = 0.0;
 depth = 0.0;
-% Compute the reference state initialization
+%% Compute the reference state initialization
 %
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
     [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
@@ -273,9 +281,16 @@ elseif strcmp(TestCase,'AndesMtn') == true
     [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 end
-%}
+%
 dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
+%{
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+contourf(XI,ZI,ujref,31); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Background Horizontal Velocity U (m/s)');
+%}
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref + uxzint,31); colorbar; grid on;
@@ -284,7 +299,7 @@ xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total Horizontal Velocity U $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
+title('Total Horizontal Velocity U $(ms^{-1})$','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
@@ -295,53 +310,51 @@ contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on;
 %hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('Vertical Velocity W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
+%caxis([-0.08 0.08]);
+title('Vertical Velocity W $(ms^{-1})$','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['WREferenceSolution_LnP' mtnh '.png']);
+screen2png(['WREferenceSolution_RhoTheta' mtnh '.png']);
+%{
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+colormap(cmap);
+contourf(1.0E-3 * XI,1.0E-3 * ZI, ... 
+    (exp(lrref + rxzint) .* (ujref + uxzint) .* wxzint),31); colorbar; grid on;
+xlim(1.0E-3 * [l1 + width l2 - width]);
+ylim(1.0E-3 * [0.0 zH - depth]);
+fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+title('Momentum Flux $(kg~m^{-1}~s^{-2})$','FontWeight','normal','Interpreter','latex');
+xlabel('Distance (km)');
+ylabel('Elevation (km)');
+screen2png(['MFluxREferenceSolution' mtnh '.png']);
+drawnow
+%}
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 colormap(cmap);
 subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('Perturbation Log Density $(kg m^{-3})$','FontWeight','normal','Interpreter','latex');
+title('Perturbation Density $(kg m^{-3})$','FontWeight','normal','Interpreter','latex');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('Perturbation Log Pressure (Pa)','FontWeight','normal','Interpreter','latex');
+title('Perturbation $\rho \theta (K kg m^{-3})$','FontWeight','normal','Interpreter','latex');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow
-%}
 %{
-%% Compare W scatter plot to the predicted growth rate
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 colormap(cmap);
-
-Im = REFS.dlthref(:,1) + 0.5 * REFS.dujref(:,1) ./ REFS.ujref(:,1) - 0.5 * REFS.dlpref(:,1);
-MZ = exp(REFS.sigma(:,1) .* Im);
-for xx=2:length(MZ)
-    MZ(xx) = MZ(xx) * MZ(xx-1);
-end
-% Normalize and scale to the W field
-MZ = max(max(wxzint)) / max(MZ) * MZ; 
-
-plot(wxzint,1.0E-3 * ZI,'ks','LineWidth',1.5); grid on; hold on;
-plot(MZ, 1.0E-3 * REFS.ZTL(:,1),'r-s','LineWidth',1.5); hold off;
-%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-%xlim(1.0E-3 * [l1 + width l2 - width]);
+contourf(1.0E-3 * XI,1.0E-3 * ZI,abs(uxzint) ./ abs(ujref),31,'LineStyle','none'); colorbar;
+xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-%caxis([-0.08 0.08]);
-title('Vertical Velocity Growth W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
-xlabel('Distance (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['WaveGrowthW_LnP' mtnh '.png']);
+title('Nonlinearity Ratio $\left| \frac{u}{\bar{u}} \right|$','FontSize',32,'FontWeight','normal','Interpreter','latex');
 %}
+drawnow
+%
 %% Compute the local Ri number and plot ...
 %
-DDZ_BC = REFS.DDZ;
-dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * real(rxz));
-duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
+dlrho = REFS.dlrref + REFS.sig .* (REFS.DDZ * real(rxz));
+duj = REFS.dujref + REFS.sig .* (REFS.DDZ * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
 RiREF = -BS.ga * REFS.dlrref(:,1);
@@ -368,42 +381,33 @@ dirname = '../ShearJetSchar/';
 fname = [dirname 'RI_TEST_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
-
-%% Compute the scaling constants needed for residual diffusion
-lrho = REFS.lrref + rxz;
-rho = exp(lrho);
-lp = REFS.lpref + pxz;
-p = exp(lp);
-P = exp(REFS.lpref);
-R = exp(REFS.lrref);
-pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
-PT = p ./ (Rd * R) .* (p0 * P.^(-1)).^(Rd / cp);
-RT = (rho .* pt) - (R .* PT);
-UINF = norm(uxz - mean(mean(uxz)),Inf);
-WINF = norm(wxz - mean(mean(wxz)),Inf);
-R = exp(rxz);
-RINF = norm(R - mean(mean(R)),Inf);
-RTINF = norm(RT - mean(mean(RT)),Inf);
-disp('Scaling constants for DynSGS coefficients:');
-disp(['|| u - U_bar ||_max = ' num2str(UINF)]);
-disp(['\| w - W_bar ||_max = ' num2str(WINF)]);
-disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
-disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
+%{
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+colormap(cmap);
+[dujint, ~, ~] = HerTransLegInterp(REFS, DS, real(duj), NXI, NZI, 0, 0);
+contourf(1.0E-3 * XI,1.0E-3 * ZI,dujint,31); colorbar; grid on;
+xlim(1.0E-3 * [l1 + width l2 - width]);
+ylim(1.0E-3 * [0.0 zH - depth]);
+fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+title('Vertical Shear $s^{-1}$','FontWeight','normal','Interpreter','latex');
+xlabel('Distance (km)');
+ylabel('Elevation (km)');
+screen2png(['VerticalShear' mtnh '.png']);
+drawnow
+%}
 
 %% Compute the local convective stability parameter and plot...
 %
-DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
-temp = p ./ (Rd * rho);
-conv = temp .* dlpt;
+theta = REFS.thref + real(pxz);
+dpt = REFS.thref .* REFS.dlthref + (REFS.DDZ * real(pxz));
+dlpt = dpt ./ theta;
+conv = dlpt;
 
 xdex = 1:1:NX;
 fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
 plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 grid on;
-xlabel('$\frac{T}{\theta} \frac{d \theta}{d z}$','FontSize',30,'Interpreter','latex');
+xlabel('$\frac{d \ln \theta}{d z}$','FontSize',30,'Interpreter','latex');
 %ylabel('Altitude (km)','FontSize',30);
 ylim([0.0 1.0E-3*zH]);
 %xlim([0.1 1.0E3]);
@@ -416,39 +420,11 @@ dirname = '../ShearJetSchar/';
 fname = [dirname 'CONV_TEST_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
-
-%% Compute the local and reference N
-%
-DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
-NBVF = sqrt(ga .* dlpt);
-
-NBVF_REF = sqrt(ga * (1 / gam * REFS.dlpref - REFS.dlrref));
-
-xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-plot(NBVF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5); hold on;
-plot(NBVF_REF(:,1),1.0E-3*REFS.ZTL(:,1),'ro-','LineWidth',1.5); hold off;
-grid on;
-xlabel('$\mathcal{N}$','FontSize',30,'Interpreter','latex');
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
-%xlim([0.1 1.0E3]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow;
-
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-dirname = '../ShearJetSchar/';
-fname = [dirname 'NBVF_TEST_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
+%}
 
 %% Compute the nonlinearity parameter in Rho and plot...
 %
-nlRho = exp(rxz) - 1.0;
+nlRho = real(rxz) ./ REFS.rref;
 
 xdex = 1:1:NX;
 fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
@@ -464,7 +440,7 @@ drawnow;
 pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
 
 dirname = '../ShearJetSchar/';
-fname = [dirname 'NLP_RHO_LnP' TestCase num2str(hC)];
+fname = [dirname 'NLP_RHO_RhoTheta' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 
@@ -486,20 +462,20 @@ drawnow;
 pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
 
 dirname = '../ShearJetSchar/';
-fname = [dirname 'NLP_U_LnP' TestCase num2str(hC)];
+fname = [dirname 'NLP_U_RhoTheta' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
-%}
+
 %% Debug
-%
+%{
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Total Horizontal Velocity U (m/s)');
 subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Vertical Velocity W (m/s)');
-subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
+subplot(2,2,3); surf(XI,ZI,exp(rxzint)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Perturbation Density (kg/m^3)');
-subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
+subplot(2,2,4); surf(XI,ZI,exp(pxzint)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Perturbation Pressure (Pa)');
 drawnow
 %}
@@ -520,6 +496,6 @@ drawnow
 %% Save the data
 %{
 close all;
-fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
+fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_RhoTheta' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);
 %}

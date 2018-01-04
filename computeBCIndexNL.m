@@ -1,8 +1,5 @@
-function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
+function sysDex = computeBCIndexNL(BC,NX,NZ,OPS)
     numVar = 4;
-    SOL = 0.0 * FF;
-    % Adjust for the boundary forcing
-    FFBC = FF;
 
     %% Create boundary condition indices
     %
@@ -10,7 +7,6 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     wbdex = ubdex + OPS;
     rbdex = ubdex + 2*OPS;
     pbdex = ubdex + 3*OPS;
-    BotOut = [ubdex wbdex rbdex pbdex];
     %
     utdex = NZ:NZ:OPS;
     wtdex = utdex + OPS;
@@ -31,7 +27,7 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     RightOut = [urdex wrdex rrdex prdex];
 
     if BC == 0
-        disp('No Specific BC`s Set');
+        disp('Hermite-Laguerre BC');
         rowsOut = [];
     elseif BC == 1
         % Only apply the BC on W at the top

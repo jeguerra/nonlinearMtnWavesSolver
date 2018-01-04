@@ -1,6 +1,16 @@
-function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS)
+function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS,RAY)
     ht = 0.0 * xh;
     dhdx = 0.0 * xh;
+    
+    %% Make a windowing function and its derivative
+    LI = 0.5 * (DS.L - 2 * RAY.width);
+    xw = find(abs(xh) <= LI);    
+    W = ht;
+    W(xw) = 1.0 - (sin(0.5 * pi * xh(xw) / LI)).^20;
+    DW = ht;
+    DW(xw) = - 10.0 * pi * cos(0.5 * pi * xh(xw) / LI) .* ((sin(0.5 * pi * xh(xw) / LI)).^19);
+    
+    %plot(xh, W, xh, DW); pause;
 
     %% Get the correct mountain for this test
     if ((strcmp(TestCase,'ShearJetSchar') == true) || ...
@@ -12,27 +22,17 @@ function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS)
             2.0 * xh / (DS.aC^2) .* (cos(pi * xh / DS.lC)).^2 + ...
             pi/DS.lC * sin(2.0 * pi * xh / DS.lC));
         
-        %plot(xh, dhdx); pause;
-        %{
-        xff = linspace(min(xh), max(xh), length(xh));
-        ht_fft = DS.hC * exp(-xff.^2/DS.aC^2) .* (cos(pi * xff / DS.lC)).^2;
-        
-        L = (max(xh) - min(xh));
-        scale = 2 * pi / L;
-        dhdx_fft = scale * fourdifft(ht_fft,1);
-        
-        plot(xh, dhdx, xff, dhdx_fft); pause;
-        %}
     elseif ((strcmp(TestCase,'HydroMtn') == true) || (strcmp(TestCase,'NonhydroMtn') == true))
         ht = DS.hC * (1.0 + xh.^2 / DS.aC).^(-1);
         
         dhdx = -DS.hC * (2 * xh / DS.aC) .* (1.0 + xh.^2 / DS.aC).^(-2);
     elseif (strcmp(TestCase,'AndesMtn') == true)
-        AM = load('/Users/TempestGuerra/Desktop/ShearFlowMountainWavesDATA/EcuadorAndesProfiles.mat');
-        xinp = AM.xtest;
-        tpinp = AM.mtest;
-        
-        ht = zeros(size(tpinp,1),length(xh));
+        AM = load('/Users/TempestGuerra/Desktop/ShearFlowMountainWavesDATA/AndesTerrainDATA/EcuadorAndesProfiles250km.mat');
+        xinp = AM.xlon;
+        tpbkg = AM.(['tpavg' char(DS.hfilt)]);
+        tpvar = AM.(['tpavg' char(DS.hfilt)]);
+        tpful = tpbkg;% + tpvar;
+        ht = zeros(size(tpvar,1),length(xh));
         dhdx = ht;
         
         % Compute length scales and ratios for different domains
@@ -44,16 +44,20 @@ function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS)
         % Compute the scaled interpolation grid [0 2pi]
         xhint = scale * (xh - min(xh));
         xhint = dl * xhint + pi * (1 - dl);
-        
-        dx = mean(diff(xinp));
-        hsize = length(xinp);
-        for ii=1:size(tpinp,1)
+        for ii=1:size(tpful,1)
+            %% Process the variance terrain data for height and slope
             % Interpolate the terrain height field
-            ht(ii,:) = DS.hC * fourint(tpinp(ii,:), xhint);
+            [~,~,ht(ii,:)] = fourint(tpful(ii,:), xhint);
+            ht(ii,:) = DS.hC * ht(ii,:);
             % Fourier terrain slopes at the native resolution
-            dhdx30m = DS.hC * pi / Linp * fourdifft(tpinp(ii,:),1);
+            dhdx30m = DS.hC * pi / Linp * fourdifft(tpful(ii,:),1);
+            % Sample the terrain variance derivatives at the interpolated grid
+            [~,~,dhdx(ii,:)] = fourint(dhdx30m, xhint);
+            
+            % DEBUG PLOTS WITH MULTIPLE COMPARISONS
+            %{
             % First order slopes for comparison checks
-            topo30m = DS.hC * tpinp(ii,:);
+            topo30m = DS.hC * tpful(ii,:);
             dhdx30m_O1 = topo30m;
             for jj=1:hsize
                if (jj == 1)
@@ -64,27 +68,25 @@ function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS)
                    dhdx30m_O1(jj) = (topo30m(jj+1) - topo30m(jj-1)) / (2*dx);
                end
             end
-            % Sample the terrain derivatives at the interpolated grid
-            dhdx(ii,:) = fourint(dhdx30m, xhint);
             
-            % DEBUG PLOTS WITH MULTIPLE COMPARISONS
-            %{
             if ii == 3
-                plot(xh, ht(ii,:), 's-', xinp, DS.hC * tpinp(ii,:), 'o-');
+                length(xinp)
+                size(tpbkg)
+                plot(xh, ht(ii,:), 's-', xinp, DS.hC * tpbkg(ii,:), 'o-');
                 figure;
                 plot(xinp, dhdx30m, 's-', xinp, dhdx30m_O1, 'o-', xh, dhdx(ii,:), '+-');
                 grid on;
-                xlim([-1.0E4 1.0E4]);
+                %xlim([-1.0E4 1.0E4]);
                 pause;
             end
             %}
         end
                 
         % Pick one of the profiles... CHANGE THIS TO BE AUTOMATED
-        ht = ht(3,:);
-        dhdx = dhdx(3,:);
+        ht = ht(3,:)';
+        dhdx = dhdx(3,:)';
     end
     
-    terrain = ht;
-    terrDeriv = dhdx;
+    terrain = W .* ht;
+    terrDeriv = W .* dhdx + DW .* ht;
 end

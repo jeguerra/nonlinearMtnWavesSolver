@@ -28,7 +28,7 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
     dNormX = (XRL1 - prs.l1) / width;
     RFX1 = 0.5 * nu * (1.0 + cos(pi * dNormX));
     %}
-    %% 2nd order profiles
+    %% 2nd or 4th order profiles
     %
     dNormZ = (prs.zH - ZRL) / depth;
     RFZ = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormZ)).^4);

@@ -1,4 +1,4 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     
     % Set the domain scale
@@ -34,16 +34,19 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
+    %DDX_H(1:NX+1:end) = 1.0E-2 * ones(NX,1);
+    DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
     %}
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
     %}
-          
+    
+    %[zl, DDZ_L] = lagdifJEG(NZ, 1, 2.0 * DS.zH);
+       
     %% Compute the terrain and derivatives
-    [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
+    [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS);
     
     %% XZ grid for Legendre nodes in the vertical
     [HTZL,~] = meshgrid(ht,zl);
@@ -53,6 +56,18 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %{
     dzdh = (1.0 - ZL / DS.zH);
     dxidz = (DS.zH - HTZL);
+    sigma = DS.zH * dxidz.^(-1);
+    %}
+    %% 8th Order Guellrich coordinate
+    %{
+    eta = ZL / DS.zH;
+    ang = 0.5 * pi * eta;
+    AR = 0.1;
+    power = 8;
+    fxi = cos(ang).^power + AR * eta;
+    dfdxi = -(0.5 * power) * pi * sin(ang) .* cos(ang).^(power-1) + AR;
+    dzdh = (1.0 - eta) .* fxi;
+    dxidz = DS.zH + HTZL .* ((1.0 - eta) .* dfdxi - fxi);
     sigma = DS.zH * dxidz.^(-1);
     %}
     %% High Order Improved Guellrich coordinate
@@ -89,7 +104,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
         [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ShearJetScharCBVF') == true
@@ -108,15 +122,13 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %% Compute the vertical profiles of density and pressure
     pref = exp(lpref);
     rref = exp(lrref);
-    rref0 = max(max(rref));
-    % Density weighted change of variable
-    rsc = sqrt(rref0) * rref.^(-0.5);
     % Background potential temperature profile
     dlthref = 1.0 / BS.gam * dlpref - dlrref;
     thref = exp(1.0 / BS.gam * lpref - lrref + ...
         BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd));
     thref0 = min(min(thref));
-
+    % Background RhoTheta gradient
+    dthref = thref .* dlthref;
 %{
     %% Plot background fields including mean Ri number
     fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
@@ -177,30 +189,13 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     dirname = '../ShearJetSchar/';
     fname = [dirname 'RICHARDSON_NUMBER'];
     screen2png(fname);
-    
-    fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
-    Im = dlthref(:,1) + 0.5 * dujref(:,1) ./ ujref(:,1) - 0.5 * dlpref(:,1);
-    MZ = exp(sigma(:,1) .* Im);
-    for xx=2:length(MZ)
-        MZ(xx) = MZ(xx) * MZ(xx-1);
-    end
-    plot(MZ,1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Amplitude Gain','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 25.0]);
-    %xlim([1.0 1.0002]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-    drawnow;
-    dirname = '../ShearJetSchar/';
-    fname = [dirname 'VERTICAL_WAVENUMBER'];
-    screen2png(fname);
     pause
 %}
     
     REFS = struct('ujref',ujref,'dujref',dujref, ...
-        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'dlthref',dlthref,...
+        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'dlthref',dlthref, ...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
-        'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
+        'DDX_H',DDX_H,'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'thref0',thref0);
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
@@ -212,12 +207,12 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite expansion)
-    DDA_OP = zeros(NX*NZ);
+    DDAL_OP = zeros(NX*NZ);
     for rr=1:NZ
         ddex = (1:NZ:NX*NZ) + (rr - 1);
-        DDA_OP(ddex,ddex) = DDX_H;
+        DDAL_OP(ddex,ddex) = DDX_H;
     end
-    DDA_OP = sparse(DDA_OP);
+    DDAL_OP = sparse(DDAL_OP);
 
     %% Assemble the block global operator L
     OPS = NX*NZ;
@@ -225,86 +220,67 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     DADX = spdiags(reshape(dAdX,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
-    DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
-    DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
-    POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
-    RSC = spdiags(reshape(rsc,OPS,1), 0, OPS, OPS);
-    U0DA = U0 * DADX * DDA_OP;
+    DTHDZ = spdiags(reshape(dthref,OPS,1), 0, OPS, OPS);
+    DLTHDZ = spdiags(reshape(dlthref,OPS,1), 0, OPS, OPS);
+    THTZ = spdiags(reshape(thref,OPS,1), 0, OPS, OPS);
+    ITHTZ = spdiags(reshape(thref.^(-1),OPS,1), 0, OPS, OPS);
+    RDTZ = spdiags(reshape(pref ./ rref,OPS,1), 0, OPS, OPS);
+    PGFTX = (BS.gam * RDTZ - U0.^2) * ITHTZ;
+    PGFTZ = BS.gam * RDTZ * ITHTZ;
+    U0DA = U0 * DADX * DDAL_OP;
+    
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
     % Horizontal momentum LHS
     L11 = U0DA;
     L12 = sparse(OPS,OPS);
     L13 = sparse(OPS,OPS);
-    L14 = POR * DADX * DDA_OP;
+    L14 = PGFTX * DADX * DDAL_OP;
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
-    L22 = RSC * U0DA;
+    L22 = U0DA;
     L23 = sparse(OPS,OPS);
-    L24 = POR * SIGMA * DDXI_OP;
+    L24 = PGFTZ * SIGMA * DDXI_OP;
     % Continuity LHS
-    L31 = DADX * DDA_OP;
-    L32 = RSC * SIGMA * DDXI_OP;
-    L33 = U0DA;
+    L31 = DADX * DDAL_OP;
+    L32 = SIGMA * DDXI_OP;
+    L33 = sparse(OPS,OPS);
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     L41 = sparse(OPS,OPS);
     L42 = sparse(OPS,OPS);
-    L43 = -U0DA;
-    L44 = 1.0 / BS.gam * U0DA;
+    L43 = -THTZ * U0DA;
+    L44 = U0DA;
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
     B11 = sparse(OPS,OPS) + RAY.nu1 * spdiags(RL,0, OPS, OPS);
-    B12 = RSC * DUDZ;
+    B12 = DUDZ - U0 * DLTHDZ;
     B13 = sparse(OPS,OPS);
     B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
     B21 = sparse(OPS,OPS);
-    B22 = sparse(OPS,OPS) + RAY.nu2 * RSC * spdiags(RL,0, OPS, OPS);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
     B23 = BS.ga * unit;
-    B24 = -BS.ga * unit;
+    B24 = BS.ga * (1.0 - BS.gam) * ITHTZ;
     % Continuity LHS (using density weighted change of variable in W)
     B31 = sparse(OPS,OPS);
-    B32 = 0.5 * RSC * DLRDZ;
+    B32 = sparse(OPS,OPS);
     B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
-    B42 = RSC * (1.0 / BS.gam * DLPDZ - DLRDZ);
-    B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS);
-    B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
-    
+    B42 = DTHDZ;
+    B43 = sparse(OPS,OPS);
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     %% Adjust the operator for the coupled forcing BC
     bdex = 1:NZ:OPS;
     GPHI = spdiags((DZT(1,:))', 0, NX, NX);
-    RSBC = spdiags((rsc(1,:))', 0, NX, NX);
+    UNIT = spdiags((ones(1,NX))', 0, NX, NX);
     
     % THE BOTTOM BOUNDARY CONDITION MUST BE IN CONTINUITY EQUATION 3
     B31(bdex,bdex) = (-GPHI);
-    B32(bdex,bdex) = RSBC;
-    
-    %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
-    tdex = NZ:NZ:OPS;
-    mbc = 1.0 * sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    L31(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L32(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L33(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    %L44(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    
-    %% Neumann Boundary Conditions LATERAL BOUNDARY TO INFINITY
-    ldex = 1:NZ;
-    rdex = (NX-1)*NZ+1:OPS;
-    UNIT = spdiags(ones(NZ,1), 0, NZ, NZ);
-    % Left side
-    L31(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L32(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L33(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    % Right side
-    L31(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L32(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L33(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
+    B32(bdex,bdex) = UNIT;
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -339,7 +315,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     F41 = zeros(OPS,1);
     
     %% Adjust the force vector for the coupled BC
-    F31(bdex) = (ujref(1,:) .* DZT(1,:))';
+    F31(bdex) = (rref(1,:) .* ujref(1,:) .* DZT(1,:))';
     
     FF = [F11 ; F21 ; F31 ; F41];
 end
