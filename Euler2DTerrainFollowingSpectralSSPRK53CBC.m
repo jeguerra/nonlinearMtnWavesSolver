@@ -193,23 +193,23 @@ pxz(:,end) = pxz(:,1);
 %
 % NATIVE GRID PLOTS
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(uxz),31); colorbar;
+subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(uxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('Total Horizontal Velocity U (m/s)');
-subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(wxz),31); colorbar;
+subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(wxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
 title('Vertical Velocity W (m/s)');
 %
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(rxz),31); colorbar;
+subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(rxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
 title('Perturbation Log Density (kg/m^3)');
-subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(pxz),31); colorbar;
+subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(pxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
 title('Perturbation Log Pressure (Pa)');

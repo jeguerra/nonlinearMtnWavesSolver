@@ -1,4 +1,4 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceLBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     
     % Set the domain scale
@@ -283,25 +283,25 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     
     % THE BOTTOM BOUNDARY CONDITION MUST BE IN CONTINUITY EQUATION 3
     %
-    B11(bdex,bdex) = - GPHI;
+    B11(bdex,bdex) = 0.0 * UNIT;
     B12(bdex,bdex) = RSBC;
     %B13(bdex,bdex) = 0.0 * UNIT;
     %B14(bdex,bdex) = 0.0 * UNIT;
     %
-    B21(bdex,bdex) = - GPHI;
+    B21(bdex,bdex) = 0.0 * UNIT;
     B22(bdex,bdex) = RSBC;
     %B23(bdex,bdex) = 0.0 * UNIT;
     %B24(bdex,bdex) = 0.0 * UNIT;
     %}
-    B31(bdex,bdex) = - GPHI;
+    B31(bdex,bdex) = 0.0 * UNIT;
     B32(bdex,bdex) = RSBC;
     %B33(bdex,bdex) = 0.0 * UNIT;
     %B34(bdex,bdex) = 0.0 * UNIT;
-    %
-    %B41(bdex,bdex) = 0.0 * UNIT;
-    %B42(bdex,bdex) = 0.0 * UNIT;
-    %B43(bdex,bdex) = 0.0 * UNIT;
-    %B44(bdex,bdex) = 0.0 * UNIT;
+    %{
+    B41(bdex,bdex) = 0.0 * UNIT;
+    B42(bdex,bdex) = RSBC;
+    B43(bdex,bdex) = 0.0 * UNIT;
+    B44(bdex,bdex) = 0.0 * UNIT;
     %}
     %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
     tdex = NZ:NZ:OPS;

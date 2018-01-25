@@ -12,14 +12,14 @@ clear
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 180;
+NX = 200;
 NXO = 60; % Expansion order
-NZ = 100; % Expansion order matches physical grid
+NZ = 80; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'AndesMtn'; BC = 1;
+TestCase = 'AndesMtn'; BC = 0;
 
 z0 = 0.0;
 gam = 1.4;
@@ -30,8 +30,8 @@ ga = 9.80616;
 p0 = 1.0E5;
 if strcmp(TestCase,'AndesMtn') == true
     zH = 40000.0;
-    l1 = -210000.0;
-    l2 = 210000.0;
+    l1 = -1.0E5 * 2.0 * pi;
+    l2 = 1.0E5 * 2.0 * pi;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -42,16 +42,16 @@ if strcmp(TestCase,'AndesMtn') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 15000.0;
-    width = 60000.0;
+    width = 51000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '200m';
+    hfilt = '100m';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -108,10 +108,10 @@ DXI = 1000.0;
 DZI = 250.0;
 xint = l1:DXI:l2; NXI = length(xint);
 zint = 0.0:DZI:zH; NZI = length(zint);
-[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, real(uxz), NXI, NZI, xint, zint);
-[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(wxz), NXI, NZI, xint, zint);
-[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(rxz), NXI, NZI, xint, zint);
-[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(pxz), NXI, NZI, xint, zint);
+[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, xint', zint');
+[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, xint', zint');
+[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, xint', zint');
+[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NXI, NZI, xint', zint');
 
 XI = l2 * XINT;
 ZI = ZINT;
@@ -180,14 +180,17 @@ fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref + uxzint,31); colorbar; grid on;
 %subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on;
+%contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,21,'LineWidth',1.0); %grid on; colorbar;
+%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total Horizontal Velocity U $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
+%title('Total Horizontal Velocity U $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+screen2png(['UREferenceSolution' mtnh '.png']);
 
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
@@ -197,7 +200,7 @@ ylim(1.0E-3 * [0.0 zH - depth]);
 title('Vertical Velocity W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['UWREferenceSolution' mtnh '.png']);
+screen2png(['WREferenceSolution' mtnh '.png']);
 %{
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 colormap(cmap);
@@ -237,9 +240,9 @@ drawnow
 %% Compute the local Ri number and plot ...
 %
 lrho = REFS.lrref + real(rxz);
-dlrho = REFS.sig .* (REFS.DDZ * lrho);
+dlrho = REFS.sigma .* (REFS.DDZ * lrho);
 uj = REFS.ujref + real(uxz);
-duj = REFS.sig .* (REFS.DDZ * uj);
+duj = REFS.sigma .* (REFS.DDZ * uj);
 Ri = -ga * dlrho ./ (duj.^2);
 
 RiREF = -BS.ga * REFS.dlrref(:,1);
@@ -260,7 +263,7 @@ xlim([0.1 1.0E4]);
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
 
-pt = mtit(['Local Ri Number - ' mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
+pt = mtit('Local Ri Number','FontSize',30,'FontWeight','normal','Interpreter','tex');
 
 dirname = '../ShearJetSchar/';
 fname = [dirname 'RI_TEST_' TestCase num2str(hC)];
@@ -307,7 +310,7 @@ rho = exp(lrho);
 lp = REFS.lpref + real(pxz);
 p = exp(lp);
 pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
-dpt = REFS.sig .* (REFS.DDZ * pt);
+dpt = REFS.sigma .* (REFS.DDZ * pt);
 temp = p ./ (Rd * rho);
 conv = (pt ./ temp) .* dpt;
 
@@ -322,7 +325,7 @@ ylim([0.0 1.0E-3*zH]);
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
 
-pt = mtit(['Convective Stability - ' mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
+pt = mtit('Convective Stability','FontSize',30,'FontWeight','normal','Interpreter','tex');
 
 dirname = '../ShearJetSchar/';
 fname = [dirname 'CONV_TEST_' num2str(hC)];
