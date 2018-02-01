@@ -150,7 +150,7 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC_SSPRK53(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
 %[LD,FF,REFS] = ...
 %computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
@@ -159,7 +159,7 @@ computeCoeffMatrixForceCBC_SSPRK53(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, apply
 %computeCoeffMatrixForceCBC_HerLag(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
-[FFBC,SOL,sysDex] = GetAdjust4CBC_SSPRK53(BC,NX,NZ,OPS,FF);
+[FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
 
 %% Solve the hyperbolic problem using SSP-RK53
 %

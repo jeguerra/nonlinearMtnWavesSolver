@@ -12,17 +12,17 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
+NX = 120; % Expansion order matches physical grid
 NXO = 80; % Expansion order
-NZ = 60; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
+TestCase = 'ShearJetSchar'; BC = 1;
 %TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 1;
-%TestCase = 'AndesMtn'; BC = 0;
+%TestCase = 'AndesMtn'; BC = 1;
 
 z0 = 0.0;
 gam = 1.4;
@@ -33,8 +33,10 @@ ga = 9.80616;
 p0 = 1.0E5;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -1.0E4 * 2.0 * pi;
+    %l2 = 1.0E4 * 2.0 * pi;
+    l1 = -6.0E4;
+    l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -45,14 +47,14 @@ if strcmp(TestCase,'ShearJetSchar') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 10000.0;
-    width = 15000.0;
+    width = 10000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -135,7 +137,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     lC = 4000.0;
     hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '100m';
+    hfilt = '25km';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -194,10 +196,11 @@ pxz(:,end) = pxz(:,1);
 %% Convert \hat{w} to w using the reference density profile
 wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
 wxz = wf .* whxz;
+%wxz = whxz;
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 1000;
+NXI = 2000;
 NZI = 300;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
@@ -275,13 +278,13 @@ dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref + uxzint,31); colorbar; grid on; cl = caxis;
+contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-caxis(cl);
+%caxis([-60.0 60.0]);
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-%xlim([-200 200]);
-%ylim([0 25]);
+%xlim([-100 100]);
+%ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{Total Horizontal Velocity U $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');
@@ -292,18 +295,18 @@ screen2png(['UREferenceSolution' mtnh '.png']);
 %
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on; cl = caxis;
+contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-caxis(cl);
+%caxis([-8.0 8.0]);
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-%xlim([-200 200]);
-%ylim([0 25]);
+%xlim([-100 100]);
+%ylim([0 15]);
 title('\textsf{Vertical Velocity W $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['WREferenceSolution_LnP' mtnh '.png']);
+screen2png(['WREferenceSolution' mtnh '.png']);
 %{
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 colormap(cmap);
@@ -365,7 +368,7 @@ disp(['\| w - W_bar ||_max = ' num2str(WINF)]);
 disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
 disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
 
-%% Compute the local Ri number and plot ...
+%% Compute Ri, Convective Parameter, and BVF
 %
 DDZ_BC = REFS.DDZ;
 dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * real(rxz));
@@ -384,58 +387,49 @@ RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
 xdex = 1:1:NX;
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
-subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+subplot(1,3,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 hold on;
 semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',1.5);
 semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
-grid on;
+grid on; grid minor;
 xlabel('Ri');
 ylabel('Elevation (km)');
-title('\textsf{Richardson Number}','FontWeight','normal','Interpreter','latex');
-ylim([0.0 25]);
+title('Ri Number','FontWeight','normal','Interpreter','latex');
 xlim([0.1 1.0E4]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+ylim([0.0 1.0E-3 * zH]);
+fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 
-subplot(1,2,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-grid on;
+subplot(1,3,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+grid on; grid minor;
 xlabel('\textsf{$\frac{T}{\theta} \frac{d \theta}{d z}$}','Interpreter','latex');
 %ylabel('Elevation (km)');
-title('\textsf{Convective Stability}','FontWeight','normal','Interpreter','latex');
-ylim([0.0 25]);
+title('Convective Stability','FontWeight','normal','Interpreter','latex');
+%ylim([0.0 30.0]);
 %xlim([0.1 1.0E3]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 
-dirname = '../ShearJetSchar/';
-fname = [dirname 'RI_CONV_TEST_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-
-%% Compute the local and reference N
-%
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
 rho = exp(lrho);
 dlpt = 1 / gam * dlpres - dlrho;
-NBVF = sqrt(ga .* dlpt);
+NBVF = (ga .* dlpt);
 
-NBVF_REF = sqrt(ga * (1 / gam * REFS.dlpref - REFS.dlrref));
+NBVF_REF = (ga * (1 / gam * REFS.dlpref - REFS.dlrref));
 
 xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-plot(NBVF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5); hold on;
+subplot(1,3,3); plot(NBVF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5); hold on;
 plot(NBVF_REF(:,1),1.0E-3*REFS.ZTL(:,1),'ro-','LineWidth',1.5); hold off;
-grid on;
-title('\textsf{Brunt-V\"ais\"al\"a Frequency}','FontWeight','normal','Interpreter','latex');
-xlabel('\textsf{$\mathcal{N}$}','Interpreter','latex');
-ylabel('\textsf{Altitude (km)}','Interpreter','latex');
-ylim([0.0 1.0E-3*zH]);
+grid on; grid minor;
+title('Brunt-V\"ais\"al\"a','FontWeight','normal','Interpreter','latex');
+xlabel('\textsf{$\mathcal{N}^2$}','Interpreter','latex');
+%ylabel('\textsf{Altitude (km)}','Interpreter','latex');
+%ylim([0.0 30.0]);
 %xlim([0.1 1.0E3]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
 
-dirname = '../ShearJetSchar/';
-fname = [dirname 'NBVF_TEST_' TestCase num2str(hC)];
+fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 
@@ -456,8 +450,7 @@ drawnow;
 
 pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
 
-dirname = '../ShearJetSchar/';
-fname = [dirname 'NLP_RHO_LnP' TestCase num2str(hC)];
+fname = ['NLP_RHO_LnP' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 
@@ -478,13 +471,12 @@ drawnow;
 
 pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
 
-dirname = '../ShearJetSchar/';
-fname = [dirname 'NLP_U_LnP' TestCase num2str(hC)];
+fname = ['NLP_U_LnP' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 %}
 %% Debug
-%
+%{
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Total Horizontal Velocity U (m/s)');
@@ -511,7 +503,7 @@ drawnow
 %}
 
 %% Save the data
-%{
+%
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

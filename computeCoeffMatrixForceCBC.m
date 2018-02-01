@@ -34,7 +34,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
+    DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
     %}
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
@@ -275,57 +275,30 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS);
     B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Adjust the operator for the coupled forcing BC
+    %% Assemble the force vector
+    F11 = zeros(OPS,1);
+    F21 = zeros(OPS,1);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
+    
+    %% Adjust the force vector for the coupled BC on W
     bdex = 1:NZ:OPS;
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    GPHI = spdiags((DZT(1,:))', 0, NX, NX);
-    RSBC = spdiags((rsc(1,:))', 0, NX, NX);
+    W0 = (ujref(1,:) .* DZT(1,:)) ./ sqrt(DZT(1,:).^2 + 1.0);
+    F11(bdex) = - B12(bdex,bdex) * W0';
+    F21(bdex) = - L22(bdex,bdex) * W0';
+    F31(bdex) = - L32(bdex,bdex) * W0' - B32(bdex,bdex) * W0';
+    F41(bdex) = - B42(bdex,bdex) * W0';
     
-    % THE BOTTOM BOUNDARY CONDITION MUST BE IN CONTINUITY EQUATION 3
-    %
-    B11(bdex,bdex) = - GPHI;
-    B12(bdex,bdex) = RSBC;
-    %B13(bdex,bdex) = 0.0 * UNIT;
-    %B14(bdex,bdex) = 0.0 * UNIT;
-    %
-    B21(bdex,bdex) = - GPHI;
-    B22(bdex,bdex) = RSBC;
-    %B23(bdex,bdex) = 0.0 * UNIT;
-    %B24(bdex,bdex) = 0.0 * UNIT;
-    %}
-    B31(bdex,bdex) = - GPHI;
-    B32(bdex,bdex) = RSBC;
-    %B33(bdex,bdex) = 0.0 * UNIT;
-    %B34(bdex,bdex) = 0.0 * UNIT;
-    %
-    %B41(bdex,bdex) = 0.0 * UNIT;
-    %B42(bdex,bdex) = 0.0 * UNIT;
-    %B43(bdex,bdex) = 0.0 * UNIT;
-    %B44(bdex,bdex) = 0.0 * UNIT;
-    %}
-    %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
-    tdex = NZ:NZ:OPS;
-    mbc = 1.0 * sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    L31(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L32(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L33(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L34(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    FF = [F11 ; F21 ; F31 ; F41];
     
-    %% Neumann Boundary Conditions LATERAL BOUNDARY TO INFINITY
-    ldex = 1:NZ;
-    rdex = (NX-1)*NZ+1:OPS;
-    UNIT = spdiags(ones(NZ,1), 0, NZ, NZ);
-    % Left side
-    L31(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L32(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L33(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L34(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    % Right side
-    L31(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L32(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L33(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L33(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
+    %% Adjust the operator blocks for the coupled forcing BC
+    %
+    B12(bdex,bdex) = 0.0 * B12(bdex,bdex);
+    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
+    L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
+    B32(bdex,bdex) = 0.0 * B32(bdex,bdex);
+    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
+    %}
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -348,22 +321,34 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
+    %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
+    %{
+    tdex = NZ:NZ:OPS;
+    mbc = 1.0 * sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
+    UNIT = spdiags(ones(NX,1), 0, NX, NX);
+    LD31(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    LD32(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    LD33(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    LD34(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    
+    %% Neumann Boundary Conditions LATERAL BOUNDARY TO INFINITY
+    ldex = 1:NZ;
+    rdex = (NX-1)*NZ+1:OPS;
+    UNIT = spdiags(ones(NZ,1), 0, NZ, NZ);
+    % Left side
+    LD31(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
+    LD32(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
+    LD33(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
+    LD34(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
+    % Right side
+    LD31(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
+    LD32(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
+    LD33(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
+    LD33(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
+    %}
+    %% Assemble the LHS operator
     LD = [LD11 LD12 LD13 LD14 ; ...
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
-
-    %% Assemble the force vector
-    F11 = zeros(OPS,1);
-    F21 = zeros(OPS,1);
-    F31 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC
-    F11(bdex) = (ujref(1,:) .* DZT(1,:))';
-    F21(bdex) = (ujref(1,:) .* DZT(1,:))';
-    F31(bdex) = (ujref(1,:) .* DZT(1,:))';
-    %F41(bdex) = (ujref(1,:) .* DZT(1,:))';
-    
-    FF = [F11 ; F21 ; F31 ; F41];
 end

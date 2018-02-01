@@ -5,13 +5,13 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     FFBC = FF;
 
     %% Create boundary condition indices
-    %
+    %{
     ubdex = 1:NZ:OPS;
     wbdex = ubdex + OPS;
     rbdex = ubdex + 2*OPS;
     pbdex = ubdex + 3*OPS;
     BotOut = [ubdex wbdex rbdex pbdex];
-    %
+    %}
     utdex = NZ:NZ:OPS;
     wtdex = utdex + OPS;
     rtdex = utdex + 2*OPS;
@@ -19,7 +19,7 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     TopOut = [utdex wtdex rtdex ptdex];
     %
     uldex = 1:NZ;
-    urdex = (NX-1)*NZ+1:OPS;
+    urdex = ((NX-1)*NZ)+1:OPS;
     wldex = uldex + OPS;
     wrdex = urdex + OPS;
     rldex = uldex + 2*OPS;
@@ -35,18 +35,16 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
         rowsOut = [];
     elseif BC == 1
         % Only apply the BC on W at the top
-        disp('No-flux W TOP, Periodic Lateral');
-        %rowsOut = wtdex;
+        disp('Dirichlet W Top, Periodic Lateral');
         rowsOut = [wtdex RightOut];
     elseif BC == 2
-        % Apply BC on W and U for no wave flow across boundaries
-        disp('No-flux W TOP, Dirichlet All LATERAL');
-        rowsOut = [wtdex LeftRightOut];
+        % Dirichlet top for all variables
+        disp('Dirichlet All Top, Periodic Lateral');
+        rowsOut = [TopOut RightOut];
     elseif BC == 3
-        % Apply BC on W and U for no wave flow across boundaries and
-        % thermodynamic variable vanish at lateral boundaries
-        disp('BC on W and U for no outflow, rho and P vanish at lateral boundaries.');
-        rowsOut = [wtdex uldex urdex wldex wrdex rldex rrdex pldex prdex];
+        % Dirichlet top and lateral for all variables
+        disp('Dirichlet All Top and Lateral');
+        rowsOut = [TopOut LeftRightOut];
     elseif BC == 4
         % Apply BC on W and U for no wave flow across boundaries and
         % thermodynamic variable vanish at lateral boundaries

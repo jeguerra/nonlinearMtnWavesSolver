@@ -27,7 +27,7 @@ function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS,RAY)
         
         dhdx = -DS.hC * (2 * xh / DS.aC) .* (1.0 + xh.^2 / DS.aC).^(-2);
     elseif (strcmp(TestCase,'AndesMtn') == true)
-        AM = load('/Users/TempestGuerra/Desktop/ShearFlowMountainWavesDATA/AndesTerrainDATA/EcuadorAndesProfiles250km.mat');
+        AM = load('/home/jeguerra/Desktop/AndesTerrainDATA/EcuadorAndesProfiles250km.mat');
         xinp = AM.xlon;
         tpbkg = AM.(['tpavg' char(DS.hfilt)]);
         tpvar = AM.(['tpavg' char(DS.hfilt)]);
