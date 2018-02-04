@@ -138,43 +138,51 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
-    B11 = sparse(OPS,OPS) + RAY.nu1 * (spdiags(RL,0, OPS, OPS));% + RTP_OP);
+    B11 = sparse(OPS,OPS) + RAY.nu1 * (spdiags(RL,0, OPS, OPS));
     B12 = RSC * DUDZ;
     B13 = sparse(OPS,OPS);
     B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
     B21 = sparse(OPS,OPS);
-    B22 = sparse(OPS,OPS) + RAY.nu2 * (spdiags(RL,0, OPS, OPS));% + RTP_OP);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * (spdiags(RL,0, OPS, OPS));
     B23 = BS.ga * unit;
     B24 = -BS.ga * unit;
     % Continuity LHS
     B31 = sparse(OPS,OPS);
     B32 = 0.5 * RSC * DLRDZ;
-    B33 = sparse(OPS,OPS) + RAY.nu3 * (spdiags(RL,0, OPS, OPS));% + RTP_OP);
+    B33 = sparse(OPS,OPS) + RAY.nu3 * (spdiags(RL,0, OPS, OPS));
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
     B42 = RSC * (1.0 / BS.gam * DLPDZ - DLRDZ);
     B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS);
-    B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);% + RTP_OP);
-
-    %% Adjust the operator for BC on w only
-    bdex = 1:NZ:OPS;
-    B21(bdex,bdex) = sparse(NX,NX);
-    B22(bdex,bdex) = speye(NX,NX);
-    B23(bdex,bdex) = sparse(NX,NX);
-    B24(bdex,bdex) = sparse(NX,NX);
+    B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
+    %% Assemble the force vector
+    F11 = zeros(OPS,1);
+    F21 = zeros(OPS,1);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
+    
+    %% Adjust the force vector for the coupled BC on W
+    bdex = 1:NZ:OPS;
+    W0 = (ujref(1,:) .* DZT(1,:)) ./ sqrt(DZT(1,:).^2 + 1.0);
+    F11(bdex) = - B12(bdex,bdex) * W0';
+    F21(bdex) = - L22(bdex,bdex) * W0';
+    F31(bdex) = - L32(bdex,bdex) * W0' - B32(bdex,bdex) * W0';
+    F41(bdex) = - B42(bdex,bdex) * W0';
+    
+    FF = [F11 ; F21 ; F31 ; F41];
+    
+    %% Adjust the operator blocks for the coupled forcing BC
     %
-    tdex = NZ:NZ:OPS;
-    mbc = 1.0 * sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    L11(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L22(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L33(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L44(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
+    B12(bdex,bdex) = 0.0 * B12(bdex,bdex);
+    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
+    L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
+    B32(bdex,bdex) = 0.0 * B32(bdex,bdex);
+    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
     %}
+
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
     LD12 = L12 + B12;
@@ -197,14 +205,4 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     LD44 = L44 + B44;
 
     LD = [LD11 LD12 LD13 LD14 ; LD21 LD22 LD23 LD24 ; LD31 LD32 LD33 LD34 ; LD41 LD42 LD43 LD44];
-
-    %% Assemble the force vector
-    F11 = zeros(OPS,1);
-    F21 = zeros(OPS,1);
-    F31 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC
-    F21(bdex) = ujref(1,:) .* DZT(1,:);
-    FF = [F11 ; F21 ; F31 ; F41];
 end

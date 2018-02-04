@@ -19,9 +19,9 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 1;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
-%TestCase = 'ClassicalSchar'; BC = 1;
+%TestCase = 'ShearJetSchar'; BC = 1;
+%TestCase = 'ShearJetScharCBVF'; BC = 1;
+TestCase = 'ClassicalSchar'; BC = 1;
 %TestCase = 'AndesMtn'; BC = 1;
 
 z0 = 0.0;
@@ -47,7 +47,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 10000.0;
-    width = 10000.0;
+    width = 15000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
@@ -278,11 +278,11 @@ dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on;
+contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-%caxis([-60.0 60.0]);
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
+caxis(cm);
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+%ylim(1.0E-3 * [0.0 zH - depth]);
 %xlim([-100 100]);
 %ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
@@ -295,11 +295,11 @@ screen2png(['UREferenceSolution' mtnh '.png']);
 %
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on;
+contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-%caxis([-8.0 8.0]);
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
+caxis(cm);
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+%ylim(1.0E-3 * [0.0 zH - depth]);
 %xlim([-100 100]);
 %ylim([0 15]);
 title('\textsf{Vertical Velocity W $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');

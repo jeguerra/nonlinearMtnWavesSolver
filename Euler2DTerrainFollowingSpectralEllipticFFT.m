@@ -19,10 +19,10 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-%TestCase = 'ShearJetSchar'; BC = 0;
+%TestCase = 'ShearJetSchar'; BC = 1;
 %TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 0;
-TestCase = 'AndesMtn'; BC = 0;
+TestCase = 'AndesMtn'; BC = 1;
 
 z0 = 0.0;
 gam = 1.4;
@@ -52,7 +52,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -129,11 +129,11 @@ elseif strcmp(TestCase,'AndesMtn') == true
     width = 100000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
-    applyLateralRL = true;
+    applyLateralRL = false;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '100m';
     u0 = 10.0;
@@ -280,8 +280,8 @@ drawnow
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 600;
-NZI = 300;
+NXI = 3000;
+NZI = 500;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
@@ -323,27 +323,36 @@ dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref + uxzint,31); colorbar; grid on;
-%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
+contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
+hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+caxis(cm);
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+%ylim(1.0E-3 * [0.0 zH - depth]);
+xlim([-150 150]);
+ylim([0 25]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total Horizontal Velocity U $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
+title('\textsf{Total Horizontal Velocity U $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 screen2png(['UREferenceSolution' mtnh '.png']);
+%
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on;
-%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-title('Vertical Velocity W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
+contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on; cm = caxis;
+hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+caxis(cm);
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+%ylim(1.0E-3 * [0.0 zH - depth]);
+xlim([-150 150]);
+ylim([0 25]);
+title('\textsf{Vertical Velocity W $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
+ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['WREferenceSolution_LnP' mtnh '.png']);
+screen2png(['WREferenceSolution' mtnh '.png']);
+%{
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 colormap(cmap);
 subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
@@ -358,40 +367,59 @@ title('Perturbation Log Pressure (Pa)','FontWeight','normal','Interpreter','late
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 drawnow
 %}
-%% Compute the local Ri number and plot ...
+%{
+%% Compare W scatter plot to the predicted growth rate
+fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
+colormap(cmap);
+
+Im = REFS.dlthref(:,1) + 0.5 * REFS.dujref(:,1) ./ REFS.ujref(:,1) - 0.5 * REFS.dlpref(:,1);
+MZ = exp(REFS.sigma(:,1) .* Im);
+for xx=2:length(MZ)
+    MZ(xx) = MZ(xx) * MZ(xx-1);
+end
+% Normalize and scale to the W field
+MZ = max(max(wxzint)) / max(MZ) * MZ; 
+
+plot(wxzint,1.0E-3 * ZI,'ks','LineWidth',1.5); grid on; hold on;
+plot(MZ, 1.0E-3 * REFS.ZTL(:,1),'r-s','LineWidth',1.5); hold off;
+%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+ylim(1.0E-3 * [0.0 zH - depth]);
+%caxis([-0.08 0.08]);
+title('Vertical Velocity Growth W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
+xlabel('Distance (km)');
+fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+screen2png(['WaveGrowthW_LnP' mtnh '.png']);
+%}
+
+%% Compute the scaling constants needed for residual diffusion
+lrho = REFS.lrref + rxz;
+rho = exp(lrho);
+lp = REFS.lpref + pxz;
+p = exp(lp);
+P = exp(REFS.lpref);
+R = exp(REFS.lrref);
+pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
+PT = p ./ (Rd * R) .* (p0 * P.^(-1)).^(Rd / cp);
+RT = (rho .* pt) - (R .* PT);
+UINF = norm(uxz - mean(mean(uxz)),Inf);
+WINF = norm(wxz - mean(mean(wxz)),Inf);
+R = exp(rxz);
+RINF = norm(R - mean(mean(R)),Inf);
+RTINF = norm(RT - mean(mean(RT)),Inf);
+disp('Scaling constants for DynSGS coefficients:');
+disp(['|| u - U_bar ||_max = ' num2str(UINF)]);
+disp(['\| w - W_bar ||_max = ' num2str(WINF)]);
+disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
+disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
+
+%% Compute Ri, Convective Parameter, and BVF
 %
 DDZ_BC = REFS.DDZ;
 dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * real(rxz));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
-RiREF = -BS.ga * REFS.dlrref(:,1);
-RiREF = RiREF ./ (REFS.dujref(:,1).^2);
-
-xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-hold on;
-semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',1.5);
-semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
-hold off;
-grid on;
-xlabel('Ri','FontSize',30);
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
-xlim([0.1 1.0E4]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow;
-
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-dirname = '../ShearJetSchar/';
-fname = [dirname 'RI_TEST_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-
-%% Compute the local convective stability parameter and plot...
-%
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
 rho = exp(lrho);
@@ -399,50 +427,54 @@ dlpt = 1 / gam * dlpres - dlrho;
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
+RiREF = -BS.ga * REFS.dlrref(:,1);
+RiREF = RiREF ./ (REFS.dujref(:,1).^2);
+
 xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-grid on;
-xlabel('$\frac{T}{\theta} \frac{d \theta}{d z}$','FontSize',30,'Interpreter','latex');
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
+fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
+subplot(1,3,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+hold on;
+semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',1.5);
+semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
+hold off;
+grid on; grid minor;
+xlabel('Ri');
+ylabel('Elevation (km)');
+title('Ri Number','FontWeight','normal','Interpreter','latex');
+xlim([0.1 1.0E4]);
+ylim([0.0 1.0E-3 * zH]);
+fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
+
+subplot(1,3,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+grid on; grid minor;
+xlabel('\textsf{$\frac{T}{\theta} \frac{d \theta}{d z}$}','Interpreter','latex');
+%ylabel('Elevation (km)');
+title('Convective Stability','FontWeight','normal','Interpreter','latex');
+%ylim([0.0 30.0]);
 %xlim([0.1 1.0E3]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow;
+fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-dirname = '../ShearJetSchar/';
-fname = [dirname 'CONV_TEST_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-
-%% Compute the local and reference N
-%
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
 rho = exp(lrho);
 dlpt = 1 / gam * dlpres - dlrho;
-NBVF = sqrt(ga .* dlpt);
+NBVF = (ga .* dlpt);
 
-NBVF_REF = sqrt(ga * (1 / gam * REFS.dlpref - REFS.dlrref));
+NBVF_REF = (ga * (1 / gam * REFS.dlpref - REFS.dlrref));
 
 xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-plot(NBVF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5); hold on;
+subplot(1,3,3); plot(NBVF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5); hold on;
 plot(NBVF_REF(:,1),1.0E-3*REFS.ZTL(:,1),'ro-','LineWidth',1.5); hold off;
-grid on;
-xlabel('$\mathcal{N}$','FontSize',30,'Interpreter','latex');
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
+grid on; grid minor;
+title('Brunt-V\"ais\"al\"a','FontWeight','normal','Interpreter','latex');
+xlabel('\textsf{$\mathcal{N}^2$}','Interpreter','latex');
+%ylabel('\textsf{Altitude (km)}','Interpreter','latex');
+%ylim([0.0 30.0]);
 %xlim([0.1 1.0E3]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
 
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-dirname = '../ShearJetSchar/';
-fname = [dirname 'NBVF_TEST_' TestCase num2str(hC)];
+fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 
