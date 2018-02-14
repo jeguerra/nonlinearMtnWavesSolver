@@ -19,10 +19,10 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-%TestCase = 'ShearJetSchar'; BC = 1;
+TestCase = 'ShearJetSchar'; BC = 0;
 %TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 0;
-TestCase = 'AndesMtn'; BC = 1;
+%TestCase = 'AndesMtn'; BC = 0;
 
 z0 = 0.0;
 gam = 1.4;

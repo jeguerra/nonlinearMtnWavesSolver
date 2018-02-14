@@ -1,4 +1,4 @@
-function [LD,FF] = evaluateJacobianOperatorCBC_FluxForm(RhoU, RhoW, Rho, RhoTheta, BS, REFS, RAY, NITER)
+function [LD, FF, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxForm(RhoU, RhoW, Rho, RhoTheta, BS, REFS, RAY)
     OPS = REFS.NX * REFS.NZ;
     
     %% Unwrap the derivative matrices into operators onto a state 1D vector
@@ -77,14 +77,33 @@ function [LD,FF] = evaluateJacobianOperatorCBC_FluxForm(RhoU, RhoW, Rho, RhoThet
     B43 = sparse(OPS,OPS);
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(REFS.RL,0, OPS, OPS);
 
-    %% Adjust the operator for the coupled forcing BC
-    bdex = 1:REFS.NZ:OPS;
-    GPHI = spdiags((REFS.DZT(1,:))', 0, REFS.NX, REFS.NX);
-    UNIT = spdiags((ones(1,REFS.NX))', 0, REFS.NX, REFS.NX);
-
-    % THE BOTTOM BOUNDARY CONDITION MUST BE IN CONTINUITY EQUATION 3
-    B31(bdex,bdex) = (-GPHI);
-    B32(bdex,bdex) = UNIT;
+    %% Assemble the force vector
+    F11 = zeros(OPS,1);
+    F21 = zeros(OPS,1);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
+    
+    %% Adjust the force vector for the coupled BC on W
+    bdex = 1:REFS.NZ:(OPS - REFS.NZ + 1);
+    W0 = (REFS.rref(1,:) .* REFS.ujref(1,:) .* REFS.DZT(1,:)) ./ sqrt(REFS.DZT(1,:).^2 + 1.0);
+    F11(bdex) = - B12(bdex,bdex) * W0';
+    F21(bdex) = - L22(bdex,bdex) * W0';
+    F31(bdex) = - L32(bdex,bdex) * W0';
+    F41(bdex) = - B42(bdex,bdex) * W0';
+    
+    %% Adjust the operator blocks for the coupled forcing BC
+    %
+    B12(bdex,bdex) = 0.0 * B12(bdex,bdex);
+    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
+    L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
+    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
+    %}
+    
+    %% Adjust the operator blocks for the top BC on PGF
+    %
+    tdex = REFS.NZ:REFS.NZ:OPS;
+    L24(tdex,tdex) = 0.0 * L24(tdex,tdex);
+    %}
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -144,46 +163,43 @@ function [LD,FF] = evaluateJacobianOperatorCBC_FluxForm(RhoU, RhoW, Rho, RhoThet
     RWTM = spdiags(RhoW, 0, OPS, OPS);
     RTHTM = spdiags(RTHT, 0 , OPS, OPS);
 
-    F11 = UTM * DDX * RhoU + ...
+    R11 = UTM * DDX * RhoU + ...
           RUTM * DDX * U + ...
           A * BS.gam * (RTHTM.^(BS.gam - 1.0)) * DDX * RhoTheta + ...
           UTM * DDZ * RhoW + ...
           RWTM * (DUREF + DDZ * U) + ...
           RAY.nu1 * spdiags(REFS.RL,0, OPS, OPS) * RhoU;
 
-    F21 = RUTM * DDX * W + WTM * DDX * RhoU + ...
+    R21 = RUTM * DDX * W + WTM * DDX * RhoU + ...
           WTM * DDZ * RhoW + RWTM * DDZ * W + ...
           A * BS.gam * (RTHTM.^(BS.gam - 1.0)) * (DRTREF + DDZ * RhoTheta) + ...
           BS.ga * RT + ...
           RAY.nu2 * spdiags(REFS.RL,0, OPS, OPS) * RhoW;
 
-    F31 = DDX * RhoU + ...
+    R31 = DDX * RhoU + ...
           DDZ * RhoW + ...
           RAY.nu3 * spdiags(REFS.RL,0, OPS, OPS) * Rho;
 
-    F41 = UTM * DDX * RhoTheta + RTHTM * DDX * U + ...
+    R41 = UTM * DDX * RhoTheta + RTHTM * DDX * U + ...
           WTM * (DRTREF + DDZ * RhoTheta) + RTHTM * DDZ * W + ...
           RAY.nu4 * spdiags(REFS.RL,0, OPS, OPS) * RhoTheta;
       
-    if NITER == 1
-        F11 = 0.0 * F11;
-        F21 = 0.0 * F21;
-        F31 = 0.0 * F31;
-        F41 = 0.0 * F41;
-    end
+    RR = [R11 ; R21 ; R31 ; R41];
 
-    %% Evaluate the force vector for the coupled BC
-    F31(bdex) = (RhoW(bdex) - RUT(bdex) .* (REFS.DZT(1,:))');
+    disp(['Residual in RhoU: ' num2str(norm(R11))]);
+    disp(['Residual in RhoW: ' num2str(norm(R21))]);
+    disp(['Residual in Rho: ' num2str(norm(R31))]);
+    disp(['Residual in RhoTheta: ' num2str(norm(R41))]);
+    
+    S = svds(LD, 5);
+    LB = 1.0 / max(S);
+    disp(['Maximum Singular Value: ' num2str(max(S))]);
 
-    disp(['Residual in RhoU: ' num2str(norm(F11))]);
-    disp(['Residual in RhoW: ' num2str(norm(F21))]);
-    disp(['Residual in Rho: ' num2str(norm(F31))]);
-    disp(['Residual in RhoTheta: ' num2str(norm(F41))]);
-
-    %% Compute the approximate Jacobian by finite difference
-    %DF = [F11 ; F21 ; F31 ; F41] - FF;
-    %DQ = [RhoU ; RhoW ; Rho ; RhoTheta];
-    %LD = sparse(DF * (DQ.^(-1))');
-
-    FF = - [F11 ; F21 ; F31 ; F41];
+    disp(['Lower Error Bound in RhoU: ' num2str(LB * norm(R11))]);
+    disp(['Lower Error Bound in RhoW: ' num2str(LB * norm(R21))]);
+    disp(['Lower Error Bound in Rho: ' num2str(LB * norm(R31))]);
+    disp(['Lower Error Bound in RhoTheta: ' num2str(LB * norm(R41))]);
+    
+    %% Assemble the tangent forcing
+    FF = [F11 ; F21 ; F31 ; F41] - RR;
 end

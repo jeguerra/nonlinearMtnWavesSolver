@@ -1,4 +1,4 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceFFT_WP(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     [~,DDX_H] = herdif(NX, 1, 0.5 * DS.L, true);
     x = linspace(DS.l1, DS.l2, NX+1);
@@ -40,9 +40,10 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     %% Compute the terrain slope derivatives using FFT derivative in X
     DZT = 1i * KF .* fft(HTZL,NX,2);
     
-    %% Make the matrix convolution operator for BC... VERY EXPENSIVE
-    %DTP = sparse(convmtx(DZT(1,:)', NX));
-    %size(DTP)
+    %% Compute the coupled BC terrain slope derivatives using FFT derivative in X
+    DZTPS = ifft(DZT,NX,2);
+    DZCBC = DZTPS .* (1.0 + DZTPS.^2).^(-0.5);
+    DZTCBC = fft(DZCBC,NX,2);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
@@ -130,19 +131,31 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     B42 = 1i * (U0 .* KX - BS.ga * IU0 * IKX * DLTHDZ);
     B44 = BS.ga * (1.0 - BS.gam) / BS.gam * unit + RAY.nu4 * (spdiags(RL,0, OPS, OPS));
 
-    %% Adjust the operator for BC on w only
-    bdex = 1:NZ:OPS;
-    B22(bdex,bdex) = speye(NX,NX);
-    B24(bdex,bdex) = sparse(NX,NX);
+    %% Assemble the force vector
+    F21 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
     
-    %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
+    %% Adjust the force vector for the coupled BC on W
+    bdex = 1:NZ:OPS;
+    W0 = ujref(1,:) .* DZTCBC(1,:);
+    F21(bdex) = - L22(bdex,bdex) * W0' - B22(bdex,bdex) * W0';
+    F41(bdex) = - B42(bdex,bdex) * W0';
+    
+    FF = [F21; F41];
+    
+    %% Adjust the operator blocks for the coupled forcing BC
+    %
+    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
+    B22(bdex,bdex) = 0.0 * B22(bdex,bdex);
+    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
+    %}
+    
+    %% Adjust the operator blocks for the top BC on PGF
     %
     tdex = NZ:NZ:OPS;
-    mbc = 1.0 * sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    L22(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L44(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    %
+    L44(tdex,tdex) = 0.0 * L44(tdex,tdex);
+    %}
+    
     %% Assemble the left hand side operator
     LD22 = L22 + B22;
     LD24 = L24 + B24;
@@ -151,12 +164,4 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     LD44 = L44 + B44;
 
     LD = [LD22 LD24 ; LD42 LD44];
-
-    %% Assemble the force vector
-    F21 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC
-    F21(bdex) = ujref(1,:) .* DZT(1,:);
-    FF = [F21 ; F41];
 end

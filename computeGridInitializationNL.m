@@ -34,7 +34,7 @@ function REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NXO, NX, 
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
+    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
     %}
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
@@ -45,7 +45,7 @@ function REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NXO, NX, 
     %[zl, DDZ_L] = lagdifJEG(NZ, 1, 2.0 * DS.zH);
        
     %% Compute the terrain and derivatives
-    [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS);
+    [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS,RAY);
     
     %% XZ grid for Legendre nodes in the vertical
     [HTZL,~] = meshgrid(ht,zl);

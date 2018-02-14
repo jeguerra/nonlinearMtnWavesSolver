@@ -34,8 +34,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %DDX_H(1:NX+1:end) = 1.0E-2 * ones(NX,1);
-    DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
+    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
     %}
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
@@ -46,7 +45,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     %[zl, DDZ_L] = lagdifJEG(NZ, 1, 2.0 * DS.zH);
        
     %% Compute the terrain and derivatives
-    [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS);
+    [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS,RAY);
     
     %% XZ grid for Legendre nodes in the vertical
     [HTZL,~] = meshgrid(ht,zl);
@@ -122,6 +121,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     %% Compute the vertical profiles of density and pressure
     pref = exp(lpref);
     rref = exp(lrref);
+    rref0 = max(max(rref));
     % Background potential temperature profile
     dlthref = 1.0 / BS.gam * dlpref - dlrref;
     thref = exp(1.0 / BS.gam * lpref - lrref + ...
@@ -129,6 +129,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     thref0 = min(min(thref));
     % Background RhoTheta gradient
     dthref = thref .* dlthref;
+    drref = rref .* dlrref;
 %{
     %% Plot background fields including mean Ri number
     fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
@@ -192,10 +193,10 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     pause
 %}
     
-    REFS = struct('ujref',ujref,'dujref',dujref, ...
+    REFS = struct('ujref',ujref,'dujref',dujref,'drref',drref,'dthref',dthref, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'dlthref',dlthref, ...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
-        'DDX_H',DDX_H,'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'thref0',thref0);
+        'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
@@ -273,14 +274,36 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     B42 = DTHDZ;
     B43 = sparse(OPS,OPS);
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
-    %% Adjust the operator for the coupled forcing BC
-    bdex = 1:NZ:OPS;
-    GPHI = spdiags((DZT(1,:))', 0, NX, NX);
-    UNIT = spdiags((ones(1,NX))', 0, NX, NX);
     
-    % THE BOTTOM BOUNDARY CONDITION MUST BE IN CONTINUITY EQUATION 3
-    B31(bdex,bdex) = (-GPHI);
-    B32(bdex,bdex) = UNIT;
+    %% Assemble the force vector
+    F11 = zeros(OPS,1);
+    F21 = zeros(OPS,1);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
+    
+    %% Adjust the force vector for the coupled BC on W
+    bdex = 1:NZ:(OPS - NZ + 1);
+    W0 = (rref(1,:) .* ujref(1,:) .* DZT(1,:)) ./ sqrt(DZT(1,:).^2 + 1.0);
+    F11(bdex) = - B12(bdex,bdex) * W0';
+    F21(bdex) = - L22(bdex,bdex) * W0';
+    F31(bdex) = - L32(bdex,bdex) * W0';
+    F41(bdex) = - B42(bdex,bdex) * W0';
+    
+    FF = [F11 ; F21 ; F31 ; F41];
+    
+    %% Adjust the operator blocks for the coupled forcing BC
+    %
+    B12(bdex,bdex) = 0.0 * B12(bdex,bdex);
+    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
+    L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
+    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
+    %}
+    
+    %% Adjust the operator blocks for the top BC on PGF
+    %
+    tdex = NZ:NZ:OPS;
+    L24(tdex,tdex) = 0.0 * L24(tdex,tdex);
+    %}
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -307,15 +330,4 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
-
-    %% Assemble the force vector
-    F11 = zeros(OPS,1);
-    F21 = zeros(OPS,1);
-    F31 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC
-    F31(bdex) = (rref(1,:) .* ujref(1,:) .* DZT(1,:))';
-    
-    FF = [F11 ; F21 ; F31 ; F41];
 end

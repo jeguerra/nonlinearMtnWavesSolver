@@ -19,7 +19,7 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     TopOut = [utdex wtdex rtdex ptdex];
     %
     uldex = 1:NZ;
-    urdex = ((NX-1)*NZ)+1:OPS;
+    urdex = (OPS - NZ + 1):OPS;
     wldex = uldex + OPS;
     wrdex = urdex + OPS;
     rldex = uldex + 2*OPS;
@@ -31,25 +31,20 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     RightOut = [urdex wrdex rrdex prdex];
 
     if BC == 0
-        disp('No Specific BC`s Set');
-        rowsOut = [];
+        disp('Dirichlet W Top, All Lateral');
+        rowsOut = [wtdex LeftRightOut];
     elseif BC == 1
-        % Only apply the BC on W at the top
-        disp('Dirichlet W Top, Periodic Lateral');
-        rowsOut = [wtdex RightOut];
+        disp('Dirichlet W Top Only');
+        rowsOut = wtdex;
     elseif BC == 2
-        % Dirichlet top for all variables
-        disp('Dirichlet All Top, Periodic Lateral');
-        rowsOut = [TopOut RightOut];
+        disp('Dirichlet All Top');
+        rowsOut = TopOut;
     elseif BC == 3
-        % Dirichlet top and lateral for all variables
         disp('Dirichlet All Top and Lateral');
         rowsOut = [TopOut LeftRightOut];
     elseif BC == 4
-        % Apply BC on W and U for no wave flow across boundaries and
-        % thermodynamic variable vanish at lateral boundaries
-        disp('BC on W and U for no outflow, rho and P vanish at all boundaries.');
-        rowsOut = [wtdex uldex urdex rldex rrdex pldex prdex rtdex ptdex];
+        disp('Dirichlet W Top, Periodic Lateral');
+        rowsOut = [wtdex RightOut];
     else
         disp('ERROR: Invalid BC combination... applying default on W bottom only.');
         rowsOut = wtdex;

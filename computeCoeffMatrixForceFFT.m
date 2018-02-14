@@ -40,8 +40,10 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     %% Compute the terrain slope derivatives using FFT derivative in X
     DZT = 1i * KF .* fft(HTZL,NX,2);
     
-    %% Make the matrix convolution operator for BC... VERY EXPENSIVE
-    DTP = sparse(convmtx(DZT(1,:)', NX));
+    %% Compute the coupled BC terrain slope derivatives using FFT derivative in X
+    DZTPS = ifft(DZT,NX,2);
+    DZCBC = DZTPS .* (1.0 + DZTPS.^2).^(-0.5);
+    DZTCBC = fft(DZCBC,NX,2);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
@@ -66,8 +68,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     pref = exp(lpref);
     rref = exp(lrref);
     rref0 = max(max(rref));
-    % Density weighted change of variable
-    rsc = sqrt(rref0) * rref.^(-0.5);
     % Background potential temperature profile
     dlthref = 1.0 / BS.gam * dlpref - dlrref;
     thref = exp(1.0 / BS.gam * lpref - lrref + ...
@@ -110,7 +110,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
-    RSC = spdiags(reshape(rsc,OPS,1), 0, OPS, OPS);
     %U0DX = U0 * DDX_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
@@ -122,12 +121,12 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     L14 = 1i * POR * KX;
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
-    L22 = 1i * RSC * KX * U0;
+    L22 = 1i * KX * U0;
     L23 = sparse(OPS,OPS);
     L24 = POR * SIGMA * DDXI_OP;
     % Continuity LHS
     L31 = 1i * KX;
-    L32 = RSC * SIGMA * DDXI_OP;
+    L32 = SIGMA * DDXI_OP;
     L33 = 1i * KX .* U0;
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
@@ -139,7 +138,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
     B11 = sparse(OPS,OPS) + RAY.nu1 * (spdiags(RL,0, OPS, OPS));
-    B12 = RSC * DUDZ;
+    B12 = DUDZ;
     B13 = sparse(OPS,OPS);
     B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
@@ -149,12 +148,12 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     B24 = -BS.ga * unit;
     % Continuity LHS
     B31 = sparse(OPS,OPS);
-    B32 = 0.5 * RSC * DLRDZ;
+    B32 = DLRDZ;
     B33 = sparse(OPS,OPS) + RAY.nu3 * (spdiags(RL,0, OPS, OPS));
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
-    B42 = RSC * (1.0 / BS.gam * DLPDZ - DLRDZ);
+    B42 = (1.0 / BS.gam * DLPDZ - DLRDZ);
     B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS);
     B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
@@ -166,7 +165,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     
     %% Adjust the force vector for the coupled BC on W
     bdex = 1:NZ:OPS;
-    W0 = (ujref(1,:) .* DZT(1,:)) ./ sqrt(DZT(1,:).^2 + 1.0);
+    W0 = ujref(1,:) .* DZTCBC(1,:);
     F11(bdex) = - B12(bdex,bdex) * W0';
     F21(bdex) = - L22(bdex,bdex) * W0';
     F31(bdex) = - L32(bdex,bdex) * W0' - B32(bdex,bdex) * W0';
@@ -181,6 +180,12 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
     B32(bdex,bdex) = 0.0 * B32(bdex,bdex);
     B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
+    %}
+    
+    %% Adjust the operator blocks for the top BC on PGF
+    %
+    tdex = NZ:NZ:OPS;
+    L24(tdex,tdex) = 0.0 * L24(tdex,tdex);
     %}
 
     %% Assemble the left hand side operator
