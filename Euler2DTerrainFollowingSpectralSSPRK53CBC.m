@@ -149,7 +149,7 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC);
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
-[LD,FF,REFS] = ...
+[LD,FF,W0,REFS] = ...
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
@@ -172,16 +172,9 @@ diag(dlambda)
 %%
 SOL(sysDex) = dvecs(:,1);
 uxz = reshape(SOL((1:OPS),1),NZ,NX);
-whxz = reshape(SOL((1:OPS) + OPS,1),NZ,NX);
+wxz = reshape(SOL((1:OPS) + OPS,1),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS,1),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS,1),NZ,NX);
-
-uxz(:,end) = uxz(:,1);
-whxz(:,end) = whxz(:,1);
-wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
-wxz = wf .* whxz;
-rxz(:,end) = rxz(:,1);
-pxz(:,end) = pxz(:,1);
 
 %% Plot the solution in the native grids
 %
@@ -306,13 +299,9 @@ SOL(sysDex) = sol;
 clear sol;
 %
 uxz = reshape(SOL((1:OPS)),NZ,NX);
-whxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
-
-%% Convert \hat{w} to w using the reference density profile
-wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
-wxz = wf .* whxz;
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %

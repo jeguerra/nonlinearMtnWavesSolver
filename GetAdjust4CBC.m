@@ -6,7 +6,7 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
 
     %% Create boundary condition indices
     %{
-    ubdex = 1:NZ:OPS;
+    ubdex = 1:NZ:(OPS - NZ + 1);
     wbdex = ubdex + OPS;
     rbdex = ubdex + 2*OPS;
     pbdex = ubdex + 3*OPS;
@@ -31,11 +31,11 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     RightOut = [urdex wrdex rrdex prdex];
 
     if BC == 0
-        disp('Dirichlet W Top, All Lateral');
+        disp('All quantities vanish at the lateral boundary');
         rowsOut = [wtdex LeftRightOut];
     elseif BC == 1
-        disp('Dirichlet W Top Only');
-        rowsOut = wtdex;
+        disp('All quantities vanish at the top and lateral boundary');
+        rowsOut = [TopOut LeftRightOut];
     elseif BC == 2
         disp('Dirichlet All Top');
         rowsOut = TopOut;
@@ -46,8 +46,8 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
         disp('Dirichlet W Top, Periodic Lateral');
         rowsOut = [wtdex RightOut];
     else
-        disp('ERROR: Invalid BC combination... applying default on W bottom only.');
-        rowsOut = wtdex;
+        disp('Default BC... nothing removed');
+        rowsOut = [];
     end
 
     sysDex = setdiff(1:numVar*OPS, rowsOut);

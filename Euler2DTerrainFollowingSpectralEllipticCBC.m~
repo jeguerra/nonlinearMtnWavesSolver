@@ -12,17 +12,17 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 240; % Expansion order matches physical grid
+NX = 80; % Expansion order matches physical grid
 NXO = 80; % Expansion order
-NZ = 80; % Expansion order matches physical grid
+NZ = 60; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-%TestCase = 'ShearJetSchar'; BC = 0;
+TestCase = 'ShearJetSchar'; BC = 1;
 %TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 0;
-TestCase = 'AndesMtn'; BC = 0;
+%TestCase = 'AndesMtn'; BC = 0;
 
 z0 = 0.0;
 gam = 1.4;
@@ -118,8 +118,8 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 40000.0;
-    l1 = -1.0E5 * 2.0 * pi;
-    l2 = 1.0E5 * 2.0 * pi;
+    l1 = -1.0E5 * 1.0 * pi;
+    l2 = 1.0E5 * 1.0 * pi;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -130,14 +130,14 @@ elseif strcmp(TestCase,'AndesMtn') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 15000.0;
-    width = 1.10E5;
+    width = 85000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
-    applyLateralRL = true;
+    applyLateralRL = false;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 1000.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '100m';
     u0 = 10.0;
@@ -157,7 +157,7 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
-[LD,FF,REFS] = ...
+[LD,FF,W0,REFS] = ...
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
 %[LD,FF,REFS] = ...
@@ -190,10 +190,8 @@ wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
-%uxz(:,end) = uxz(:,1);
-%whxz(:,end) = whxz(:,1);
-%rxz(:,end) = rxz(:,1);
-%pxz(:,end) = pxz(:,1);
+wbdex = 1:NZ:OPS;
+wxz(wbdex) = W0;
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
@@ -220,7 +218,7 @@ XI = l2 * XINT;
 ZI = ZINT;
 %}
 % Plot the solution in the native grids
-%{
+%
 % NATIVE GRID PLOTS
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(REFS.ujref + uxz),31); colorbar;
@@ -275,13 +273,13 @@ dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
-%contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
-contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
+contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
+%contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XI(1,:),2.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
 caxis(cm);
 %xlim(1.0E-3 * [l1 + width l2 - width]);
 %ylim(1.0E-3 * [0.0 zH - depth]);
-%xlim([-100 100]);
+%xlim([-200 300]);
 %ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
@@ -410,31 +408,36 @@ ylim([0.0 30.0]);
 xlim([-0.3 0.3]);
 fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 
-%{
+fname = ['RI_CONV_N2_' TestCase num2str(hC)];
+drawnow;
+screen2png(fname);
+%% Compute N and the local Fr number
+%
+fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
 rho = exp(lrho);
 dlpt = 1 / gam * dlpres - dlrho;
 NBVF = (ga .* dlpt);
 
-NBVF_REF = (ga * (1 / gam * REFS.dlpref - REFS.dlrref));
+Lv = 2.5E3;
+FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
 
 xdex = 1:1:NX;
-subplot(1,3,3); plot(NBVF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5); hold on;
-plot(NBVF_REF(:,1),1.0E-3*REFS.ZTL(:,1),'ro-','LineWidth',1.5); hold off;
+plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 grid on; grid minor;
-title('Brunt-V\"ais\"al\"a','FontWeight','normal','Interpreter','latex');
-xlabel('\textsf{$\mathcal{N}^2$}','Interpreter','latex');
+title('Local Froude Number - l_v = 2.5\times10^3 (m)','FontWeight','normal','Interpreter','tex');
+%xlabel('\textsf{Fr = \frac{2 \pi | w |}{\mathcal{N} l_v}}','Interpreter','latex');
 %ylabel('\textsf{Altitude (km)}','Interpreter','latex');
-%ylim([0.0 30.0]);
-xlim([-1.0E-3 2.0E-3]);
+ylim([0.0 30.0]);
+%xlim([-1.0E-3 2.0E-3]);
 fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
-%}
-fname = ['RI_CONV_N2_' TestCase num2str(hC)];
+
+fname = ['FROUDE_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
-%
+%}
 %% Compute the nonlinearity parameter in Rho and plot...
 %{
 nlRho = exp(rxz) - 1.0;
