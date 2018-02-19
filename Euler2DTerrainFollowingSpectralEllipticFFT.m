@@ -19,7 +19,7 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
+TestCase = 'ShearJetSchar'; BC = 4;
 %TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 0;
 %TestCase = 'AndesMtn'; BC = 0;
@@ -202,12 +202,12 @@ cmap = cmap(:,1:3);
 %% Plot the solution frequency space
 SOL(sysDex) = sol;
 uxz = real(reshape(SOL((1:OPS)),NZ,NX));
-whxz = real(reshape(SOL((1:OPS) + OPS),NZ,NX));
+wxz = real(reshape(SOL((1:OPS) + OPS),NZ,NX));
 rxz = real(reshape(SOL((1:OPS) + 2*OPS),NZ,NX));
 pxz = real(reshape(SOL((1:OPS) + 3*OPS),NZ,NX));
 %% Convert \hat{w} to w using the reference density profile
-wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
-wxz = wf .* whxz;
+%wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
+%wxz = wf .* whxz;
 %
 kdex = find(REFS.KF(1,:) >= 0.0);
 rad2len = 1. / (2. * pi);
@@ -245,12 +245,12 @@ drawnow
 %% Plot the solution using the IFFT to recover the solution in physical space
 SOL(sysDex) = sol;
 uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),[],2));
-whxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
+wxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
 rxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
 pxz = real(ifft(reshape(SOL((1:OPS) + 3*OPS),NZ,NX),[],2));
 %% Convert \hat{w} to w using the reference density profile
-wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
-wxz = wf .* whxz;
+%wf = sqrt(REFS.rref0) * REFS.rref.^(-0.5);
+%wxz = wf .* whxz;
 %
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);

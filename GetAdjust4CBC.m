@@ -44,7 +44,7 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
         rowsOut = [TopOut LeftRightOut];
     elseif BC == 4
         disp('Dirichlet W Top, Periodic Lateral');
-        rowsOut = [wtdex RightOut];
+        rowsOut = wtdex;
     else
         disp('Default BC... nothing removed');
         rowsOut = [];

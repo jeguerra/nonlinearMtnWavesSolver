@@ -182,11 +182,21 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
     %}
     
-    %% Adjust the operator blocks for the top BC on PGF
+    %% Adjust the operator blocks for the top BC on W and PGF
     %
     tdex = NZ:NZ:OPS;
+    % if w = 0 then:
+    B12(tdex,tdex) = 0.0 * B12(tdex,tdex);
+    B22(tdex,tdex) = 0.0 * B22(tdex,tdex);
+    L22(tdex,tdex) = 0.0 * L22(tdex,tdex);
+    B32(tdex,tdex) = 0.0 * B32(tdex,tdex);
+    B42(tdex,tdex) = 0.0 * B42(tdex,tdex);
+    % if PGF = 0 then:
     L24(tdex,tdex) = 0.0 * L24(tdex,tdex);
-    %}
+    % if BC is time invariant then:
+    B11(tdex,tdex) = 0.0 * B11(tdex,tdex);
+    B33(tdex,tdex) = 0.0 * B33(tdex,tdex);
+    B44(tdex,tdex) = 0.0 * B44(tdex,tdex);
 
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
