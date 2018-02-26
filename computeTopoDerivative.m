@@ -4,7 +4,7 @@ function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS,RAY)
     
     %% Make a windowing function and its derivative
     LI = 0.5 * (DS.L - 2 * RAY.width);
-    xw = find(abs(xh) <= LI);    
+    xw = find(abs(xh) <= 0.25 * DS.L);    
     W = ht;
     W(xw) = 1.0 - (sin(0.5 * pi * xh(xw) / LI)).^20;
     DW = ht;

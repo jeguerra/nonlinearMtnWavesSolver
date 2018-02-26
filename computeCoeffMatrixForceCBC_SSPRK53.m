@@ -1,4 +1,4 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,W0,REFS] = computeCoeffMatrixForceCBC_SSPRK53(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     
     % Set the domain scale
@@ -109,8 +109,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     pref = exp(lpref);
     rref = exp(lrref);
     rref0 = max(max(rref));
-    % Density weighted change of variable
-    rsc = sqrt(rref0) * rref.^(-0.5);
     % Background potential temperature profile
     dlthref = 1.0 / BS.gam * dlpref - dlrref;
     thref = exp(1.0 / BS.gam * lpref - lrref + ...
@@ -228,7 +226,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
-    RSC = spdiags(reshape(rsc,OPS,1), 0, OPS, OPS);
     U0DA = U0 * DADX * DDA_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
@@ -239,72 +236,83 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     L14 = POR * DADX * DDA_OP;
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
-    L22 = RSC * U0DA;
+    L22 = U0DA;
     L23 = sparse(OPS,OPS);
     L24 = POR * SIGMA * DDXI_OP;
     % Continuity LHS
     L31 = DADX * DDA_OP;
-    L32 = RSC * SIGMA * DDXI_OP;
+    L32 = SIGMA * DDXI_OP;
     L33 = U0DA;
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
-    L41 = sparse(OPS,OPS);
-    L42 = sparse(OPS,OPS);
-    L43 = -U0DA;
-    L44 = 1.0 / BS.gam * U0DA;
+    L41 = BS.gam * DADX * DDA_OP;
+    L42 = BS.gam * SIGMA * DDXI_OP;
+    L43 = sparse(OPS,OPS);
+    L44 = U0DA;
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
     B11 = sparse(OPS,OPS) + RAY.nu1 * spdiags(RL,0, OPS, OPS);
-    B12 = RSC * DUDZ;
+    B12 = DUDZ;
     B13 = sparse(OPS,OPS);
     B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
     B21 = sparse(OPS,OPS);
-    B22 = sparse(OPS,OPS) + RAY.nu2 * RSC * spdiags(RL,0, OPS, OPS);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
     B23 = BS.ga * unit;
     B24 = -BS.ga * unit;
     % Continuity LHS (using density weighted change of variable in W)
     B31 = sparse(OPS,OPS);
-    B32 = 0.5 * RSC * DLRDZ;
+    B32 = DLRDZ;
     B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
-    B42 = RSC * (1.0 / BS.gam * DLPDZ - DLRDZ);
-    B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS);
-    B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    B42 = DLPDZ;
+    B43 = sparse(OPS,OPS);
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Adjust the operator for the coupled forcing BC
-    bdex = 1:NZ:OPS;
-    GPHI = spdiags((DZT(1,:))', 0, NX, NX);
-    RSBC = spdiags((rsc(1,:))', 0, NX, NX);
+    %% Assemble the force vector
+    F11 = zeros(OPS,1);
+    F21 = zeros(OPS,1);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
     
-    % THE BOTTOM BOUNDARY CONDITION MUST BE IN CONTINUITY EQUATION 3
-    B31(bdex,bdex) = (-GPHI);
-    B32(bdex,bdex) = RSBC;
+    %% Adjust the force vector for the coupled BC on W
+    bdex = 1:NZ:(OPS - NZ + 1);
+    W0 = (ujref(1,:) .* DZT(1,:)) ./ sqrt(DZT(1,:).^2 + 1.0);
+    F11(bdex) = - B12(bdex,bdex) * W0';
+    F21(bdex) = - L22(bdex,bdex) * W0';
+    F31(bdex) = - L32(bdex,bdex) * W0' - B32(bdex,bdex) * W0';
+    F41(bdex) = - L42(bdex,bdex) * W0' - B42(bdex,bdex) * W0';
     
-    %% Neumann Boundary Conditions TOP BOUNDARY TO INFINITY
+    FF = [F11 ; F21 ; F31 ; F41];
+    
+    %% Adjust the operator blocks for the coupled forcing BC on W
+    %
+    B12(bdex,bdex) = 0.0 * B12(bdex,bdex);
+    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
+    L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
+    B32(bdex,bdex) = 0.0 * B32(bdex,bdex);
+    L42(bdex,bdex) = 0.0 * L42(bdex,bdex);
+    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
+    %}
+    
+    %% Adjust the operator blocks for the top BC on W and PGF
+    %
     tdex = NZ:NZ:OPS;
-    mbc = 1.0 * sqrt(BS.ga * dlthref(NZ,1)) / ujref(NZ,1);
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    L31(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L32(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    L33(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    %L44(tdex,tdex) = SIGMA(tdex,tdex) * DDXI_OP(tdex,tdex) + mbc * UNIT;
-    
-    %% Neumann Boundary Conditions LATERAL BOUNDARY TO INFINITY
-    ldex = 1:NZ;
-    rdex = (NX-1)*NZ+1:OPS;
-    UNIT = spdiags(ones(NZ,1), 0, NZ, NZ);
-    % Left side
-    L31(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L32(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    L33(ldex,ldex) = DADX(ldex,ldex) * DDA_OP(ldex,ldex) + 0.1 * UNIT;
-    % Right side
-    L31(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L32(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
-    L33(rdex,rdex) = DADX(rdex,rdex) * DDA_OP(rdex,rdex) + 0.1 * UNIT;
+    % if w = 0 then:
+    B12(tdex,tdex) = 0.0 * B12(tdex,tdex);
+    B22(tdex,tdex) = 0.0 * B22(tdex,tdex);
+    L22(tdex,tdex) = 0.0 * L22(tdex,tdex);
+    B32(tdex,tdex) = 0.0 * B32(tdex,tdex);
+    B42(tdex,tdex) = 0.0 * B42(tdex,tdex);
+    % if PGF = 0 then:
+    L24(tdex,tdex) = 0.0 * L24(tdex,tdex);
+    % if BC is time invariant then:
+    %B11(tdex,tdex) = 0.0 * B11(tdex,tdex);
+    %B33(tdex,tdex) = 0.0 * B33(tdex,tdex);
+    %B44(tdex,tdex) = 0.0 * B44(tdex,tdex);
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -327,19 +335,9 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
+    %% Assemble the LHS operator
     LD = [LD11 LD12 LD13 LD14 ; ...
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
-
-    %% Assemble the force vector
-    F11 = zeros(OPS,1);
-    F21 = zeros(OPS,1);
-    F31 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC
-    F31(bdex) = (ujref(1,:) .* DZT(1,:))';
-    
-    FF = [F11 ; F21 ; F31 ; F41];
 end

@@ -5,7 +5,7 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     FFBC = FF;
 
     %% Create boundary condition indices
-    %{
+    %
     ubdex = 1:NZ:(OPS - NZ + 1);
     wbdex = ubdex + OPS;
     rbdex = ubdex + 2*OPS;
@@ -28,11 +28,12 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
     prdex = urdex + 3*OPS;
     %}
     LeftRightOut = [uldex urdex wldex wrdex rldex rrdex pldex prdex];
+    LeftOut = [uldex wldex rldex pldex];
     RightOut = [urdex wrdex rrdex prdex];
 
     if BC == 0
-        disp('All quantities vanish at the lateral boundary');
-        rowsOut = [wtdex LeftRightOut];
+        disp('All quantities vanish at the upstream lateral boundary');
+        rowsOut = LeftOut;
     elseif BC == 1
         disp('All quantities vanish at the top and lateral boundary');
         rowsOut = [TopOut LeftRightOut];
@@ -40,15 +41,15 @@ function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
         disp('Dirichlet All Top');
         rowsOut = TopOut;
     elseif BC == 3
-        disp('Dirichlet All Top and Lateral');
-        rowsOut = [TopOut LeftRightOut];
+        disp('Dirichlet W Top, Bottom, and Lateral');
+        rowsOut = [ubdex utdex wbdex wtdex LeftRightOut];
     elseif BC == 4
-        disp('Dirichlet W Top, Periodic Lateral');
-        rowsOut = wtdex;
+        disp('Dirichlet Testing');
+        rowsOut = [wtdex];
     else
         disp('Default BC... nothing removed');
         rowsOut = [];
     end
 
-    sysDex = setdiff(1:numVar*OPS, rowsOut);
+    sysDex = setdiff(1:numVar*OPS + 2*NX, rowsOut);
 end

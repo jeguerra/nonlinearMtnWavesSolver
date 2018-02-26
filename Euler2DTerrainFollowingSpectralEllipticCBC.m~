@@ -19,7 +19,7 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 1;
+TestCase = 'ShearJetSchar'; BC = 0;
 %TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 0;
 %TestCase = 'AndesMtn'; BC = 0;
@@ -83,7 +83,7 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -118,8 +118,8 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 40000.0;
-    l1 = -1.0E5 * 1.0 * pi;
-    l2 = 1.0E5 * 1.0 * pi;
+    l1 = -1.0E5 * 2.0 * pi;
+    l2 = 1.0E5 * 2.0 * pi;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -137,7 +137,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '100m';
     u0 = 10.0;
@@ -157,8 +157,11 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
-[LD,FF,W0,REFS] = ...
+[LD,FF,REFS] = ...
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+
+%[LD,FF,U0,W0,REFS] = ...
+%computeCoeffMatrixForceCBC_LMC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
 %[LD,FF,REFS] = ...
 %computeCoeffMatrixForceCBC_HerLag(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
@@ -168,35 +171,38 @@ computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, a
 
 %% Solve the system using the matlab linear solver
 %
-disp('Solve the raw system with matlab default \.');
+disp('Solve by applying orthogonal basis and matlab \.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
-%A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
-%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
+toc; disp('Compute raw coefficient matrix... DONE.');
+% Project onto the orthogonal subspace in the range of A
+tic
+AO = sporth(A);
+AR = AO' * A * AO;
+BR = AO' * b;
+toc; disp('Compute projection to 
 clear LD FF FFBC;
-sol = A \ b;
-clear A b;
+tic
+sol = AO * (AR \ BR);
+%[~,sig,sol] = svds(A,4,'smallest');
 toc
 %}
-
+% clear A b
 %% Get the solution fields
-SOL(sysDex) = sol;
-clear sol;
+SOL(sysDex) = sol(:,1);
+%clear sol;
 %%
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
-wbdex = 1:NZ:OPS;
-wxz(wbdex) = W0;
-
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 3000;
-NZI = 300;
+NXI = 2000;
+NZI = 200;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
@@ -218,7 +224,7 @@ XI = l2 * XINT;
 ZI = ZINT;
 %}
 % Plot the solution in the native grids
-%
+%{
 % NATIVE GRID PLOTS
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(REFS.ujref + uxz),31); colorbar;
@@ -283,7 +289,7 @@ caxis(cm);
 %ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('\textsf{Total Horizontal Velocity U $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');
+title('\textsf{$U^{\prime} ~~ (ms^{-1})$}','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
@@ -298,23 +304,23 @@ caxis(cm);
 %ylim(1.0E-3 * [0.0 zH - depth]);
 %xlim([-100 100]);
 %ylim([0 15]);
-title('\textsf{Vertical Velocity W $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');
+title('\textsf{$W^{\prime} ~~ (ms^{-1})$}','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 screen2png(['WREferenceSolution' mtnh '.png']);
-%{
+%
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 colormap(cmap);
 subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('Perturbation Log Density $(kg m^{-3})$','FontWeight','normal','Interpreter','latex');
+title('$(\ln p)^{\prime} ~~ (Pa)$','FontWeight','normal','Interpreter','latex');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('Perturbation Log Pressure (Pa)','FontWeight','normal','Interpreter','latex');
+title('$(\ln \theta)^{\prime} ~~ (K)$','FontWeight','normal','Interpreter','latex');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 drawnow
 %}
@@ -342,7 +348,7 @@ xlabel('Distance (km)');
 fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 screen2png(['WaveGrowthW_LnP' mtnh '.png']);
 %}
-
+%
 %% Compute the scaling constants needed for residual diffusion
 lrho = REFS.lrref + rxz;
 rho = exp(lrho);
@@ -481,16 +487,16 @@ drawnow;
 screen2png(fname);
 %}
 %% Debug
-%{
+%
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Total Horizontal Velocity U (m/s)');
 subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
 title('Vertical Velocity W (m/s)');
 subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Perturbation Density (kg/m^3)');
+title('Perturbation Log Pressure (Pa)');
 subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Perturbation Pressure (Pa)');
+title('Perturbation Log \theta (K)');
 drawnow
 %}
 

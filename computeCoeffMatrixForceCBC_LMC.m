@@ -1,12 +1,5 @@
-function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LDA,FF,U0,W0,REFS] = computeCoeffMatrixForceCBC_LMC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
-    % Set the boundary indices and operator dimension
-    OPS = NX*NZ;
-    tdex = NZ:NZ:OPS;
-    bdex = 1:NZ:(OPS - NZ + 1);
-    rdex = (OPS - NZ + 2):OPS - 1;
-    NO = length(bdex);
-    NR = length(rdex);
     
     % Set the domain scale
     dscale = 0.5 * DS.L;
@@ -85,14 +78,13 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
         DZT(rr,:) = fxi(rr,:) .* dhdx';
     end
     % Compute the horizontal metric derivative
-    dadx = (1.0 + DZT.^2).^(0.5);
-    dxidx = sigma .* DZT;
+    dAdX = (1.0 + DZT.^2).^(0.5);
     
     %% Compute the Rayleigh field
     [rayField, ~] = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyTopRL,applyLateralRL);
     %[rayField, ~] = computeRayleighPolar(DS,1.0,RAY.depth,XL,ZL);
     %[rayField, ~] = computeRayleighEllipse(DS,1.0,RAY.depth,RAY.width,XL,ZL);
-    RL = reshape(rayField,OPS,1);
+    RL = reshape(rayField,NX*NZ,1);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
@@ -210,7 +202,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
-    DDXI_OP = zeros(OPS);
+    DDXI_OP = zeros(NX*NZ);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
@@ -218,49 +210,45 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite expansion)
-    DDA_OP = zeros(OPS);
+    DDA_OP = zeros(NX*NZ);
     for rr=1:NZ
-        ddex = (1:NZ:OPS) + (rr - 1);
+        ddex = (1:NZ:NX*NZ) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;
     end
     DDA_OP = sparse(DDA_OP);
 
     %% Assemble the block global operator L
+    OPS = NX*NZ;
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
-    DADX = spdiags(reshape(dadx,OPS,1), 0, OPS, OPS);
-    DXIDX = spdiags(reshape(dxidx,OPS,1), 0, OPS, OPS);
+    DADX = spdiags(reshape(dAdX,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
-    DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
-    U0DX = U0 * DDA_OP;
-    DX = DDA_OP;
-    %DX = DDA_OP - DXIDX * DDXI_OP;
-    %U0DX = U0 * (DDA_OP - DXIDX * DDXI_OP);
+    U0DA = U0 * DADX * DDA_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
     % Horizontal momentum LHS
-    L11 = U0DX;
+    L11 = U0DA;
     L12 = sparse(OPS,OPS);
-    L13 = POR * DX;
-    L14 = sparse(OPS,OPS);
+    L13 = sparse(OPS,OPS);
+    L14 = POR * DADX * DDA_OP;
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
-    L22 = U0DX;
-    L23 = POR * SIGMA * DDXI_OP;
-    L24 = sparse(OPS,OPS);
-    % Continuity (log pressure) LHS
-    L31 = BS.gam * DDA_OP;
-    L32 = BS.gam * SIGMA * DDXI_OP;
-    L33 = U0DX;
+    L22 = U0DA;
+    L23 = sparse(OPS,OPS);
+    L24 = POR * SIGMA * DDXI_OP;
+    % Continuity LHS
+    L31 = DADX * DDA_OP;
+    L32 = SIGMA * DDXI_OP;
+    L33 = U0DA;
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     L41 = sparse(OPS,OPS);
     L42 = sparse(OPS,OPS);
-    L43 = sparse(OPS,OPS);
-    L44 = U0DX;
+    L43 = -U0DA;
+    L44 = 1.0 / BS.gam * U0DA;
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
@@ -271,50 +259,44 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     % Vertical momentum LHS
     B21 = sparse(OPS,OPS);
     B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
-    B23 = BS.ga * (1.0 / BS.gam - 1.0) * unit;
-    B24 = - BS.ga * unit;
-    % Continuity (log pressure) LHS
+    B23 = BS.ga * unit;
+    B24 = -BS.ga * unit;
+    % Continuity LHS (using density weighted change of variable in W)
     B31 = sparse(OPS,OPS);
-    B32 = DLPDZ;
+    %B32 = sparse(OPS,OPS);
+    B32 = DLRDZ;
     B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
-    B42 = DLPTDZ;
-    B43 = sparse(OPS,OPS);
-    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    B42 = (1.0 / BS.gam * DLPDZ - DLRDZ);
+    B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Constraint the top and bottom boundaries
-    %{
-    % No horizontal transport of vertical velocity
-    B12(tdex,tdex) = zeros(NO);
-    % No vertical momentum constraint along boundary
-    L22(tdex,tdex) = zeros(NO);
-    L23(tdex,tdex) = zeros(NO);
-    B23(tdex,tdex) = zeros(NO);
-    B24(tdex,tdex) = zeros(NO);
-    % No vertical transport of pressure 
-    B32(tdex,tdex) = zeros(NO);
-    % No vertical transport of entropy 
-    B42(tdex,tdex) = zeros(NO);
+    %% Write the constraint equations
     %
-    %L11(bdex,bdex) = zeros(NO);
-    %L22(bdex,bdex) = zeros(NO);
-    %LD22(bdex,bdex) = zeros(NO);
-    %LD23(bdex,bdex) = zeros(NO);
-    %LD24(bdex,bdex) = zeros(NO);
-    %LD32(bdex,bdex) = zeros(NO);
-    %LD42(bdex,bdex) = zeros(NO);
-    %}
+    bdex = 1:NZ:(OPS - NZ + 1);
+    tdex = NZ:NZ:OPS;
+    W0 = (ujref(1,:) .* DZT(1,:)) ./ sqrt(DZT(1,:).^2 + 1.0);
+    U0 = (ujref(1,:) ./ sqrt(DZT(1,:).^2 + 1.0)) - ujref(1,:);
     
-    %% Neumann condition at the right lateral boundary
-    %{
-    L11(rdex,rdex) = zeros(NR);
-    L13(rdex,rdex) = zeros(NR);
-    L22(rdex,rdex) = zeros(NR);
-    L31(rdex,rdex) = zeros(NR);
-    L33(rdex,rdex) = zeros(NR);
-    L44(rdex,rdex) = zeros(NR);
+    % Bottom boundary
+    BCU = spdiags((DZT(1,:))', 0, NX, NX);
+    BCW = spdiags(ones(NX,1), 0, NX, NX);
+    BC = sparse(NX,OPS); BC(:,bdex) = BCU; BCU = BC;
+    BC = sparse(NX,OPS); BC(:,bdex) = BCW; BCW = BC;
+    BC = sparse(NX,OPS); BCR = BC;
+    BC = sparse(NX,OPS); BCP = BC;
+    BCB = [-BCU BCW BCR BCP];
+    % Top boundary
+    BCW = spdiags(ones(length(tdex),1), 0, NX, NX);
+    BC = sparse(NX,OPS); BC(:,tdex) = BCW; BCW = BC;
+    BC = sparse(NX,OPS); BCU = BC;
+    BC = sparse(NX,OPS); BCR = BC;
+    BC = sparse(NX,OPS); BCP = BC;
+    BCT = [BCU BCW BCR BCP];
+    
+    BCM = [BCB ; BCT];
     %}
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -337,42 +319,23 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
-    %% Assemble the LHS operator
-    LD = [LD11 LD12 LD13 LD14 ; ...
-          LD21 LD22 LD23 LD24 ; ...
-          LD31 LD32 LD33 LD34 ; ...
-          LD41 LD42 LD43 LD44];
-      
     %% Assemble the force vector
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
-    FF = [F11 ; F21 ; F31 ; F41];
     
-    %% Compute the bottom boundary constraint
-    HBC = sparse(NX,4 * OPS);
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    HX = spdiags((DZT(1,:))', 0, NX, NX);
-    HBC(:,bdex) = -HX;
-    HBC(:,bdex + OPS) = UNIT;
+    %% Adjust the force vector for the coupled BC on W
+    FB = ujref(1,:) .* DZT(1,:);
     
-    %% Compute the top boundary constraint
-    TBC = sparse(NX,4 * OPS);
-    UNIT = spdiags(ones(NX,1), 0, NX, NX);
-    TBC(:,tdex + OPS) = UNIT;
+    FF = [F11 ; F21 ; F31 ; F41 ; FB' ; zeros(NX,1)];
     
-    %% Compute the lateral boundary constraint
-    %
-    RBC = sparse(NZ-2,4*OPS);
-    UNIT = spdiags(ones(NZ-2,1), 0, NZ-2, NZ-2);
-    RBC(:,rdex + OPS) = UNIT;
-    %}
+    %% Assemble the LHS operator
+    LD = [LD11 LD12 LD13 LD14 ; ...
+          LD21 LD22 LD23 LD24 ; ...
+          LD31 LD32 LD33 LD34 ; ...
+          LD41 LD42 LD43 LD44];
+    
     %% Augment the system with the Lagrange Multiplier Constraints
-    RPAD = zeros(2*NX + (NZ - 2));
-    LDA = [LD HBC' TBC'];
-    RAG = [HBC ; TBC ; RBC];
-    RAG = [RAG RPAD];
-    LDA = [LDA ; RAG];
-    FFA = [FF ; (ujref(1,:) .* DZT(1,:))' ; zeros(NX,1) ; zeros(NZ-2,1)];
+    LDA = [LD BCM' ; BCM zeros(2*NX)];
 end

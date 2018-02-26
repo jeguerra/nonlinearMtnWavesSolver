@@ -52,7 +52,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 1.0E-6;
     mtnh = [int2str(hC) 'm'];
     u0 = 10.0;
     uj = 16.822;
@@ -149,8 +149,12 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC);
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
+%[LD,FF,W0,REFS] = ...
+%computeCoeffMatrixForceCBC_SSPRK53(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+
 [LD,FF,W0,REFS] = ...
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+
 
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
@@ -162,6 +166,8 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
+rank(full(A))
+pause;
 %A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
 %b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
 clear LD FF FFBC;
