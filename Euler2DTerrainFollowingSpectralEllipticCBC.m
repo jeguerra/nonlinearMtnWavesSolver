@@ -12,9 +12,9 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
+NX = 100; % Expansion order matches physical grid
 NXO = 80; % Expansion order
-NZ = 60; % Expansion order matches physical grid
+NZ = 80; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -180,6 +180,8 @@ toc; disp('Compute raw coefficient matrix... DONE.');
 % Project onto the orthogonal subspace in the range of A
 tic
 AO = sporth(A);
+toc; disp('Compute orthonormal basis... DONE.');
+tic
 AR = AO' * A * AO;
 BR = AO' * b;
 toc; disp('Compute projection to orthogonal basis... DONE.');
@@ -193,13 +195,17 @@ toc; disp('Solve the system... DONE.');
 disp('Solve by using matlab \ only.');
 tic
 spparms('spumoni',2);
-A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
+A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
+b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
 toc; disp('Compute raw coefficient matrix... DONE.');
 clear LD FF FFBC;
 tic
 sol = (A \ b);
 toc; disp('Solve the system... DONE.');
+tic
+[dvecs, dlambda] = eigs(A,20,'lr');
+disp(diag(dlambda));
+toc; disp('Compute some eigenvalues/vectors... DONE.');
 %}
 % clear A b
 %% Get the solution fields

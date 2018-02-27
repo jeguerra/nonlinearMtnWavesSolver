@@ -97,20 +97,22 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ShearJetScharCBVF') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ClassicalSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
     elseif strcmp(TestCase,'AndesMtn') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     end
     
     %% Compute the vertical profiles of density and pressure
@@ -227,8 +229,8 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
 
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
-    DADX = spdiags(reshape(dadx,OPS,1), 0, OPS, OPS);
-    DXIDX = spdiags(reshape(dxidx,OPS,1), 0, OPS, OPS);
+    %DADX = spdiags(reshape(dadx,OPS,1), 0, OPS, OPS);
+    %DXIDX = spdiags(reshape(dxidx,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
@@ -284,27 +286,18 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     B43 = sparse(OPS,OPS);
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Constraint the top and bottom boundaries
-    %{
-    % No horizontal transport of vertical velocity
-    B12(tdex,tdex) = zeros(NO);
+    %% Constrain the top and bottom boundaries
+    %
     % No vertical momentum constraint along boundary
-    L22(tdex,tdex) = zeros(NO);
+    L22(bdex,bdex) = zeros(NO);
+    L23(bdex,bdex) = zeros(NO);
+    B23(bdex,bdex) = zeros(NO);
+    B24(bdex,bdex) = zeros(NO);
+    % No vertical momentum constraint along boundary
+    L23(tdex,tdex) = zeros(NO);
     L23(tdex,tdex) = zeros(NO);
     B23(tdex,tdex) = zeros(NO);
     B24(tdex,tdex) = zeros(NO);
-    % No vertical transport of pressure 
-    B32(tdex,tdex) = zeros(NO);
-    % No vertical transport of entropy 
-    B42(tdex,tdex) = zeros(NO);
-    %
-    %L11(bdex,bdex) = zeros(NO);
-    %L22(bdex,bdex) = zeros(NO);
-    %LD22(bdex,bdex) = zeros(NO);
-    %LD23(bdex,bdex) = zeros(NO);
-    %LD24(bdex,bdex) = zeros(NO);
-    %LD32(bdex,bdex) = zeros(NO);
-    %LD42(bdex,bdex) = zeros(NO);
     %}
     
     %% Neumann condition at the right lateral boundary
@@ -362,17 +355,27 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     UNIT = spdiags(ones(NX,1), 0, NX, NX);
     TBC(:,tdex + OPS) = UNIT;
     
+    %% Augment the system with the Lagrange Multiplier Constraints
+    RPAD = zeros(2*NX);
+    %LDA = [LD HBC' TBC'];
+    LDA = [LD zeros(size(HBC')) zeros(size(TBC))'];
+    RAG = [HBC ; TBC];
+    RAG = [RAG RPAD];
+    LDA = [LDA ; RAG];
+    FFA = [FF ; (ujref(1,:) .* DZT(1,:))' ; zeros(NX,1)];
+    
+    %{
     %% Compute the lateral boundary constraint
-    %
     RBC = sparse(NZ-2,4*OPS);
     UNIT = spdiags(ones(NZ-2,1), 0, NZ-2, NZ-2);
     RBC(:,rdex + OPS) = UNIT;
-    %}
+    %
     %% Augment the system with the Lagrange Multiplier Constraints
     RPAD = zeros(2*NX + (NZ - 2));
-    LDA = [LD HBC' TBC'];
+    LDA = [LD HBC' TBC' RBC'];
     RAG = [HBC ; TBC ; RBC];
     RAG = [RAG RPAD];
     LDA = [LDA ; RAG];
     FFA = [FF ; (ujref(1,:) .* DZT(1,:))' ; zeros(NX,1) ; zeros(NZ-2,1)];
+    %}
 end

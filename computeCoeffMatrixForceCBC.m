@@ -229,8 +229,8 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
 
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
-    DADX = spdiags(reshape(dadx,OPS,1), 0, OPS, OPS);
-    DXIDX = spdiags(reshape(dxidx,OPS,1), 0, OPS, OPS);
+    %DADX = spdiags(reshape(dadx,OPS,1), 0, OPS, OPS);
+    %DXIDX = spdiags(reshape(dxidx,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
@@ -286,27 +286,18 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     B43 = sparse(OPS,OPS);
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Constraint the top and bottom boundaries
-    %{
-    % No horizontal transport of vertical velocity
-    B12(tdex,tdex) = zeros(NO);
+    %% Constrain the top and bottom boundaries
+    %
+    % No vertical momentum constraint along boundary
+    L22(bdex,bdex) = zeros(NO);
+    L23(bdex,bdex) = zeros(NO);
+    B23(bdex,bdex) = zeros(NO);
+    B24(bdex,bdex) = zeros(NO);
     % No vertical momentum constraint along boundary
     L22(tdex,tdex) = zeros(NO);
     L23(tdex,tdex) = zeros(NO);
     B23(tdex,tdex) = zeros(NO);
     B24(tdex,tdex) = zeros(NO);
-    % No vertical transport of pressure 
-    B32(tdex,tdex) = zeros(NO);
-    % No vertical transport of entropy 
-    B42(tdex,tdex) = zeros(NO);
-    %
-    %L11(bdex,bdex) = zeros(NO);
-    %L22(bdex,bdex) = zeros(NO);
-    %LD22(bdex,bdex) = zeros(NO);
-    %LD23(bdex,bdex) = zeros(NO);
-    %LD24(bdex,bdex) = zeros(NO);
-    %LD32(bdex,bdex) = zeros(NO);
-    %LD42(bdex,bdex) = zeros(NO);
     %}
     
     %% Neumann condition at the right lateral boundary
@@ -366,7 +357,8 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     
     %% Augment the system with the Lagrange Multiplier Constraints
     RPAD = zeros(2*NX);
-    LDA = [LD HBC' TBC'];
+    %LDA = [LD HBC' TBC'];
+    LDA = [LD zeros(size(HBC')) zeros(size(TBC))'];
     RAG = [HBC ; TBC];
     RAG = [RAG RPAD];
     LDA = [LDA ; RAG];

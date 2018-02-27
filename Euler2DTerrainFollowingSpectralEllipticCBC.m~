@@ -169,8 +169,8 @@ computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, a
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
 
-%% Solve the system using the matlab linear solver
-%
+%% Solve the system by projecting to orthogonal space first then solving
+%{
 disp('Solve by applying orthogonal basis and matlab \.');
 tic
 spparms('spumoni',2);
@@ -180,14 +180,28 @@ toc; disp('Compute raw coefficient matrix... DONE.');
 % Project onto the orthogonal subspace in the range of A
 tic
 AO = sporth(A);
+toc; disp('Compute orthonormal basis... DONE.');
+tic
 AR = AO' * A * AO;
 BR = AO' * b;
-toc; disp('Compute projection to 
+toc; disp('Compute projection to orthogonal basis... DONE.');
 clear LD FF FFBC;
 tic
 sol = AO * (AR \ BR);
-%[~,sig,sol] = svds(A,4,'smallest');
-toc
+toc; disp('Solve the system... DONE.');
+%}
+%% Solve the system by letting matlab \ do its thing...
+%
+disp('Solve by using matlab \ only.');
+tic
+spparms('spumoni',2);
+A = LD(sysDex,sysDexLD(sysDex,sysDex);
+b = FFBC(sysDex,1);
+toc; disp('Compute raw coefficient matrix... DONE.');
+clear LD FF FFBC;
+tic
+sol = (A \ b);
+toc; disp('Solve the system... DONE.');
 %}
 % clear A b
 %% Get the solution fields
