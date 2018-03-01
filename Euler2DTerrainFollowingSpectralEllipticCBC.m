@@ -19,9 +19,9 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
-%TestCase = 'ClassicalSchar'; BC = 0;
+%TestCase = 'ShearJetSchar'; BC = 2;
+%TestCase = 'ShearJetScharCBVF'; BC = 2;
+TestCase = 'ClassicalSchar'; BC = 2;
 %TestCase = 'AndesMtn'; BC = 0;
 
 z0 = 0.0;
@@ -33,10 +33,10 @@ ga = 9.80616;
 p0 = 1.0E5;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
-    %l1 = -6.0E4;
-    %l2 = 6.0E4;
+    %l1 = -1.0E4 * 2.0 * pi;
+    %l2 = 1.0E4 * 2.0 * pi;
+    l1 = -6.0E4;
+    l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -54,7 +54,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -62,10 +62,10 @@ if strcmp(TestCase,'ShearJetSchar') == true
     b = 1.386;
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
-    %l1 = -6.0E4;
-    %l2 = 6.0E4;
+    %l1 = -1.0E4 * 2.0 * pi;
+    %l2 = 1.0E4 * 2.0 * pi;
+    l1 = -6.0E4;
+    l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -83,7 +83,7 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -91,8 +91,8 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     b = 1.386;
 elseif strcmp(TestCase,'ClassicalSchar') == true
     zH = 35000.0;
-    l1 = -60000.0;
-    l2 = 60000.0;
+    l1 = -6.0E4;
+    l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -130,14 +130,14 @@ elseif strcmp(TestCase,'AndesMtn') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 15000.0;
-    width = 85000.0;
+    width = 101000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
-    applyLateralRL = false;
+    applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 1000.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '100m';
     u0 = 10.0;
@@ -171,6 +171,7 @@ computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, a
 
 %% Solve the system by projecting to orthogonal space first then solving
 %{
+%parpool('local');
 disp('Solve by applying orthogonal basis and matlab \.');
 tic
 spparms('spumoni',2);
@@ -182,7 +183,8 @@ tic
 AO = sporth(A);
 toc; disp('Compute orthonormal basis... DONE.');
 tic
-AR = AO' * A * AO;
+AR = full(AO') * full(A);
+AR = sparse(AR * full(AO));
 BR = AO' * b;
 toc; disp('Compute projection to orthogonal basis... DONE.');
 clear LD FF FFBC;
@@ -195,22 +197,26 @@ toc; disp('Solve the system... DONE.');
 disp('Solve by using matlab \ only.');
 tic
 spparms('spumoni',2);
-A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
-b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
+A = LD(sysDex,sysDex);
+b = FFBC(sysDex,1);
+% Normal equations...
+%A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
+%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
 toc; disp('Compute raw coefficient matrix... DONE.');
-clear LD FF FFBC;
+clear FF FFBC;
 tic
 sol = (A \ b);
 toc; disp('Solve the system... DONE.');
-tic
-[dvecs, dlambda] = eigs(A,20,'lr');
-disp(diag(dlambda));
-toc; disp('Compute some eigenvalues/vectors... DONE.');
+%tic
+%[dvecs, dlambda] = eigs(LD(sysDex,sysDex),20,'lr');
+%disp(diag(dlambda));
+clear LD
+%toc; disp('Compute some eigenvalues/vectors... DONE.');
 %}
 % clear A b
 %% Get the solution fields
 SOL(sysDex) = sol(:,1);
-%clear sol;
+clear sol;
 %%
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
@@ -219,7 +225,7 @@ pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 2000;
+NXI = 1000;
 NZI = 200;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
@@ -277,25 +283,21 @@ cmap = cmap(:,1:3);
 %
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-    [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
-    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
-    [lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZLINT);
-    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
 elseif strcmp(TestCase,'ClassicalSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 elseif strcmp(TestCase,'AndesMtn') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
-    [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
-    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
 end
 %}
 dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
+figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
 %contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
@@ -307,13 +309,12 @@ caxis(cm);
 %ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('\textsf{$U^{\prime} ~~ (ms^{-1})$}','FontWeight','normal','Interpreter','latex');
+title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 screen2png(['UREferenceSolution' mtnh '.png']);
 %
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
+figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
@@ -322,24 +323,21 @@ caxis(cm);
 %ylim(1.0E-3 * [0.0 zH - depth]);
 %xlim([-100 100]);
 %ylim([0 15]);
-title('\textsf{$W^{\prime} ~~ (ms^{-1})$}','FontWeight','normal','Interpreter','latex');
+title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 screen2png(['WREferenceSolution' mtnh '.png']);
 %
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+figure;
 colormap(cmap);
 subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('$(\ln p)^{\prime} ~~ (Pa)$','FontWeight','normal','Interpreter','latex');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+title('$(\ln p)^{\prime} ~~ (Pa)$');
 subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('$(\ln \theta)^{\prime} ~~ (K)$','FontWeight','normal','Interpreter','latex');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
 %}
 %{
@@ -406,8 +404,8 @@ RiREF = -BS.ga * REFS.dlrref(:,1);
 RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
 xdex = 1:1:NX;
-fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
-subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+figure;
+subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
 hold on;
 semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',2.5);
 semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
@@ -415,22 +413,20 @@ hold off;
 grid on; grid minor;
 %xlabel('\textsf{$\mathcal{N}^2 \left( \frac{\partial u}{\partial z} \right)^{-2}$}','Interpreter','latex');
 ylabel('Elevation (km)');
-title('Ri Number','FontWeight','normal','Interpreter','tex');
+title('Ri Number');
 xlim([0.1 1.0E4]);
 ylim([0.0 30.0]);
-fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 
-subplot(1,2,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+subplot(1,2,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
 hold on;
 semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
 hold off;
 grid on; grid minor;
 %xlabel('\textsf{$\frac{T}{\theta} \frac{\partial \theta}{\partial z}$}','Interpreter','latex');
 %ylabel('Elevation (km)');
-title('Convective Stability','FontWeight','normal','Interpreter','tex');
+title('Convective Stability');
 ylim([0.0 30.0]);
 xlim([-0.3 0.3]);
-fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
@@ -450,12 +446,11 @@ FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
 xdex = 1:1:NX;
 plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 grid on; grid minor;
-title('Local Froude Number - l_v = 2.5\times10^3 (m)','FontWeight','normal','Interpreter','tex');
+title('Local Froude Number - $l_v = 2.5\times10^3 (m)$');
 %xlabel('\textsf{Fr = \frac{2 \pi | w |}{\mathcal{N} l_v}}','Interpreter','latex');
 %ylabel('\textsf{Altitude (km)}','Interpreter','latex');
 ylim([0.0 30.0]);
 %xlim([-1.0E-3 2.0E-3]);
-fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 drawnow;
 
 fname = ['FROUDE_' TestCase num2str(hC)];
@@ -505,16 +500,16 @@ drawnow;
 screen2png(fname);
 %}
 %% Debug
-%
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+%{
+figure;
 subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Total Horizontal Velocity U (m/s)');
+title('U (m/s)');
 subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Vertical Velocity W (m/s)');
+title('W (m/s)');
 subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Perturbation Log Pressure (Pa)');
+title('$(\ln p)^{\prime}$ (Pa)');
 subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Perturbation Log \theta (K)');
+title('$(\ln \theta)^{\prime}$ (K)');
 drawnow
 %}
 
@@ -532,7 +527,7 @@ drawnow
 %}
 
 %% Save the data
-%{
+%
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

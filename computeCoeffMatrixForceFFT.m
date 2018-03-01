@@ -1,4 +1,11 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
+function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
+    % Set the boundary indices and operator dimension
+    OPS = NX*NZ;
+    tdex = NZ:NZ:OPS;
+    bdex = 1:NZ:(OPS - NZ + 1);
+    NB = length(bdex);
+    NT = length(tdex);
+    
     %% Compute the Hermite and Legendre points and derivatives for this grid
     [~,DDX_H] = herdif(NX, 1, 0.5 * DS.L, true);
     x = linspace(DS.l1, DS.l2, NX+1);
@@ -39,11 +46,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     
     %% Compute the terrain slope derivatives using FFT derivative in X
     DZT = 1i * KF .* fft(HTZL,NX,2);
-    
-    %% Compute the coupled BC terrain slope derivatives using FFT derivative in X
-    DZTPS = ifft(DZT,NX,2);
-    DZCBC = DZTPS .* (1.0 + DZTPS.^2).^(-0.5);
-    DZTCBC = fft(DZCBC,NX,2);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
@@ -83,11 +85,11 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     [rayField, ~] = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyTopRL,applyLateralRL);
     %[rayField, ~] = computeRayleighPolar(DS,1.0,RAY.depth,XL,ZL);
     %[rayField, ~] = computeRayleighEllipse(DS,1.0,RAY.depth,RAY.width,XL,ZL);
-    RL = reshape(rayField,NX*NZ,1);
+    RL = reshape(rayField,OPS,1);
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
-    DDXI_OP = zeros(NX*NZ);
+    DDXI_OP = zeros(OPS);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
@@ -95,20 +97,20 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     DDXI_OP = sparse(DDXI_OP);
 %{
     % Compute the horizontal derivatives operator (Hermite expansion)
-    DDX_OP = zeros(NX*NZ);
+    DDX_OP = zeros(OPS);
     for rr=1:NZ
-        ddex = (1:NZ:NX*NZ) + (rr - 1);
+        ddex = (1:NZ:OPS) + (rr - 1);
         DDX_OP(ddex,ddex) = DDX_H;
     end
     DDX_OP = sparse(DDX_OP);
 %}    
     %% Assemble the block global operator L
-    OPS = NX*NZ;
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
     KX = spdiags(reshape(KF,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
+    DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
     %U0DX = U0 * DDX_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
@@ -117,23 +119,23 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     % Horizontal momentum LHS
     L11 = 1i * KX .* U0;
     L12 = sparse(OPS,OPS);
-    L13 = sparse(OPS,OPS);
-    L14 = 1i * POR * KX;
+    L13 = 1i * POR * KX;
+    L14 = sparse(OPS,OPS);
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
     L22 = 1i * KX * U0;
-    L23 = sparse(OPS,OPS);
-    L24 = POR * SIGMA * DDXI_OP;
+    L23 = POR * SIGMA * DDXI_OP;
+    L24 = sparse(OPS,OPS);
     % Continuity LHS
-    L31 = 1i * KX;
-    L32 = SIGMA * DDXI_OP;
+    L31 = BS.gam * 1i * KX;
+    L32 = BS.gam * SIGMA * DDXI_OP;
     L33 = 1i * KX .* U0;
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     L41 = sparse(OPS,OPS);
     L42 = sparse(OPS,OPS);
-    L43 = - 1i * KX .* U0;
-    L44 = 1.0 / BS.gam * 1i * KX .* U0;
+    L43 = sparse(OPS,OPS);
+    L44 = 1i * KX .* U0;
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
@@ -144,60 +146,19 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     % Vertical momentum LHS
     B21 = sparse(OPS,OPS);
     B22 = sparse(OPS,OPS) + RAY.nu2 * (spdiags(RL,0, OPS, OPS));
-    B23 = BS.ga * unit;
-    B24 = -BS.ga * unit;
+    B23 = BS.ga * (1.0 / BS.gam - 1.0) * unit;
+    B24 = - BS.ga * unit;
     % Continuity LHS
     B31 = sparse(OPS,OPS);
-    B32 = DLRDZ;
+    B32 = DLPDZ;
     B33 = sparse(OPS,OPS) + RAY.nu3 * (spdiags(RL,0, OPS, OPS));
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
-    B42 = (1.0 / BS.gam * DLPDZ - DLRDZ);
-    B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS);
-    B44 = sparse(OPS,OPS) + 1.0 / BS.gam * RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    B42 = DLPTDZ;
+    B43 = sparse(OPS,OPS);
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Assemble the force vector
-    F11 = zeros(OPS,1);
-    F21 = zeros(OPS,1);
-    F31 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC on W
-    bdex = 1:NZ:OPS;
-    W0 = ujref(1,:) .* DZTCBC(1,:);
-    F11(bdex) = - B12(bdex,bdex) * W0';
-    F21(bdex) = - L22(bdex,bdex) * W0';
-    F31(bdex) = - L32(bdex,bdex) * W0' - B32(bdex,bdex) * W0';
-    F41(bdex) = - B42(bdex,bdex) * W0';
-    
-    FF = [F11 ; F21 ; F31 ; F41];
-    
-    %% Adjust the operator blocks for the coupled forcing BC
-    %
-    B12(bdex,bdex) = 0.0 * B12(bdex,bdex);
-    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
-    L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
-    B32(bdex,bdex) = 0.0 * B32(bdex,bdex);
-    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
-    %}
-    
-    %% Adjust the operator blocks for the top BC on W and PGF
-    %
-    tdex = NZ:NZ:OPS;
-    % if w = 0 then:
-    B12(tdex,tdex) = 0.0 * B12(tdex,tdex);
-    B22(tdex,tdex) = 0.0 * B22(tdex,tdex);
-    L22(tdex,tdex) = 0.0 * L22(tdex,tdex);
-    B32(tdex,tdex) = 0.0 * B32(tdex,tdex);
-    B42(tdex,tdex) = 0.0 * B42(tdex,tdex);
-    % if PGF = 0 then:
-    L24(tdex,tdex) = 0.0 * L24(tdex,tdex);
-    % if BC is time invariant then:
-    %B11(tdex,tdex) = 0.0 * B11(tdex,tdex);
-    %B33(tdex,tdex) = 0.0 * B33(tdex,tdex);
-    %B44(tdex,tdex) = 0.0 * B44(tdex,tdex);
-
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
     LD12 = L12 + B12;
@@ -219,5 +180,43 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     LD43 = L43 + B43;
     LD44 = L44 + B44;
 
-    LD = [LD11 LD12 LD13 LD14 ; LD21 LD22 LD23 LD24 ; LD31 LD32 LD33 LD34 ; LD41 LD42 LD43 LD44];
+    %% Assemble the LHS operator
+    LD = [LD11 LD12 LD13 LD14 ; ...
+          LD21 LD22 LD23 LD24 ; ...
+          LD31 LD32 LD33 LD34 ; ...
+          LD41 LD42 LD43 LD44];
+      
+    %% Assemble the force vector
+    F11 = zeros(OPS,1);
+    F21 = zeros(OPS,1);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
+    FF = [F11 ; F21 ; F31 ; F41];
+    
+    %% Compute the bottom boundary constraint
+    HBC = sparse(NB,4 * OPS);
+    HBCT = HBC;
+    UNIT = spdiags(ones(NB,1), 0, NB, NB);
+    % Row augmentation
+    HBC(:,bdex + OPS) = UNIT;
+    % Column augmentation
+    HBCT(:,bdex + OPS) = UNIT;
+    
+    %% Compute the top boundary constraint
+    TBC = sparse(NT,4 * OPS);
+    TBCT = TBC;
+    UNIT = spdiags(ones(NT,1), 0, NT, NT);
+    % Row augmentation
+    TBC(:,tdex + OPS) = UNIT;
+    % Column augmentation
+    TBCT(:,tdex + OPS) = UNIT;
+    
+    %% Augment the system with the Lagrange Multiplier Constraints
+    RPAD = zeros(NB + NT);
+    LDA = [LD HBCT' TBCT'];
+    %LDA = [LD zeros(size(HBC')) zeros(size(TBC))'];
+    RAG = [HBC ; TBC];
+    RAG = [RAG RPAD];
+    LDA = [LDA ; RAG];
+    FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))' ; zeros(NT,1)];
 end
