@@ -2,50 +2,57 @@ function sysDex = computeBCIndexNL(BC,NX,NZ,OPS)
     numVar = 4;
 
     %% Create boundary condition indices
-    %{
-    ubdex = 1:NZ:OPS;
-    wbdex = ubdex + OPS;
-    rbdex = ubdex + 2*OPS;
-    pbdex = ubdex + 3*OPS;
-    BotOut = [ubdex wbdex rbdex pbdex];
-    %}
-    utdex = NZ:NZ:OPS;
-    wtdex = utdex + OPS;
-    rtdex = utdex + 2*OPS;
-    ptdex = utdex + 3*OPS;
-    TopOut = [utdex wtdex rtdex ptdex];
     %
-    uldex = 1:NZ;
-    urdex = (OPS - NZ + 1):OPS;
+    uldex = 2:NZ-1;
     wldex = uldex + OPS;
-    wrdex = urdex + OPS;
     rldex = uldex + 2*OPS;
-    rrdex = urdex + 2*OPS;
     pldex = uldex + 3*OPS;
-    prdex = urdex + 3*OPS;
     %}
-    LeftRightOut = [uldex urdex wldex wrdex rldex rrdex pldex prdex];
-    RightOut = [urdex wrdex rrdex prdex];
-
+    LeftOutExcludeCorners = [uldex wldex rldex pldex];
+    RightOutExcludeCorners = LeftOutExcludeCorners + (OPS - NZ);
+    
     if BC == 0
-        disp('Dirichlet W Top, All Lateral');
-        rowsOut = [wtdex LeftRightOut];
+        disp('Hermite-Lagrange Model, Dirichlet Lateral BC...');
+        var1BotLeftCorner = 1;
+        var1TopLeftCorner = NZ;
+        var1BotRightCorner = OPS - NZ + 1;
+        var1TopRightCorner = OPS;
+        var3BotLeftCorner = []; %(2*OPS + 1);
+        var3TopLeftCorner = []; %(3*OPS - NZ + 1);
+        var3BotRightCorner = []; %(2*OPS + NZ);
+        var3TopRightCorner = []; %(3*OPS);
+        rowsOut = [LeftOutExcludeCorners ...
+                   RightOutExcludeCorners ...
+                   var1BotLeftCorner ...
+                   var1TopLeftCorner ...
+                   var1BotRightCorner ...
+                   var1TopRightCorner ...
+                   var3BotLeftCorner ...
+                   var3TopLeftCorner ...
+                   var3BotRightCorner ...
+                   var3TopRightCorner];
     elseif BC == 1
-        disp('Dirichlet W Top Only');
-        rowsOut = wtdex;
+        disp('Applying BC FFT-Lagrange Model...');
+        rowsOut = [];
     elseif BC == 2
-        disp('Dirichlet All Top');
-        rowsOut = TopOut;
-    elseif BC == 3
-        disp('Dirichlet All Top and Lateral');
-        rowsOut = [TopOut LeftRightOut];
-    elseif BC == 4
-        disp('Dirichlet W Top, Periodic Lateral');
-        rowsOut = [wtdex RightOut];
-    else
-        disp('ERROR: Invalid BC combination... applying default on W bottom only.');
-        rowsOut = wtdex;
+        disp('Hermite-Lagrange Model, Free Lateral BC...');
+        var1BotLeftCorner = 1;
+        var1TopLeftCorner = NZ;
+        var1BotRightCorner = OPS - NZ + 1;
+        var1TopRightCorner = OPS;
+        var3BotLeftCorner = (2*OPS + 1);
+        var3TopLeftCorner = (3*OPS - NZ + 1);
+        var3BotRightCorner = (2*OPS + NZ);
+        var3TopRightCorner = (3*OPS);
+        rowsOut = [var1BotLeftCorner ...
+                   var1TopLeftCorner ...
+                   var1BotRightCorner ...
+                   var1TopRightCorner ...
+                   var3BotLeftCorner ...
+                   var3TopLeftCorner ...
+                   var3BotRightCorner ...
+                   var3TopRightCorner];
     end
 
-    sysDex = setdiff(1:numVar*OPS, rowsOut);
+    sysDex = setdiff(1:numVar*OPS + 2*NX, rowsOut);
 end

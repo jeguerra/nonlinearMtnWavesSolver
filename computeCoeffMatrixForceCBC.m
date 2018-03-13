@@ -97,15 +97,21 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ShearJetScharCBVF') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ClassicalSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
     elseif strcmp(TestCase,'AndesMtn') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     end
     
     %% Compute the vertical profiles of density and pressure
@@ -114,8 +120,9 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     rref0 = max(max(rref));
     % Background potential temperature profile
     dlthref = 1.0 / BS.gam * dlpref - dlrref;
-    thref = exp(1.0 / BS.gam * lpref - lrref + ...
-        BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd));
+    lthref = 1.0 / BS.gam * lpref - lrref + ...
+        BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd);
+    thref = exp(lthref);
     thref0 = min(min(thref));
 
 %{
@@ -199,7 +206,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
 %}
     
     REFS = struct('ujref',ujref,'dujref',dujref, ...
-        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'dlthref',dlthref,...
+        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref,...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
 
@@ -319,11 +326,11 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     UNIT = spdiags(ones(NB,1), 0, NB, NB);
     HX = spdiags((DZT(1,:))', 0, NB, NB);
     % Row augmentation
-    HBC(:,bdex) = -HX;
+    %HBC(:,bdex) = -HX;
     HBC(:,bdex + OPS) = UNIT;
     % Column augmentation
     %HBCT(:,bdex) = -HX;
-    HBCT(:,bdex + OPS) = UNIT;
+    HBCT(:,bdex + 1*OPS) = UNIT;
     
     %% Compute the top boundary constraint
     TBC = sparse(NT,4 * OPS);
@@ -332,12 +339,11 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     % Row augmentation
     TBC(:,tdex + OPS) = UNIT;
     % Column augmentation
-    TBCT(:,tdex + OPS) = UNIT;
+    TBCT(:,tdex + 1*OPS) = UNIT;
     
     %% Augment the system with the Lagrange Multiplier Constraints
     RPAD = zeros(NB + NT);
     LDA = [LD HBCT' TBCT'];
-    %LDA = [LD zeros(size(HBC')) zeros(size(TBC))'];
     RAG = [HBC ; TBC];
     RAG = [RAG RPAD];
     LDA = [LDA ; RAG];

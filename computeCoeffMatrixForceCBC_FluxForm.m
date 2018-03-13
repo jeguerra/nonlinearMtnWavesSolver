@@ -1,5 +1,11 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
+    % Set the boundary indices and operator dimension
+    OPS = NX*NZ;
+    tdex = NZ:NZ:OPS;
+    bdex = 1:NZ:(OPS - NZ + 1);
+    NB = length(bdex);
+    NT = length(tdex);
     
     % Set the domain scale
     dscale = 0.5 * DS.L;
@@ -275,36 +281,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     B43 = sparse(OPS,OPS);
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
-    %% Assemble the force vector
-    F11 = zeros(OPS,1);
-    F21 = zeros(OPS,1);
-    F31 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC on W
-    bdex = 1:NZ:(OPS - NZ + 1);
-    W0 = (rref(1,:) .* ujref(1,:) .* DZT(1,:)) ./ sqrt(DZT(1,:).^2 + 1.0);
-    F11(bdex) = - B12(bdex,bdex) * W0';
-    F21(bdex) = - L22(bdex,bdex) * W0';
-    F31(bdex) = - L32(bdex,bdex) * W0';
-    F41(bdex) = - B42(bdex,bdex) * W0';
-    
-    FF = [F11 ; F21 ; F31 ; F41];
-    
-    %% Adjust the operator blocks for the coupled forcing BC
-    %
-    B12(bdex,bdex) = 0.0 * B12(bdex,bdex);
-    L22(bdex,bdex) = 0.0 * L22(bdex,bdex);
-    L32(bdex,bdex) = 0.0 * L32(bdex,bdex);
-    B42(bdex,bdex) = 0.0 * B42(bdex,bdex);
-    %}
-    
-    %% Adjust the operator blocks for the top BC on PGF
-    %
-    tdex = NZ:NZ:OPS;
-    L24(tdex,tdex) = 0.0 * L24(tdex,tdex);
-    %}
-    
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
     LD12 = L12 + B12;
@@ -326,8 +302,46 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
+    %% Assemble the LHS operator
     LD = [LD11 LD12 LD13 LD14 ; ...
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
+      
+    %% Assemble the force vector
+    F11 = zeros(OPS,1);
+    F21 = zeros(OPS,1);
+    F31 = zeros(OPS,1);
+    F41 = zeros(OPS,1);
+    FF = [F11 ; F21 ; F31 ; F41];
+    
+    %% Compute the bottom boundary constraint
+    HBC = sparse(NB,4 * OPS);
+    HBCT = HBC;
+    UNIT = spdiags(ones(NB,1), 0, NB, NB);
+    HX = spdiags((DZT(1,:))', 0, NB, NB);
+    % Row augmentation
+    HBC(:,bdex) = -HX;
+    HBC(:,bdex + OPS) = UNIT;
+    % Column augmentation
+    %HBCT(:,bdex) = -HX;
+    HBCT(:,bdex + 2*OPS) = UNIT;
+    
+    %% Compute the top boundary constraint
+    TBC = sparse(NT,4 * OPS);
+    TBCT = TBC;
+    UNIT = spdiags(ones(NT,1), 0, NT, NT);
+    % Row augmentation
+    TBC(:,tdex + OPS) = UNIT;
+    % Column augmentation
+    TBCT(:,tdex + OPS) = UNIT;
+    
+    %% Augment the system with the Lagrange Multiplier Constraints
+    RPAD = zeros(NB + NT);
+    LDA = [LD HBCT' TBCT'];
+    %LDA = [LD zeros(size(HBC')) zeros(size(TBC))'];
+    RAG = [HBC ; TBC];
+    RAG = [RAG RPAD];
+    LDA = [LDA ; RAG];
+    FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))' ; zeros(NT,1)];
 end

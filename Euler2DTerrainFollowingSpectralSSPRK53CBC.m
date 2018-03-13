@@ -20,9 +20,9 @@ numVar = 4;
 
 %% Set the test case and global parameters
 TestCase = 'ShearJetSchar'; BC = 0;
-%TestCase = 'ShearJetScharCBVF'; BC = 1;
-%TestCase = 'ClassicalSchar'; BC = 1;
-%TestCase = 'AndesMtn'; BC = 1;
+%TestCase = 'ShearJetScharCBVF'; BC = 2;
+%TestCase = 'ClassicalSchar'; BC = 2;
+%TestCase = 'AndesMtn'; BC = 2;
 
 z0 = 0.0;
 gam = 1.4;
@@ -152,7 +152,7 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 %[LD,FF,W0,REFS] = ...
 %computeCoeffMatrixForceCBC_SSPRK53(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
-[LD,FF,W0,REFS] = ...
+[LD,FF,REFS] = ...
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
 
@@ -166,8 +166,6 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
-rank(full(A))
-pause;
 %A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
 %b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
 clear LD FF FFBC;
@@ -191,21 +189,21 @@ xlim([l1 l2]);
 ylim([0.0 zH]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total Horizontal Velocity U (m/s)');
+title('Total u (ms^{-1})');
 subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(wxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Vertical Velocity W (m/s)');
+title('$w$ $(ms^{-1})$');
 %
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(rxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Perturbation Log Density (kg/m^3)');
+title('Perturbation %\ln \rho$ $(kg/m^3)$');
 subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(pxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Perturbation Log Pressure (Pa)');
+title('Perturbation $\ln \theta$ $(K)$');
 drawnow
 pause;
 %}

@@ -12,7 +12,7 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 512; % Expansion order matches physical grid
+NX = 300; % Expansion order matches physical grid
 NXO = 80; % Expansion order
 NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
@@ -20,8 +20,8 @@ numVar = 4;
 
 %% Set the test case and global parameters
 %TestCase = 'ShearJetSchar'; BC = 1;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
-%TestCase = 'ClassicalSchar'; BC = 0;
+%TestCase = 'ShearJetScharCBVF'; BC = 1;
+%TestCase = 'ClassicalSchar'; BC = 1;
 TestCase = 'AndesMtn'; BC = 1;
 
 z0 = 0.0;
@@ -33,8 +33,8 @@ ga = 9.80616;
 p0 = 1.0E5;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    l1 = - 1.0E4 * (2.5 * pi);
-    l2 = 1.0E4 * (2.5 * pi);
+    l1 = - 1.0E4 * (2.0 * pi);
+    l2 = 1.0E4 * (2.0 * pi);
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -114,8 +114,8 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 40000.0;
-    l1 = - 1.0E5 * (2.0 * pi);
-    l2 = 1.0E5 * (2.0 * pi);
+    l1 = - 1.0E5 * (2.5 * pi);
+    l2 = 1.0E5 * (2.5 * pi);
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -158,6 +158,26 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
 
+% Use the NCL hotcold colormap and check the initialization
+
+cmap = load('NCLcolormap254.txt');
+cmap = cmap(:,1:3);
+%{
+figure;
+colormap(cmap);
+contourf(1.0E-3 * REFS.XL, 1.0E-3 * REFS.ZTL, REFS.ujref,20); colorbar; grid on; cm = caxis;
+hold on; area(1.0E-3 * REFS.XL(1,:),2.0E-3 * REFS.ZTL(1,:),'FaceColor','k'); hold off;
+caxis([10.0 20.0]);
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+%ylim(1.0E-3 * [0.0 zH - depth]);
+xlim([-200 300]);
+%ylim([0 15]);
+title('Initial Flow Schematic');
+xlabel('Distance (km)');
+ylabel('Elevation (km)');
+screen2png(['TEST_INITIAL' mtnh '.png']);
+pause;
+%}
 %% Solve the system using the matlab linear solver
 %
 disp('Solve the raw system with matlab default \.');
@@ -195,11 +215,8 @@ sol = gmres(A,b,[],1.0E-4,50,L,U);
 toc
 %}
 
-% Use the NCL hotcold colormap
-cmap = load('NCLcolormap254.txt');
-cmap = cmap(:,1:3);
-
 %% Plot the solution frequency space
+%{
 SOL(sysDex) = sol;
 uxz = real(reshape(SOL((1:OPS)),NZ,NX));
 wxz = real(reshape(SOL((1:OPS) + OPS),NZ,NX));
@@ -212,14 +229,14 @@ wlen = rad2len * REFS.KF(:,kdex);
 %
 figure;
 colormap(cmap);
-contourf(wlen,REFS.ZTL(:,kdex),2*uxz(:,kdex),21); colorbar; grid on;
+contourf(wlen,REFS.ZL(:,kdex),2*uxz(:,kdex),21); colorbar; grid on;
 xlim([0.0 0.4E-3]);
 ylim([0.0 zH]);
 title('Total Horizontal Velocity U (m/s)');
 fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
 
 figure;
-contourf(wlen,REFS.ZTL(:,kdex),2*wxz(:,kdex),21); colorbar; grid on;
+contourf(wlen,REFS.ZL(:,kdex),2*wxz(:,kdex),21); colorbar; grid on;
 xlim([0.0 0.4E-3]);
 ylim([0.0 zH]);
 title('Vertical Velocity W (m/s)');
@@ -259,18 +276,17 @@ drawnow
 %}
 
 %% Compute the scaling constants needed for residual diffusion
-lrho = REFS.lrref + rxz;
-rho = exp(lrho);
-lp = REFS.lpref + pxz;
+lpt = REFS.lthref + pxz;
+pt = exp(lpt);
+lp = REFS.lpref + rxz;
 p = exp(lp);
-P = exp(REFS.lpref);
-R = exp(REFS.lrref);
-pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
-PT = p ./ (Rd * R) .* (p0 * P.^(-1)).^(Rd / cp);
+P = REFS.pref;
+PT = REFS.thref;
+rho = p ./ (Rd * pt) .* (p0 * p.^(-1)).^(Rd / cp);
+R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^(Rd / cp);
 RT = (rho .* pt) - (R .* PT);
 UINF = norm(uxz - mean(mean(uxz)),Inf);
 WINF = norm(wxz - mean(mean(wxz)),Inf);
-R = exp(rxz);
 RINF = norm(R - mean(mean(R)),Inf);
 RTINF = norm(RT - mean(mean(RT)),Inf);
 disp('Scaling constants for DynSGS coefficients:');
@@ -280,16 +296,13 @@ disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
 disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
 
 %% Compute Ri, Convective Parameter, and BVF
-%
 DDZ_BC = REFS.DDZ;
-dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * real(rxz));
+dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.rref));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
 DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
+dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
@@ -304,21 +317,21 @@ semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',2.5);
 semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
-%xlabel('\textsf{$\mathcal{N}^2 \left( \frac{\partial u}{\partial z} \right)^{-2}$}','Interpreter','latex');
+xlabel('$Ri$');
 ylabel('Elevation (km)');
-title('Ri Number');
+title('Richardson Number');
 xlim([0.1 1.0E4]);
-ylim([0.0 30.0]);
+ylim([0.0 25.0]);
 
 subplot(1,2,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
-hold on;
-semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
-hold off;
+%hold on;
+%semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
+%hold off;
 grid on; grid minor;
-%xlabel('\textsf{$\frac{T}{\theta} \frac{\partial \theta}{\partial z}$}','Interpreter','latex');
+xlabel('$S_p$');
 %ylabel('Elevation (km)');
 title('Convective Stability');
-ylim([0.0 30.0]);
+ylim([0.0 25.0]);
 %xlim([-0.3 0.3]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
@@ -328,21 +341,19 @@ screen2png(fname);
 %
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
 DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
+dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
 NBVF = (ga .* dlpt);
 
-Lv = 2.5E3;
+Lv = 5.0E3;
 FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
 
 xdex = 1:1:NX;
 plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 grid on; grid minor;
-title('Local Froude Number - $l_v = 2.5\times10^3 (m)$');
-%xlabel('\textsf{Fr = \frac{2 \pi | w |}{\mathcal{N} l_v}}','Interpreter','latex');
+title('Local Froude Number');
+xlabel('$Fr$');
 %ylabel('\textsf{Altitude (km)}','Interpreter','latex');
-ylim([0.0 30.0]);
+ylim([0.0 25.0]);
 %xlim([-1.0E-3 2.0E-3]);
 drawnow;
 
@@ -364,10 +375,6 @@ XI = l2 * XINT;
 ZI = ZINT;
 %} 
 
-% Use the NCL hotcold colormap
-cmap = load('NCLcolormap254.txt');
-cmap = cmap(:,1:3);
-
 % INTERPOLATED GRID PLOTS
 %
 width = 0.0;
@@ -377,19 +384,23 @@ depth = 0.0;
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
+    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZLINT);
+    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ClassicalSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 elseif strcmp(TestCase,'AndesMtn') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
+    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 end
 %}
-dlthref = 1.0 / BS.gam * dlpref - dlrref;
-
 figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,30); colorbar; grid on; cm = caxis;
@@ -436,13 +447,13 @@ drawnow
 %%
 figure;
 subplot(2,2,1); surf(REFS.XL,REFS.ZTL,uxz); colorbar; xlim([-100000.0 100000.0]); ylim([0.0 5000.0]); zlim([-1.0 1.0]);
-title('Total Horizontal Velocity U (m/s)');
-subplot(2,2,2); surf(REFS.XL,REFS.ZTL,wxz); colorbar; xlim([-20000.0 20000.0]); ylim([0.0 15000.0]);
-title('Vertical Velocity W (m/s)');
-subplot(2,2,3); surf(REFS.XL,REFS.ZTL,exp(rxz)); colorbar; xlim([-20000.0 20000.0]); ylim([0.0 15000.0]);
-title('Perturbation Density (kg/m^3)');
-subplot(2,2,4); surf(REFS.XL,REFS.ZTL,exp(pxz)); colorbar; xlim([-20000.0 20000.0]); ylim([0.0 15000.0]);
-title('Perturbation Pressure (Pa)');
+title('$U (m/s)$');
+subplot(2,2,2); surf(REFS.XL,REFS.ZTL,wxz); colorbar; xlim([-100000.0 10000.0]); ylim([0.0 15000.0]);
+title('$W (m/s)$');
+subplot(2,2,3); surf(REFS.XL,REFS.ZTL,exp(rxz)); colorbar; xlim([-100000.0 100000.0]); ylim([0.0 15000.0]);
+title('$(\ln p) (Pa)$');
+subplot(2,2,4); surf(REFS.XL,REFS.ZTL,exp(pxz)); colorbar; xlim([-100000.0 100000.0]); ylim([0.0 15000.0]);
+title('$(\ln \theta) (K)$');
 drawnow
 %}
 

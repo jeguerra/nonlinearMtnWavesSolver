@@ -11,7 +11,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     x = linspace(DS.l1, DS.l2, NX+1);
     xh = (x(1:NX))';
     kx = (2*pi / DS.L) * [0:NX/2-1 -NX/2:-1];
-    kx(1) = 1.0E-10;
+    kx(1) = 1.0E-6;
 
     [zlc,~] = chebdif(NZ,1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
@@ -45,25 +45,27 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     ZTL = (dzdh .* HTZL) + ZL;
     
     %% Compute the terrain slope derivatives using FFT derivative in X
-    DZT = 1i * KF .* fft(HTZL,NX,2);
+    DZT = -1i * KF .* fft(HTZL,NX,2);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ShearJetScharCBVF') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ClassicalSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
     elseif strcmp(TestCase,'AndesMtn') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
+        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     end
     
     %% Compute the vertical profiles of density and pressure
@@ -72,12 +74,13 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     rref0 = max(max(rref));
     % Background potential temperature profile
     dlthref = 1.0 / BS.gam * dlpref - dlrref;
-    thref = exp(1.0 / BS.gam * lpref - lrref + ...
-        BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd));
+    lthref = 1.0 / BS.gam * lpref - lrref + ...
+        BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd);
+    thref = exp(lthref);
     thref0 = min(min(thref));
     
     REFS = struct('ujref',ujref,'dujref',dujref, ...
-        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'dlthref',dlthref,...
+        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref,...
         'pref',pref,'rref',rref,'thref',thref,'KF',KF,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
     
@@ -147,7 +150,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     B21 = sparse(OPS,OPS);
     B22 = sparse(OPS,OPS) + RAY.nu2 * (spdiags(RL,0, OPS, OPS));
     B23 = BS.ga * (1.0 / BS.gam - 1.0) * unit;
-    B24 = - BS.ga * unit;
+    B24 = -BS.ga * unit;
     % Continuity LHS
     B31 = sparse(OPS,OPS);
     B32 = DLPDZ;
@@ -200,7 +203,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     % Row augmentation
     HBC(:,bdex + OPS) = UNIT;
     % Column augmentation
-    HBCT(:,bdex + OPS) = UNIT;
+    HBCT(:,bdex + 2*OPS) = UNIT;
     
     %% Compute the top boundary constraint
     TBC = sparse(NT,4 * OPS);

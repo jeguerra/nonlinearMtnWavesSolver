@@ -8,7 +8,7 @@
 
 clc
 clear
-close all
+%close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
@@ -19,9 +19,9 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-%TestCase = 'ShearJetSchar'; BC = 2;
-%TestCase = 'ShearJetScharCBVF'; BC = 2;
-TestCase = 'ClassicalSchar'; BC = 2;
+%TestCase = 'ShearJetSchar'; BC = 0;
+%TestCase = 'ShearJetScharCBVF'; BC = 0;
+TestCase = 'ClassicalSchar'; BC = 0;
 %TestCase = 'AndesMtn'; BC = 0;
 
 z0 = 0.0;
@@ -160,12 +160,6 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 [LD,FF,REFS] = ...
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
 
-%[LD,FF,U0,W0,REFS] = ...
-%computeCoeffMatrixForceCBC_LMC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
-
-%[LD,FF,REFS] = ...
-%computeCoeffMatrixForceCBC_HerLag(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
-
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
 
@@ -199,6 +193,7 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
+disp(size(A));
 % Normal equations...
 %A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
 %b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
@@ -284,18 +279,23 @@ cmap = cmap(:,1:3);
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
+    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZLINT);
+    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ClassicalSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 elseif strcmp(TestCase,'AndesMtn') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
+    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 end
 %}
-dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
 figure;
 colormap(cmap);
@@ -366,18 +366,17 @@ screen2png(['WaveGrowthW_LnP' mtnh '.png']);
 %}
 %
 %% Compute the scaling constants needed for residual diffusion
-lrho = REFS.lrref + rxz;
-rho = exp(lrho);
-lp = REFS.lpref + pxz;
+lpt = REFS.lthref + pxz;
+pt = exp(lpt);
+lp = REFS.lpref + rxz;
 p = exp(lp);
-P = exp(REFS.lpref);
-R = exp(REFS.lrref);
-pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
-PT = p ./ (Rd * R) .* (p0 * P.^(-1)).^(Rd / cp);
+P = REFS.pref;
+PT = REFS.thref;
+rho = p ./ (Rd * pt) .* (p0 * p.^(-1)).^(Rd / cp);
+R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^(Rd / cp);
 RT = (rho .* pt) - (R .* PT);
 UINF = norm(uxz - mean(mean(uxz)),Inf);
 WINF = norm(wxz - mean(mean(wxz)),Inf);
-R = exp(rxz);
 RINF = norm(R - mean(mean(R)),Inf);
 RTINF = norm(RT - mean(mean(RT)),Inf);
 disp('Scaling constants for DynSGS coefficients:');
@@ -387,16 +386,13 @@ disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
 disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
 
 %% Compute Ri, Convective Parameter, and BVF
-%
 DDZ_BC = REFS.DDZ;
-dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * real(rxz));
+dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.rref));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
 DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
+dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
@@ -411,9 +407,9 @@ semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',2.5);
 semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
-%xlabel('\textsf{$\mathcal{N}^2 \left( \frac{\partial u}{\partial z} \right)^{-2}$}','Interpreter','latex');
+xlabel('$Ri$');
 ylabel('Elevation (km)');
-title('Ri Number');
+title('Richardson Number');
 xlim([0.1 1.0E4]);
 ylim([0.0 30.0]);
 
@@ -422,11 +418,10 @@ hold on;
 semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
 hold off;
 grid on; grid minor;
-%xlabel('\textsf{$\frac{T}{\theta} \frac{\partial \theta}{\partial z}$}','Interpreter','latex');
+xlabel('$S_p$');
 %ylabel('Elevation (km)');
 title('Convective Stability');
-ylim([0.0 30.0]);
-xlim([-0.3 0.3]);
+%xlim([-0.3 0.3]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
@@ -435,9 +430,7 @@ screen2png(fname);
 %
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
 DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
+dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
 NBVF = (ga .* dlpt);
 
 Lv = 2.5E3;
@@ -446,10 +439,10 @@ FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
 xdex = 1:1:NX;
 plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 grid on; grid minor;
-title('Local Froude Number - $l_v = 2.5\times10^3 (m)$');
-%xlabel('\textsf{Fr = \frac{2 \pi | w |}{\mathcal{N} l_v}}','Interpreter','latex');
+title('Local Froude Number');
+xlabel('$Fr$');
 %ylabel('\textsf{Altitude (km)}','Interpreter','latex');
-ylim([0.0 30.0]);
+ylim([0.0 25.0]);
 %xlim([-1.0E-3 2.0E-3]);
 drawnow;
 
@@ -502,13 +495,13 @@ screen2png(fname);
 %% Debug
 %{
 figure;
-subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('U (m/s)');
-subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
+subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
+title('U (m/s)'); %zlim([-0.1 0.1]);
+subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
 title('W (m/s)');
-subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
+subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 2000.0]);
 title('$(\ln p)^{\prime}$ (Pa)');
-subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
+subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 2000.0]);
 title('$(\ln \theta)^{\prime}$ (K)');
 drawnow
 %}
