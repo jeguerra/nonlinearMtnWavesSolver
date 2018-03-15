@@ -1,4 +1,4 @@
-function [qxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, qxz, NXI, NZI, xint, zint)
+function [qxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, RAY, qxz, NXI, NZI, xint, zint)
 
 %{
 Interpolates the 2D field qxz by applying Hermite function transform in the
@@ -46,7 +46,7 @@ end
 [XINT,ZI] = meshgrid(xint / max(xint) ,zint / max(zint));
 
 %% Compute the terrain and derivatives
-[ht,~] = computeTopoDerivative(REFS.TestCase, xint / bx, DS);
+[ht,~] = computeTopoDerivative(REFS.TestCase, xint / bx, DS, RAY);
 
 %% XZ grid for Legendre nodes in the vertical
 [HTZL,~] = meshgrid(ht, zint / max(zint));

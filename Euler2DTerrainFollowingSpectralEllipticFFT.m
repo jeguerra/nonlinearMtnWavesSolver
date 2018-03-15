@@ -12,9 +12,9 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 300; % Expansion order matches physical grid
+NX = 512; % Expansion order matches physical grid
 NXO = 80; % Expansion order
-NZ = 100; % Expansion order matches physical grid
+NZ = 120; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -187,6 +187,7 @@ A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
 clear LD FF FFBC;
 sol = A \ b;
+%sol = gmres(A, b, 10, 1.0E-8, 20);
 %[V,D] = eig(full(A));
 clear A b;
 toc

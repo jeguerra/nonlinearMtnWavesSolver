@@ -40,14 +40,21 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
-    %}
+    %
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    alpha = exp(-0.5 * zlc);
+    beta = (-0.5) * ones(size(zlc'));
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
     %}
-          
+    %{
+    [zl, DDZ_L] = lagdif(NZ, 1, DS.zH);
+    %zl = DS.zH * (zlc / max(zlc));
+    %zlc = (zlc / max(zlc));
+    %DDZ_L = (1.0 / DS.zH) * DDZ_L;
+    %}      
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
     
@@ -212,20 +219,20 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
-    DDXI_OP = zeros(OPS);
+    DDXI_OP = spalloc(OPS, OPS, NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
-    DDXI_OP = sparse(DDXI_OP);
+    %DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite expansion)
-    DDA_OP = zeros(OPS);
+    DDA_OP = spalloc(OPS, OPS, NX^2);
     for rr=1:NZ
         ddex = (1:NZ:OPS) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;
     end
-    DDA_OP = sparse(DDA_OP);
+    %DDA_OP = sparse(DDA_OP);
 
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);

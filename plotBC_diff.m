@@ -5,11 +5,11 @@ startup
 
 %% Load in the two sets of data
 % Linear BC's on W and Vertical Momentum Equation Eliminated
-BCJB = load('100X80_BielloBC_100m.mat');
+BCJB = load('100X100_BielloBC_100m.mat');
 % Linear BC's on W and LnP (continuity) Equation Eliminated
-%BCJG = load('100X80_GuerraBC_100m.mat');
+BCJG = load('100X100_GuerraBC_100m.mat');
 % Coupled w' - h_x u' = h_x U and LnP (continuity) Equation Eliminated
-BCJG = load('100X80_GuerraInconsistentBC_100m.mat');
+%BCJG = load('100X80_GuerraInconsistentBC_100m.mat');
 
 %% Stuff
 % Use the NCL hotcold colormap

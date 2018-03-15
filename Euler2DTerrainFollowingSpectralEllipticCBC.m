@@ -14,7 +14,7 @@ clear
 %% Create the dimensional XZ grid
 NX = 100; % Expansion order matches physical grid
 NXO = 80; % Expansion order
-NZ = 80; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -191,24 +191,25 @@ toc; disp('Solve the system... DONE.');
 disp('Solve by using matlab \ only.');
 tic
 spparms('spumoni',2);
-A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
-disp(size(A));
+%A = LD(sysDex,sysDex);
+%b = FFBC(sysDex,1);
+%disp(size(A));
 % Normal equations...
-%A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
-%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
+A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
+b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
+disp(size(A));
 toc; disp('Compute raw coefficient matrix... DONE.');
-clear FF FFBC;
+clear LD FF FFBC;
 tic
 sol = (A \ b);
 toc; disp('Solve the system... DONE.');
 %tic
 %[dvecs, dlambda] = eigs(LD(sysDex,sysDex),20,'lr');
 %disp(diag(dlambda));
-clear LD
+%clear LD
 %toc; disp('Compute some eigenvalues/vectors... DONE.');
 %}
-% clear A b
+clear A b
 %% Get the solution fields
 SOL(sysDex) = sol(:,1);
 clear sol;
@@ -232,40 +233,38 @@ ZI = ZINT;
 %}
 %% Interpolate to a regular grid using Hermite and Laguerre transforms'
 %{
-NXI = 600;
-NZI = 300;
-[uxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, real(uxz), NXI, NZI, 0, 0);
-[wxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(wxz), NXI, NZI, 0, 0);
-[rxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(rxz), NXI, NZI, 0, 0);
-[pxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(pxz), NXI, NZI, 0, 0);
+NXI = 1000;
+NZI = 200;
+[uxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
+[wxzint, ~, ~] = HerTransLagTrans(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
+[rxzint, ~, ~] = HerTransLagTrans(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
+[pxzint, ~, ~] = HerTransLagTrans(REFS, DS, RAY, real(pxz), NXI, NZI, 0, 0);
 
 XI = l2 * XINT;
 ZI = ZINT;
 %}
 % Plot the solution in the native grids
-%{
+%
 % NATIVE GRID PLOTS
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+figure;
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(REFS.ujref + uxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-disp(['U MAX: ' num2str(max(max(uxz)))]);
-disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total Horizontal Velocity U (m/s)');
+title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(wxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Vertical Velocity W (m/s)');
+title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+figure;
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(rxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Perturbation Log Density (kg/m^3)');
+title('$(\ln p)^{\prime} ~~ (Pa)$');
 subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(pxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Perturbation Log Pressure (Pa)');
+title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
 %}
 

@@ -13,10 +13,13 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     kx = (2*pi / DS.L) * [0:NX/2-1 -NX/2:-1];
     kx(1) = 1.0E-6;
 
-    [zlc,~] = chebdif(NZ,1);
+    [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    alpha = exp(-0.5 * zlc);
+    beta = (-0.5) * ones(size(zlc'));
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
        
     %% Compute the terrain and derivatives
     [ht,~] = computeTopoDerivative(TestCase,xh,DS,RAY);
@@ -92,12 +95,12 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
-    DDXI_OP = zeros(OPS);
+    DDXI_OP = spalloc(OPS, OPS, NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
-    DDXI_OP = sparse(DDXI_OP);
+    %DDXI_OP = sparse(DDXI_OP);
 %{
     % Compute the horizontal derivatives operator (Hermite expansion)
     DDX_OP = zeros(OPS);
