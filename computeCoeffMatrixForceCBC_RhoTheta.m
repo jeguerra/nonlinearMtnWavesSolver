@@ -34,17 +34,16 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_RhoTheta(DS, BS, UJ, RAY, Tes
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %DDX_H(1:NX+1:end) = 1.0E-2 * ones(NX,1);
     DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
     %}
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %}
-    
-    %[zl, DDZ_L] = lagdifJEG(NZ, 1, 2.0 * DS.zH);
-       
+    alpha = exp(-0.5 * zlc);
+    beta = (-0.5) * ones(size(zlc'));
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    %}       
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS);
     
@@ -123,99 +122,78 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_RhoTheta(DS, BS, UJ, RAY, Tes
     pref = exp(lpref);
     rref = exp(lrref);
     rref0 = max(max(rref));
-    % Density weighted change of variable
-    rsc = sqrt(rref0) * rref.^(-0.5);
     % Background potential temperature profile
     dlthref = 1.0 / BS.gam * dlpref - dlrref;
-    thref = exp(1.0 / BS.gam * lpref - lrref + ...
-        BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd));
+    lthref = 1.0 / BS.gam * lpref - lrref + ...
+        BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd);
+    thref = exp(lthref);
     thref0 = min(min(thref));
-    % Background RhoTheta gradient
-    dTref = thref .* dlthref;
+
 %{
     %% Plot background fields including mean Ri number
-    fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+    figure;
     subplot(2,2,1);
     plot(ujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Speed (m s^{-1})','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Speed $(m s^{-1})$');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
     subplot(2,2,2);
     plot(pref(:,1) ./ (rref(:,1) * BS.Rd),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
     %title('Temperature Profile','FontSize',30);
-    xlabel('Temperature (K)','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Temperature (K)');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
     subplot(2,2,3);
     plot(0.01*pref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Pressure (hPa)','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Pressure (hPa)');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
     subplot(2,2,4);
-    plot(rref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Density (kg m^{-3})','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    plot(thref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
+    xlabel('P. Temperature (K)','FontSize',30);
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     dirname = '../ShearJetSchar/';
     fname = [dirname 'BACKGROUND_PROFILES'];
     screen2png(fname);
     
-    fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
+    figure;
     plot(dujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Shear (s^{-1})','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Shear $(s^{-1})$');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
-    
-    fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
-    Ri = -BS.ga * dlrref(:,1);
-    Ri = Ri ./ (dujref(:,1).^2);
-    semilogx(Ri,1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Ri','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 20.0]);
-    xlim([0.1 1.0E4]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-    drawnow;
-    dirname = '../ShearJetSchar/';
-    fname = [dirname 'RICHARDSON_NUMBER'];
-    screen2png(fname);
     pause
 %}
     
     REFS = struct('ujref',ujref,'dujref',dujref, ...
-        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'dlthref',dlthref, ...
+        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref,...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
-        'DDX_H',DDX_H,'sig',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
+        'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
-    DDXI_OP = zeros(NX*NZ);
+    DDXI_OP = spalloc(OPS, OPS, NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
-    DDXI_OP = sparse(DDXI_OP);
+    %DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite expansion)
-    DDAL_OP = zeros(NX*NZ);
+    DDA_OP = spalloc(OPS, OPS, NX^2);
     for rr=1:NZ
-        ddex = (1:NZ:NX*NZ) + (rr - 1);
-        DDAL_OP(ddex,ddex) = DDX_H;
+        ddex = (1:NZ:OPS) + (rr - 1);
+        DDA_OP(ddex,ddex) = DDX_H;
     end
-    DDAL_OP = sparse(DDAL_OP);
+    %DDA_OP = sparse(DDA_OP);
 
     %% Assemble the block global operator L
     OPS = NX*NZ;
@@ -232,8 +210,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_RhoTheta(DS, BS, UJ, RAY, Tes
     IRHOZ = spdiags(reshape(rref.^(-1),OPS,1), 0, OPS, OPS);
     IRTHZ = spdiags(reshape((rref .* thref).^(-1),OPS,1), 0, OPS, OPS);
     PGFT = RDTZ * IRTHZ;
-    RSC = spdiags(reshape(rsc,OPS,1), 0, OPS, OPS);
-    U0DA = U0 * DADX * DDAL_OP;
+    U0DA = U0 * DDAL_OP;
     
     %unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
@@ -241,15 +218,15 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_RhoTheta(DS, BS, UJ, RAY, Tes
     L11 = U0DA;
     L12 = sparse(OPS,OPS);
     L13 = sparse(OPS,OPS);
-    L14 = BS.gam * PGFT * DADX * DDAL_OP;
+    L14 = BS.gam * PGFT * DDAL_OP;
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
-    L22 = RSC * U0DA;
+    L22 = U0DA;
     L23 = sparse(OPS,OPS);
     L24 = BS.gam * PGFT * SIGMA * DDXI_OP;
     % Continuity LHS
-    L31 = RHOZ * DADX * DDAL_OP;
-    L32 = RSC * RHOZ * SIGMA * DDXI_OP;
+    L31 = RHOZ * DDAL_OP;
+    L32 = RHOZ * SIGMA * DDXI_OP;
     L33 = U0DA;
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
@@ -261,32 +238,24 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_RhoTheta(DS, BS, UJ, RAY, Tes
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
     B11 = sparse(OPS,OPS) + RAY.nu1 * spdiags(RL,0, OPS, OPS);
-    B12 = RSC * DUDZ;
+    B12 = DUDZ;
     B13 = sparse(OPS,OPS);
     B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
     B21 = sparse(OPS,OPS);
-    B22 = sparse(OPS,OPS) + RAY.nu2 * RSC * spdiags(RL,0, OPS, OPS);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
     B23 = BS.ga * IRHOZ;
     B24 = -(BS.gam * PGFT * DLRTDZ + BS.gam * BS.ga * IRTHZ);
     % Continuity LHS (using density weighted change of variable in W)
     B31 = sparse(OPS,OPS);
-    B32 = 0.5 * RSC * DRDZ;
+    B32 = DRDZ;
     B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
     B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     B41 = sparse(OPS,OPS);
-    B42 = RSC * RHOZ * DTHDZ;
+    B42 = RHOZ * DTHDZ;
     B43 = sparse(OPS,OPS) - RAY.nu4 * spdiags(RL,0, OPS, OPS) * THTZ;
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
-    %% Adjust the operator for the coupled forcing BC
-    bdex = 1:NZ:OPS;
-    GPHI = spdiags((DZT(1,:))', 0, NX, NX);
-    RSBC = spdiags((rsc(1,:))', 0, NX, NX);
-    
-    % THE BOTTOM BOUNDARY CONDITION MUST BE IN CONTINUITY EQUATION 3
-    B31(bdex,bdex) = (-GPHI);
-    B32(bdex,bdex) = RSBC;
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -313,15 +282,36 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_RhoTheta(DS, BS, UJ, RAY, Tes
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
-
     %% Assemble the force vector
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
-    
-    %% Adjust the force vector for the coupled BC
-    F31(bdex) = (ujref(1,:) .* DZT(1,:))';
-    
     FF = [F11 ; F21 ; F31 ; F41];
+    
+    %% Compute the bottom boundary constraint
+    HBC = sparse(NB,4 * OPS);
+    HBCT = HBC;
+    UNIT = spdiags(ones(NB,1), 0, NB, NB);
+    % Row augmentation
+    HBC(:,bdex + OPS) = UNIT;
+    % Column augmentation
+    HBCT(:,bdex + OPS) = UNIT;
+    
+    %% Compute the top boundary constraint
+    TBC = sparse(NT,4 * OPS);
+    TBCT = TBC;
+    UNIT = spdiags(ones(NT,1), 0, NT, NT);
+    % Row augmentation
+    TBC(:,tdex + OPS) = UNIT;
+    % Column augmentation
+    TBCT(:,tdex + OPS) = UNIT;
+    
+    %% Augment the system with the Lagrange Multiplier Constraints
+    RPAD = zeros(NB + NT);
+    LDA = [LD HBCT' TBCT'];
+    RAG = [HBC ; TBC];
+    RAG = [RAG RPAD];
+    LDA = [LDA ; RAG];
+    FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))' ; zeros(NT,1)];
 end

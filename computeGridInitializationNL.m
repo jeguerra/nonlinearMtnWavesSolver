@@ -1,4 +1,4 @@
-function REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     
     % Set the domain scale
@@ -34,16 +34,16 @@ function REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NXO, NX, 
     %}
     %
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
     %}
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    alpha = exp(-0.5 * zlc);
+    beta = (-0.5) * ones(size(zlc'));
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
     %}
-    
-    %[zl, DDZ_L] = lagdifJEG(NZ, 1, 2.0 * DS.zH);
-       
+           
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS,RAY);
     
@@ -73,8 +73,6 @@ function REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NXO, NX, 
     for rr=1:size(DZT,1)
         DZT(rr,:) = fxi(rr,:) .* dhdx';
     end
-    % Compute the horizontal metric derivative
-    dAdX = (1.0 + DZT.^2).^(0.5);
     
     %% Compute the Rayleigh field
     [rayField, ~] = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyTopRL,applyLateralRL);
@@ -116,7 +114,7 @@ function REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NXO, NX, 
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'dlthref',dlthref, ...
         'pref',pref,'rref',rref,'thref',thref,'dthref',dthref,'drthref',drthref, ...
         'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT, ...
-        'dAdX',dAdX,'DDZ_L',DDZ_L,'DDX_H',DDX_H,'sigma',sigma,'RL',RL, ...
+        'DDZ_L',DDZ_L,'DDX_H',DDX_H,'sigma',sigma,'RL',RL, ...
         'NX',NX,'NZ',NZ,'TestCase',TestCase,'thref0',thref0);
 
 end

@@ -1,10 +1,8 @@
 function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     % Set the boundary indices and operator dimension
     OPS = NX*NZ;
-    tdex = NZ:NZ:OPS;
     bdex = 1:NZ:(OPS - NZ + 1);
     NB = length(bdex);
-    NT = length(tdex);
     
     %% Compute the Hermite and Legendre points and derivatives for this grid
     [~,DDX_H] = herdif(NX, 1, 0.5 * DS.L, true);
@@ -206,23 +204,13 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     % Row augmentation
     HBC(:,bdex + OPS) = UNIT;
     % Column augmentation
-    HBCT(:,bdex + 2*OPS) = UNIT;
-    
-    %% Compute the top boundary constraint
-    TBC = sparse(NT,4 * OPS);
-    TBCT = TBC;
-    UNIT = spdiags(ones(NT,1), 0, NT, NT);
-    % Row augmentation
-    TBC(:,tdex + OPS) = UNIT;
-    % Column augmentation
-    TBCT(:,tdex + OPS) = UNIT;
+    HBCT(:,bdex + OPS) = UNIT;
     
     %% Augment the system with the Lagrange Multiplier Constraints
-    RPAD = zeros(NB + NT);
-    LDA = [LD HBCT' TBCT'];
-    %LDA = [LD zeros(size(HBC')) zeros(size(TBC))'];
-    RAG = [HBC ; TBC];
+    RPAD = zeros(NB);
+    LDA = [LD HBCT'];
+    RAG = HBC;
     RAG = [RAG RPAD];
     LDA = [LDA ; RAG];
-    FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))' ; zeros(NT,1)];
+    FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))'];
 end

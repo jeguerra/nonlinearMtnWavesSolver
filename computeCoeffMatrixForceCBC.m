@@ -1,11 +1,9 @@
-function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     % Set the boundary indices and operator dimension
     OPS = NX*NZ;
-    tdex = NZ:NZ:OPS;
-    bdex = 1:NZ:(OPS - NZ + 1);
-    NB = length(bdex);
-    NT = length(tdex);
+    %bdex = 1:NZ:(OPS - NZ + 1);
+    %NB = length(bdex);
     
     % Set the domain scale
     dscale = 0.5 * DS.L;
@@ -46,15 +44,8 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
     %}
-    %{
-    [zl, DDZ_L] = lagdif(NZ, 1, DS.zH);
-    %zl = DS.zH * (zlc / max(zlc));
-    %zlc = (zlc / max(zlc));
-    %DDZ_L = (1.0 / DS.zH) * DDZ_L;
-    %}      
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
     
@@ -90,9 +81,6 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     for rr=1:size(DZT,1)
         DZT(rr,:) = fxi(rr,:) .* dhdx';
     end
-    % Compute the horizontal metric derivative
-    dadx = (1.0 + DZT.^2).^(0.5);
-    dxidx = sigma .* DZT;
     
     %% Compute the Rayleigh field
     [rayField, ~] = computeRayleighXZ(DS,1.0,RAY.depth,RAY.width,XL,ZL,applyTopRL,applyLateralRL);
@@ -134,81 +122,45 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
 
 %{
     %% Plot background fields including mean Ri number
-    fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+    figure;
     subplot(2,2,1);
     plot(ujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Speed (m s^{-1})','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Speed $(m s^{-1})$');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
     subplot(2,2,2);
     plot(pref(:,1) ./ (rref(:,1) * BS.Rd),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
     %title('Temperature Profile','FontSize',30);
-    xlabel('Temperature (K)','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Temperature (K)');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
     subplot(2,2,3);
     plot(0.01*pref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Pressure (hPa)','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Pressure (hPa)');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     
     subplot(2,2,4);
-    plot(rref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Density (kg m^{-3})','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    plot(thref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
+    xlabel('P. Temperature (K)','FontSize',30);
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
     dirname = '../ShearJetSchar/';
     fname = [dirname 'BACKGROUND_PROFILES'];
     screen2png(fname);
     
-    fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
+    figure;
     plot(dujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Shear (s^{-1})','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
+    xlabel('Shear $(s^{-1})$');
+    ylabel('Elevation (km)');
     ylim([0.0 35.0]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
     drawnow;
-    
-    fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
-    Ri = -BS.ga * dlrref(:,1);
-    Ri = Ri ./ (dujref(:,1).^2);
-    semilogx(Ri,1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Ri','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 20.0]);
-    xlim([0.1 1.0E4]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-    drawnow;
-    dirname = '../ShearJetSchar/';
-    fname = [dirname 'RICHARDSON_NUMBER'];
-    screen2png(fname);
-    
-    fig = figure('Position',[0 0 1200 1200]); fig.Color = 'w';
-    Im = dlthref(:,1) + 0.5 * dujref(:,1) ./ ujref(:,1) - 0.5 * dlpref(:,1);
-    MZ = exp(sigma(:,1) .* Im);
-    for xx=2:length(MZ)
-        MZ(xx) = MZ(xx) * MZ(xx-1);
-    end
-    plot(MZ,1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Amplitude Gain','FontSize',30);
-    ylabel('Altitude (km)','FontSize',30);
-    ylim([0.0 25.0]);
-    %xlim([1.0 1.0002]);
-    fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-    drawnow;
-    dirname = '../ShearJetSchar/';
-    fname = [dirname 'VERTICAL_WAVENUMBER'];
-    screen2png(fname);
     pause
 %}
     
@@ -224,7 +176,6 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
-    %DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite expansion)
     DDA_OP = spalloc(OPS, OPS, NX^2);
@@ -232,22 +183,17 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
         ddex = (1:NZ:OPS) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;
     end
-    %DDA_OP = sparse(DDA_OP);
 
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
-    %DADX = spdiags(reshape(dadx,OPS,1), 0, OPS, OPS);
-    %DXIDX = spdiags(reshape(dxidx,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
     DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
-    U0DX = U0 * DDA_OP;
     DX = DDA_OP;
-    %DX = DDA_OP - DXIDX * DDXI_OP;
-    %U0DX = U0 * (DDA_OP - DXIDX * DDXI_OP);
+    U0DX = U0 * DX;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
     % Horizontal momentum LHS
@@ -264,6 +210,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     L31 = BS.gam * DDA_OP;
     L32 = BS.gam * SIGMA * DDXI_OP;
     L33 = U0DX;
+    %L33 = sparse(OPS,OPS);
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     L41 = sparse(OPS,OPS);
@@ -315,30 +262,42 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     LD44 = L44 + B44;
     
     %% Assemble the LHS operator
-    LD = [LD11 LD12 LD13 LD14 ; ...
-          LD21 LD22 LD23 LD24 ; ...
-          LD31 LD32 LD33 LD34 ; ...
-          LD41 LD42 LD43 LD44];
+    %LD = [LD11 LD12 LD13 LD14 ; ...
+    %      LD21 LD22 LD23 LD24 ; ...
+    %      LD31 LD32 LD33 LD34 ; ...
+    %      LD41 LD42 LD43 LD44];
+      
+    LD = [LD11 LD13 LD12 LD14 ; ...
+          LD31 LD33 LD32 LD34 ; ...
+          LD21 LD23 LD22 LD24 ; ...
+          LD41 LD43 LD42 LD44];
       
     %% Assemble the force vector
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
-    FF = [F11 ; F21 ; F31 ; F41];
+    FF = [F11 ; F31 ; F21 ; F41];
     
+    %{
     %% Compute the bottom boundary constraint
     HBC = sparse(NB,4 * OPS);
     HBCT = HBC;
     UNIT = spdiags(ones(NB,1), 0, NB, NB);
-    HX = spdiags((DZT(1,:))', 0, NB, NB);
     % Row augmentation
-    %HBC(:,bdex) = -HX;
     HBC(:,bdex + OPS) = UNIT;
     % Column augmentation
-    %HBCT(:,bdex) = -HX;
-    HBCT(:,bdex + 1*OPS) = UNIT;
+    HBCT(:,bdex + OPS) = UNIT;
     
+    %% Augment the system with the Lagrange Multiplier Constraints
+    RPAD = zeros(NB);
+    LDA = [LD HBCT'];
+    RAG = HBC;
+    RAG = [RAG RPAD];
+    LDA = [LDA ; RAG];
+    FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))'];
+    %}
+    %{
     %% Compute the top boundary constraint
     TBC = sparse(NT,4 * OPS);
     TBCT = TBC;
@@ -346,7 +305,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     % Row augmentation
     TBC(:,tdex + OPS) = UNIT;
     % Column augmentation
-    TBCT(:,tdex + 1*OPS) = UNIT;
+    TBCT(:,tdex + OPS) = UNIT;
     
     %% Augment the system with the Lagrange Multiplier Constraints
     RPAD = zeros(NB + NT);
@@ -355,19 +314,5 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, 
     RAG = [RAG RPAD];
     LDA = [LDA ; RAG];
     FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))' ; zeros(NT,1)];
-    
-    %{
-    %% Compute the lateral boundary constraint
-    RBC = sparse(NZ-2,4*OPS);
-    UNIT = spdiags(ones(NZ-2,1), 0, NZ-2, NZ-2);
-    RBC(:,rdex + OPS) = UNIT;
-    %
-    %% Augment the system with the Lagrange Multiplier Constraints
-    RPAD = zeros(2*NX + (NZ - 2));
-    LDA = [LD HBC' TBC' RBC'];
-    RAG = [HBC ; TBC ; RBC];
-    RAG = [RAG RPAD];
-    LDA = [LDA ; RAG];
-    FFA = [FF ; (ujref(1,:) .* DZT(1,:))' ; zeros(NX,1) ; zeros(NZ-2,1)];
     %}
 end

@@ -12,17 +12,17 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
+NX = 120; % Expansion order matches physical grid
 NXO = 80; % Expansion order
-NZ = 60; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
-%TestCase = 'ShearJetScharCBVF'; BC = 2;
-%TestCase = 'ClassicalSchar'; BC = 2;
-%TestCase = 'AndesMtn'; BC = 2;
+TestCase = 'ShearJetSchar'; BC = 3;
+%TestCase = 'ShearJetScharCBVF'; BC = 0;
+%TestCase = 'ClassicalSchar'; BC = 0;
+%TestCase = 'AndesMtn'; BC = 0;
 
 z0 = 0.0;
 gam = 1.4;
@@ -52,7 +52,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 1.0E-6;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     u0 = 10.0;
     uj = 16.822;
@@ -149,29 +149,60 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC);
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
-%[LD,FF,W0,REFS] = ...
-%computeCoeffMatrixForceCBC_SSPRK53(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
-
 [LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 
 %% Get the boundary conditions
-[FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
+[SOL,sysDex] = GetAdjust4CBC(BS,REFS,BC,NX,NZ,OPS);
 
+%{
+uxz = reshape(SOL((1:OPS),1),NZ,NX);
+wxz = reshape(SOL((1:OPS) + OPS,1),NZ,NX);
+rxz = reshape(SOL((1:OPS) + 2*OPS,1),NZ,NX);
+pxz = reshape(SOL((1:OPS) + 3*OPS,1),NZ,NX);
+
+%% Plot the solution in the native grids
+%
+% NATIVE GRID PLOTS
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(uxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+disp(['U MAX: ' num2str(max(max(uxz)))]);
+disp(['U MIN: ' num2str(min(min(uxz)))]);
+title('$u$ $(ms^{-1})$');
+subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(wxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('$w$ $(ms^{-1})$');
+%
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(rxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Perturbation $\ln p$ $(Pa)$');
+subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(pxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Perturbation $\ln \theta$ $(K)$');
+drawnow
+pause;
+%}
 %% Solve the hyperbolic problem using SSP-RK53
 %
 disp('Solve with explicit SSP-RK53.');
 tic
 spparms('spumoni',2);
-A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
-%A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
-%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
-clear LD FF FFBC;
-%
+A = LD;
+b = FF;
+AN = A;
+bN = b;
+toc; disp('Compute coefficient matrix... DONE.');
+clear A b LD FF;
+%{
 %% Check the eigenvalues of the RHS operator before time integration
-[dvecs, dlambda] = eigs(A,20,'lr');
+[dvecs, dlambda] = eigs(AN,10,'lr');
 diag(dlambda)
 %%
 SOL(sysDex) = dvecs(:,1);
@@ -189,7 +220,7 @@ xlim([l1 l2]);
 ylim([0.0 zH]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total u (ms^{-1})');
+title('$u$ $(ms^{-1})$');
 subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(wxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
@@ -199,7 +230,7 @@ fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(rxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('Perturbation %\ln \rho$ $(kg/m^3)$');
+title('Perturbation $\ln p$ $(Pa)$');
 subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(pxz)); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
@@ -209,54 +240,58 @@ pause;
 %}
 
 % Time step (fraction of a second)
-DT = 1.0E-2;
+DT = 0.01;
 % End time in seconds (HR hours)
 HR = 1;
 ET = HR * 60 * 60;
 %TI = DT:DT:ET;
 
-sol0 = zeros(length(b),1);
+%% Set storage for solution vectors and initialize
+sol = zeros(length(SOL),5);
+for ss=1:5
+    sol(:,ss) = SOL;
+end
 
 %% Explitcit SSP RK53
 %
-for tt=2:500%length(TI)
+for tt=2:200%length(TI)
     % Initialize the RHS
-    RHS = b - A * sol0;
+    RHS = bN - AN * sol(:,1);
     % Stage 1
     c1 = 0.377268915331368;
-    sol1 = sol0 + c1 * DT * RHS;
-    RHS = b - A * sol1;
-    sol2 = sol1 + c1 * DT * RHS;
+    sol(sysDex,2) = sol(sysDex,1) + c1 * DT * RHS(sysDex);
+    RHS = bN - AN * sol(:,2);
+    sol(sysDex,3) = sol(sysDex,2) + c1 * DT * RHS(sysDex);
     % First linear combination
     LC1_s0 = 0.355909775063327;
     LC1_s2 = 0.644090224936674;
-    sol3 = LC1_s0 * sol0 + LC1_s2 * sol2;
+    sol(sysDex,4) = LC1_s0 * sol(sysDex,1) + LC1_s2 * sol(sysDex,3);
     %
     % Stage 2
     c2 = 0.242995220537396;
-    RHS = b - A * sol2;
-    sol3 = sol3 + c2 * DT * RHS;
+    RHS = bN - AN * sol(:,3);
+    sol(sysDex,4) = sol(sysDex,4) + c2 * DT * RHS(sysDex);
     % Second linear combination
     LC2_s0 = 0.367933791638137;
     LC2_s3 = 0.632066208361863;
-    sol0 = LC2_s0 * sol0 + LC2_s3 * sol3;
+    sol(sysDex,1) = LC2_s0 * sol(sysDex,1) + LC2_s3 * sol(sysDex,4);
     %
     % Stage 3
     c3 = 0.238458932846290;
-    RHS = b - A * sol3;
-    sol0 = sol0 + c3 * DT * RHS;
+    RHS = bN - AN * sol(:,4);
+    sol(sysDex,1) = sol(sysDex,1) + c3 * DT * RHS(sysDex);
     % Third linear combination
     LC3_s0 = 0.762406163401431;
     LC3_s2 = 0.237593836598569;
-    sol5 = LC3_s0 * sol0 + LC3_s2 * sol2;
+    sol(sysDex,5) = LC3_s0 * sol(sysDex,1) + LC3_s2 * sol(sysDex,3);
     %
     % Stage 4
     c4 = 0.287632146308408;
-    RHS = b - A * sol0;
-    sol5 = sol5 + c4 * DT * RHS;
+    RHS = bN - AN * sol(:,1);
+    sol(sysDex,5) = sol(sysDex,5) + c4 * DT * RHS(sysDex);
     %
     % Update the solution
-    sol0 = sol5;
+    sol(sysDex,1) = sol(sysDex,5);
     disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
 end
 %}
@@ -264,7 +299,7 @@ end
 %{
 for tt=2:500%length(TI)
     % Initialize the RHS
-    RHS = b - A * sol0;
+    RHS = bN - A * sol0;
     % Stage 1
     c1 = 1.0;
     sol1 = sol0 + c1 * DT * RHS;
@@ -275,7 +310,7 @@ for tt=2:500%length(TI)
     %
     % Stage 2
     c2 = 0.25;
-    RHS = b - A * sol1;
+    RHS = bN - A * sol1;
     sol2 = sol2 + c2 * DT * RHS;
     % Second linear combination
     LC2_s0 = 1.0 / 3.0;
@@ -284,7 +319,7 @@ for tt=2:500%length(TI)
     %
     % Stage 3
     c3 = 2.0 / 3.0;
-    RHS = b - A * sol2;
+    RHS = bN - A * sol2;
     sol3 = sol3 + c3 * DT * RHS;
     %
     % Update the solution
@@ -293,13 +328,9 @@ for tt=2:500%length(TI)
 end
 %}
 
-sol = sol0;
-clear A b;
-toc
-%}
 
 %% Get the solution fields
-SOL(sysDex) = sol;
+SOL(sysDex) = sol(sysDex,1);
 clear sol;
 %
 uxz = reshape(SOL((1:OPS)),NZ,NX);
@@ -307,29 +338,14 @@ wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
-%% Interpolate to a regular grid using Hermite and Legendre transforms'
-%
-NXI = 600;
-NZI = 300;
-[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, real(uxz), NXI, NZI, 0, 0);
-[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(wxz), NXI, NZI, 0, 0);
-[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(rxz), NXI, NZI, 0, 0);
-[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, real(pxz), NXI, NZI, 0, 0);
-
-XI = l2 * XINT;
-ZI = ZINT;
-%}
 %% Interpolate to a regular grid using Hermite and Laguerre transforms'
-%{
-DXI = 100.0;
-DZI = 50.0;
-xint = l1:DXI:l2; NXI = length(xint);
-zint = 0.0:DZI:zH; NZI = length(zint);
-%[zint, ~] = lagdifJEG(NZI, 1, 2.0 * DS.zH);
-[uxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, real(uxz), NXI, NZI, xint, zint);
-[wxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(wxz), NXI, NZI, xint, zint);
-[rxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(rxz), NXI, NZI, xint, zint);
-[pxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(pxz), NXI, NZI, xint, zint);
+%
+NXI = 1000;
+NZI = 200;
+[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
+[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
+[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
+[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NXI, NZI, 0, 0);
 
 XI = l2 * XINT;
 ZI = ZINT;
@@ -391,68 +407,47 @@ end
 dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
 %{
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-contourf(XI,ZI,ujref,31); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-title('Background Horizontal Velocity U (m/s)');
-%}
-%{
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
+figure;
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref + uxzint,31); colorbar; grid on;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
+contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
+%contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
+hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+caxis(cm);
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+%ylim(1.0E-3 * [0.0 zH - depth]);
+%xlim([-200 300]);
+%ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total Horizontal Velocity U $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
+title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
+screen2png(['UREferenceSolution' mtnh '.png']);
+%
+figure;
 colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-title('Vertical Velocity W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
-xlabel('Distance (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['UWREferenceSolution' mtnh '.png']);
-%{
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI, ... 
-    (exp(lrref + rxzint) .* (ujref + uxzint) .* wxzint),31); colorbar; grid on;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-title('Momentum Flux $(kg~m^{-1}~s^{-2})$','FontWeight','normal','Interpreter','latex');
+contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on; cm = caxis;
+hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+caxis(cm);
+%xlim(1.0E-3 * [l1 + width l2 - width]);
+%ylim(1.0E-3 * [0.0 zH - depth]);
+%xlim([-100 100]);
+%ylim([0 15]);
+title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-screen2png(['MFluxREferenceSolution' mtnh '.png']);
-drawnow
-%}
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+screen2png(['WREferenceSolution' mtnh '.png']);
+%
+figure;
 colormap(cmap);
 subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('Perturbation Log Density $(kg m^{-3})$','FontWeight','normal','Interpreter','latex');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
+title('$(\ln p)^{\prime} ~~ (Pa)$');
 subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('Perturbation Log Pressure (Pa)','FontWeight','normal','Interpreter','latex');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-%{
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-colormap(cmap);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,abs(uxzint) ./ abs(ujref),31,'LineStyle','none'); colorbar;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-title('Nonlinearity Ratio $\left| \frac{u}{\bar{u}} \right|$','FontSize',32,'FontWeight','normal','Interpreter','latex');
-%}
+title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
 %}
 %% Compute the local Ri number and plot ...
@@ -549,15 +544,15 @@ screen2png(fname);
 %}
 %% Debug
 %
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Total Horizontal Velocity U (m/s)');
-subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Vertical Velocity W (m/s)');
-subplot(2,2,3); surf(XI,ZI,exp(rxzint)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Perturbation Density (kg/m^3)');
-subplot(2,2,4); surf(XI,ZI,exp(pxzint)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 5000.0]);
-title('Perturbation Pressure (Pa)');
+figure;
+subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-25000.0 25000.0]); ylim([0.0 2000.0]);
+title('U (m/s)'); %zlim([-0.1 0.1]);
+subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-25000.0 25000.0]); ylim([0.0 2000.0]);
+title('W (m/s)');
+subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-30000.0 30000.0]); ylim([0.0 2000.0]);
+title('$(\ln p)^{\prime}$ (Pa)');
+subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-30000.0 30000.0]); ylim([0.0 2000.0]);
+title('$(\ln \theta)^{\prime}$ (K)');
 drawnow
 %}
 

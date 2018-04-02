@@ -12,14 +12,13 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NXO = 80; % Expansion order
-NZ = 80; % Expansion order matches physical grid
+NX = 120; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
+TestCase = 'ShearJetSchar'; BC = 1;
 %TestCase = 'ShearJetScharCBVF'; BC = 1;
 %TestCase = 'ClassicalSchar'; BC = 1;
 %TestCase = 'AndesMtn'; BC = 1;
@@ -34,10 +33,10 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
-    %l1 = -6.0E4;
-    %l2 = 6.0E4;
+    %l1 = -1.0E4 * 2.0 * pi;
+    %l2 = 1.0E4 * 2.0 * pi;
+    l1 = -6.0E4;
+    l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -157,26 +156,30 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
 [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
 
 %% Solve the system using the matlab linear solver
 %
-disp('Solve the raw system with matlab default \.');
+disp('Solve by using matlab \ only.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = FFBC(sysDex,1);
-%A = LD(sysDex,sysDex)' * LD(sysDex,sysDex);
-%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
-clear LD FF FFBC;
-sol = A \ b;
-clear A b;
-toc
+%AN = A;
+%bN = b;
+% Normal equations to make the system symmetric
+AN = A' * A;
+bN = A' * b;
+toc; disp('Compute coefficient matrix... DONE.');
+clear A b LD FF FFBC;
+%tic
+sol = (AN \ bN);
+toc; disp('Solve the system... DONE.');
 %}
-
+clear AN bN
 %% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
@@ -269,7 +272,7 @@ figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
 %contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
-hold on; area(1.0E-3 * XI(1,:),2.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
 caxis(cm);
 %xlim(1.0E-3 * [l1 + width l2 - width]);
 %ylim(1.0E-3 * [0.0 zH - depth]);
@@ -301,11 +304,11 @@ colormap(cmap);
 subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('$(\ln p)^{\prime} ~~ (Pa)$');
+title('$\rho^{\prime} ~~ (kgm^{-3})$');
 subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
-title('$(\ln \theta)^{\prime} ~~ (K)$');
+title('$\theta^{\prime} ~~ (K)$');
 drawnow
 %}
 %{
@@ -334,18 +337,15 @@ screen2png(['WaveGrowthW_LnP' mtnh '.png']);
 %}
 %
 %% Compute the scaling constants needed for residual diffusion
-lrho = REFS.lrref + rxz;
-rho = exp(lrho);
-lp = REFS.lpref + pxz;
-p = exp(lp);
-P = exp(REFS.lpref);
-R = exp(REFS.lrref);
-pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
-PT = p ./ (Rd * R) .* (p0 * P.^(-1)).^(Rd / cp);
-RT = (rho .* pt) - (R .* PT);
+pt = REFS.thref + txz;
+rho = REFS.rref + rxz;
+P = REFS.pref;
+PT = REFS.thref;
+p = ((Rd * rho .* pt) * (p0^(-kappa))).^(kappa - 1.0); 
+R = rho;
+RT = pxz;
 UINF = norm(uxz - mean(mean(uxz)),Inf);
 WINF = norm(wxz - mean(mean(wxz)),Inf);
-R = exp(rxz);
 RINF = norm(R - mean(mean(R)),Inf);
 RTINF = norm(RT - mean(mean(RT)),Inf);
 disp('Scaling constants for DynSGS coefficients:');
@@ -355,17 +355,14 @@ disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
 disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
 
 %% Compute Ri, Convective Parameter, and BVF
-%
 DDZ_BC = REFS.DDZ;
-dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * real(rxz));
+dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
 DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
-temp = p ./ (Rd * rho);
+dlpt = (REFS.dthref + REFS.sigma .* (DDZ_BC * real(txz))) .* (pt.^(-1));
+temp = (P + p) ./ (Rd * rho);
 conv = temp .* dlpt;
 
 RiREF = -BS.ga * REFS.dlrref(:,1);
@@ -379,9 +376,9 @@ semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',2.5);
 semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
-%xlabel('\textsf{$\mathcal{N}^2 \left( \frac{\partial u}{\partial z} \right)^{-2}$}','Interpreter','latex');
+xlabel('$Ri$');
 ylabel('Elevation (km)');
-title('Ri Number');
+title('Richardson Number');
 xlim([0.1 1.0E4]);
 ylim([0.0 30.0]);
 
@@ -390,11 +387,10 @@ hold on;
 semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
 hold off;
 grid on; grid minor;
-%xlabel('\textsf{$\frac{T}{\theta} \frac{\partial \theta}{\partial z}$}','Interpreter','latex');
+xlabel('$S_p$');
 %ylabel('Elevation (km)');
 title('Convective Stability');
-ylim([0.0 30.0]);
-xlim([-0.3 0.3]);
+%xlim([-0.3 0.3]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
@@ -403,9 +399,7 @@ screen2png(fname);
 %
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
 DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
+dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * log(p));
 NBVF = (ga .* dlpt);
 
 Lv = 2.5E3;
@@ -414,56 +408,14 @@ FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
 xdex = 1:1:NX;
 plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 grid on; grid minor;
-title('Local Froude Number - $l_v = 2.5\times10^3 (m)$');
-%xlabel('\textsf{Fr = \frac{2 \pi | w |}{\mathcal{N} l_v}}','Interpreter','latex');
+title('Local Froude Number');
+xlabel('$Fr$');
 %ylabel('\textsf{Altitude (km)}','Interpreter','latex');
-ylim([0.0 30.0]);
+ylim([0.0 25.0]);
 %xlim([-1.0E-3 2.0E-3]);
 drawnow;
 
 fname = ['FROUDE_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-%}
-%% Compute the nonlinearity parameter in Rho and plot...
-%{
-nlRho = exp(rxz) - 1.0;
-
-xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-plot(nlRho(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-grid on;
-xlabel('$\frac{\rho \prime}{\bar{\rho}}$','FontSize',30,'Interpreter','latex');
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
-xlim([-1.0E-3 1.0E-3]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow;
-
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-fname = ['NLP_RHO_LnP' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-
-%% Compute the nonlinearity parameter in U and plot...
-%
-nlU = uxz ./ REFS.ujref;
-
-xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-plot(nlU(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-grid on;
-xlabel('$\frac{u \prime}{\bar{u}}$','FontSize',30,'Interpreter','latex');
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
-xlim([-1.0E-1 1.0E-1]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow;
-
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-fname = ['NLP_U_LnP' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 %}
@@ -495,8 +447,8 @@ drawnow
 %}
 
 %% Save the data
-%{
+%
 close all;
-fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
+fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_Flux' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);
 %}

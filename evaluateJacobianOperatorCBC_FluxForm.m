@@ -8,24 +8,21 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
-    DDXI_OP = zeros(OPS);
+    DDXI_OP = spalloc(OPS, OPS, REFS.NZ^2);
     for cc=1:REFS.NX
         ddex = (1:REFS.NZ) + (cc - 1) * REFS.NZ;
         DDXI_OP(ddex,ddex) = REFS.DDZ_L;
     end
-    DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite expansion)
-    DDAL_OP = zeros(OPS);
+    DDA_OP = spalloc(OPS, OPS, REFS.NX^2);
     for rr=1:REFS.NZ
         ddex = (1:REFS.NZ:OPS) + (rr - 1);
-        DDAL_OP(ddex,ddex) = REFS.DDX_H;
+        DDA_OP(ddex,ddex) = REFS.DDX_H;
     end
-    DDAL_OP = sparse(DDAL_OP);
     
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(REFS.sigma,OPS,1), 0, OPS, OPS);
-    DADX = spdiags(reshape(REFS.dAdX,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(REFS.ujref,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(REFS.dujref,OPS,1), 0, OPS, OPS);
     DTHDZ = spdiags(reshape(REFS.dthref,OPS,1), 0, OPS, OPS);
@@ -35,7 +32,7 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     RDTZ = spdiags(reshape(REFS.pref ./ REFS.rref,OPS,1), 0, OPS, OPS);
     PGFTX = (BS.gam * RDTZ - U0.^2) * ITHTZ;
     PGFTZ = BS.gam * RDTZ * ITHTZ;
-    U0DA = U0 * DADX * DDAL_OP;
+    U0DA = U0 * DDA_OP;
 
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
@@ -43,14 +40,14 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     L11 = U0DA;
     L12 = sparse(OPS,OPS);
     L13 = sparse(OPS,OPS);
-    L14 = PGFTX * DADX * DDAL_OP;
+    L14 = PGFTX * DDA_OP;
     % Vertical momentum LHS
     L21 = sparse(OPS,OPS);
     L22 = U0DA;
     L23 = sparse(OPS,OPS);
     L24 = PGFTZ * SIGMA * DDXI_OP;
     % Continuity LHS
-    L31 = DADX * DDAL_OP;
+    L31 = DDA_OP;
     L32 = SIGMA * DDXI_OP;
     L33 = sparse(OPS,OPS);
     L34 = sparse(OPS,OPS);
@@ -120,13 +117,10 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     HBC = sparse(NB,4 * OPS);
     HBCT = HBC;
     UNIT = spdiags(ones(NB,1), 0, NB, NB);
-    HX = spdiags((REFS.DZT(1,:))', 0, NB, NB);
     % Row augmentation
-    HBC(:,bdex) = -HX;
     HBC(:,bdex + OPS) = UNIT;
     % Column augmentation
-    %HBCT(:,bdex) = -HX;
-    HBCT(:,bdex + 2*OPS) = UNIT;
+    HBCT(:,bdex + 1*OPS) = UNIT;
     
     %% Compute the top boundary constraint
     TBC = sparse(NT,4 * OPS);
@@ -140,7 +134,6 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     %% Augment the system with the Lagrange Multiplier Constraints
     RPAD = zeros(NB + NT);
     LDA = [LD HBCT' TBCT'];
-    %LDA = [LD zeros(size(HBC')) zeros(size(TBC))'];
     RAG = [HBC ; TBC];
     RAG = [RAG RPAD];
     LDA = [LDA ; RAG];
@@ -164,9 +157,8 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
 
     %% Get the metric quantities
     SIGMA = spdiags(reshape(REFS.sigma,OPS,1), 0, OPS, OPS);
-    DADX = spdiags(reshape(REFS.dAdX,OPS,1), 0, OPS, OPS);
 
-    DDX = DADX * DDAL_OP;
+    DDX = DDA_OP;
     DDZ = SIGMA * DDXI_OP;
 
     %% Evaluate the RHS force vector force vector
@@ -214,5 +206,5 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     disp(['Lower Error Bound in RhoTheta: ' num2str(LB * norm(R41))]);
     
     %% Assemble the tangent forcing augmented system
-    FFA = [FF - RR; (REFS.ujref(1,1:REFS.NX) .* REFS.DZT(1,1:REFS.NX))' ; zeros(NT,1)];
+    FFA = [FF - RR; (REFS.rref(1,1:REFS.NX) .* REFS.ujref(1,1:REFS.NX) .* REFS.DZT(1,1:REFS.NX))' ; zeros(NT,1)];
 end

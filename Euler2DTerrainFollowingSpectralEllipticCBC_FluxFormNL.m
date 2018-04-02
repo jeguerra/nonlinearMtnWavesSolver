@@ -17,8 +17,8 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
+%TestCase = 'ShearJetSchar'; BC = 1;
+TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 0;
 %TestCase = 'AndesMtn'; BC = 0;
 
@@ -77,7 +77,7 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 0.1;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -151,7 +151,7 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the grid and initialization state
-REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NXO, NX, NZ, applyTopRL, applyLateralRL);
+REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 SOL = zeros(4 * OPS, 1);
 ruxz = SOL(1:OPS);
@@ -165,19 +165,25 @@ for n=1:iter
     [LD, FF, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxForm(ruxz, rwxz, rxz, pxz, BS, REFS, RAY);
 
     %% Solve the system for iteration 1 only
-    if n >= 1
+    if n == 1
         sysDex = computeBCIndexNL(BC,NX,NZ,OPS);
         disp('Solve the raw system with matlab default \.');
         tic
         spparms('spumoni',2);
         A = LD(sysDex,sysDex);
         b = FF(sysDex,1);
-        sol = A \ b;
+        clear LD FF;
+        AN = A' * A;
+        bN = A' * b;
         clear A b;
+        sol = AN \ bN;
+        clear AN bN;
         toc
         %% Get the solution fields
         SOL(sysDex) = sol;
         clear sol;
+    else
+        return;
     end
     
     %% Send the current iterate back
@@ -228,32 +234,6 @@ NZI = 300;
 
 XI = l2 * XINT;
 ZI = ZINT;
-%}
-% Plot the solution in the native grids
-%{
-% NATIVE GRID PLOTS
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(REFS.ujref + uxz),31); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-disp(['U MAX: ' num2str(max(max(uxz)))]);
-disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('Total Horizontal Velocity U (m/s)');
-subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(wxz),31); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-title('Vertical Velocity W (m/s)');
-
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(rxz),31); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-title('Perturbation Log Density (kg/m^3)');
-subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(pxz),31); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-title('Perturbation Log Pressure (Pa)');
-drawnow
 %}
 
 % Use the NCL hotcold colormap
@@ -312,7 +292,6 @@ caxis(cm);
 title('\textsf{Vertical Velocity W $(m~s^{-1})$}','FontWeight','normal','Interpreter','latex');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 screen2png(['WREferenceSolution' mtnh '.png']);
 %
 fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
@@ -323,40 +302,13 @@ caxis(cm);
 %xlim(1.0E-3 * [l1 + width l2 - width]);
 %ylim(1.0E-3 * [0.0 zH - depth]);
 title('Perturbation Density $(kg m^{-3})$','FontWeight','normal','Interpreter','latex');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
 caxis(cm);
 %xlim(1.0E-3 * [l1 + width l2 - width]);
 %ylim(1.0E-3 * [0.0 zH - depth]);
 title('Perturbation Potential Temperature (K)','FontWeight','normal','Interpreter','latex');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
 drawnow
-%}
-%{
-%% Compare W scatter plot to the predicted growth rate
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
-colormap(cmap);
-
-Im = REFS.dlthref(:,1) + 0.5 * REFS.dujref(:,1) ./ REFS.ujref(:,1) - 0.5 * REFS.dlpref(:,1);
-MZ = exp(REFS.sigma(:,1) .* Im);
-for xx=2:length(MZ)
-    MZ(xx) = MZ(xx) * MZ(xx-1);
-end
-% Normalize and scale to the W field
-MZ = max(max(wxzint)) / max(MZ) * MZ; 
-
-plot(wxzint,1.0E-3 * ZI,'ks','LineWidth',1.5); grid on; hold on;
-plot(MZ, 1.0E-3 * REFS.ZTL(:,1),'r-s','LineWidth',1.5); hold off;
-%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-%caxis([-0.08 0.08]);
-title('Vertical Velocity Growth W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
-xlabel('Distance (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['WaveGrowthW_LnP' mtnh '.png']);
-%}
 
 %% Compute the scaling constants needed for residual diffusion
 rho = REFS.rref + rxz;

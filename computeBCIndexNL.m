@@ -2,57 +2,36 @@ function sysDex = computeBCIndexNL(BC,NX,NZ,OPS)
     numVar = 4;
 
     %% Create boundary condition indices
-    %
     uldex = 2:NZ-1;
     wldex = uldex + OPS;
     rldex = uldex + 2*OPS;
     pldex = uldex + 3*OPS;
-    %}
     LeftOutExcludeCorners = [uldex wldex rldex pldex];
     RightOutExcludeCorners = LeftOutExcludeCorners + (OPS - NZ);
     
     if BC == 0
-        disp('Hermite-Lagrange Model, Dirichlet Lateral BC...');
-        var1BotLeftCorner = 1;
-        var1TopLeftCorner = NZ;
-        var1BotRightCorner = OPS - NZ + 1;
-        var1TopRightCorner = OPS;
-        var3BotLeftCorner = []; %(2*OPS + 1);
-        var3TopLeftCorner = []; %(3*OPS - NZ + 1);
-        var3BotRightCorner = []; %(2*OPS + NZ);
-        var3TopRightCorner = []; %(3*OPS);
-        rowsOut = [LeftOutExcludeCorners ...
-                   RightOutExcludeCorners ...
-                   var1BotLeftCorner ...
-                   var1TopLeftCorner ...
-                   var1BotRightCorner ...
-                   var1TopRightCorner ...
-                   var3BotLeftCorner ...
-                   var3TopLeftCorner ...
-                   var3BotRightCorner ...
-                   var3TopRightCorner];
+        disp('Hermite-Lagrange LogP-LogTheta Model, Dirichlet Lateral BC...');
+        % LnP and Theta at the corners
+        LeftCorners = [(2*OPS + 1) (3*OPS + 1) ...
+                       (2*OPS + 1) (3*OPS + 1)];
+        RightCorners = [(3*OPS - NZ + 1) (4*OPS - NZ + 1) ...
+                        3*OPS 4*OPS];
+        rowsOut = [LeftOutExcludeCorners LeftCorners ...
+                   RightOutExcludeCorners RightCorners];
     elseif BC == 1
+        disp('Hermite-Lagrange Rho-RhoTheta Model, Dirichlet Lateral BC...');
+        % LnP and Theta at the corners
+        LeftCorners = [(2*OPS + 1) ...
+                       (2*OPS + 1)];
+        RightCorners = [(3*OPS - NZ + 1) ...
+                        3*OPS];
+        rowsOut = [LeftOutExcludeCorners LeftCorners ...
+                   RightOutExcludeCorners RightCorners];
+    elseif BC == 2
         disp('Applying BC FFT-Lagrange Model...');
         rowsOut = [];
-    elseif BC == 2
-        disp('Hermite-Lagrange Model, Free Lateral BC...');
-        var1BotLeftCorner = 1;
-        var1TopLeftCorner = NZ;
-        var1BotRightCorner = OPS - NZ + 1;
-        var1TopRightCorner = OPS;
-        var3BotLeftCorner = (2*OPS + 1);
-        var3TopLeftCorner = (3*OPS - NZ + 1);
-        var3BotRightCorner = (2*OPS + NZ);
-        var3TopRightCorner = (3*OPS);
-        rowsOut = [var1BotLeftCorner ...
-                   var1TopLeftCorner ...
-                   var1BotRightCorner ...
-                   var1TopRightCorner ...
-                   var3BotLeftCorner ...
-                   var3TopLeftCorner ...
-                   var3BotRightCorner ...
-                   var3TopRightCorner];
     end
+
 
     sysDex = setdiff(1:numVar*OPS + 2*NX, rowsOut);
 end

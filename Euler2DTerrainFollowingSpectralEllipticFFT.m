@@ -19,10 +19,10 @@ OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-%TestCase = 'ShearJetSchar'; BC = 1;
-%TestCase = 'ShearJetScharCBVF'; BC = 1;
-%TestCase = 'ClassicalSchar'; BC = 1;
-TestCase = 'AndesMtn'; BC = 1;
+TestCase = 'ShearJetSchar'; BC = 2;
+%TestCase = 'ShearJetScharCBVF'; BC = 2;
+%TestCase = 'ClassicalSchar'; BC = 2;
+%TestCase = 'AndesMtn'; BC = 2;
 
 z0 = 0.0;
 gam = 1.4;
@@ -156,7 +156,7 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
-[FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
+[SOL,sysDex] = GetAdjust4CBC(BS,REFS,BC,NX,NZ,OPS);
 
 % Use the NCL hotcold colormap and check the initialization
 
@@ -184,14 +184,19 @@ disp('Solve the raw system with matlab default \.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
-clear LD FF FFBC;
-sol = A \ b;
-%sol = gmres(A, b, 10, 1.0E-8, 20);
-%[V,D] = eig(full(A));
-clear A b;
-toc
+b = FF(sysDex,1);
+%AN = A;
+%bN = b;
+% Normal equations to make the system symmetric
+AN = A' * A;
+bN = A' * b;
+toc; disp('Compute coefficient matrix... DONE.');
+clear A b LD FF;
+%tic
+sol = (AN \ bN);
+toc; disp('Solve the system... DONE.');
 %}
+clear AN bN
 
 %% Solve the system using residual non-linear line search solver
 %{

@@ -1,80 +1,59 @@
-function [FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF)
+function [SOL,sysDex] = GetAdjust4CBC(BS,REFS,BC,NX,NZ,OPS)
+    %% Number of variables and block positions in the solution vector
     numVar = 4;
-    SOL = 0.0 * FF;
-    % Adjust for the boundary forcing
-    FFBC = FF;
+    iP = 1;
+    iW = 2;
+    iT = 3;
+
+    %% Set an initial solution vector
+    SOL = zeros(numVar*OPS,1);
 
     %% Create boundary condition indices
-    %
     uldex = 2:NZ-1;
-    wldex = uldex + OPS;
-    rldex = uldex + 2*OPS;
-    pldex = uldex + 3*OPS;
-    %}
+    rldex = uldex + OPS;
+    wldex = rldex + OPS;
+    pldex = wldex + OPS;
     LeftOutExcludeCorners = [uldex wldex rldex pldex];
     RightOutExcludeCorners = LeftOutExcludeCorners + (OPS - NZ);
     
+    utdex = NZ:NZ:OPS;
+    rtdex = utdex + OPS;
+    wtdex = rtdex + OPS;
+    ptdex = wtdex + OPS;
+    %TopOut = [utdex wtdex rtdex ptdex];
+    
+    ubdex = 1:NZ:(OPS - NZ + 1);
+    wbdex = ubdex + iW * OPS;
+    
+    LeftCorners = [1 (iP*OPS + 1) (iT*OPS + 1) ...
+                       NZ (iP*OPS + NZ) (iT*OPS + NZ)];
+    RightCorners = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
+                       OPS iT*OPS numVar*OPS];
+    
     if BC == 0
-        disp('Hermite-Lagrange Model, Dirichlet Lateral BC...');
-        var1BotLeftCorner = 1;
-        var1TopLeftCorner = NZ;
-        var1BotRightCorner = OPS - NZ + 1;
-        var1TopRightCorner = OPS;
-        var3BotLeftCorner = []; %(2*OPS + 1);
-        var3TopLeftCorner = []; %(3*OPS - NZ + 1);
-        var3BotRightCorner = []; %(2*OPS + NZ);
-        var3TopRightCorner = []; %(3*OPS);
-        rowsOut = [LeftOutExcludeCorners ...
-                   RightOutExcludeCorners ...
-                   var1BotLeftCorner ...
-                   var1TopLeftCorner ...
-                   var1BotRightCorner ...
-                   var1TopRightCorner ...
-                   var3BotLeftCorner ...
-                   var3TopLeftCorner ...
-                   var3BotRightCorner ...
-                   var3TopRightCorner];
+        disp('Hermite-Lagrange LogP-LogTheta Model, Dirichlet Lateral BC...');
+        SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
+        rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
+                   LeftCorners RightCorners ...
+                   wtdex wbdex];
+               
+        sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 1
-        disp('Applying BC FFT-Lagrange Model...');
-        rowsOut = [];
+        disp('Hermite-Lagrange Rho-RhoTheta Model, Dirichlet Lateral BC...');
+        rowsOut = [LeftOutExcludeCorners LeftCorners ...
+                   RightOutExcludeCorners RightCorners];
+        sysDex = setdiff(1:numVar*OPS + NX, rowsOut);
     elseif BC == 2
-        disp('Hermite-Lagrange Model, Free Lateral BC...');
-        var1BotLeftCorner = 1;
-        var1TopLeftCorner = NZ;
-        var1BotRightCorner = OPS - NZ + 1;
-        var1TopRightCorner = OPS;
-        var3BotLeftCorner = (2*OPS + 1);
-        var3TopLeftCorner = (3*OPS - NZ + 1);
-        var3BotRightCorner = (2*OPS + NZ);
-        var3TopRightCorner = (3*OPS);
-        rowsOut = [var1BotLeftCorner ...
-                   var1TopLeftCorner ...
-                   var1BotRightCorner ...
-                   var1TopRightCorner ...
-                   var3BotLeftCorner ...
-                   var3TopLeftCorner ...
-                   var3BotRightCorner ...
-                   var3TopRightCorner];
+        disp('Applying BC FFT-Lagrange Model, Periodic Lateral BC');
+        rowsOut = wtdex;
+        sysDex = setdiff(1:numVar*OPS + NX, rowsOut);
     elseif BC == 3
-        disp('Hermite-Lagrange Model, Dirichlet Left BC...');
-        var1BotLeftCorner = 1;
-        var1TopLeftCorner = NZ;
-        var1BotRightCorner = OPS - NZ + 1;
-        var1TopRightCorner = OPS;
-        var3BotLeftCorner = (2*OPS + 1);
-        var3TopLeftCorner = (3*OPS - NZ + 1);
-        var3BotRightCorner = (2*OPS + NZ);
-        var3TopRightCorner = (3*OPS);
-        rowsOut = [LeftOutExcludeCorners ...
-                   var1BotLeftCorner ...
-                   var1TopLeftCorner ...
-                   var1BotRightCorner ...
-                   var1TopRightCorner ...
-                   var3BotLeftCorner ...
-                   var3TopLeftCorner ...
-                   var3BotRightCorner ...
-                   var3TopRightCorner];
+        disp('Hermite-Lagrange LogP-LogTheta Model, Transient Solve');
+        SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
+        rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
+                   LeftCorners RightCorners ...
+                   wtdex wbdex];
+               
+        sysDex = setdiff(1:numVar*OPS, rowsOut);
     end
-
-    sysDex = setdiff(1:numVar*OPS + 2*NX, rowsOut);
 end
