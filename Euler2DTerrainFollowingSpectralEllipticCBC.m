@@ -30,7 +30,7 @@ cp = 1004.5;
 cv = cp - Rd;
 ga = 9.80616;
 p0 = 1.0E5;
-kappa = Rd/cp;
+kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
     %l1 = -1.0E4 * 2.0 * pi;
@@ -163,31 +163,8 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
-[SOL,sysDex] = GetAdjust4CBC(BS,REFS,BC,NX,NZ,OPS);
+[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
 
-%% Solve the system by projecting to orthogonal space first then solving
-%{
-%parpool('local');
-disp('Solve by applying orthogonal basis and matlab \.');
-tic
-spparms('spumoni',2);
-A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
-toc; disp('Compute raw coefficient matrix... DONE.');
-% Project onto the orthogonal subspace in the range of A
-tic
-AO = sporth(A);
-toc; disp('Compute orthonormal basis... DONE.');
-tic
-AR = full(AO') * full(A);
-AR = sparse(AR * full(AO));
-BR = AO' * b;
-toc; disp('Compute projection to orthogonal basis... DONE.');
-clear LD FF FFBC;
-tic
-sol = AO * (AR \ BR);
-toc; disp('Solve the system... DONE.');
-%}
 %% Solve the system by letting matlab \ do its thing...
 %
 disp('Solve by using matlab \ only.');
@@ -195,8 +172,6 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL);
-%AN = A;
-%bN = b(sysDex,1);
 % Normal equations to make the system symmetric
 AN = A' * A;
 bN = A' * b(sysDex,1);
@@ -204,106 +179,10 @@ toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
 sol = (AN \ bN);
 toc; disp('Solve the system... DONE.');
-%{
-% Use Schur complement solution (better conditioned)
-SN = length(sysDex);
-SD = 1 * (OPS - 2*NZ);
-%clear AN;
-tic;
-A = AN(1:SN - SD - 1, 1:SN - SD - 1);
-B = AN(1:SN - SD - 1, SN - SD:SN);
-C = AN(SN - SD:SN, 1:SN - SD - 1);
-D = AN(SN - SD:SN, SN - SD:SN);
-a = bN(1:SN - SD - 1);
-b = bN(SN - SD:SN);
-toc
-clear AN bN;
-% Compute the solution by Schur complement
-tic;
-DI = D \ speye(size(D));
-AN = A - B * (DI * C);
-bN = a - B * (DI * b);
-toc;
-clear a A B D;
-tic;
-%AS = AN' * AN;
-%bS = AN' * bN;
-toc;
-tic;
-x = AN \ bN;
-%x = AS \ bS;
-toc;
-clear AN bN AS bS;
-tic;
-y = DI * (b - C * x);
-sol = [x ; y];
-%};
-toc; disp('Solve the system... DONE.');
-%}
-clear AN bN C DI
+clear AN bN
 %% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
-%% Apply a grid doubling multigrid solution
-%{
-multiGrid = true;
-if multiGrid
-    NXD = 2 * NX;
-    NZD = 2 * NZ;
-    
-    xn = herroots(NXD, 1.0);
-    [zn,~] = chebdif(NZD, 1);
-    zn = 0.5 * (zn + 1.0);
-    
-    uxz = reshape(SOL((1:OPS)),NZ,NX);
-    wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-    rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
-    pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
-    
-    [uxzcf, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), 0, 0, xn, zn);
-    [wxzcf, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), 0, 0, xn, zn);
-    [rxzcf, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), 0, 0, xn, zn);
-    [pxzcf, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), 0, 0, xn, zn);
-    
-    OPS = NXD * NZD;
-    SOL((1:OPS)) = reshape(uxzcf, OPS, 1);
-    SOL((1:OPS) + OPS) = reshape(wxzcf, OPS, 1);
-    SOL((1:OPS) + 2*OPS) = reshape(rxzcf, OPS, 1);
-    SOL((1:OPS) + 3*OPS) = reshape(pxzcf, OPS, 1);
-   
-    % Compute the LHS coefficient matrix and force vector for the test case
-    [LD,FF,REFS] = ...
-    computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXD, NZD, applyTopRL, applyLateralRL);
-
-    %%Get the boundary conditions
-    [SOLN,sysDex] = GetAdjust4CBC(BS,REFS,BC,NXD,NZD,OPS);
-    
-    disp('Solve the find multigrid iteratively...');
-    tic
-    spparms('spumoni',2);
-    A = LD(sysDex,sysDex);
-    b = (FF - LD * SOLN);
-    AN = A;
-    bN = b(sysDex,1) - A * SOL(sysDex);
-    % Normal equations to make the system symmetric
-    %AN = A' * A;
-    %bN = A' * b(sysDex,1);
-    toc; disp('Compute coefficient matrix... DONE.');
-    clear A b LD FF;
-    %tic
-    sol = gmres(AN, bN, 10, 1.0E-12, 20, [], [], SOL(sysDex));
-    rm = norm(bN - AN * sol);
-    disp(rm);
-    toc; disp('Solve the system... DONE.');
-    clear AN bN
-    % Get the solution fields
-    SOL(sysDex) = SOL(sysDex) + sol;
-    clear sol;
-end
-%}
-%%
-%NX = NXD;
-%NZ = NZD;
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 rxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 wxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
@@ -357,21 +236,15 @@ cmap = cmap(:,1:3);
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-    %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZLINT);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ClassicalSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 elseif strcmp(TestCase,'AndesMtn') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 end
 %}
 %

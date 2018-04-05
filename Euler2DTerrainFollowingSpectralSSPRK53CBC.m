@@ -12,8 +12,7 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 120; % Expansion order matches physical grid
-NXO = 80; % Expansion order
+NX = 160; % Expansion order matches physical grid
 NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
@@ -152,9 +151,8 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 [LD,FF,REFS] = ...
 computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
-
 %% Get the boundary conditions
-[SOL,sysDex] = GetAdjust4CBC(BS,REFS,BC,NX,NZ,OPS);
+[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
 
 %{
 uxz = reshape(SOL((1:OPS),1),NZ,NX);
@@ -207,8 +205,8 @@ diag(dlambda)
 %%
 SOL(sysDex) = dvecs(:,1);
 uxz = reshape(SOL((1:OPS),1),NZ,NX);
-wxz = reshape(SOL((1:OPS) + OPS,1),NZ,NX);
-rxz = reshape(SOL((1:OPS) + 2*OPS,1),NZ,NX);
+rxz = reshape(SOL((1:OPS) + OPS,1),NZ,NX);
+wxz = reshape(SOL((1:OPS) + 2*OPS,1),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS,1),NZ,NX);
 
 %% Plot the solution in the native grids
@@ -240,7 +238,7 @@ pause;
 %}
 
 % Time step (fraction of a second)
-DT = 0.01;
+DT = 0.05;
 % End time in seconds (HR hours)
 HR = 1;
 ET = HR * 60 * 60;
@@ -254,7 +252,7 @@ end
 
 %% Explitcit SSP RK53
 %
-for tt=2:200%length(TI)
+for tt=2:50000%length(TI)
     % Initialize the RHS
     RHS = bN - AN * sol(:,1);
     % Stage 1
@@ -334,8 +332,8 @@ SOL(sysDex) = sol(sysDex,1);
 clear sol;
 %
 uxz = reshape(SOL((1:OPS)),NZ,NX);
-wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
+rxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+wxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Laguerre transforms'
@@ -406,7 +404,7 @@ end
 %}
 dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
-%{
+%
 figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;

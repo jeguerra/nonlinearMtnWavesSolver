@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 120; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 160; % Expansion order matches physical grid
+NZ = 120; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -159,7 +159,7 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
-[FFBC,SOL,sysDex] = GetAdjust4CBC(BC,NX,NZ,OPS,FF);
+[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
 
 %% Solve the system using the matlab linear solver
 %
@@ -167,26 +167,23 @@ disp('Solve by using matlab \ only.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
+b = (FF - LD * SOL);
 %AN = A;
 %bN = b;
 % Normal equations to make the system symmetric
 AN = A' * A;
-bN = A' * b;
+bN = A' * b(sysDex,1);
 toc; disp('Compute coefficient matrix... DONE.');
-clear A b LD FF FFBC;
-%tic
+clear A b LD FF;
 sol = (AN \ bN);
 toc; disp('Solve the system... DONE.');
-%}
 clear AN bN
 %% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
-%
 ruxz = reshape(SOL((1:OPS)),NZ,NX);
-rwxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
+rxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+rwxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Compute the kinematic fields from (u, w, rho, rho-theta)
@@ -283,6 +280,7 @@ disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
+drawnow;
 screen2png(['UREferenceSolution' mtnh '.png']);
 %
 figure;
@@ -297,6 +295,7 @@ caxis(cm);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
+drawnow;
 screen2png(['WREferenceSolution' mtnh '.png']);
 %
 figure;
@@ -310,31 +309,6 @@ xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$\theta^{\prime} ~~ (K)$');
 drawnow
-%}
-%{
-%% Compare W scatter plot to the predicted growth rate
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
-colormap(cmap);
-
-Im = REFS.dlthref(:,1) + 0.5 * REFS.dujref(:,1) ./ REFS.ujref(:,1) - 0.5 * REFS.dlpref(:,1);
-MZ = exp(REFS.sigma(:,1) .* Im);
-for xx=2:length(MZ)
-    MZ(xx) = MZ(xx) * MZ(xx-1);
-end
-% Normalize and scale to the W field
-MZ = max(max(wxzint)) / max(MZ) * MZ; 
-
-plot(wxzint,1.0E-3 * ZI,'ks','LineWidth',1.5); grid on; hold on;
-plot(MZ, 1.0E-3 * REFS.ZTL(:,1),'r-s','LineWidth',1.5); hold off;
-%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-%caxis([-0.08 0.08]);
-title('Vertical Velocity Growth W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
-xlabel('Distance (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['WaveGrowthW_LnP' mtnh '.png']);
-%}
 %
 %% Compute the scaling constants needed for residual diffusion
 pt = REFS.thref + txz;
@@ -397,7 +371,7 @@ drawnow;
 screen2png(fname);
 %% Compute N and the local Fr number
 %
-fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
+figure;
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * log(p));
 NBVF = (ga .* dlpt);

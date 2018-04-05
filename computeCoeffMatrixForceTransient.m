@@ -1,7 +1,8 @@
 function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     % Set the boundary indices and operator dimension
-    OPS = NX*NZ;    
+    OPS = NX*NZ;
+    
     % Set the domain scale
     dscale = 0.5 * DS.L;
     %{
@@ -41,7 +42,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
     %}
     %% Compute the terrain and derivatives
@@ -90,21 +90,15 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ShearJetScharCBVF') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-        %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL);
-        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     elseif strcmp(TestCase,'ClassicalSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
     elseif strcmp(TestCase,'AndesMtn') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
         [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-        %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
     end
     
     %% Compute the vertical profiles of density and pressure
@@ -174,7 +168,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
-    %DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite expansion)
     DDA_OP = spalloc(OPS, OPS, NX^2);
@@ -182,7 +175,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
         ddex = (1:NZ:OPS) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;
     end
-    %DDA_OP = sparse(DDA_OP);
 
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
@@ -210,6 +202,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     L31 = BS.gam * DDA_OP;
     L32 = BS.gam * SIGMA * DDXI_OP;
     L33 = U0DX;
+    %L33 = sparse(OPS,OPS);
     L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
     L41 = sparse(OPS,OPS);
@@ -260,16 +253,16 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
-    %% Assemble the LHS operator
-    LD = [LD11 LD12 LD13 LD14 ; ...
-          LD21 LD22 LD23 LD24 ; ...
-          LD31 LD32 LD33 LD34 ; ...
-          LD41 LD42 LD43 LD44];
+    %% Assemble the LHS operator (reorder u p w t)
+    LD = [LD11 LD13 LD12 LD14 ; ...
+          LD31 LD33 LD32 LD34 ; ...
+          LD21 LD23 LD22 LD24 ; ...
+          LD41 LD43 LD42 LD44];
       
-    %% Assemble the force vector
+    %% Assemble the force vector (reorder u p w t)
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
-    FF = [F11 ; F21 ; F31 ; F41];
+    FF = [F11 ; F31 ; F21 ; F41];
 end
