@@ -12,9 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 512; % Expansion order matches physical grid
-NXO = 80; % Expansion order
-NZ = 120; % Expansion order matches physical grid
+NX = 256; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -31,6 +30,7 @@ cp = 1004.5;
 cv = cp - Rd;
 ga = 9.80616;
 p0 = 1.0E5;
+kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
     l1 = - 1.0E4 * (2.0 * pi);
@@ -52,7 +52,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -156,40 +156,23 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
-[SOL,sysDex] = GetAdjust4CBC(BS,REFS,BC,NX,NZ,OPS);
+[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
 
 % Use the NCL hotcold colormap and check the initialization
 
 cmap = load('NCLcolormap254.txt');
 cmap = cmap(:,1:3);
-%{
-figure;
-colormap(cmap);
-contourf(1.0E-3 * REFS.XL, 1.0E-3 * REFS.ZTL, REFS.ujref,20); colorbar; grid on; cm = caxis;
-hold on; area(1.0E-3 * REFS.XL(1,:),2.0E-3 * REFS.ZTL(1,:),'FaceColor','k'); hold off;
-caxis([10.0 20.0]);
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-%ylim(1.0E-3 * [0.0 zH - depth]);
-xlim([-200 300]);
-%ylim([0 15]);
-title('Initial Flow Schematic');
-xlabel('Distance (km)');
-ylabel('Elevation (km)');
-screen2png(['TEST_INITIAL' mtnh '.png']);
-pause;
-%}
+
 %% Solve the system using the matlab linear solver
 %
 disp('Solve the raw system with matlab default \.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = FF(sysDex,1);
-%AN = A;
-%bN = b;
+b = (FF - LD * SOL);
 % Normal equations to make the system symmetric
 AN = A' * A;
-bN = A' * b;
+bN = A' * b(sysDex,1);
 toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
 %tic
@@ -197,29 +180,6 @@ sol = (AN \ bN);
 toc; disp('Solve the system... DONE.');
 %}
 clear AN bN
-
-%% Solve the system using residual non-linear line search solver
-%{
-disp('Solve the system with a La Cruz Raydan Algorithm.');
-tic
-x0 = 0.0 * FFBC(sysDex,1);
-A = LD(sysDex,sysDex);
-b = FFBC(sysDex,1);
-[sol,rseq] = ResidualMtSolve((A'*A),(A'*b),x0,1.0E-6,100);
-clear A b;
-toc
-%}
-%% Solve the system with an iterative solver
-%{
-tic
-A = LD(sysDex,sysDex);%' * LD(sysDex,sysDex);
-%b = LD(sysDex,sysDex)' * FFBC(sysDex,1);
-b = FFBC(sysDex,1);
-disp('Solve the raw system with iterative solver.');
-[L,U] = ilu(A,struct('type','ilutp','udiag',1,'droptol',1.0e-2));
-sol = gmres(A,b,[],1.0E-4,50,L,U);
-toc
-%}
 
 %% Plot the solution frequency space
 %{
@@ -251,8 +211,8 @@ drawnow
 %% Plot the solution using the IFFT to recover the solution in physical space
 SOL(sysDex) = sol;
 uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),[],2));
-wxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
-rxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
+rxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
+wxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
 pxz = real(ifft(reshape(SOL((1:OPS) + 3*OPS),NZ,NX),[],2));
 %{
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
@@ -281,25 +241,16 @@ title('Perturbation Log Pressure (Pa)');
 drawnow
 %}
 
-%% Compute the scaling constants needed for residual diffusion
+%% Compute some of the fields needed for instability checks
 lpt = REFS.lthref + pxz;
 pt = exp(lpt);
 lp = REFS.lpref + rxz;
 p = exp(lp);
 P = REFS.pref;
 PT = REFS.thref;
-rho = p ./ (Rd * pt) .* (p0 * p.^(-1)).^(Rd / cp);
-R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^(Rd / cp);
+rho = p ./ (Rd * pt) .* (p0 * p.^(-1)).^kappa;
+R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^kappa;
 RT = (rho .* pt) - (R .* PT);
-UINF = norm(uxz - mean(mean(uxz)),Inf);
-WINF = norm(wxz - mean(mean(wxz)),Inf);
-RINF = norm(R - mean(mean(R)),Inf);
-RTINF = norm(RT - mean(mean(RT)),Inf);
-disp('Scaling constants for DynSGS coefficients:');
-disp(['|| u - U_bar ||_max = ' num2str(UINF)]);
-disp(['\| w - W_bar ||_max = ' num2str(WINF)]);
-disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
-disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
 
 %% Compute Ri, Convective Parameter, and BVF
 DDZ_BC = REFS.DDZ;
@@ -344,7 +295,7 @@ fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 %% Compute N and the local Fr number
-%
+%{
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
@@ -390,21 +341,15 @@ depth = 0.0;
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-    %[lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZLINT);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ClassicalSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 elseif strcmp(TestCase,'AndesMtn') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
-    %[lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
-    %[ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 end
 %}
 figure;
@@ -449,19 +394,6 @@ xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
-
-%%
-figure;
-subplot(2,2,1); surf(REFS.XL,REFS.ZTL,uxz); colorbar; xlim([-100000.0 100000.0]); ylim([0.0 5000.0]); zlim([-1.0 1.0]);
-title('$U (m/s)$');
-subplot(2,2,2); surf(REFS.XL,REFS.ZTL,wxz); colorbar; xlim([-100000.0 10000.0]); ylim([0.0 15000.0]);
-title('$W (m/s)$');
-subplot(2,2,3); surf(REFS.XL,REFS.ZTL,exp(rxz)); colorbar; xlim([-100000.0 100000.0]); ylim([0.0 15000.0]);
-title('$(\ln p) (Pa)$');
-subplot(2,2,4); surf(REFS.XL,REFS.ZTL,exp(pxz)); colorbar; xlim([-100000.0 100000.0]); ylim([0.0 15000.0]);
-title('$(\ln \theta) (K)$');
-drawnow
-%}
 
 %% Debug
 %{

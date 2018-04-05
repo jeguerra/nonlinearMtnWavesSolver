@@ -1,10 +1,8 @@
-function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     % Set the boundary indices and operator dimension
     OPS = NX*NZ;
-    bdex = 1:NZ:(OPS - NZ + 1);
-    NB = length(bdex);
     
-    %% Compute the Hermite and Legendre points and derivatives for this grid
+    %% Compute the Fourier space and vertical derivative matrix
     [~,DDX_H] = herdif(NX, 1, 0.5 * DS.L, true);
     x = linspace(DS.l1, DS.l2, NX+1);
     xh = (x(1:NX))';
@@ -46,7 +44,7 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     ZTL = (dzdh .* HTZL) + ZL;
     
     %% Compute the terrain slope derivatives using FFT derivative in X
-    DZT = -1i * KF .* fft(HTZL,NX,2);
+    DZT = 1i * KF .* fft(HTZL,NX,2);
 
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
@@ -184,33 +182,16 @@ function [LDA,FFA,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, 
     LD43 = L43 + B43;
     LD44 = L44 + B44;
 
-    %% Assemble the LHS operator
-    LD = [LD11 LD12 LD13 LD14 ; ...
-          LD21 LD22 LD23 LD24 ; ...
-          LD31 LD32 LD33 LD34 ; ...
-          LD41 LD42 LD43 LD44];
+    %% Assemble the LHS operator (reorder u p w t)
+    LD = [LD11 LD13 LD12 LD14 ; ...
+          LD31 LD33 LD32 LD34 ; ...
+          LD21 LD23 LD22 LD24 ; ...
+          LD41 LD43 LD42 LD44];
       
-    %% Assemble the force vector
+    %% Assemble the force vector (reorder u p w t)
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
-    FF = [F11 ; F21 ; F31 ; F41];
-    
-    %% Compute the bottom boundary constraint
-    HBC = sparse(NB,4 * OPS);
-    HBCT = HBC;
-    UNIT = spdiags(ones(NB,1), 0, NB, NB);
-    % Row augmentation
-    HBC(:,bdex + OPS) = UNIT;
-    % Column augmentation
-    HBCT(:,bdex + OPS) = UNIT;
-    
-    %% Augment the system with the Lagrange Multiplier Constraints
-    RPAD = zeros(NB);
-    LDA = [LD HBCT'];
-    RAG = HBC;
-    RAG = [RAG RPAD];
-    LDA = [LDA ; RAG];
-    FFA = [FF ; (ujref(1,1:NX) .* DZT(1,1:NX))'];
+    FF = [F11 ; F31 ; F21 ; F41];
 end

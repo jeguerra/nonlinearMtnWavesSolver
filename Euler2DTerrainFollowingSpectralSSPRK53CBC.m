@@ -12,7 +12,7 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 160; % Expansion order matches physical grid
+NX = 140; % Expansion order matches physical grid
 NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
@@ -151,42 +151,9 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 [LD,FF,REFS] = ...
 computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
-%% Get the boundary conditions
+%% Get the boundary conditions in the SOL vector and subscript indices sysDex
 [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
 
-%{
-uxz = reshape(SOL((1:OPS),1),NZ,NX);
-wxz = reshape(SOL((1:OPS) + OPS,1),NZ,NX);
-rxz = reshape(SOL((1:OPS) + 2*OPS,1),NZ,NX);
-pxz = reshape(SOL((1:OPS) + 3*OPS,1),NZ,NX);
-
-%% Plot the solution in the native grids
-%
-% NATIVE GRID PLOTS
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(uxz)); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-disp(['U MAX: ' num2str(max(max(uxz)))]);
-disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('$u$ $(ms^{-1})$');
-subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(wxz)); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-title('$w$ $(ms^{-1})$');
-%
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(rxz)); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-title('Perturbation $\ln p$ $(Pa)$');
-subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(pxz)); colorbar;
-xlim([l1 l2]);
-ylim([0.0 zH]);
-title('Perturbation $\ln \theta$ $(K)$');
-drawnow
-pause;
-%}
 %% Solve the hyperbolic problem using SSP-RK53
 %
 disp('Solve with explicit SSP-RK53.');
@@ -288,44 +255,11 @@ for tt=2:50000%length(TI)
     RHS = bN - AN * sol(:,1);
     sol(sysDex,5) = sol(sysDex,5) + c4 * DT * RHS(sysDex);
     %
-    % Update the solution
+    % Update the solution (currently NOT storing history...)
     sol(sysDex,1) = sol(sysDex,5);
     disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
 end
 %}
-%% Explicit SSP RK3
-%{
-for tt=2:500%length(TI)
-    % Initialize the RHS
-    RHS = bN - A * sol0;
-    % Stage 1
-    c1 = 1.0;
-    sol1 = sol0 + c1 * DT * RHS;
-    % First linear combination
-    LC1_s0 = 0.75;
-    LC1_s1 = 0.25;
-    sol2 = LC1_s0 * sol0 + LC1_s1 * sol1;
-    %
-    % Stage 2
-    c2 = 0.25;
-    RHS = bN - A * sol1;
-    sol2 = sol2 + c2 * DT * RHS;
-    % Second linear combination
-    LC2_s0 = 1.0 / 3.0;
-    LC2_s2 = 2.0 / 3.0;
-    sol3 = LC2_s0 * sol0 + LC2_s2 * sol2;
-    %
-    % Stage 3
-    c3 = 2.0 / 3.0;
-    RHS = bN - A * sol2;
-    sol3 = sol3 + c3 * DT * RHS;
-    %
-    % Update the solution
-    sol0 = sol3;
-    disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
-end
-%}
-
 
 %% Get the solution fields
 SOL(sysDex) = sol(sysDex,1);
@@ -448,100 +382,9 @@ ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
 %}
-%% Compute the local Ri number and plot ...
+
+%% Debug plots to check the boundary up close
 %{
-dlrho = REFS.dlrref + REFS.sig .* (REFS.DDZ * real(rxz));
-duj = REFS.dujref + REFS.sig .* (REFS.DDZ * real(uxz));
-Ri = -ga * dlrho ./ (duj.^2);
-
-RiREF = -BS.ga * REFS.dlrref(:,1);
-RiREF = RiREF ./ (REFS.dujref(:,1).^2);
-
-xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-hold on;
-semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',1.5);
-semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
-hold off;
-grid on;
-xlabel('Ri','FontSize',30);
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
-xlim([0.1 1.0E4]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow;
-
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-dirname = '../ShearJetSchar/';
-fname = [dirname 'RI_TEST_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-%{
-fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
-colormap(cmap);
-[dujint, ~, ~] = HerTransLegInterp(REFS, DS, real(duj), NXI, NZI, 0, 0);
-contourf(1.0E-3 * XI,1.0E-3 * ZI,dujint,31); colorbar; grid on;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-title('Vertical Shear $s^{-1}$','FontWeight','normal','Interpreter','latex');
-xlabel('Distance (km)');
-ylabel('Elevation (km)');
-screen2png(['VerticalShear' mtnh '.png']);
-drawnow
-%}
-
-%% Compute the scaling constants needed for residual diffusion
-lrho = REFS.lrref + rxz;
-rho = exp(lrho);
-lp = REFS.lpref + pxz;
-p = exp(lp);
-P = exp(REFS.lpref);
-R = exp(REFS.lrref);
-pt = p ./ (Rd * rho) .* (p0 * p.^(-1)).^(Rd / cp);
-PT = p ./ (Rd * R) .* (p0 * P.^(-1)).^(Rd / cp);
-RT = (rho .* pt) - (R .* PT);
-UINF = norm(uxz - mean(mean(uxz)),Inf);
-WINF = norm(wxz - mean(mean(wxz)),Inf);
-R = exp(rxz);
-RINF = norm(R - mean(mean(R)),Inf);
-RTINF = norm(RT - mean(mean(RT)),Inf);
-disp('Scaling constants for DynSGS coefficients:');
-disp(['|| u - U_bar ||_max = ' num2str(UINF)]);
-disp(['\| w - W_bar ||_max = ' num2str(WINF)]);
-disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
-disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
-
-%% Compute the local convective stability parameter and plot...
-%
-dlpres = REFS.dlpref + REFS.sig .* (REFS.DDZ * real(pxz));
-rho = exp(lrho);
-dlpt = 1 / gam * dlpres - dlrho;
-temp = p ./ (Rd * rho);
-conv = temp .* dlpt;
-
-xdex = 1:1:NX;
-fig = figure('Position',[0 0 800 1200]); fig.Color = 'w';
-plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-grid on;
-xlabel('$\frac{T}{\theta} \frac{d \theta}{d z}$','FontSize',30,'Interpreter','latex');
-%ylabel('Altitude (km)','FontSize',30);
-ylim([0.0 1.0E-3*zH]);
-%xlim([0.1 1.0E3]);
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-drawnow;
-
-pt = mtit([mtnh ' Mountain'],'FontSize',36,'FontWeight','normal','Interpreter','tex');
-
-dirname = '../ShearJetSchar/';
-fname = [dirname 'CONV_TEST_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-%}
-%% Debug
-%
 figure;
 subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-25000.0 25000.0]); ylim([0.0 2000.0]);
 title('U (m/s)'); %zlim([-0.1 0.1]);
@@ -551,19 +394,6 @@ subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-
 title('$(\ln p)^{\prime}$ (Pa)');
 subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-30000.0 30000.0]); ylim([0.0 2000.0]);
 title('$(\ln \theta)^{\prime}$ (K)');
-drawnow
-%}
-
-%% Plot the terrain forcing
-%{
-subplot(2,2,1); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS)),NZ,NX)); colorbar; xlim([-15000.0 15000.0]); ylim([0.0 1000.0]);
-title('Total Horizontal Velocity U (m/s)');
-subplot(2,2,2); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Vertical Velocity W (m/s)');
-subplot(2,2,3); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + 2*OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Perturbation Density (kg/m^3)');
-subplot(2,2,4); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + 3*OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Perturbation Pressure (Pa)');
 drawnow
 %}
 

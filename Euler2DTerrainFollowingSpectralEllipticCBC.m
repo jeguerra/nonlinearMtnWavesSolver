@@ -12,8 +12,8 @@ clear
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 160; % Expansion order matches physical grid
-NZ = 120; % Expansion order matches physical grid
+NX = 100; % Expansion order matches physical grid
+NZ = 80; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -290,33 +290,8 @@ xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
-%}
-%{
-%% Compare W scatter plot to the predicted growth rate
-fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
-colormap(cmap);
-
-Im = REFS.dlthref(:,1) + 0.5 * REFS.dujref(:,1) ./ REFS.ujref(:,1) - 0.5 * REFS.dlpref(:,1);
-MZ = exp(REFS.sigma(:,1) .* Im);
-for xx=2:length(MZ)
-    MZ(xx) = MZ(xx) * MZ(xx-1);
-end
-% Normalize and scale to the W field
-MZ = max(max(wxzint)) / max(MZ) * MZ; 
-
-plot(wxzint,1.0E-3 * ZI,'ks','LineWidth',1.5); grid on; hold on;
-plot(MZ, 1.0E-3 * REFS.ZTL(:,1),'r-s','LineWidth',1.5); hold off;
-%hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
-%caxis([-0.08 0.08]);
-title('Vertical Velocity Growth W $(m~s^{-1})$','FontWeight','normal','Interpreter','latex');
-xlabel('Distance (km)');
-fig.CurrentAxes.FontSize = 30; fig.CurrentAxes.LineWidth = 1.5;
-screen2png(['WaveGrowthW_LnP' mtnh '.png']);
-%}
 %
-%% Compute the scaling constants needed for residual diffusion
+%% Compute some of the fields needed for instability checks
 lpt = REFS.lthref + pxz;
 pt = exp(lpt);
 lp = REFS.lpref + rxz;
@@ -326,15 +301,6 @@ PT = REFS.thref;
 rho = p ./ (Rd * pt) .* (p0 * p.^(-1)).^kappa;
 R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^kappa;
 RT = (rho .* pt) - (R .* PT);
-UINF = norm(uxz - mean(mean(uxz)),Inf);
-WINF = norm(wxz - mean(mean(wxz)),Inf);
-RINF = norm(R - mean(mean(R)),Inf);
-RTINF = norm(RT - mean(mean(RT)),Inf);
-disp('Scaling constants for DynSGS coefficients:');
-disp(['|| u - U_bar ||_max = ' num2str(UINF)]);
-disp(['\| w - W_bar ||_max = ' num2str(WINF)]);
-disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
-disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
 
 %% Compute Ri, Convective Parameter, and BVF
 DDZ_BC = REFS.DDZ;
@@ -378,7 +344,7 @@ fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 %% Compute N and the local Fr number
-%
+%{
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));

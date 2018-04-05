@@ -54,7 +54,10 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 2
         disp('Applying BC FFT-Lagrange Model, Periodic Lateral BC');
+        SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
+        
         rowsOut = [wbdex wtdex];
+        
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 3
         disp('Hermite-Lagrange LogP-LogTheta Model, Transient Solve');

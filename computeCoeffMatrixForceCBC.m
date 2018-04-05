@@ -6,7 +6,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     % Set the domain scale
     dscale = 0.5 * DS.L;
     %{
-    %% Use a truncated projection space
+    %% Use a truncated projection space (may make explicit time integration faster)
     [xo,~] = herdif(NX, 2, dscale, false);
     [xh,~] = herdif(NX, 2, dscale, true);
 
@@ -34,16 +34,17 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     surf(DDX_H);
     figure;
     %}
-    %
+    % Get the Hermite Function derivative matrix and grid
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %
+    % Get the Chebyshev nodes and compute the vertical derivative matrix
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
-    %}
+
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
     
@@ -161,15 +162,16 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
 
-    %% Unwrap the derivative matrices into operators onto a state 1D vector
-    % Compute the vertical derivatives operator (Legendre expansion)
+    %% Unwrap the derivative matrices into operator for 2D implementation
+    
+    % Compute the vertical derivatives operator (Lagrange expansion)
     DDXI_OP = spalloc(OPS, OPS, NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
 
-    % Compute the horizontal derivatives operator (Hermite expansion)
+    % Compute the horizontal derivatives operator (Hermite Function expansion)
     DDA_OP = spalloc(OPS, OPS, NX^2);
     for rr=1:NZ
         ddex = (1:NZ:OPS) + (rr - 1);

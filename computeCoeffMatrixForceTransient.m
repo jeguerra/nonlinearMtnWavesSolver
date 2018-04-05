@@ -161,21 +161,22 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
 
-    %% Unwrap the derivative matrices into operators onto a state 1D vector
-    % Compute the vertical derivatives operator (Legendre expansion)
+    %% Unwrap the derivative matrices into operator for 2D implementation
+    
+    % Compute the vertical derivatives operator (Lagrange expansion)
     DDXI_OP = spalloc(OPS, OPS, NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
 
-    % Compute the horizontal derivatives operator (Hermite expansion)
+    % Compute the horizontal derivatives operator (Hermite Function expansion)
     DDA_OP = spalloc(OPS, OPS, NX^2);
     for rr=1:NZ
         ddex = (1:NZ:OPS) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;
     end
-
+    
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);

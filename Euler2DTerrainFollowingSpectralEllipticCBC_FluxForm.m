@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 160; % Expansion order matches physical grid
-NZ = 120; % Expansion order matches physical grid
+NX = 100; % Expansion order matches physical grid
+NZ = 80; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -203,18 +203,7 @@ NZI = 200;
 XI = l2 * XINT;
 ZI = ZINT;
 %}
-%% Interpolate to a regular grid using Hermite and Laguerre transforms'
-%{
-NXI = 600;
-NZI = 300;
-[uxzint, XINT, ZINT, ZLINT] = HerTransLagTrans(REFS, DS, real(uxz), NXI, NZI, 0, 0);
-[wxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(wxz), NXI, NZI, 0, 0);
-[rxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(rxz), NXI, NZI, 0, 0);
-[pxzint, ~, ~] = HerTransLagTrans(REFS, DS, real(pxz), NXI, NZI, 0, 0);
 
-XI = l2 * XINT;
-ZI = ZINT;
-%}
 % Plot the solution in the native grids
 %{
 % NATIVE GRID PLOTS
@@ -310,7 +299,7 @@ ylim(1.0E-3 * [0.0 zH - depth]);
 title('$\theta^{\prime} ~~ (K)$');
 drawnow
 %
-%% Compute the scaling constants needed for residual diffusion
+%% Compute some of the fields needed for instability checks
 pt = REFS.thref + txz;
 rho = REFS.rref + rxz;
 P = REFS.pref;
@@ -318,15 +307,6 @@ PT = REFS.thref;
 p = ((Rd * rho .* pt) * (p0^(-kappa))).^(kappa - 1.0); 
 R = rho;
 RT = pxz;
-UINF = norm(uxz - mean(mean(uxz)),Inf);
-WINF = norm(wxz - mean(mean(wxz)),Inf);
-RINF = norm(R - mean(mean(R)),Inf);
-RTINF = norm(RT - mean(mean(RT)),Inf);
-disp('Scaling constants for DynSGS coefficients:');
-disp(['|| u - U_bar ||_max = ' num2str(UINF)]);
-disp(['\| w - W_bar ||_max = ' num2str(WINF)]);
-disp(['\| rho - rho_bar ||_max = ' num2str(RINF)]);
-disp(['\| rhoTheta - rhoTheta_bar ||_max = ' num2str(RTINF)]);
 
 %% Compute Ri, Convective Parameter, and BVF
 DDZ_BC = REFS.DDZ;
@@ -370,7 +350,7 @@ fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 %% Compute N and the local Fr number
-%
+%{
 figure;
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * log(p));
@@ -407,21 +387,8 @@ title('$(\ln \theta)^{\prime}$ (K)');
 drawnow
 %}
 
-%% Plot the terrain forcing
-%{
-subplot(2,2,1); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS)),NZ,NX)); colorbar; xlim([-15000.0 15000.0]); ylim([0.0 1000.0]);
-title('Total Horizontal Velocity U (m/s)');
-subplot(2,2,2); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Vertical Velocity W (m/s)');
-subplot(2,2,3); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + 2*OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Perturbation Density (kg/m^3)');
-subplot(2,2,4); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + 3*OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Perturbation Pressure (Pa)');
-drawnow
-%}
-
 %% Save the data
-%
+%{
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_Flux' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

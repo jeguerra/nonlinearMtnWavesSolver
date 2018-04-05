@@ -2,13 +2,11 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     %% Compute the Hermite and Legendre points and derivatives for this grid
     % Set the boundary indices and operator dimension
     OPS = NX*NZ;
-    %bdex = 1:NZ:(OPS - NZ + 1);
-    %NB = length(bdex);
-    
-    % Set the domain scale
+    % Set the horizontal domain scale
     dscale = 0.5 * DS.L;
+    % Get the Hermite Function derivative matrix and grid
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %}
+    % Get the Chebyshev nodes and compute the vertical derivative matrix
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
@@ -16,7 +14,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     beta = (-0.5) * ones(size(zlc'));
     %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
-    %}       
+
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS,RAY);
     
@@ -89,7 +87,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     dthref = thref .* dlthref;
     drref = rref .* dlrref;
 %{
-    %% Plot background fields including mean Ri number
+    %% Check plots background fields including mean Ri number
     fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
     subplot(2,2,1);
     plot(ujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
@@ -156,15 +154,16 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
 
-    %% Unwrap the derivative matrices into operators onto a state 1D vector
-    % Compute the vertical derivatives operator (Legendre expansion)
+    %% Unwrap the derivative matrices into operator for 2D implementation
+    
+    % Compute the vertical derivatives operator (Lagrange expansion)
     DDXI_OP = spalloc(OPS, OPS, NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
 
-    % Compute the horizontal derivatives operator (Hermite expansion)
+    % Compute the horizontal derivatives operator (Hermite Function expansion)
     DDA_OP = spalloc(OPS, OPS, NX^2);
     for rr=1:NZ
         ddex = (1:NZ:OPS) + (rr - 1);
@@ -262,25 +261,4 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
     FF = [F11 ; F31 ; F21 ; F41];
-    
-    %{
-    %% Compute the bottom boundary constraint
-    HBC = sparse(NB,4*OPS);
-    HBCT = HBC;
-    UNIT = spdiags(ones(NB,1), 0, NB, NB);
-    UHX = spdiags((ujref(1,:) .* DZT(1,:))',0, NB, NB);
-    % Row augmentation
-    HBC(:,bdex + OPS) = -UHX;
-    HBC(:,bdex + 2*OPS) = UNIT;
-    % Column augmentation
-    HBCT(:,bdex + 2*OPS) = UNIT;
-    
-    %% Augment the system with the Lagrange Multiplier Constraints
-    RPAD = zeros(NB);
-    LDA = [LD HBCT'];
-    RAG = HBC;
-    RAG = [RAG RPAD];
-    LDA = [LDA ; RAG];
-    FFA = [FF ; (rref(1,:) .* ujref(1,:) .* DZT(1,:))'];
-    %}
 end
