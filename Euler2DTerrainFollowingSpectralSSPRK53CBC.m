@@ -1,10 +1,10 @@
-% Computes the semi-analytical solution to the steady, linearized Euler equations
-% in terrain following coordinates using a coordinate transformation from
-% XZ to alpha-eta both from -pi to pi. The vertical boundary condition is
-% also tranformed in the vertical so that infinity maps to eta = pi. The
-% reference state is a standard atmosphere of piece-wise linear temperature
-% profiles with a smooth zonal jet given. Pressure and density initialized
-% in hydrostatic balance.
+%% COMPUTES TRANSIENT LNP-LNT 2D MOUNTAIN WAVE PROBLEM IN 4 TEST CONFIGURATIONS:
+
+% 1) 'ShearJetSchar' Discontinous background with strong shear
+% 2) 'ShearJetScharCBVF' Uniform background with strong shear
+% 3) 'ClassicalSchar' The typical Schar mountain test with uniform
+% background and constant wind
+% 4) 'AndesMtn' Same as 1) but with real input terrain data
 
 clc
 clear
@@ -19,9 +19,9 @@ numVar = 4;
 
 %% Set the test case and global parameters
 TestCase = 'ShearJetSchar'; BC = 3;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
-%TestCase = 'ClassicalSchar'; BC = 0;
-%TestCase = 'AndesMtn'; BC = 0;
+%TestCase = 'ShearJetScharCBVF'; BC = 3;
+%TestCase = 'ClassicalSchar'; BC = 3;
+%TestCase = 'AndesMtn'; BC = 3;
 
 z0 = 0.0;
 gam = 1.4;
