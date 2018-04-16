@@ -1,5 +1,4 @@
-
-%% COMPUTES STEADY LNP-LNT 2D MOUNTAIN WAVE PROBLEM IN 4 TEST CONFIGURATIONS:
+%% COMPUTES TRANSIENT LNP-LNT 2D MOUNTAIN WAVE PROBLEM IN 4 TEST CONFIGURATIONS:
 
 % 1) 'ShearJetSchar' Discontinous background with strong shear
 % 2) 'ShearJetScharCBVF' Uniform background with strong shear
@@ -9,20 +8,20 @@
 
 clc
 clear
-%close all
+close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NZ = 80; % Expansion order matches physical grid
+NX = 140; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
-%TestCase = 'ClassicalSchar'; BC = 0;
-%TestCase = 'AndesMtn'; BC = 0;
+TestCase = 'ShearJetSchar'; BC = 3;
+%TestCase = 'ShearJetScharCBVF'; BC = 3;
+%TestCase = 'ClassicalSchar'; BC = 3;
+%TestCase = 'AndesMtn'; BC = 3;
 
 z0 = 0.0;
 gam = 1.4;
@@ -154,42 +153,140 @@ BS = struct('gam',gam,'Rd',Rd,'cp',cp,'cv',cv,'GAMT',GAMT,'HT',HT,'GAMS', ...
 
 %% Set up the jet and mountain profile parameters
 UJ = struct('u0',u0,'uj',uj,'b',b,'ga',ga);
-DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt',hfilt);
+DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC);
 
 %% Set up the Rayleigh Layer with a coefficient one order of magnitude less than the order of the wave field
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
-%% Get the boundary conditions
+%% Get the boundary conditions in the SOL vector and subscript indices sysDex
 [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
 
-%% Solve the system by letting matlab \ do its thing...
+%% Solve the hyperbolic problem using SSP-RK53
 %
-disp('Solve by using matlab \ only.');
+disp('Solve with explicit SSP-RK53.');
 tic
 spparms('spumoni',2);
-A = LD(sysDex,sysDex);
-b = (FF - LD * SOL);
-% Normal equations to make the system symmetric
-AN = A' * A;
-bN = A' * b(sysDex,1);
+A = LD;
+b = FF;
+AN = A;
+bN = b;
 toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
-sol = (AN \ bN);
-toc; disp('Solve the system... DONE.');
-clear AN bN
+%{
+%% Check the eigenvalues of the RHS operator before time integration
+[dvecs, dlambda] = eigs(AN(sysDex,sysDex),10,'lr');
+diag(dlambda)
+%%
+SOL(sysDex) = dvecs(:,1);
+uxz = reshape(SOL((1:OPS),1),NZ,NX);
+rxz = reshape(SOL((1:OPS) + OPS,1),NZ,NX);
+wxz = reshape(SOL((1:OPS) + 2*OPS,1),NZ,NX);
+pxz = reshape(SOL((1:OPS) + 3*OPS,1),NZ,NX);
+
+%% Plot the solution in the native grids
+%
+% NATIVE GRID PLOTS
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(uxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+disp(['U MAX: ' num2str(max(max(uxz)))]);
+disp(['U MIN: ' num2str(min(min(uxz)))]);
+title('$u$ $(ms^{-1})$');
+subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(wxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('$w$ $(ms^{-1})$');
+%
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(1,2,1); surf(REFS.XL,REFS.ZTL,real(rxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Perturbation $\ln p$ $(Pa)$');
+subplot(1,2,2); surf(REFS.XL,REFS.ZTL,real(pxz)); colorbar;
+xlim([l1 l2]);
+ylim([0.0 zH]);
+title('Perturbation $\ln \theta$ $(K)$');
+drawnow
+pause;
+%}
+
+% Time step (fraction of a second)
+DT = 0.05;
+% End time in seconds (HR hours)
+HR = 10;
+ET = HR * 60 * 60;
+TI = DT:DT:ET;
+% Output times as an integer multiple of DT
+OTI = 0
+
+%% Set storage for solution vectors and initialize
+sol = zeros(length(SOL),5);
+for ss=1:5
+    sol(:,ss) = SOL;
+end
+
+%% Set storage for transient solution
+SOLT = zeros(length(SOL), 
+
+%% Explitcit SSP RK53
+%
+for tt=1:length(TI)
+    % Initialize the RHS
+    RHS = bN - AN * sol(:,1);
+    % Stage 1
+    c1 = 0.377268915331368;
+    sol(sysDex,2) = sol(sysDex,1) + c1 * DT * RHS(sysDex);
+    RHS = bN - AN * sol(:,2);
+    sol(sysDex,3) = sol(sysDex,2) + c1 * DT * RHS(sysDex);
+    % First linear combination
+    LC1_s0 = 0.355909775063327;
+    LC1_s2 = 0.644090224936674;
+    sol(sysDex,4) = LC1_s0 * sol(sysDex,1) + LC1_s2 * sol(sysDex,3);
+    %
+    % Stage 2
+    c2 = 0.242995220537396;
+    RHS = bN - AN * sol(:,3);
+    sol(sysDex,4) = sol(sysDex,4) + c2 * DT * RHS(sysDex);
+    % Second linear combination
+    LC2_s0 = 0.367933791638137;
+    LC2_s3 = 0.632066208361863;
+    sol(sysDex,1) = LC2_s0 * sol(sysDex,1) + LC2_s3 * sol(sysDex,4);
+    %
+    % Stage 3
+    c3 = 0.238458932846290;
+    RHS = bN - AN * sol(:,4);
+    sol(sysDex,1) = sol(sysDex,1) + c3 * DT * RHS(sysDex);
+    % Third linear combination
+    LC3_s0 = 0.762406163401431;
+    LC3_s2 = 0.237593836598569;
+    sol(sysDex,5) = LC3_s0 * sol(sysDex,1) + LC3_s2 * sol(sysDex,3);
+    %
+    % Stage 4
+    c4 = 0.287632146308408;
+    RHS = bN - AN * sol(:,1);
+    sol(sysDex,5) = sol(sysDex,5) + c4 * DT * RHS(sysDex);
+    %
+    % Update the solution (currently NOT storing history...)
+    sol(sysDex,1) = sol(sysDex,5);
+    disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
+end
+%}
+
 %% Get the solution fields
-SOL(sysDex) = sol;
+SOL(sysDex) = sol(sysDex,1);
 clear sol;
+%
 uxz = reshape(SOL((1:OPS)),NZ,NX);
-wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
+rxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+wxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
-%% Interpolate to a regular grid using Hermite and Legendre transforms'
+%% Interpolate to a regular grid using Hermite and Laguerre transforms'
 %
 NXI = 1000;
 NZI = 200;
@@ -201,29 +298,30 @@ NZI = 200;
 XI = l2 * XINT;
 ZI = ZINT;
 %}
-
-% Plot the solution in the native grids
+%% Plot the solution in the native grids
 %{
 % NATIVE GRID PLOTS
-figure;
-subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(REFS.ujref + uxz),31); colorbar;
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
+subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(uxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
+disp(['U MAX: ' num2str(max(max(uxz)))]);
+disp(['U MIN: ' num2str(min(min(uxz)))]);
+title('Total Horizontal Velocity U (m/s)');
 subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(wxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
-
-figure;
+title('Vertical Velocity W (m/s)');
+%
+fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(rxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('$(\ln p)^{\prime} ~~ (Pa)$');
+title('Perturbation Log Density (kg/m^3)');
 subplot(1,2,2); contourf(REFS.XL,REFS.ZTL,real(pxz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
-title('$(\ln \theta)^{\prime} ~~ (K)$');
+title('Perturbation Log Pressure (Pa)');
 drawnow
 %}
 
@@ -232,22 +330,30 @@ cmap = load('NCLcolormap254.txt');
 cmap = cmap(:,1:3);
 
 % INTERPOLATED GRID PLOTS
-% Compute the reference state initialization
+%
+width = 0.0;
+depth = 0.0;
+%% Compute the reference state initialization
 %
 if strcmp(TestCase,'ShearJetSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
-    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
+    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
-    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    [lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZLINT);
+    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 elseif strcmp(TestCase,'ClassicalSchar') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressureCBVF(BS, ZINT);
     [ujref, ~] = computeJetProfileUniform(UJ, lpref);
 elseif strcmp(TestCase,'AndesMtn') == true
     [lpref, lrref, dlpref, dlrref] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZINT, RAY);
-    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
+    [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, zH, ZINT(:,1), ZLINT, RAY);
+    [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
 end
 %}
+dlthref = 1.0 / BS.gam * dlpref - dlrref;
+
 %
 figure;
 colormap(cmap);
@@ -291,113 +397,25 @@ xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
-%
-%% Compute some of the fields needed for instability checks
-lpt = REFS.lthref + pxz;
-pt = exp(lpt);
-lp = REFS.lpref + rxz;
-p = exp(lp);
-P = REFS.pref;
-PT = REFS.thref;
-rho = p ./ (Rd * pt) .* (p0 * p.^(-1)).^kappa;
-R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^kappa;
-RT = (rho .* pt) - (R .* PT);
-
-%% Compute Ri, Convective Parameter, and BVF
-DDZ_BC = REFS.DDZ;
-dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
-duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
-Ri = -ga * dlrho ./ (duj.^2);
-
-DDZ_BC = REFS.DDZ;
-dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
-temp = p ./ (Rd * rho);
-conv = temp .* dlpt;
-
-RiREF = -BS.ga * REFS.dlrref(:,1);
-RiREF = RiREF ./ (REFS.dujref(:,1).^2);
-
-xdex = 1:1:NX;
-figure;
-subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
-hold on;
-semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',2.5);
-semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
-hold off;
-grid on; grid minor;
-xlabel('$Ri$');
-ylabel('Elevation (km)');
-title('Richardson Number');
-xlim([0.1 1.0E4]);
-ylim([0.0 30.0]);
-
-subplot(1,2,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
-hold on;
-semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
-hold off;
-grid on; grid minor;
-xlabel('$S_p$');
-%ylabel('Elevation (km)');
-title('Convective Stability');
-%xlim([-0.3 0.3]);
-
-fname = ['RI_CONV_N2_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-%% Compute N and the local Fr number
-%{
-fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
-DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
-NBVF = (ga .* dlpt);
-
-Lv = 2.5E3;
-FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
-
-xdex = 1:1:NX;
-plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-grid on; grid minor;
-title('Local Froude Number');
-xlabel('$Fr$');
-%ylabel('\textsf{Altitude (km)}','Interpreter','latex');
-ylim([0.0 25.0]);
-%xlim([-1.0E-3 2.0E-3]);
-drawnow;
-
-fname = ['FROUDE_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
 %}
-%% Debug
+
+%% Debug plots to check the boundary up close
 %{
 figure;
-subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
+subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-25000.0 25000.0]); ylim([0.0 2000.0]);
 title('U (m/s)'); %zlim([-0.1 0.1]);
-subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
+subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-25000.0 25000.0]); ylim([0.0 2000.0]);
 title('W (m/s)');
-subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 2000.0]);
+subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-30000.0 30000.0]); ylim([0.0 2000.0]);
 title('$(\ln p)^{\prime}$ (Pa)');
-subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 2000.0]);
+subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-30000.0 30000.0]); ylim([0.0 2000.0]);
 title('$(\ln \theta)^{\prime}$ (K)');
-drawnow
-%}
-
-%% Plot the terrain forcing
-%{
-subplot(2,2,1); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS)),NZ,NX)); colorbar; xlim([-15000.0 15000.0]); ylim([0.0 1000.0]);
-title('Total Horizontal Velocity U (m/s)');
-subplot(2,2,2); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Vertical Velocity W (m/s)');
-subplot(2,2,3); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + 2*OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Perturbation Density (kg/m^3)');
-subplot(2,2,4); surf(REFS.XL,REFS.ZTL,reshape(FBC((1:OPS) + 3*OPS),NZ,NX)); colorbar; ylim([0.0 1000.0]);
-title('Perturbation Pressure (Pa)');
 drawnow
 %}
 
 %% Save the data
 %{
 close all;
-fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
+fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);
 %}

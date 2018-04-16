@@ -59,19 +59,16 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     %% Compute the reference state initialization
     if strcmp(TestCase,'ShearJetSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
     elseif strcmp(TestCase,'ShearJetScharCBVF') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressureCBVF(BS, ZL);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
     elseif strcmp(TestCase,'ClassicalSchar') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressureCBVF(BS, ZTL);
         [ujref,dujref] = computeJetProfileUniform(UJ, lpref);
     elseif strcmp(TestCase,'AndesMtn') == true
         [lpref,lrref,dlpref,dlrref] = computeBackgroundPressure(BS, DS.zH, zl, ZTL, RAY);
-        [lprefU,~,dlprefU,~] = computeBackgroundPressure(BS, DS.zH, zl, ZL, RAY);
-        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lprefU, dlprefU);
+        [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
     end
     
     %% Compute the vertical profiles of density and pressure
@@ -249,16 +246,16 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
-    %% Assemble the LHS operator (reorder ru r rw rt)
-    LD = [LD11 LD13 LD12 LD14 ; ...
-          LD31 LD33 LD32 LD34 ; ...
-          LD21 LD23 LD22 LD24 ; ...
-          LD41 LD43 LD42 LD44];
+    %% Assemble the LHS operator (reorder u p w t)
+    LD = [LD11 LD12 LD13 LD14 ; ...
+          LD21 LD22 LD23 LD24 ; ...
+          LD31 LD32 LD33 LD34 ; ...
+          LD41 LD42 LD43 LD44];
       
-    %% Assemble the force vector (reorder ru r rw rt)
+    %% Assemble the force vector (reorder u p w t)
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
-    FF = [F11 ; F31 ; F21 ; F41];
+    FF = [F11 ; F21 ; F31 ; F41];
 end

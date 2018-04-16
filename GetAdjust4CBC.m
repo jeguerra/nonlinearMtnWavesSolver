@@ -1,8 +1,8 @@
 function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
     %% Number of variables and block positions in the solution vector
     numVar = 4;
-    iP = 1;
-    iW = 2;
+    iW = 1;
+    iP = 2;
     iT = 3;
 
     %% Set an initial solution vector
@@ -10,15 +10,14 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
 
     %% Create boundary condition indices
     uldex = 2:NZ-1;
-    rldex = uldex + OPS;
-    wldex = rldex + OPS;
-    pldex = wldex + OPS;
-    LeftOutExcludeCorners = [uldex rldex wldex pldex];
+    wldex = uldex + OPS;
+    rldex = wldex + OPS;
+    pldex = rldex + OPS;
+    LeftOutExcludeCorners = [uldex wldex rldex pldex];
     RightOutExcludeCorners = LeftOutExcludeCorners + (OPS - NZ);
     
     utdex = NZ:NZ:OPS;
-    rtdex = utdex + OPS;
-    wtdex = rtdex + OPS;
+    wtdex = utdex + OPS;
     
     ubdex = 1:NZ:(OPS - NZ + 1);
     wbdex = ubdex + iW * OPS;
@@ -30,8 +29,8 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         
         LeftCorners = [1 (iP*OPS + 1) (iT*OPS + 1) ...
                        NZ (iP*OPS + NZ) (iT*OPS + NZ)];
-        RightCorners = [(OPS - NZ + 1) (iW*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
-                       OPS iW*OPS numVar*OPS];
+        RightCorners = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
+                       OPS iT*OPS numVar*OPS];
         
         rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
                    LeftCorners RightCorners ...
@@ -44,8 +43,8 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         
         LeftCorners = [1 (iP*OPS + 1) (iT*OPS + 1) ...
                        NZ (iP*OPS + NZ) (iT*OPS + NZ)];
-        RightCorners = [(OPS - NZ + 1) (iW*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
-                       OPS iW*OPS numVar*OPS];
+        RightCorners = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
+                       OPS iT*OPS numVar*OPS];
         
         rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
                    LeftCorners RightCorners ...
@@ -65,8 +64,8 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         
         LeftCorners = [1 (iP*OPS + 1) (iT*OPS + 1) ...
                        NZ (iP*OPS + NZ) (iT*OPS + NZ)];
-        RightCorners = [(OPS - NZ + 1) (iW*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
-                       OPS iW*OPS numVar*OPS];
+        RightCorners = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
+                       OPS iT*OPS numVar*OPS];
                    
         rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
                    LeftCorners RightCorners ...

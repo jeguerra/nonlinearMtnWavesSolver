@@ -182,8 +182,8 @@ clear AN bN
 SOL(sysDex) = sol;
 clear sol;
 ruxz = reshape(SOL((1:OPS)),NZ,NX);
-rxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-rwxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
+rwxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Compute the kinematic fields from (u, w, rho, rho-theta)

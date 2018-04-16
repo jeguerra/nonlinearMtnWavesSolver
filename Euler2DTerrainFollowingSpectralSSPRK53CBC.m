@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 140; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 100; % Expansion order matches physical grid
+NZ = 80; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -178,7 +178,7 @@ toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
 %{
 %% Check the eigenvalues of the RHS operator before time integration
-[dvecs, dlambda] = eigs(AN,10,'lr');
+[dvecs, dlambda] = eigs(AN(sysDex,sysDex),10,'lr');
 diag(dlambda)
 %%
 SOL(sysDex) = dvecs(:,1);
@@ -220,17 +220,19 @@ DT = 0.05;
 % End time in seconds (HR hours)
 HR = 1;
 ET = HR * 60 * 60;
-%TI = DT:DT:ET;
+TI = DT:DT:ET;
+% Output times as an integer multiple of DT
+OTI = 1000;
 
 %% Set storage for solution vectors and initialize
 sol = zeros(length(SOL),5);
 for ss=1:5
     sol(:,ss) = SOL;
-end
+end 
 
 %% Explitcit SSP RK53
 %
-for tt=2:50000%length(TI)
+for tt=1:length(TI)
     % Initialize the RHS
     RHS = bN - AN * sol(:,1);
     % Stage 1
@@ -277,8 +279,8 @@ SOL(sysDex) = sol(sysDex,1);
 clear sol;
 %
 uxz = reshape(SOL((1:OPS)),NZ,NX);
-rxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-wxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
+wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Laguerre transforms'

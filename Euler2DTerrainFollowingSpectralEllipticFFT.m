@@ -12,16 +12,16 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 256; % Expansion order matches physical grid
+NX = 512; % Expansion order matches physical grid
 NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 2;
+%TestCase = 'ShearJetSchar'; BC = 2;
 %TestCase = 'ShearJetScharCBVF'; BC = 2;
 %TestCase = 'ClassicalSchar'; BC = 2;
-%TestCase = 'AndesMtn'; BC = 2;
+TestCase = 'AndesMtn'; BC = 2;
 
 z0 = 0.0;
 gam = 1.4;
@@ -171,8 +171,10 @@ spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL);
 % Normal equations to make the system symmetric
-AN = A' * A;
-bN = A' * b(sysDex,1);
+%AN = A' * A;
+%bN = A' * b(sysDex,1);
+AN = A;
+bN = b(sysDex,1);
 toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
 %tic
@@ -321,8 +323,8 @@ screen2png(fname);
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 3000;
-NZI = 400;
+NXI = 2000;
+NZI = 200;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);

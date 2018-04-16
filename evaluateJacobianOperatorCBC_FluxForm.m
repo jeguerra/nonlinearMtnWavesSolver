@@ -1,10 +1,5 @@
-function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxForm(RhoU, RhoW, Rho, RhoTheta, BS, REFS, RAY)
+function [LD, FF, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxForm(RhoU, RhoW, Rho, RhoTheta, BS, REFS, RAY)
     OPS = REFS.NX * REFS.NZ;
-    % Set the boundary indices and operator dimension
-    tdex = REFS.NZ:REFS.NZ:OPS;
-    bdex = 1:REFS.NZ:(OPS - REFS.NZ + 1);
-    NB = length(bdex);
-    NT = length(tdex);
     
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
@@ -33,7 +28,7 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     PGFTX = (BS.gam * RDTZ - U0.^2) * ITHTZ;
     PGFTZ = BS.gam * RDTZ * ITHTZ;
     U0DA = U0 * DDA_OP;
-
+    
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
     % Horizontal momentum LHS
@@ -78,7 +73,7 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     B42 = DTHDZ;
     B43 = sparse(OPS,OPS);
     B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(REFS.RL,0, OPS, OPS);
-
+    
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
     LD12 = L12 + B12;
@@ -100,43 +95,18 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
-    %% Assemble the LHS operator
+    %% Assemble the LHS operator (reorder ru r rw rt)
     LD = [LD11 LD12 LD13 LD14 ; ...
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
       
-    %% Assemble the force vector
+    %% Assemble the force vector (reorder ru r rw rt)
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
     F31 = zeros(OPS,1);
     F41 = zeros(OPS,1);
     FF = [F11 ; F21 ; F31 ; F41];
-    
-    %% Compute the bottom boundary constraint
-    HBC = sparse(NB,4 * OPS);
-    HBCT = HBC;
-    UNIT = spdiags(ones(NB,1), 0, NB, NB);
-    % Row augmentation
-    HBC(:,bdex + OPS) = UNIT;
-    % Column augmentation
-    HBCT(:,bdex + 1*OPS) = UNIT;
-    
-    %% Compute the top boundary constraint
-    TBC = sparse(NT,4 * OPS);
-    TBCT = TBC;
-    UNIT = spdiags(ones(NT,1), 0, NT, NT);
-    % Row augmentation
-    TBC(:,tdex + OPS) = UNIT;
-    % Column augmentation
-    TBCT(:,tdex + OPS) = UNIT;
-    
-    %% Augment the system with the Lagrange Multiplier Constraints
-    RPAD = zeros(NB + NT);
-    LDA = [LD HBCT' TBCT'];
-    RAG = [HBC ; TBC];
-    RAG = [RAG RPAD];
-    LDA = [LDA ; RAG];
         
     %% Recover U and W from the solution momenta
     UREF = reshape(REFS.ujref, OPS, 1);
@@ -190,13 +160,13 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
           RAY.nu4 * spdiags(REFS.RL,0, OPS, OPS) * RhoTheta;
       
     RR = [R11 ; R21 ; R31 ; R41];
-
+    
     disp(['Residual in RhoU: ' num2str(norm(R11))]);
     disp(['Residual in RhoW: ' num2str(norm(R21))]);
     disp(['Residual in Rho: ' num2str(norm(R31))]);
     disp(['Residual in RhoTheta: ' num2str(norm(R41))]);
-    
-    S = svds(LD, 5);
+
+    S = svds(LD, 2);
     LB = 1.0 / max(S);
     disp(['Maximum Singular Value: ' num2str(max(S))]);
 
@@ -204,7 +174,4 @@ function [LDA, FFA, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxFo
     disp(['Lower Error Bound in RhoW: ' num2str(LB * norm(R21))]);
     disp(['Lower Error Bound in Rho: ' num2str(LB * norm(R31))]);
     disp(['Lower Error Bound in RhoTheta: ' num2str(LB * norm(R41))]);
-    
-    %% Assemble the tangent forcing augmented system
-    FFA = [FF - RR; (REFS.rref(1,1:REFS.NX) .* REFS.ujref(1,1:REFS.NX) .* REFS.DZT(1,1:REFS.NX))' ; zeros(NT,1)];
 end
