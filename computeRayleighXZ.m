@@ -16,7 +16,8 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
     XRL1 = X(xl1,xl2);
     XRL2 = X(xr1,xr2);
     ZRL = Z(zt1,zt2);
-    
+    RLX = zeros(size(X));
+    clear X Z;
     %% Set up the layers (default cosine profiles)
     %{
     dNormZ = (prs.zH - ZRL) / depth;
@@ -41,7 +42,6 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
     %}
     
     %% Assemble the layer strength field
-    RLX = zeros(size(X));
     if applyLateral == true
         RLX(xl1,xl2) = RFX1;
         RLX(xr1,xr2) = RFX2;

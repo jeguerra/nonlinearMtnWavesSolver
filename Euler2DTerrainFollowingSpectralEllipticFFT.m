@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 512; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 640; % Expansion order matches physical grid
+NZ = 180; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -213,9 +213,14 @@ drawnow
 %% Plot the solution using the IFFT to recover the solution in physical space
 SOL(sysDex) = sol;
 uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),[],2));
-rxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
-wxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
+wxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
+rxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
 pxz = real(ifft(reshape(SOL((1:OPS) + 3*OPS),NZ,NX),[],2));
+
+uxz(:,end) = uxz(:,1);
+wxz(:,end) = wxz(:,1);
+rxz(:,end) = rxz(:,1);
+pxz(:,end) = pxz(:,1);
 %{
 fig = figure('Position',[0 0 1800 1200]); fig.Color = 'w';
 colormap(cmap);
@@ -256,7 +261,7 @@ RT = (rho .* pt) - (R .* PT);
 
 %% Compute Ri, Convective Parameter, and BVF
 DDZ_BC = REFS.DDZ;
-dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.rref));
+dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
@@ -334,7 +339,7 @@ XI = l2 * XINT;
 ZI = ZINT;
 %} 
 
-% INTERPOLATED GRID PLOTS
+%% INTERPOLATED GRID PLOTS
 %
 width = 0.0;
 depth = 0.0;

@@ -55,7 +55,16 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         disp('Applying BC FFT-Lagrange Model, Periodic Lateral BC');
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
         
-        rowsOut = [wbdex wtdex];
+        LeftCorners = [1 (iP*OPS + 1) (iT*OPS + 1) ...
+                       NZ (iP*OPS + NZ) (iT*OPS + NZ)];
+        RightCorners = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
+                       OPS iT*OPS numVar*OPS];
+        
+        rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
+                   LeftCorners RightCorners ...
+                   wtdex wbdex];
+               
+        %rowsOut = [wbdex wtdex];
         
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 3
