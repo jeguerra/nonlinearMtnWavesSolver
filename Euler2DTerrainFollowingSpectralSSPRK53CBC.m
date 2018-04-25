@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NZ = 80; % Expansion order matches physical grid
+NX = 140; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -218,7 +218,7 @@ pause;
 % Time step (fraction of a second)
 DT = 0.05;
 % End time in seconds (HR hours)
-HR = 1;
+HR = 15;
 ET = HR * 60 * 60;
 TI = DT:DT:ET;
 % Output times as an integer multiple of DT
@@ -232,6 +232,7 @@ end
 
 %% Explitcit SSP RK53
 %
+tic
 for tt=1:length(TI)
     % Initialize the RHS
     RHS = bN - AN * sol(:,1);
@@ -272,6 +273,7 @@ for tt=1:length(TI)
     sol(sysDex,1) = sol(sysDex,5);
     disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
 end
+toc
 %}
 
 %% Get the solution fields
@@ -285,7 +287,7 @@ pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Laguerre transforms'
 %
-NXI = 1000;
+NXI = 2000;
 NZI = 200;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
@@ -411,7 +413,7 @@ drawnow
 %}
 
 %% Save the data
-%{
+%
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

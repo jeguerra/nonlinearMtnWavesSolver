@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 640; % Expansion order matches physical grid
-NZ = 180; % Expansion order matches physical grid
+NX = 768; % Expansion order matches physical grid
+NZ = 160; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -114,8 +114,8 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 40000.0;
-    l1 = - 1.0E5 * (2.5 * pi);
-    l2 = 1.0E5 * (2.5 * pi);
+    l1 = - 1.0E5 * (2.0 * pi);
+    l2 = 1.0E5 * (2.0 * pi);
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -184,31 +184,67 @@ toc; disp('Solve the system... DONE.');
 clear AN bN
 
 %% Plot the solution frequency space
-%{
+%
 SOL(sysDex) = sol;
 uxz = real(reshape(SOL((1:OPS)),NZ,NX));
 wxz = real(reshape(SOL((1:OPS) + OPS),NZ,NX));
-%rxz = real(reshape(SOL((1:OPS) + 2*OPS),NZ,NX));
-%pxz = real(reshape(SOL((1:OPS) + 3*OPS),NZ,NX));
+rxz = real(reshape(SOL((1:OPS) + 2*OPS),NZ,NX));
+pxz = real(reshape(SOL((1:OPS) + 3*OPS),NZ,NX));
 %
 kdex = find(REFS.KF(1,:) >= 0.0);
-rad2len = 1. / (2. * pi);
-wlen = rad2len * REFS.KF(:,kdex);
+rad2freq = 1. / (2. * pi);
+wfreq = rad2freq * (REFS.KF(:,kdex));
+wlen = wfreq.^(-1);
+m2km = 1.0E-3;
+im2ikm = 1.0E3;
+%
+mu = max(max(abs(uxz)));
+mw = max(max(abs(wxz)));
+mr = max(max(abs(rxz)));
+mp = max(max(abs(pxz)));
+xd = [1.0E-4 1.0E-1];
+nc = 12;
 %
 figure;
+subplot(2,1,1);
 colormap(cmap);
-contourf(wlen,REFS.ZL(:,kdex),2*uxz(:,kdex),21); colorbar; grid on;
-xlim([0.0 0.4E-3]);
-ylim([0.0 zH]);
-title('Total Horizontal Velocity U (m/s)');
-fig.CurrentAxes.FontSize = 24; fig.CurrentAxes.LineWidth = 1.5;
+contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mu * uxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
+set(gca, 'XScale', 'log'); xlim(xd);
+title('Horizontal Velocity U $(ms^{-1})$');
+ylabel('Elevation (km)');
 
-figure;
-contourf(wlen,REFS.ZL(:,kdex),2*wxz(:,kdex),21); colorbar; grid on;
-xlim([0.0 0.4E-3]);
-ylim([0.0 zH]);
-title('Vertical Velocity W (m/s)');
+subplot(2,1,2);
+colormap(cmap);
+contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mw * wxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
+%set(gca, 'XScale', 'log'); xlim(xd);
+xlim([8.0E-2 1.0E-1]);
+title('Vertical Velocity W $(ms^{-1})$');
+xlabel('Spatial Frequency $(km^{-1})$');
+ylabel('Elevation (km)');
 drawnow
+fname = ['FREQ_RESP01' TestCase num2str(hC)];
+drawnow;
+screen2png(fname);
+%
+figure;
+subplot(2,1,1);
+colormap(cmap);
+contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mr * rxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
+set(gca, 'XScale', 'log'); xlim(xd);
+title('$\ln \rho$');
+ylabel('Elevation (km)');
+
+subplot(2,1,2);
+colormap(cmap);
+contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mp * pxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
+set(gca, 'XScale', 'log'); xlim(xd);
+title('$\ln \theta$');
+xlabel('Spatial Frequency $(km^{-1})$');
+ylabel('Elevation (km)');
+fname = ['FREQ_RESP02' TestCase num2str(hC)];
+drawnow;
+screen2png(fname);
+%pause;
 %}
 %% Plot the solution using the IFFT to recover the solution in physical space
 SOL(sysDex) = sol;
@@ -302,8 +338,8 @@ fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 %% Compute N and the local Fr number
-%{
-fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
+%
+figure;
 DDZ_BC = REFS.DDZ;
 dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
 NBVF = (ga .* dlpt);

@@ -33,12 +33,15 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
     %
     dNormZ = (prs.zH - ZRL) / depth;
     RFZ = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormZ)).^4);
+    clear dNormZ;
     
     dNormX = (prs.l2 - XRL2) / width;
     RFX2 = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormX)).^4);
+    clear dNormX;
     
     dNormX = (XRL1 - prs.l1) / width;
     RFX1 = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormX)).^4);
+    clear dNormX;
     %}
     
     %% Assemble the layer strength field

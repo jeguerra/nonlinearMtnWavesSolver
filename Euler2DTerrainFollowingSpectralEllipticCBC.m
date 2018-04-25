@@ -13,8 +13,8 @@ clear
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NZ = 80; % Expansion order matches physical grid
+NX = 180; % Expansion order matches physical grid
+NZ = 120; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -55,7 +55,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -174,8 +174,10 @@ spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL);
 % Normal equations to make the system symmetric
-AN = A' * A;
-bN = A' * b(sysDex,1);
+%AN = A' * A;
+%bN = A' * b(sysDex,1);
+AN = A;
+bN = b(sysDex,1);
 toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
 sol = (AN \ bN);
