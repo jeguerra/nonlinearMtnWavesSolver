@@ -165,14 +165,14 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     %% Unwrap the derivative matrices into operator for 2D implementation
     
     % Compute the vertical derivatives operator (Lagrange expansion)
-    DDXI_OP = spalloc(OPS, OPS, NZ^2);
+    DDXI_OP = spalloc(OPS, OPS, NX * NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
 
     % Compute the horizontal derivatives operator (Hermite Function expansion)
-    DDA_OP = spalloc(OPS, OPS, NX^2);
+    DDA_OP = spalloc(OPS, OPS, NZ * NX^2);
     for rr=1:NZ
         ddex = (1:NZ:OPS) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;

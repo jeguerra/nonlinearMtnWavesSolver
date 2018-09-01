@@ -34,14 +34,13 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
         SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
-        BotLeftCorner = [1 (iP*OPS + 1)];
-        BotRightCorner = [(OPS - NZ + 1) (iT*OPS - NZ + 1)];
+        BotLeftCorner = [1 (iP*OPS + 1) (iT*OPS + 1)];
+        BotRightCorner = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1)];
         
-        TopLeftCorner = [NZ (iP*OPS + NZ)];
-        TopRightCorner = [OPS iT*OPS];
+        TopLeftCorners = [NZ (iP*OPS + NZ) (iT*OPS + NZ)];
+        TopRightCorners = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1)];
         
         rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
-                   TopLeftCorner TopRightCorner ...
                    BotLeftCorner BotRightCorner ...
                    wtdex ptdex wbdex pbdex];
                
