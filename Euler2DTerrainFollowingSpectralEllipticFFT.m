@@ -12,16 +12,16 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 768; % Expansion order matches physical grid
-NZ = 160; % Expansion order matches physical grid
+NX = 1024; % Expansion order matches physical grid
+NZ = 256; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-%TestCase = 'ShearJetSchar'; BC = 2;
+TestCase = 'ShearJetSchar'; BC = 2;
 %TestCase = 'ShearJetScharCBVF'; BC = 2;
 %TestCase = 'ClassicalSchar'; BC = 2;
-TestCase = 'AndesMtn'; BC = 2;
+%TestCase = 'AndesMtn'; BC = 2;
 
 z0 = 0.0;
 gam = 1.4;
@@ -33,8 +33,8 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    l1 = - 1.0E4 * (2.0 * pi);
-    l2 = 1.0E4 * (2.0 * pi);
+    l1 = - 1.0E4 * (3.0 * pi);
+    l2 = 1.0E4 * (3.0 * pi);
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
