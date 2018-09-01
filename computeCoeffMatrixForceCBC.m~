@@ -42,8 +42,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
 
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
@@ -191,49 +191,50 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
     RAYM = spdiags(RL,0, OPS, OPS);
-    ZSPR = sparse(OPS,OPS);
+    Z
     % Horizontal momentum LHS
     L11 = U0DX;
-    L12 = ZSPR;
+    L12 = sparse(OPS,OPS);
     L13 = POR * DX;
-    L14 = ZSPR;
+    L14 = sparse(OPS,OPS);
     % Vertical momentum LHS
-    L21 = ZSPR;
+    L21 = sparse(OPS,OPS);
     L22 = U0DX;
     L23 = POR * SIGMA * DDXI_OP;
-    L24 = ZSPR;
+    L24 = sparse(OPS,OPS);
     % Continuity (log pressure) LHS
     L31 = BS.gam * DDA_OP;
     L32 = BS.gam * SIGMA * DDXI_OP;
     L33 = U0DX;
-    L34 = ZSPR;
+    %L33 = sparse(OPS,OPS);
+    L34 = sparse(OPS,OPS);
     % Thermodynamic LHS
-    L41 = ZSPR;
-    L42 = ZSPR;
-    L43 = ZSPR;
+    L41 = sparse(OPS,OPS);
+    L42 = sparse(OPS,OPS);
+    L43 = sparse(OPS,OPS);
     L44 = U0DX;
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
-    B11 = RAY.nu1 * RAYM;
+    B11 = sparse(OPS,OPS) + RAY.nu1 * spdiags(RL,0, OPS, OPS);
     B12 = DUDZ;
-    B13 = ZSPR;
-    B14 = ZSPR;
+    B13 = sparse(OPS,OPS);
+    B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
-    B21 = ZSPR;
-    B22 = RAY.nu2 * RAYM;
+    B21 = sparse(OPS,OPS);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
     B23 = BS.ga * (1.0 / BS.gam - 1.0) * unit;
     B24 = - BS.ga * unit;
     % Continuity (log pressure) LHS
-    B31 = ZSPR;
+    B31 = sparse(OPS,OPS);
     B32 = DLPDZ;
-    B33 = RAY.nu3 * RAYM;
-    B34 = ZSPR;
+    B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
+    B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
-    B41 = ZSPR;
+    B41 = sparse(OPS,OPS);
     B42 = DLPTDZ;
-    B43 = ZSPR;
-    B44 = RAY.nu4 * RAYM;
+    B43 = sparse(OPS,OPS);
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;

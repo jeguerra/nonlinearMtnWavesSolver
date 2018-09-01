@@ -7,14 +7,14 @@
 % background and constant wind
 % 4) 'AndesMtn' Same as 1) but with real input terrain data
 
-clc
+%clc
 clear
 %close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 180; % Expansion order matches physical grid
-NZ = 120; % Expansion order matches physical grid
+NX = 120; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -173,16 +173,23 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL);
+%spy(A); 
+%[dvecs, dlambda] = eigs(A,10,'bothendsreal');
+%diag(dlambda)
+%pause;
 % Normal equations to make the system symmetric
 %AN = A' * A;
 %bN = A' * b(sysDex,1);
-AN = A;
+AN = A;       
 bN = b(sysDex,1);
 toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
-sol = (AN \ bN);
+%spparms('piv_tol',1.0);
+%spparms('sym_tol',1.0);
+%[L, U, P, Q, R] = lu(AN); clear AN;
+%sol = Q * (U \ (L \ (P * (R \ bN)))) ;
+sol = (AN \ bN); clear AN bN;
 toc; disp('Solve the system... DONE.');
-clear AN bN
 %% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
@@ -193,8 +200,8 @@ pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 1000;
-NZI = 200;
+NXI = 2001;
+NZI = 451;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);

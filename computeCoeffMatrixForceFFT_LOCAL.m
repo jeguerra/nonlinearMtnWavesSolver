@@ -14,8 +14,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
        
     %% Compute the terrain and derivatives
     [ht,~] = computeTopoDerivative(TestCase,xh,DS,RAY);
@@ -85,102 +85,120 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
 
     %% Unwrap the derivative matrices into operators onto a state 1D vector
     % Compute the vertical derivatives operator (Legendre expansion)
-    DDXI_OP = spalloc(OPS, OPS, NX * NZ^2);
+    DDXI_OP = spalloc(OPS, OPS, OPS);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
     %DDXI_OP = sparse(DDXI_OP);
-%{
-    % Compute the horizontal derivatives operator (Hermite expansion)
-    DDX_OP = zeros(OPS);
-    for rr=1:NZ
-        ddex = (1:NZ:OPS) + (rr - 1);
-        DDX_OP(ddex,ddex) = DDX_H;
-    end
-    DDX_OP = sparse(DDX_OP);
-%}    
+    %spy(DDXI_OP); pause;
+
     %% Assemble the block global operator L
     U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
     KX = spdiags(reshape(KF,OPS,1), 0, OPS, OPS);
+    KXU0 = KX .* U0; clear U0;
     DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
     DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
-    DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ); clear DLRDZ;
+    DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
-    %U0DX = U0 * DDX_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
-
-    RAYM = spdiags(RL,0, OPS, OPS);
-    ZSPR = sparse(OPS,OPS);
+    
+    RAYF = spdiags(RL,0, OPS, OPS);
     % Horizontal momentum LHS
-    LD11 = 1i * KX .* U0 + RAY.nu1 * RAYM;
+    LD11 = 1i * KXU0 + RAY.nu1 * RAYF;
     LD12 = DUDZ;
     LD13 = 1i * POR * KX;
-    LD14 = ZSPR;
+    LD14 = sparse(OPS,OPS);
     % Vertical momentum LHS
-    LD21 = ZSPR;
-    LD22 = 1i * KX * U0 + RAY.nu2 * RAYM;
+    LD21 = sparse(OPS,OPS);
+    LD22 = 1i * KXU0 + RAY.nu2 * RAYF;
     LD23 = POR * SIGMA * DDXI_OP + BS.ga * (1.0 / BS.gam - 1.0) * unit;
     LD24 = - BS.ga * unit;
     % Continuity LHS
     LD31 = BS.gam * 1i * KX;
     LD32 = BS.gam * SIGMA * DDXI_OP + DLPDZ;
-    LD33 = 1i * KX .* U0 + RAY.nu3 * RAYM;
-    LD34 = ZSPR;
+    LD33 = 1i * KXU0 + RAY.nu3 * RAYF;
+    LD34 = sparse(OPS,OPS);
     % Thermodynamic LHS
-    LD41 = ZSPR;
+    LD41 = sparse(OPS,OPS);
     LD42 = DLPTDZ;
-    LD43 = ZSPR;
-    LD44 = 1i * KX .* U0;
+    LD43 = sparse(OPS,OPS);
+    LD44 = 1i * KXU0 + RAY.nu4 * RAYF;
     
-    clear U0 KX DUDZ DLPDZ DLPTDZ POR unit SIGMA RAYM
-
+    clear KX KXU0 POR DUDZ DLPDZ DLPTDZ;
+    
     %{
+    % Horizontal momentum LHS
+    L11 = 1i * KXU0;
+    L12 = sparse(OPS,OPS);
+    L13 = 1i * POR * KX;
+    L14 = sparse(OPS,OPS);
+    % Vertical momentum LHS
+    L21 = sparse(OPS,OPS);
+    L22 = 1i * KXU0;
+    L23 = POR * SIGMA * DDXI_OP;
+    L24 = sparse(OPS,OPS);
+    % Continuity LHS
+    L31 = BS.gam * 1i * KX;
+    L32 = BS.gam * SIGMA * DDXI_OP;
+    L33 = 1i * KXU0;
+    L34 = sparse(OPS,OPS);
+    % Thermodynamic LHS
+    L41 = sparse(OPS,OPS);
+    L42 = sparse(OPS,OPS);
+    L43 = sparse(OPS,OPS);
+    L44 = 1i * KXU0;
+    
+    clear KX KXU0 POR;
+
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
-    B11 = RAY.nu1 * RAYM;
+    B11 = sparse(OPS,OPS) + RAY.nu1 * (spdiags(RL,0, OPS, OPS));
     B12 = DUDZ;
-    B13 = ZSPR;
-    B14 = ZSPR;
+    B13 = sparse(OPS,OPS);
+    B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
-    B21 = ZSPR;
-    B22 = RAY.nu2 * RAYM;
+    B21 = sparse(OPS,OPS);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * (spdiags(RL,0, OPS, OPS));
     B23 = BS.ga * (1.0 / BS.gam - 1.0) * unit;
     B24 = -BS.ga * unit;
     % Continuity LHS
-    B31 = ZSPR;
+    B31 = sparse(OPS,OPS);
     B32 = DLPDZ;
-    B33 = RAY.nu3 * RAYM;
-    B34 = ZSPR;
+    B33 = sparse(OPS,OPS) + RAY.nu3 * (spdiags(RL,0, OPS, OPS));
+    B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
-    B41 = ZSPR;
+    B41 = sparse(OPS,OPS);
     B42 = DLPTDZ;
-    B43 = ZSPR;
-    B44 = RAY.nu4 * RAYM;
+    B43 = sparse(OPS,OPS);
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    
+    clear DUDZ DLPDZ DLPTDZ;
     
     %% Assemble the left hand side operator
-    LD11 = L11 + B11;
-    LD12 = L12 + B12;
-    LD13 = L13 + B13;
-    LD14 = L14 + B14;
+    LD11 = L11 + B11; clear L11 B11;
+    LD12 = L12 + B12; clear L12 B12;
+    LD13 = L13 + B13; clear L13 B13;
+    LD14 = L14 + B14; clear L14 B14;
 
-    LD21 = L21 + B21;
-    LD22 = L22 + B22;
-    LD23 = L23 + B23;
-    LD24 = L24 + B24;
+    LD21 = L21 + B21; clear L21 B21;
+    LD22 = L22 + B22; clear L22 B22;
+    LD23 = L23 + B23; clear L23 B23;
+    LD24 = L24 + B24; clear L24 B24;
 
-    LD31 = L31 + B31;
-    LD32 = L32 + B32;
-    LD33 = L33 + B33;
-    LD34 = L34 + B34;
+    LD31 = L31 + B31; clear L31 B31;
+    LD32 = L32 + B32; clear L32 B32;
+    LD33 = L33 + B33; clear L33 B33;
+    LD34 = L34 + B34; clear L34 B34;
 
-    LD41 = L41 + B41;
-    LD42 = L42 + B42;
-    LD43 = L43 + B43;
-    LD44 = L44 + B44;
+    LD41 = L41 + B41; clear L41 B41;
+    LD42 = L42 + B42; clear L42 B42;
+    LD43 = L43 + B43; clear L43 B43;
+    LD44 = L44 + B44; clear L44 B44;
     %}
+
     %% Assemble the LHS operator (reorder u p w t)
     LD = [LD11 LD12 LD13 LD14 ; ...
           LD21 LD22 LD23 LD24 ; ...

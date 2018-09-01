@@ -218,7 +218,7 @@ pause;
 % Time step (fraction of a second)
 DT = 0.05;
 % End time in seconds (HR hours)
-HR = 15;
+HR = 0.1;
 ET = HR * 60 * 60;
 TI = DT:DT:ET;
 % Output times as an integer multiple of DT

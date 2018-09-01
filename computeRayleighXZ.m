@@ -5,19 +5,13 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
     dLayerL = prs.l1 + width;
     
     % Get the indices for the lateral layers
-    [xr1,xr2] = ind2sub(size(X),find(X > dLayerR));
-    [xl1,xl2] = ind2sub(size(X),find(X < dLayerL));
+    [xr1,xr2] = ind2sub(size(X),find(X >= dLayerR));
+    [xl1,xl2] = ind2sub(size(X),find(X <= dLayerL));
     %xdex = [xldex xrdex];
     
     % Get the indices for the top layers
-    [zt1,zt2] = ind2sub(size(Z),find(Z > dLayerZ));
+    %[zt1,zt2] = ind2sub(size(Z),find(Z >= dLayerZ));
     
-    % Get the layer physical locations
-    XRL1 = X(xl1,xl2);
-    XRL2 = X(xr1,xr2);
-    ZRL = Z(zt1,zt2);
-    RLX = zeros(size(X));
-    clear X Z;
     %% Set up the layers (default cosine profiles)
     %{
     dNormZ = (prs.zH - ZRL) / depth;
@@ -30,29 +24,38 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
     RFX1 = 0.5 * nu * (1.0 + cos(pi * dNormX));
     %}
     %% 2nd or 4th order profiles
-    %
-    dNormZ = (prs.zH - ZRL) / depth;
-    RFZ = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormZ)).^4);
-    clear dNormZ;
-    
-    dNormX = (prs.l2 - XRL2) / width;
-    RFX2 = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormX)).^4);
-    clear dNormX;
-    
-    dNormX = (XRL1 - prs.l1) / width;
-    RFX1 = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormX)).^4);
-    clear dNormX;
-    %}
-    
     %% Assemble the layer strength field
+    RLX = zeros(size(X));
+    RLZ = zeros(size(Z));
     if applyLateral == true
-        RLX(xl1,xl2) = RFX1;
-        RLX(xr1,xr2) = RFX2;
+        for ii=1:size(Z,1)
+            for jj=1:size(Z,2)
+                if X(ii,jj) >= dLayerR
+                    XRL = X(ii,jj);
+                    dNormX = (prs.l2 - XRL) / width;
+                    RFX = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormX)).^4);
+                elseif X(ii,jj) <= dLayerL
+                    XRL = X(ii,jj);
+                    dNormX = (XRL - prs.l1) / width;
+                    RFX = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormX)).^4);
+                end
+                RLX(ii,jj) = RFX;
+            end
+        end
     end
     
-    RLZ = 0.0 * RLX;
     if applyTop == true
-        RLZ(zt1,zt2) = RFZ;
+        for ii=1:size(Z,1)
+            for jj=1:size(Z,2)
+                if Z(ii,jj) >= dLayerZ
+                    ZRL = Z(ii,jj); 
+                    dNormZ = (prs.zH - ZRL) / depth;
+                    RFZ = 1.0 * nu * (0.0 + (cos(0.5 * pi * dNormZ)).^4);
+
+                    RLZ(ii,jj) = RFZ;
+                end
+            end
+        end
     end
     
     % Get the overlaping indices
