@@ -9,10 +9,11 @@
 clc
 clear
 close all
+opengl info;
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 2048; % Expansion order matches physical grid
+NX = 32; % Expansion order matches physical grid
 NZ = 401; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
@@ -135,7 +136,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     lC = 4000.0;
     hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '100m';
+    hfilt = '25km';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -169,18 +170,21 @@ disp('Solve the raw system with matlab default \.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = (FF - LD * SOL);
-% Normal equations to make the system symmetric
+b = (FF - LD * SOL); clear LD FF;
+%spy(A); 
+%[dvecs, dlambda] = eigs(A,10,'bothendsreal');
+%diag(dlambda)
+%pause;
+% Solve the symmetric normal equations
 %AN = A' * A;
-%bN = A' * b(sysDex,1);
-AN = A;
-bN = b(sysDex,1);
-toc; disp('Compute coefficient matrix... DONE.');
-clear A b LD FF;
-%tic
+%bN = A' * b(sysDex,1); clear A b;
+% Solve the original unsymmetric system (with partial pivoting ONLY)
+AN = A; clear A;       
+bN = b(sysDex,1); clear b;
 spparms('piv_tol',1.0);
 spparms('sym_tol',1.0);
-sol = (AN \ bN);
+toc; disp('Compute coefficient matrix... DONE.');
+sol = (AN \ bN); clear AN bN;
 toc; disp('Solve the system... DONE.');
 %}
 clear AN bN

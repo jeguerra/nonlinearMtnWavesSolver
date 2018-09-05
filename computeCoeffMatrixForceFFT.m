@@ -14,8 +14,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
        
     %% Compute the terrain and derivatives
     [ht,~] = computeTopoDerivative(TestCase,xh,DS,RAY);
@@ -133,7 +133,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     LD41 = ZSPR;
     LD42 = DLPTDZ;
     LD43 = ZSPR;
-    LD44 = 1i * KX .* U0;
+    LD44 = 1i * KX .* U0 + RAY.nu4 * RAYM;
     
     clear U0 KX DUDZ DLPDZ DLPTDZ POR unit SIGMA RAYM
 

@@ -42,8 +42,8 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
 
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
