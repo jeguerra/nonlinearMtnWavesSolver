@@ -41,30 +41,25 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
         % U and LnP need to be constrained at the corners
-        BotLeftCorner = [1 (iP*OPS + 1)];
-        BotRightCorner = [(OPS - NZ + 1) (iT*OPS - NZ + 1)];
+        %{
+        BotLeftCorner = [uldex(1) rldex(1)];
+        BotRightCorner = BotLeftCorner + (OPS - NZ);
         
-        TopLeftCorner = [NZ (iP*OPS + NZ)];
-        TopRightCorner = [OPS iT*OPS];
+        TopLeftCorner = [uldex(end) rldex(end)];
+        TopRightCorner = TopLeftCorner + (OPS - NZ);
         
-        rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
-                   BotLeftCorner BotRightCorner ...
+        rowsOut = [BotLeftCorner BotRightCorner ...
                    TopLeftCorner TopRightCorner ...
                    wtdex ptdex wbdex pbdex];
+        %}
+        rowsOut = [utdex wtdex ptdex wbdex pbdex];
            
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 1
         disp('Hermite-Lagrange Rho-RhoTheta Model, Dirichlet Lateral BC...');
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.rref(1,:) .* REFS.ujref(1,:);
         
-        LeftCorners = [1 (iP*OPS + 1) (iT*OPS + 1) ...
-                       NZ (iP*OPS + NZ) (iT*OPS + NZ)];
-        RightCorners = [(OPS - NZ + 1) (iT*OPS - NZ + 1) (numVar*OPS - NZ + 1) ...
-                       OPS iT*OPS numVar*OPS];
-        
-        rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
-                   LeftCorners RightCorners ...
-                   ptdex wtdex wbdex];
+        rowsOut = [utdex wtdex ptdex wbdex pbdex];
                
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 2
@@ -73,7 +68,7 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         ZTLF = fft(REFS.ZTL, NX, 2);
         SOL(pbdex) = -ZTLF(1,:) .* REFS.dlthref(1,:);
         
-        rowsOut = [wtdex ptdex wbdex pbdex];
+        rowsOut = [utdex wtdex ptdex wbdex pbdex];
                
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 3
@@ -81,17 +76,7 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
         SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
-        % U and LnP need to be constrained at the corners
-        BotLeftCorner = [1 (iP*OPS + 1)];
-        BotRightCorner = [(OPS - NZ + 1) (iT*OPS - NZ + 1)];
-        
-        TopLeftCorner = [NZ (iP*OPS + NZ)];
-        TopRightCorner = [OPS iT*OPS];
-        
-        rowsOut = [LeftOutExcludeCorners RightOutExcludeCorners ...
-                   BotLeftCorner BotRightCorner ...
-                   TopLeftCorner TopRightCorner ...
-                   wtdex ptdex wbdex pbdex];
+        rowsOut = [utdex wtdex ptdex wbdex pbdex];
                
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     end

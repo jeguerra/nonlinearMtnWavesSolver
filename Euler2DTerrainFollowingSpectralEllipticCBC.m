@@ -9,12 +9,12 @@
 
 %clc
 clear
-%close all
+close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 120; % Expansion order matches physical grid
+NZ = 180; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -180,8 +180,6 @@ b = (FF - LD * SOL); clear LD FF;
 % Solve the symmetric normal equations
 AN = A' * A;
 bN = A' * b(sysDex,1); clear A b;
-ss = svds(AN,10,'smallest')
-pause;
 % Solve the original unsymmetric system (with partial pivoting ONLY)
 %AN = A; clear A;       
 %bN = b(sysDex,1); clear b;

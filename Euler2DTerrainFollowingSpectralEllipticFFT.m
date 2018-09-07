@@ -13,8 +13,8 @@ opengl info;
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 32; % Expansion order matches physical grid
-NZ = 401; % Expansion order matches physical grid
+NX = 2048; % Expansion order matches physical grid
+NZ = 451; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -136,7 +136,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     lC = 4000.0;
     hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '25km';
+    hfilt = '100m';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -315,6 +315,8 @@ conv = temp .* dlpt;
 RiREF = -BS.ga * REFS.dlrref(:,1);
 RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
+convREF = REFS.pref ./ (Rd * REFS.rref) .* REFS.dlthref;
+
 xdex = 1:1:NX;
 figure;
 subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
@@ -333,13 +335,14 @@ subplot(1,2,2);
 plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
 hold on;
 semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
+semilogx(convREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
 xlabel('$S_p$');
 %ylabel('Elevation (km)');
 title('Convective Stability');
 ylim([0.0 25.0]);
-%xlim([-0.3 0.3]);
+xlim([-0.06 0.06]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
@@ -347,22 +350,25 @@ screen2png(fname);
 %% Compute N and the local Fr number
 %
 figure;
-DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
+%DDZ_BC = REFS.DDZ;
+%dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
 NBVF = (ga .* dlpt);
+NBVFREF = (ga .* REFS.dlthref);
 
 Lv = hC;
 FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
+FRREF = 2 * pi * abs(REFS.ujref) ./ (sqrt(NBVFREF) * Lv);
 
 xdex = 1:1:NX;
 plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 hold on;
 semilogx([1.0 1.0],[0.0 1.0E5],'k--','LineWidth',2.5);
+semilogx(FRREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
 title('Local Froude Number');
 xlabel('$Fr$');
-%ylabel('\textsf{Altitude (km)}','Interpreter','latex');
+ylabel('Elevation (km)');
 ylim([0.0 25.0]);
 xlim([-1.0 20.0]);
 drawnow;
