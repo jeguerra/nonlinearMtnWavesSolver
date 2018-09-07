@@ -13,8 +13,8 @@ clear
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NZ = 80; % Expansion order matches physical grid
+NX = 120; % Expansion order matches physical grid
+NZ = 200; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -34,10 +34,10 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -6.0E4;
+    %l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -171,16 +171,17 @@ computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyL
 disp('Solve by using matlab \ only.');
 tic
 spparms('spumoni',2);
-A = LD(sysDex,sysDex);
-b = (FF - LD * SOL);
-% Normal equations to make the system symmetric
-AN = A' * A;
-bN = A' * b(sysDex,1);
+AN = (LD(sysDex,sysDex))' * LD(sysDex,sysDex);
+bN = (LD(sysDex,sysDex))' * (FF - LD * SOL);
+bN = (LD(sysDex,sysDex))' * (bN(sysDex,1));
+clear LD FF;
 toc; disp('Compute coefficient matrix... DONE.');
-clear A b LD FF;
-sol = (AN \ bN);
+clear A b;
+sol = AN \ bN;
+%FN = factorize(AN, 'lu'); clear AN;
+%sol = FN \ (bN(sysDex,1));
 toc; disp('Solve the system... DONE.');
-clear AN bN
+clear FN bN
 %% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
@@ -191,8 +192,8 @@ pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 1000;
-NZI = 200;
+NXI = 2001;
+NZI = 451;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);

@@ -1,4 +1,4 @@
-function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
+function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL)
     %% Compute the Hermite and Legendre points and derivatives for this grid
     % Set the boundary indices and operator dimension
     OPS = NX*NZ;
@@ -6,7 +6,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     % Set the domain scale
     dscale = 0.5 * DS.L;
     %{
-    %% Use a truncated projection space
+    %% Use a truncated projection space (may make explicit time integration faster)
     [xo,~] = herdif(NX, 2, dscale, false);
     [xh,~] = herdif(NX, 2, dscale, true);
 
@@ -34,17 +34,17 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     surf(DDX_H);
     figure;
     %}
-    %
+    % Get the Hermite Function derivative matrix and grid
     [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %
+    % Get the Chebyshev nodes and compute the vertical derivative matrix
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
-    %}
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
     
@@ -140,12 +140,11 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     
     subplot(2,2,4);
     plot(thref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('P. Temperature (K)','FontSize',30);
+    xlabel('Potential Temperature (K)','FontSize',30);
     ylabel('Elevation (km)');
     ylim([0.0 35.0]);
     drawnow;
-    dirname = '../ShearJetSchar/';
-    fname = [dirname 'BACKGROUND_PROFILES'];
+    fname = 'BACKGROUND_PROFILES';
     screen2png(fname);
     
     figure;
@@ -157,6 +156,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     pause
 %}
     
+    %% Make a data structure with all the background quantities and model parameters
     REFS = struct('ujref',ujref,'dujref',dujref, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref,...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ',DDZ_L, ...
@@ -170,6 +170,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
+    %DDXI_OP = sparse(DDXI_OP);
 
     % Compute the horizontal derivatives operator (Hermite Function expansion)
     DDA_OP = spalloc(OPS, OPS, NZ * NX^2);
@@ -177,6 +178,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
         ddex = (1:NZ:OPS) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;
     end
+    %DDA_OP = sparse(DDA_OP);
 
     %% Assemble the block global operator L
     SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
@@ -190,50 +192,53 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     U0DX = U0 * DX;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
-    RAYM = spdiags(RL,0, OPS, OPS);
+    RAYF = spdiags(RL,0, OPS, OPS);
     ZSPR = sparse(OPS,OPS);
     % Horizontal momentum LHS
-    L11 = U0DX;
-    L12 = ZSPR;
-    L13 = POR * DX;
-    L14 = ZSPR;
+    LD11 = U0DX + RAY.nu1 * RAYF;
+    LD12 = DUDZ;
+    LD13 = POR * DX;
+    LD14 = ZSPR;
     % Vertical momentum LHS
-    L21 = ZSPR;
-    L22 = U0DX;
-    L23 = POR * SIGMA * DDXI_OP;
-    L24 = ZSPR;
+    LD21 = ZSPR;
+    LD22 = U0DX + RAY.nu2 * RAYF;
+    LD23 = POR * SIGMA * DDXI_OP + BS.ga * (1.0 / BS.gam - 1.0) * unit;
+    LD24 = - BS.ga * unit;
     % Continuity (log pressure) LHS
-    L31 = BS.gam * DDA_OP;
-    L32 = BS.gam * SIGMA * DDXI_OP;
-    L33 = U0DX;
-    L34 = ZSPR;
+    LD31 = BS.gam * DDA_OP;
+    LD32 = BS.gam * SIGMA * DDXI_OP + DLPDZ;
+    LD33 = U0DX + RAY.nu3 * RAYF;
+    LD34 = ZSPR;
     % Thermodynamic LHS
-    L41 = ZSPR;
-    L42 = ZSPR;
-    L43 = ZSPR;
-    L44 = U0DX;
+    LD41 = ZSPR;
+    LD42 = DLPTDZ;
+    LD43 = ZSPR;
+    LD44 = U0DX + RAY.nu4 * RAYF;
+    
+    clear unit SIGMA U0DX U0 DX POR DUDZ DLPDZ DLPTDZ;
 
+    %{
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
-    B11 = RAY.nu1 * RAYM;
+    B11 = sparse(OPS,OPS) + RAY.nu1 * spdiags(RL,0, OPS, OPS);
     B12 = DUDZ;
-    B13 = ZSPR;
-    B14 = ZSPR;
+    B13 = sparse(OPS,OPS);
+    B14 = sparse(OPS,OPS);
     % Vertical momentum LHS
-    B21 = ZSPR;
-    B22 = RAY.nu2 * RAYM;
+    B21 = sparse(OPS,OPS);
+    B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
     B23 = BS.ga * (1.0 / BS.gam - 1.0) * unit;
     B24 = - BS.ga * unit;
     % Continuity (log pressure) LHS
-    B31 = ZSPR;
+    B31 = sparse(OPS,OPS);
     B32 = DLPDZ;
-    B33 = RAY.nu3 * RAYM;
-    B34 = ZSPR;
+    B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
+    B34 = sparse(OPS,OPS);
     % Thermodynamic LHS
-    B41 = ZSPR;
+    B41 = sparse(OPS,OPS);
     B42 = DLPTDZ;
-    B43 = ZSPR;
-    B44 = RAY.nu4 * RAYM;
+    B43 = sparse(OPS,OPS);
+    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
@@ -256,11 +261,20 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
-    %% Assemble the LHS operator (reorder u p w t)
-    LD = [LD11 LD12 LD13 LD14 ; ...
-          LD21 LD22 LD23 LD24 ; ...
-          LD31 LD32 LD33 LD34 ; ...
-          LD41 LD42 LD43 LD44];
+    clear L11 L12 L13 L14 L21 L22 L23 L24 L31 L32 L33 L34 L41 L42 L43 L44
+    clear B11 B12 B13 B14 B21 B22 B23 B24 B31 B32 B33 B34 B41 B42 B43 B44
+    %}
+    
+    %% Assemble the LHS operator splitting (reorder u p w t)
+    LD1 = [LD11 ZSPR ZSPR ZSPR ; ...
+          ZSPR LD22 ZSPR ZSPR ; ...
+          ZSPR ZSPR LD33 ZSPR ; ...
+          ZSPR ZSPR ZSPR LD44];
+      
+    LD2 = [ZSPR LD12 LD13 ZSPR ; ...
+          ZSPR ZSPR LD23 LD24 ; ...
+          LD31 ZSPR ZSPR ZSPR ; ...
+          ZSPR ZSPR ZSPR ZSPR];
       
     %% Assemble the force vector (reorder u p w t)
     F11 = zeros(OPS,1);

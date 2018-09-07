@@ -9,20 +9,21 @@
 clc
 clear
 close all
-opengl info;
 %addpath(genpath('MATLAB/'))
 
-%% Create the dimensional XZ grid
-NX = 2048; % Expansion order matches physical grid
-NZ = 451; % Expansion order matches physical grid
-OPS = NX * NZ;
-numVar = 4;
-
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 2;
+%TestCase = 'ShearJetSchar'; BC = 2;
 %TestCase = 'ShearJetScharCBVF'; BC = 2;
 %TestCase = 'ClassicalSchar'; BC = 2;
-%TestCase = 'AndesMtn'; BC = 2;
+TestCase = 'AndesMtn'; BC = 2;
+
+%% Create the dimensional XZ grid
+%NX = 1536; % Expansion order matches physical grid
+%NZ = 351; % Expansion order matches physical grid
+NX = 8192; % Expansion order matches physical grid
+NZ = 256; % Expansion order matches physical grid
+OPS = NX * NZ;
+numVar = 4;
 
 z0 = 0.0;
 gam = 1.4;
@@ -34,8 +35,8 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    l1 = - 1.0E4 * (3.0 * pi);
-    l2 = 1.0E4 * (3.0 * pi);
+    l1 = -1.0E4 * (5.0 * pi);
+    l2 = 1.0E4 * (5.0 * pi);
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -53,7 +54,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -115,8 +116,8 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 45000.0;
-    l1 = - 1.0E5 * 4.0;
-    l2 = 1.0E5 * 4.0;
+    l1 = - 1.0E5 * (1.3 * pi);
+    l2 = 1.0E5 * (1.3 * pi); 
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -170,21 +171,18 @@ disp('Solve the raw system with matlab default \.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = (FF - LD * SOL); clear LD FF;
-%spy(A); 
-%[dvecs, dlambda] = eigs(A,10,'bothendsreal');
-%diag(dlambda)
-%pause;
-% Solve the symmetric normal equations
+b = (FF - LD * SOL);
+clear LD FF;
+% Normal equations to make the system symmetric
 %AN = A' * A;
-%bN = A' * b(sysDex,1); clear A b;
-% Solve the original unsymmetric system (with partial pivoting ONLY)
-AN = A; clear A;       
-bN = b(sysDex,1); clear b;
-spparms('piv_tol',1.0);
-spparms('sym_tol',1.0);
+%bN = A' * b(sysDex,1);
+AN = A;
+bN = b(sysDex,1);
 toc; disp('Compute coefficient matrix... DONE.');
-sol = (AN \ bN); clear AN bN;
+clear A b;
+tic
+sol = (AN \ bN);
+%sol = bicgstabl(AN,bN,1.0E-10,10);
 toc; disp('Solve the system... DONE.');
 %}
 clear AN bN
@@ -208,22 +206,23 @@ mu = max(max(abs(uxz)));
 mw = max(max(abs(wxz)));
 mr = max(max(abs(rxz)));
 mp = max(max(abs(pxz)));
-xd = [1.0E-4 1.0E-1];
+xd = [1.0E-4 1.0];
 nc = 12;
-%
+%%
 figure;
 subplot(2,1,1);
 colormap(cmap);
 contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mu * uxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
-set(gca, 'XScale', 'log'); xlim(xd);
+set(gca, 'XScale', 'log'); xlim(xd); colorbar;
 title('Horizontal Velocity U $(ms^{-1})$');
 ylabel('Elevation (km)');
 
 subplot(2,1,2);
 colormap(cmap);
 contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mw * wxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
+colorbar;
 %set(gca, 'XScale', 'log'); xlim(xd);
-xlim([8.0E-2 1.0E-1]);
+xlim([7.5E-2 0.125]);
 title('Vertical Velocity W $(ms^{-1})$');
 xlabel('Spatial Frequency $(km^{-1})$');
 ylabel('Elevation (km)');
@@ -254,7 +253,8 @@ screen2png(fname);
 %}
 %% Plot the solution using the IFFT to recover the solution in physical space
 SOL(sysDex) = sol;
-uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),[],2));
+%NXI = 2 * NX;
+uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),NX,2));
 wxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
 rxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
 pxz = real(ifft(reshape(SOL((1:OPS) + 3*OPS),NZ,NX),[],2));
@@ -315,11 +315,12 @@ conv = temp .* dlpt;
 RiREF = -BS.ga * REFS.dlrref(:,1);
 RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
-convREF = REFS.pref ./ (Rd * REFS.rref) .* REFS.dlthref;
+convREF = P ./ (Rd * REFS.rref) .* REFS.dlthref;
 
 xdex = 1:1:NX;
 figure;
-subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
+subplot(1,2,1); box on;
+semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
 hold on;
 semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',2.5);
 semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
@@ -331,27 +332,26 @@ title('Richardson Number');
 xlim([0.1 1.0E4]);
 ylim([0.0 25.0]);
 
-subplot(1,2,2); 
-plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
+subplot(1,2,2); box on;
 hold on;
-semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
-semilogx(convREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
+plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
+plot(convREF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'r-s');
 hold off;
 grid on; grid minor;
 xlabel('$S_p$');
 %ylabel('Elevation (km)');
 title('Convective Stability');
 ylim([0.0 25.0]);
-xlim([-0.06 0.06]);
+%xlim([-0.3 0.3]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
 %% Compute N and the local Fr number
 %
-figure;
-%DDZ_BC = REFS.DDZ;
-%dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
+figure; box on;
+DDZ_BC = REFS.DDZ;
+dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
 NBVF = (ga .* dlpt);
 NBVFREF = (ga .* REFS.dlthref);
 
@@ -360,17 +360,16 @@ FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
 FRREF = 2 * pi * abs(REFS.ujref) ./ (sqrt(NBVFREF) * Lv);
 
 xdex = 1:1:NX;
-plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
 hold on;
-semilogx([1.0 1.0],[0.0 1.0E5],'k--','LineWidth',2.5);
-semilogx(FRREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
-hold off;
+plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
+plot(FRREF(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'r-s','LineWidth',1.5);
+hold off
 grid on; grid minor;
 title('Local Froude Number');
 xlabel('$Fr$');
 ylabel('Elevation (km)');
 ylim([0.0 25.0]);
-xlim([-1.0 20.0]);
+%xlim([-1.0E-3 2.0E-3]);
 drawnow;
 
 fname = ['FROUDE_' TestCase num2str(hC)];
@@ -422,16 +421,12 @@ elseif strcmp(TestCase,'AndesMtn') == true
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
 end
 %}
+%%
 figure;
 colormap(cmap);
 contourf(XI,ZI,uxzint,30); colorbar; grid on; cm = caxis;
-%contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
-hold on; area(1.0E-3 * XI(1,:),2.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+hold on; area(XI(1,:),ZI(1,:),'FaceColor','k'); hold off;
 caxis(cm);
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-%ylim(1.0E-3 * [0.0 zH - depth]);
-%xlim([-200 300]);
-%ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
@@ -442,26 +437,22 @@ screen2png(['UREferenceSolution' mtnh '.png']);
 figure;
 colormap(cmap);
 contourf(XI,ZI,wxzint,30); colorbar; grid on; cm = caxis;
-hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
+hold on; area(XI(1,:), ZI(1,:),'FaceColor','k'); hold off;
 caxis(cm);
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-%ylim(1.0E-3 * [0.0 zH - depth]);
-%xlim([-100 100]);
-%ylim([0 15]);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
 screen2png(['WREferenceSolution' mtnh '.png']);
-%
+%%
 figure;
 colormap(cmap);
-subplot(1,2,1); contourf(XI,ZI,rxzint,30); colorbar; grid on;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
+subplot(1,2,1); contourf(XI,ZI,rxzint,30); colorbar; grid on; cm = caxis;
+hold on; area(XI(1,:),ZI(1,:),'FaceColor','k'); hold off;
+caxis(cm);
 title('$(\ln p)^{\prime} ~~ (Pa)$');
-subplot(1,2,2); contourf(XI,ZI,pxzint,30); colorbar; grid on;
-xlim(1.0E-3 * [l1 + width l2 - width]);
-ylim(1.0E-3 * [0.0 zH - depth]);
+subplot(1,2,2); contourf(XI,ZI,pxzint,30); colorbar; grid on; cm = caxis;
+hold on; area(XI(1,:),ZI(1,:),'FaceColor','k'); hold off;
+caxis(cm);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
 

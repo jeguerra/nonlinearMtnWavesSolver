@@ -165,7 +165,7 @@ for n=1:iter
     [LD, FF, RR, UREF, RREF, RTHREF] = evaluateJacobianOperatorCBC_FluxForm(ruxz, rwxz, rxz, pxz, BS, REFS, RAY);
 
     %% Solve the system for iteration 1 only
-    if n == 1
+    if n <= 2
         disp('Solve the raw system with matlab default \.');
         tic
         spparms('spumoni',2);

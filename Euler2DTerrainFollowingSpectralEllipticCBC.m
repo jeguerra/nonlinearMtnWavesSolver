@@ -7,14 +7,14 @@
 % background and constant wind
 % 4) 'AndesMtn' Same as 1) but with real input terrain data
 
-clc
+%clc
 clear
-%close all
+close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 120; % Expansion order matches physical grid
+NZ = 180; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -34,10 +34,10 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -6.0E4;
+    %l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -172,17 +172,22 @@ disp('Solve by using matlab \ only.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = (FF - LD * SOL);
-% Normal equations to make the system symmetric
+b = (FF - LD * SOL); clear LD FF;
+%spy(A); 
+%[dvecs, dlambda] = eigs(A,10,'bothendsreal');
+%diag(dlambda)
+%pause;
+% Solve the symmetric normal equations
 AN = A' * A;
-bN = A' * b(sysDex,1);
-%AN = A;
-%bN = b(sysDex,1);
+bN = A' * b(sysDex,1); clear A b;
+% Solve the original unsymmetric system (with partial pivoting ONLY)
+%AN = A; clear A;       
+%bN = b(sysDex,1); clear b;
+spparms('piv_tol',1.0);
+spparms('sym_tol',1.0);
 toc; disp('Compute coefficient matrix... DONE.');
-clear A b LD FF;
-sol = (AN \ bN);
+sol = (AN \ bN); clear AN bN;
 toc; disp('Solve the system... DONE.');
-clear AN bN
 %% Get the solution fields
 SOL(sysDex) = sol;
 clear sol;
@@ -193,8 +198,8 @@ pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Legendre transforms'
 %
-NXI = 1000;
-NZI = 200;
+NXI = 2001;
+NZI = 451;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
