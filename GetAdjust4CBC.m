@@ -9,20 +9,6 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
     SOL = zeros(numVar*OPS,1);
 
     %% Create boundary condition indices
-    uldex = 2:NZ-1;
-    wldex = uldex + OPS;
-    rldex = wldex + OPS;
-    pldex = rldex + OPS;
-    LeftOutExcludeCorners = [uldex wldex rldex pldex];
-    RightOutExcludeCorners = LeftOutExcludeCorners + (OPS - NZ);
-    
-    uldex = 1:NZ;
-    wldex = uldex + OPS;
-    rldex = wldex + OPS;
-    pldex = rldex + OPS;
-    LeftWTOut = [uldex wldex rldex pldex];
-    RightWTOut = LeftOutExcludeCorners + (OPS - NZ);
-    
     utdex = NZ:NZ:OPS;
     wtdex = utdex + iW*OPS;
     rtdex = utdex + iP*OPS;
@@ -40,18 +26,6 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
         SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
-        % U and LnP need to be constrained at the corners
-        %{
-        BotLeftCorner = [uldex(1) rldex(1)];
-        BotRightCorner = BotLeftCorner + (OPS - NZ);
-        
-        TopLeftCorner = [uldex(end) rldex(end)];
-        TopRightCorner = TopLeftCorner + (OPS - NZ);
-        
-        rowsOut = [BotLeftCorner BotRightCorner ...
-                   TopLeftCorner TopRightCorner ...
-                   wtdex ptdex wbdex pbdex];
-        %}
         rowsOut = [utdex wtdex ptdex wbdex pbdex];
            
         sysDex = setdiff(1:numVar*OPS, rowsOut);

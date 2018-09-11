@@ -13,16 +13,16 @@ opengl info;
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 2048; % Expansion order matches physical grid
+NX = 3072; % Expansion order matches physical grid
 NZ = 451; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 2;
+%TestCase = 'ShearJetSchar'; BC = 2;
 %TestCase = 'ShearJetScharCBVF'; BC = 2;
 %TestCase = 'ClassicalSchar'; BC = 2;
-%TestCase = 'AndesMtn'; BC = 2;
+TestCase = 'AndesMtn'; BC = 2;
 
 z0 = 0.0;
 gam = 1.4;
@@ -136,7 +136,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     lC = 4000.0;
     hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '100m';
+    hfilt = '25km';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -346,7 +346,7 @@ xlim([-0.06 0.06]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
-screen2png(fname);
+%screen2png(fname);
 %% Compute N and the local Fr number
 %
 figure;
@@ -374,7 +374,7 @@ xlim([-1.0 20.0]);
 drawnow;
 
 fname = ['FROUDE_' TestCase num2str(hC)];
-drawnow;
+%drawnow;
 screen2png(fname);
 %}
 
@@ -437,7 +437,7 @@ disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-screen2png(['UREferenceSolution' mtnh '.png']);
+%screen2png(['UREferenceSolution' mtnh '.png']);
 %
 figure;
 colormap(cmap);
@@ -451,7 +451,7 @@ caxis(cm);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-screen2png(['WREferenceSolution' mtnh '.png']);
+%screen2png(['WREferenceSolution' mtnh '.png']);
 %
 figure;
 colormap(cmap);

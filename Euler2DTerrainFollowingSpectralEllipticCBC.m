@@ -14,7 +14,7 @@ close all
 
 %% Create the dimensional XZ grid
 NX = 120; % Expansion order matches physical grid
-NZ = 180; % Expansion order matches physical grid
+NZ = 200; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
