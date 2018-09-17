@@ -154,14 +154,15 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     %% Unwrap the derivative matrices into operator for 2D implementation
     
     % Compute the vertical derivatives operator (Lagrange expansion)
-    DDXI_OP = spalloc(OPS, OPS, NZ^2);
+    % Compute the vertical derivatives operator (Lagrange expansion)
+    DDXI_OP = spalloc(OPS, OPS, NX * NZ^2);
     for cc=1:NX
         ddex = (1:NZ) + (cc - 1) * NZ;
         DDXI_OP(ddex,ddex) = DDZ_L;
     end
 
     % Compute the horizontal derivatives operator (Hermite Function expansion)
-    DDA_OP = spalloc(OPS, OPS, NX^2);
+    DDA_OP = spalloc(OPS, OPS, NZ * NX^2);
     for rr=1:NZ
         ddex = (1:NZ:OPS) + (rr - 1);
         DDA_OP(ddex,ddex) = DDX_H;
@@ -179,51 +180,52 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     PGFTX = (BS.gam * RDTZ - U0.^2) * ITHTZ;
     PGFTZ = BS.gam * RDTZ * ITHTZ;
     U0DA = U0 * DDA_OP;
-    
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
-
+    
+    RAYM = spdiags(RL,0, OPS, OPS);
+    ZSPR = sparse(OPS,OPS);
     % Horizontal momentum LHS
     L11 = U0DA;
-    L12 = sparse(OPS,OPS);
-    L13 = sparse(OPS,OPS);
+    L12 = ZSPR;
+    L13 = ZSPR;
     L14 = PGFTX * DDA_OP;
     % Vertical momentum LHS
-    L21 = sparse(OPS,OPS);
+    L21 = ZSPR;
     L22 = U0DA;
-    L23 = sparse(OPS,OPS);
+    L23 = ZSPR;
     L24 = PGFTZ * SIGMA * DDXI_OP;
     % Continuity LHS
     L31 = DDA_OP;
     L32 = SIGMA * DDXI_OP;
-    L33 = sparse(OPS,OPS);
-    L34 = sparse(OPS,OPS);
+    L33 = ZSPR;
+    L34 = ZSPR;
     % Thermodynamic LHS
-    L41 = sparse(OPS,OPS);
-    L42 = sparse(OPS,OPS);
+    L41 = ZSPR;
+    L42 = ZSPR;
     L43 = -THTZ * U0DA;
     L44 = U0DA;
 
     %% Assemble the algebraic part (Rayleigh layer on the diagonal)
     % Horizontal momentum LHS
-    B11 = sparse(OPS,OPS) + RAY.nu1 * spdiags(RL,0, OPS, OPS);
+    B11 = RAY.nu1 * RAYM;
     B12 = DUDZ - U0 * DLTHDZ;
-    B13 = sparse(OPS,OPS);
-    B14 = sparse(OPS,OPS);
+    B13 = ZSPR;
+    B14 = ZSPR;
     % Vertical momentum LHS
-    B21 = sparse(OPS,OPS);
-    B22 = sparse(OPS,OPS) + RAY.nu2 * spdiags(RL,0, OPS, OPS);
+    B21 = ZSPR;
+    B22 = RAY.nu2 * RAYM;
     B23 = BS.ga * unit;
     B24 = BS.ga * (1.0 - BS.gam) * ITHTZ;
     % Continuity LHS (using density weighted change of variable in W)
-    B31 = sparse(OPS,OPS);
-    B32 = sparse(OPS,OPS);
-    B33 = sparse(OPS,OPS) + RAY.nu3 * spdiags(RL,0, OPS, OPS);
-    B34 = sparse(OPS,OPS);
+    B31 = ZSPR;
+    B32 = ZSPR;
+    B33 = RAY.nu3 * RAYM;
+    B34 = ZSPR;
     % Thermodynamic LHS
-    B41 = sparse(OPS,OPS);
+    B41 = ZSPR;
     B42 = DTHDZ;
-    B43 = sparse(OPS,OPS);
-    B44 = sparse(OPS,OPS) + RAY.nu4 * spdiags(RL,0, OPS, OPS);
+    B43 = ZSPR;
+    B44 = RAY.nu4 * RAYM;
     
     %% Assemble the left hand side operator
     LD11 = L11 + B11;
