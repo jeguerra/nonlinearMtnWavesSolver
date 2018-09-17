@@ -191,19 +191,20 @@ AN = A;
 bN = b(sysDexF,1); clear A b;
 save('fineANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
 %
-%% Apply 2 iterations of LSQR to the  fine problem
+%% Restrict the RHS of the fine problem to be the RHS of the coarse problem
 %{
 FP = load('fineANbN');
+%{
 sol = lsqr(FP.AN, 0.0*FP.bN, 0.1, 2);
 SOLF(sysDexF) = sol;
 rsl = zeros(size(SOLF));
 rsl(sysDexF) = FP.bN - FP.AN * sol; clear FP sol;
-
+%}
 %% Unpack the fine solution and interpolate down to coarse
-ruxz = reshape(rsl((1:OPSF)),NZF,NXF);
-rwxz = reshape(rsl((1:OPSF) + iW * OPSF),NZF,NXF);
-rpxz = reshape(rsl((1:OPSF) + iP * OPSF),NZF,NXF);
-rtxz = reshape(rsl((1:OPSF) + iT * OPSF),NZF,NXF);
+ruxz = reshape(FP.b((1:OPSF)),NZF,NXF);
+rwxz = reshape(FP.b((1:OPSF) + iW * OPSF),NZF,NXF);
+rpxz = reshape(FP.b((1:OPSF) + iP * OPSF),NZF,NXF);
+rtxz = reshape(FP.b((1:OPSF) + iT * OPSF),NZF,NXF);
 
 [xh,~] = herdif(NX, 1, 0.5*L, true);
 [zlc, ~] = chebdif(NZ, 1);
@@ -248,11 +249,11 @@ SOLF(sysDexF) = SOLF(sysDexF) + dsol(sysDexF);
 
 %% Apply a final set of iterations on the fine problem
 FP = load('fineANbN');
-setup.type = 'crout';
-setup.milu = 'row';
-setup.droptol = 1.0E-2;
-[L,U] = ilu(FP.AN ,setup);
-sol = gmres(FP.AN, FP.bN, 5, 1.0E-6, 100, L, U, SOLF(sysDexF)); clear L U;
+%setup.type = 'ilutp';
+%setup.udiag = 1;
+%setup.droptol = 1.0E-1;
+%[L,U] = ilu(FP.AN ,setup);
+sol = gmres(FP.AN, FP.bN, 20, 1.0E-6, 100, [], [], SOLF(sysDexF));
 %sol = gmres(FP.AN, FP.bN, 5, 1.0E-6, 20, [], [], SOLF(sysDexF));
 %sol = lsqr(FP.AN, FP.bN, 1.0E-6, 100, [], [], SOLF(sysDexF));
 %sol = cgs(FP.AN, FP.bN, 1.0E-6, 100, [], [], SOLF(sysDexF));
@@ -412,9 +413,9 @@ semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
 hold off;
 grid on; grid minor;
 xlabel('$S_p$');
-%ylabel('Elevation (km)');
 title('Convective Stability');
 %xlim([-0.3 0.3]);
+ylim([0.0 30.0]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
