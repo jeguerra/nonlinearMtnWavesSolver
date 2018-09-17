@@ -1,8 +1,8 @@
 function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
     %% Number of variables and block positions in the solution vector
     numVar = 4;
-    iW = 1;
-    iP = 2;
+    iW = 2;
+    iP = 1;
     iT = 3;
 
     %% Set an initial solution vector

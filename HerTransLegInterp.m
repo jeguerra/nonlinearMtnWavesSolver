@@ -21,7 +21,7 @@ xn = herroots(REFS.NX, 1.0);
 b = max(xn) / DS.l2;
 
 % If the input xint grid is a scalar or all zeros make a regular grid with NXI
-if (length(xint) == 1 || norm(xint) == 0.0)
+if (length(xint) == 1 || norm(xint) == 0)
     xint = linspace(min(xn), max(xn), NXI);
     xint = xint';
 else
@@ -35,7 +35,7 @@ end
 zn = 0.5 * (zn + 1.0);
 
 % If the input zint grid is a scalar or all zeros make a regular grid with NZI
-if (length(zint) == 1 || norm(zint) == 0.0)
+if (length(zint) == 1 || norm(zint) == 0)
     zint = linspace(0.0, 1.0 ,NZI);
     zint = zint';
 else
