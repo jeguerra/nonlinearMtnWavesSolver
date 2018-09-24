@@ -5,37 +5,33 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX
     
     % Set the domain scale
     dscale = 0.5 * DS.L;
-    %{
-    %% Use a truncated projection space (may make explicit time integration faster)
+    %
+    %% Get the Hermite Function derivative matrix and grid (ALTERNATE METHOD)
     [xo,~] = herdif(NX, 2, dscale, false);
     [xh,~] = herdif(NX, 2, dscale, true);
 
     [~,~,w]=hegs(NX);
     W = spdiags(w, 0, NX, NX);
 
-    [~, HT] = hefunm(NXO-1, xo);
-    [~, HTD] = hefunm(NXO, xo);
+    [~, HT] = hefunm(NX-1, xo);
+    [~, HTD] = hefunm(NX, xo);
     
     %% Compute the coefficients of spectral derivative in matrix form
-    SDIFF = zeros(NXO+1,NXO);
+    SDIFF = zeros(NX+1,NX);
     SDIFF(1,2) = sqrt(0.5);
-    SDIFF(NXO + 1,NXO) = -sqrt(NXO * 0.5);
-    SDIFF(NXO,NXO-1) = -sqrt((NXO - 1) * 0.5);
+    SDIFF(NX + 1,NX) = -sqrt(NX * 0.5);
+    SDIFF(NX,NX-1) = -sqrt((NX - 1) * 0.5);
 
-    for cc = NXO-2:-1:1
+    for cc = NX-2:-1:1
         SDIFF(cc+1,cc+2) = sqrt((cc + 1) * 0.5);
         SDIFF(cc+1,cc) = -sqrt(cc * 0.5);
     end
 
     b = max(xo) / dscale;
     DDX_H = b * HTD' * SDIFF * (HT * W);
-    %rcond(DDX_H)
-    %rank(DDX_H)
-    surf(DDX_H);
-    figure;
     %}
-    % Get the Hermite Function derivative matrix and grid
-    [xh,DDX_H] = herdif(NX, 1, dscale, true);
+    % Get the Hermite derivative matrix and grid (BAD DEFAULT NX > 240)
+    %[xh,DDX_H] = herdif(NX, 1, dscale, true);
     % Get the Chebyshev nodes and compute the vertical derivative matrix
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);

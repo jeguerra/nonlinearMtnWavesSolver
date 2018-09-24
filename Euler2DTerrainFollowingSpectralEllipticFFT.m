@@ -13,10 +13,13 @@ opengl info;
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 3072; % Expansion order matches physical grid
-NZ = 451; % Expansion order matches physical grid
+NX = 2048; % Expansion order matches physical grid
+NZ = 420; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
+iW = 2;
+iP = 1;
+iT = 3;
 
 %% Set the test case and global parameters
 %TestCase = 'ShearJetSchar'; BC = 2;
@@ -136,7 +139,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     lC = 4000.0;
     hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '25km';
+    hfilt = '100m';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -153,6 +156,141 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt
 %% Set up the Rayleigh Layer with a coefficient one order of magnitude less than the order of the wave field
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
+%% Compute coarse and fine matrices and RHS vectors
+tic;
+[LD,FF,REFS] = ...
+computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
+spparms('spumoni',2);
+AN = LD(sysDex,sysDex);
+bN = (FF - LD * SOL); clear LD FF;
+% Solve the symmetric normal equations (in the coarsest grid)
+%AN = A' * A;
+%bN = A' * b(sysDex,1); clear A b;
+
+%% Solve the coarse residual system by direct method
+solc = AN \ bN;
+SOL(sysDex) = solc; clear solc;
+
+%% Unpack the coarse solution and interpolate up to fine
+%{
+duxz = reshape(SOL((1:OPS)),NZ,NX);
+dwxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
+dpxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
+dtxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
+%%
+save('coarseANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
+toc; disp('Direct solve on the coarsest mesh and save data... DONE!');
+
+%% Compute a sequence of grids all the way to 100 m resolution
+NX100 = round(L / 100, -1);
+NZ100 = round(zH / 100, -1);
+
+DNX = NX100 - NX;
+DNZ = NZ100 - NZ;
+
+NXF = [(NX + 120) (NX + 200) (NX + 300)];
+NZF = [(NZ + 80) (NZ + 160) (NZ + 260)];
+OPSF = NXF .* NZF;
+%}
+%% Restrict the RHS of the fine problem to be the RHS of the coarse problem
+%{
+FP = load('fineANbN');
+%{
+sol = lsqr(FP.AN, 0.0*FP.bN, 0.1, 2);
+SOLF(sysDexF) = sol;
+rsl = zeros(size(SOLF));
+rsl(sysDexF) = FP.bN - FP.AN * sol; clear FP sol;
+%}
+%% Unpack the fine solution and interpolate down to coarse
+ruxz = reshape(FP.b((1:OPSF)),NZF,NXF);
+rwxz = reshape(FP.b((1:OPSF) + iW * OPSF),NZF,NXF);
+rpxz = reshape(FP.b((1:OPSF) + iP * OPSF),NZF,NXF);
+rtxz = reshape(FP.b((1:OPSF) + iT * OPSF),NZF,NXF);
+
+[xh,~] = herdif(NX, 1, 0.5*L, true);
+[zlc, ~] = chebdif(NZ, 1);
+zlc = 0.5 * (zlc + 1.0);
+[ruxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(ruxz), NX, NZ, xh, zlc);
+[rwxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rwxz), NX, NZ, xh, zlc);
+[rpxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rpxz), NX, NZ, xh, zlc);
+[rtxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rtxz), NX, NZ, xh, zlc);
+
+rslc = [reshape(ruxzint, OPS, 1); ...
+        reshape(rpxzint, OPS, 1); ...
+        reshape(rwxzint, OPS, 1); ...
+        reshape(rtxzint, OPS, 1)];
+rslc = rslc(sysDex);
+%}
+
+%% Generate the fine grids and save the coefficient matrices
+%{
+tic;
+for nn=1:length(NXF)
+    [LD,FF,REFSF(nn)] = ...
+    computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
+
+    [SOLF,sysDexF] = GetAdjust4CBC(REFSF(nn), BC, NXF(nn), NZF(nn), OPSF(nn));
+
+    spparms('spumoni',2);
+    A = LD(sysDexF,sysDexF);
+    b = (FF - LD * SOLF); clear LD FF;
+    AN = A;
+    bN = b(sysDexF,1); clear A b;
+    save(['fineANbN' int2str(OPSF(nn))], 'AN', 'bN', 'sysDexF', 'SOLF', '-v7.3'); clear AN bN;
+end
+toc; disp('Save fine meshes
+%}
+%% Solve up from the coarsest grid!
+%{
+tic;
+MITER = [400 200 100];
+IITER = [40 20 10];
+for nn=1:length(NXF)
+    
+    if nn == 1
+        FP = load(['fineANbN' int2str(OPSF(nn))]);
+        [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
+        [zlc, ~] = chebdif(NZF(nn), 1);
+        zlc = 0.5 * (zlc + 1.0);
+        [duxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(duxz), NXF(nn), NZF(nn), xh, zlc);
+        [dwxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dwxz), NXF(nn), NZF(nn), xh, zlc);
+        [dpxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dpxz), NXF(nn), NZF(nn), xh, zlc);
+        [dtxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dtxz), NXF(nn), NZF(nn), xh, zlc);
+        clear duxz dwxz dpxz dtxz;
+    else
+        FP = load(['fineANbN' int2str(OPSF(nn))]);
+        [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
+        [zlc, ~] = chebdif(NZF(nn), 1);
+        zlc = 0.5 * (zlc + 1.0);
+        [duxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(uxz), NXF(nn), NZF(nn), xh, zlc);
+        [dwxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(wxz), NXF(nn), NZF(nn), xh, zlc);
+        [dpxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(pxz), NXF(nn), NZF(nn), xh, zlc);
+        [dtxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(txz), NXF(nn), NZF(nn), xh, zlc);
+        %clear uxz wxz pxz txz;
+    end
+
+    dsol = [reshape(duxzint, OPSF(nn), 1); ...
+            reshape(dpxzint, OPSF(nn), 1); ...
+            reshape(dwxzint, OPSF(nn), 1); ...
+            reshape(dtxzint, OPSF(nn), 1)];
+
+    % Apply iterative solve up every level of mesh
+    sol = gmres(FP.AN, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
+    FP.SOLF(FP.sysDexF) = sol;
+    
+    % Compute the residual
+    
+    % Get the solution fields
+    uxz = reshape(FP.SOLF((1:OPSF(nn))), NZF(nn), NXF(nn));
+    wxz = reshape(FP.SOLF((1:OPSF(nn)) + iW * OPSF(nn)), NZF(nn), NXF(nn));
+    pxz = reshape(FP.SOLF((1:OPSF(nn)) + iP * OPSF(nn)), NZF(nn), NXF(nn));
+    txz = reshape(FP.SOLF((1:OPSF(nn)) + iT * OPSF(nn)), NZF(nn), NXF(nn));
+    clear sol FP;
+end
+toc; disp('Run Full Multigrid Solution (N grids)... DONE!');
+%}
+%{
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
@@ -186,9 +324,8 @@ spparms('sym_tol',1.0);
 toc; disp('Compute coefficient matrix... DONE.');
 sol = (AN \ bN); clear AN bN;
 toc; disp('Solve the system... DONE.');
-%}
 clear AN bN
-
+%}
 %% Plot the solution frequency space
 %
 SOL(sysDex) = sol;
@@ -217,7 +354,7 @@ colormap(cmap);
 contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mu * uxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
 set(gca, 'XScale', 'log'); xlim(xd);
 title('Horizontal Velocity U $(ms^{-1})$');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 
 subplot(2,1,2);
 colormap(cmap);
@@ -226,7 +363,7 @@ contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mw * wxz(:,kdex),nc,'LineS
 xlim([8.0E-2 1.0E-1]);
 title('Vertical Velocity W $(ms^{-1})$');
 xlabel('Spatial Frequency $(km^{-1})$');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 drawnow
 fname = ['FREQ_RESP01' TestCase num2str(hC)];
 drawnow;
@@ -238,7 +375,7 @@ colormap(cmap);
 contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mr * rxz(:,kdex),nc,'LineStyle','-'); grid on; caxis([-1.0 1.0]);
 set(gca, 'XScale', 'log'); xlim(xd);
 title('$\ln \rho$');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 
 subplot(2,1,2);
 colormap(cmap);
@@ -246,7 +383,7 @@ contourf(im2ikm * wfreq,m2km * REFS.ZKL(:,kdex),1.0 / mp * pxz(:,kdex),nc,'LineS
 set(gca, 'XScale', 'log'); xlim(xd);
 title('$\ln \theta$');
 xlabel('Spatial Frequency $(km^{-1})$');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 fname = ['FREQ_RESP02' TestCase num2str(hC)];
 drawnow;
 screen2png(fname);
@@ -326,7 +463,7 @@ semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
 xlabel('$Ri$');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 title('Richardson Number');
 xlim([0.1 1.0E4]);
 ylim([0.0 25.0]);
@@ -339,7 +476,7 @@ semilogx(convREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
 xlabel('$S_p$');
-%ylabel('Elevation (km)');
+%ylabel('Height (km)');
 title('Convective Stability');
 ylim([0.0 25.0]);
 xlim([-0.06 0.06]);
@@ -368,7 +505,7 @@ hold off;
 grid on; grid minor;
 title('Local Froude Number');
 xlabel('$Fr$');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 ylim([0.0 25.0]);
 xlim([-1.0 20.0]);
 drawnow;
@@ -436,7 +573,7 @@ disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 %screen2png(['UREferenceSolution' mtnh '.png']);
 %
 figure;
@@ -450,7 +587,7 @@ caxis(cm);
 %ylim([0 15]);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 %screen2png(['WREferenceSolution' mtnh '.png']);
 %
 figure;

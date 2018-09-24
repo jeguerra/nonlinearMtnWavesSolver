@@ -4,8 +4,32 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     OPS = NX*NZ;
     % Set the horizontal domain scale
     dscale = 0.5 * DS.L;
-    % Get the Hermite Function derivative matrix and grid
-    [xh,DDX_H] = herdif(NX, 1, dscale, true);
+    %% Get the Hermite Function derivative matrix and grid (ALTERNATE METHOD)
+    [xo,~] = herdif(NX, 2, dscale, false);
+    [xh,~] = herdif(NX, 2, dscale, true);
+
+    [~,~,w]=hegs(NX);
+    W = spdiags(w, 0, NX, NX);
+
+    [~, HT] = hefunm(NX-1, xo);
+    [~, HTD] = hefunm(NX, xo);
+    
+    %% Compute the coefficients of spectral derivative in matrix form
+    SDIFF = zeros(NX+1,NX);
+    SDIFF(1,2) = sqrt(0.5);
+    SDIFF(NX + 1,NX) = -sqrt(NX * 0.5);
+    SDIFF(NX,NX-1) = -sqrt((NX - 1) * 0.5);
+
+    for cc = NX-2:-1:1
+        SDIFF(cc+1,cc+2) = sqrt((cc + 1) * 0.5);
+        SDIFF(cc+1,cc) = -sqrt(cc * 0.5);
+    end
+
+    b = max(xo) / dscale;
+    DDX_H = b * HTD' * SDIFF * (HT * W);
+    %}
+    % Get the Hermite derivative matrix and grid (BAD DEFAULT NX > 240)
+    %[xh,DDX_H] = herdif(NX, 1, dscale, true);
     % Get the Chebyshev nodes and compute the vertical derivative matrix
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
@@ -246,12 +270,19 @@ function [LD,FF,REFS] = computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, Tes
     LD43 = L43 + B43;
     LD44 = L44 + B44;
     
-    %% Assemble the LHS operator (reorder u p w t)
+    %% Assemble the LHS operator (reorder u rt r w)
+    %
     LD = [LD11 LD12 LD13 LD14 ; ...
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
-      
+    %}
+    %{
+    LD = [LD33 LD34 LD31 LD32 ; ...
+          LD43 LD44 LD41 LD42 ; ...
+          LD13 LD14 LD11 LD12 ; ...
+          LD23 LD24 LD21 LD22];
+    %}  
     %% Assemble the force vector (reorder u p w t)
     F11 = zeros(OPS,1);
     F21 = zeros(OPS,1);
