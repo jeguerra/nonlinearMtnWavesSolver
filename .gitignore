@@ -12,3 +12,5 @@ ResidualMtSolve.m
 *.png
 
 *.m~
+
+octave-workspace
