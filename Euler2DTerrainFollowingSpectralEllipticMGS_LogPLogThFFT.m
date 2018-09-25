@@ -13,12 +13,12 @@ opengl info;
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 2048; % Expansion order matches physical grid
-NZ = 256; % Expansion order matches physical grid
+NX = 1024; % Expansion order matches physical grid
+NZ = 128; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
-iW = 2;
-iP = 1;
+iW = 1;
+iP = 2;
 iT = 3;
 
 %% Set the test case and global parameters
@@ -165,36 +165,43 @@ spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
 % Solve the symmetric normal equations (in the coarsest grid)
-AN = A' * A;
-bN = A' * b(sysDex,1); clear A b;
+%AN = A' * A;
+%bN = A' * b(sysDex,1); clear A b;
+AN = A;
+bN = b(sysDex,1); clear A b;
 %% Solve the coarse residual system by direct method
+spparms('piv_tol', 1.0);
+spparms('sym_tol', 1.0);
 solc = AN \ bN;
 SOL(sysDex) = solc; clear solc;
 
 %% Unpack the coarse solution and interpolate up to fine
-%{
-duxz = reshape(SOL((1:OPS)),NZ,NX);
-dwxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
-dpxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
-dtxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
+%
+uxz = reshape(SOL((1:OPS)),NZ,NX);
+wxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
+pxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
+txz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 %%
 save('coarseANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
 toc; disp('Direct solve on the coarsest mesh and save data... DONE!');
 
 %% Compute a sequence of grids all the way to 100 m resolution
+%
 NX100 = round(L / 100, -1);
 NZ100 = round(zH / 100, -1);
 
 DNX = NX100 - NX;
 DNZ = NZ100 - NZ;
 
-NXF = [(NX + 120) (NX + 200) (NX + 300)];
-NZF = [(NZ + 80) (NZ + 160) (NZ + 260)];
+%NXF = [2*NX 4*NX 8*NX];
+%NZF = [2*NZ 350 450];
+NXF = [1200 1400 1600];
+NZF = [200 260 320];
 OPSF = NXF .* NZF;
 %}
 
 %% Generate the fine grids and save the coefficient matrices
-%{
+%
 tic;
 for nn=1:length(NXF)
     [LD,FF,REFSF(nn)] = ...
@@ -209,36 +216,45 @@ for nn=1:length(NXF)
     bN = b(sysDexF,1); clear A b;
     save(['fineANbN' int2str(OPSF(nn))], 'AN', 'bN', 'sysDexF', 'SOLF', '-v7.3'); clear AN bN;
 end
-toc; disp('Save fine meshes
+toc; disp('Save fine meshes... DONE!');
 %}
 %% Solve up from the coarsest grid!
-%{
+%
 tic;
 MITER = [400 200 100];
 IITER = [40 20 10];
 for nn=1:length(NXF)
-    
-    FP = load(['fineANbN' int2str(OPSF(nn))]);
-    [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
+    % IFFT to the fine mesh
+    duxzint = real(ifft(uxz, NXF(nn), 2));
+    dwxzint = real(ifft(wxz, NXF(nn), 2));
+    dpxzint = real(ifft(pxz, NXF(nn), 2));
+    dtxzint = real(ifft(txz, NXF(nn), 2));
+    % Interpolate the vertical
     [zlc, ~] = chebdif(NZF(nn), 1);
     zlc = 0.5 * (zlc + 1.0);
     if nn == 1
-        [duxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(duxz), NXF(nn), NZF(nn), xh, zlc);
-        [dwxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dwxz), NXF(nn), NZF(nn), xh, zlc);
-        [dpxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dpxz), NXF(nn), NZF(nn), xh, zlc);
-        [dtxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dtxz), NXF(nn), NZF(nn), xh, zlc);
+        [duxzint, ~, ~, ~] = VertLegInterp(REFS, DS, RAY, duxzint, NXF(nn), NZF(nn), zlc);
+        [dwxzint, ~, ~, ~] = VertLegInterp(REFS, DS, RAY, dwxzint, NXF(nn), NZF(nn), zlc);
+        [dpxzint, ~, ~, ~] = VertLegInterp(REFS, DS, RAY, dpxzint, NXF(nn), NZF(nn), zlc);
+        [dtxzint, ~, ~, ~] = VertLegInterp(REFS, DS, RAY, dtxzint, NXF(nn), NZF(nn), zlc);
     else
-        [duxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(uxz), NXF(nn), NZF(nn), xh, zlc);
-        [dwxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(wxz), NXF(nn), NZF(nn), xh, zlc);
-        [dpxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(pxz), NXF(nn), NZF(nn), xh, zlc);
-        [dtxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(txz), NXF(nn), NZF(nn), xh, zlc);
+        [duxzint, ~, ~, ~] = VertLegInterp(REFSF(nn-1), DS, RAY, duxzint, NXF(nn), NZF(nn), zlc);
+        [dwxzint, ~, ~, ~] = VertLegInterp(REFSF(nn-1), DS, RAY, dwxzint, NXF(nn), NZF(nn), zlc);
+        [dpxzint, ~, ~, ~] = VertLegInterp(REFSF(nn-1), DS, RAY, dpxzint, NXF(nn), NZF(nn), zlc);
+        [dtxzint, ~, ~, ~] = VertLegInterp(REFSF(nn-1), DS, RAY, dtxzint, NXF(nn), NZF(nn), zlc);
     end
+    % FFT back to include the new k_x components (should have no power)
+    duxzint = fft(duxzint, NXF(nn), 2);
+    dwxzint = fft(dwxzint, NXF(nn), 2);
+    dpxzint = fft(dpxzint, NXF(nn), 2);
+    dtxzint = fft(dtxzint, NXF(nn), 2);
 
     dsol = [reshape(duxzint, OPSF(nn), 1); ...
             reshape(dpxzint, OPSF(nn), 1); ...
             reshape(dwxzint, OPSF(nn), 1); ...
             reshape(dtxzint, OPSF(nn), 1)];
 
+    FP = load(['fineANbN' int2str(OPSF(nn))]);
     % Apply iterative solve up every level of mesh
     sol = gmres(FP.AN, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
     FP.SOLF(FP.sysDexF) = sol;
@@ -255,8 +271,9 @@ end
 toc; disp('Run Full Multigrid Solution (N grids)... DONE!');
 %}
 %% Plot the solution frequency space
+cmap = load('NCLcolormap254.txt');
+cmap = cmap(:,1:3);
 %
-SOL(sysDex) = sol;
 uxz = real(reshape(SOL((1:OPS)),NZ,NX));
 wxz = real(reshape(SOL((1:OPS) + OPS),NZ,NX));
 rxz = real(reshape(SOL((1:OPS) + 2*OPS),NZ,NX));
@@ -318,11 +335,12 @@ screen2png(fname);
 %pause;
 %}
 %% Plot the solution using the IFFT to recover the solution in physical space
-SOL(sysDex) = sol;
-uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),[],2));
-wxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
-rxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
-pxz = real(ifft(reshape(SOL((1:OPS) + 3*OPS),NZ,NX),[],2));
+%SOL(sysDex) = sol;
+NXI = 4096;
+uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),NXI,2));
+wxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),NXI,2));
+rxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),NXI,2));
+pxz = real(ifft(reshape(SOL((1:OPS) + 3*OPS),NZ,NX),NXI,2));
 
 uxz(:,end) = uxz(:,1);
 wxz(:,end) = wxz(:,1);
