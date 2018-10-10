@@ -27,8 +27,8 @@ function [terrain,terrDeriv] = computeTopoDerivative(TestCase,xh,DS,RAY)
         
         dhdx = -DS.hC * (2 * xh / DS.aC) .* (1.0 + xh.^2 / DS.aC).^(-2);
     elseif (strcmp(TestCase,'AndesMtn') == true)
-        AM = load('/Volumes/Patriot USB3/AndesTerrainDATA/EcuadorAndesProfiles400km.mat');
-        %AM = load('/home/jeguerra/Desktop/AndesTerrainDATA/EcuadorAndesProfiles400km.mat');
+        %AM = load('/Volumes/Patriot USB3/AndesTerrainDATA/EcuadorAndesProfiles400km.mat');
+        AM = load('/home/jeguerra/Desktop/AndesTerrainDATA/EcuadorAndesProfiles400km.mat');
         xinp = AM.xlon;
         tpbkg = AM.(['tpavg' char(DS.hfilt)]);
         tpvar = AM.(['tpavg' char(DS.hfilt)]);

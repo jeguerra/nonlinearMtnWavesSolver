@@ -1,4 +1,4 @@
-function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
+function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
     %% Number of variables and block positions in the solution vector
     numVar = 4;
 
@@ -7,8 +7,8 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
     
     if BC == 0
         % Create boundary condition indices
-        iW = 2;
-        iP = 1;
+        iW = 1;
+        iP = 2;
         iT = 3;
         
         utdex = NZ:NZ:OPS;
@@ -64,6 +64,18 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS)
                
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 3
+        % Create boundary condition indices
+        iW = 1;
+        iP = 2;
+        iT = 3;
+        
+        utdex = NZ:NZ:OPS;
+        wtdex = utdex + iW*OPS;
+        ptdex = utdex + iT*OPS;    
+        ubdex = 1:NZ:(OPS - NZ + 1);
+        wbdex = ubdex + iW*OPS;
+        pbdex = ubdex + iT*OPS;
+        
         disp('Hermite-Lagrange LogP-LogTheta Model, Transient Solve');
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
         SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);

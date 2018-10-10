@@ -13,8 +13,8 @@ opengl info;
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 1024; % Expansion order matches physical grid
-NZ = 200; % Expansion order matches physical grid
+NX = 3072; % Expansion order matches physical grid
+NZ = 451; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -56,7 +56,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -170,7 +170,7 @@ bN = b(sysDex,1);
 %bN = A' * b(sysDex,1); clear A b;
 
 %% Solve the coarse residual system by direct method
-solc = AN \ bN;
+solc = AN \ bN; clear AN;
 SOL(sysDex) = solc; clear solc;
 
 %% Plot the solution frequency space
@@ -330,7 +330,7 @@ xlim([-0.06 0.06]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC) '.png'];
 drawnow;
-screen2png(fname);
+export_fig(fname);
 %% Compute N and the local Fr number
 %
 figure;
@@ -363,11 +363,16 @@ export_fig(fname);
 %}
 
 %% INTERPOLATED GRID PLOTS
-NXI = NX;
-uxz = real(ifft(reshape(SOL((1:OPS)),NZ,NX),[],2));
-wxz = real(ifft(reshape(SOL((1:OPS) + OPS),NZ,NX),[],2));
-rxz = real(ifft(reshape(SOL((1:OPS) + 2*OPS),NZ,NX),[],2));
-pxz = real(ifft(reshape(SOL((1:OPS) + 3*OPS),NZ,NX),[],2));
+DNX = 256;
+NXI = NX + DNX;
+solint = ifft(reshape(SOL((1:OPS)), NZ, NX), [], 2);
+uxz = real(interpft(solint, NXI, 2));
+solint = ifft(reshape(SOL((1:OPS) + iW * OPS), NZ, NX), [], 2);
+wxz = real(interpft(solint, NXI, 2));
+solint = ifft(reshape(SOL((1:OPS) + iP * OPS), NZ, NX), [], 2);
+rxz = real(interpft(solint, NXI, 2));
+solint = ifft(reshape(SOL((1:OPS) + iT * OPS), NZ, NX), [], 2);
+pxz = real(interpft(solint, NXI, 2));
 NZI = 350;
 [uxzint, XINT, ZINT, ~] = VertLegInterp(REFS, DS, RAY, uxz, NXI, NZI, 0);
 [wxzint, ~, ~, ~] = VertLegInterp(REFS, DS, RAY, wxz, NXI, NZI, 0);
@@ -400,9 +405,9 @@ end
 %% PLOTS
 figure;
 colormap(cmap);
-contourf(XINT,ZINT,uxzint,20); colorbar; grid on; cm = caxis;
-%contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
-hold on; area(1.0E-3 * XINT(1,:),2.0E-3 * ZINT(1,:),'FaceColor','k'); hold off;
+contourf(XINT,ZINT,uxzint,20); colorbar; grid on; cm = caxis; 
+%contourf(1.0E-3 * XINT,1.0E-3 * ZINT, ujref, 31); colorbar; grid on; cm = caxis;
+%hold on; area(1.0E-3 * XINT(1,:),2.0E-3 * ZINT(1,:),'FaceColor','k'); hold off;
 caxis(cm);
 %xlim(1.0E-3 * [l1 + width l2 - width]);
 %ylim(1.0E-3 * [0.0 zH - depth]);
@@ -411,10 +416,11 @@ caxis(cm);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
+%title('Initial Flow Schematic');
 xlabel('Distance (km)');
 ylabel('Height (km)');
-%screen2png(['UREferenceSolution' mtnh '.png']);
-%
+export_fig(['UREferenceSolution' mtnh '.png']);
+%%
 figure;
 colormap(cmap);
 contourf(XINT,ZINT,wxzint,20); colorbar; grid on; cm = caxis;
@@ -428,14 +434,14 @@ title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Height (km)');
 %screen2png(['WREferenceSolution' mtnh '.png']);
-%
+%%
 figure;
 colormap(cmap);
-subplot(1,2,1); contourf(XINT,ZINT,rxzint,30); colorbar; grid on;
+subplot(1,2,1); contourf(1.0E-3 * XINT,1.0E-3 * ZINT,rxzint,30); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln p)^{\prime} ~~ (Pa)$');
-subplot(1,2,2); contourf(XINT,ZINT,pxzint,30); colorbar; grid on;
+subplot(1,2,2); contourf(1.0E-3 * XINT,1.0E-3 * ZINT,pxzint,30); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');

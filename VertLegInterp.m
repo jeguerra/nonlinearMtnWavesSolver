@@ -57,6 +57,9 @@ ZLINT = ZI * DS.zH;
 %% Apply Legendre interpolation for the vertical (DMSUITE modification)
 [LT,wlf] = poltrans(zn, zint);
 wlfm = repmat(wlf, 1, NXI);
+%size(LT)
+%size(wlfm)
+%size(qxz)
 qxzint = (LT * (wlfm .* qxz) ./ (LT * wlfm));
 
 %}

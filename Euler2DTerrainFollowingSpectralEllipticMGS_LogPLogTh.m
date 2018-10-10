@@ -10,16 +10,16 @@
 clc
 clear
 close all
-opengl info
-%addpath(genpath('MATLAB/'))
+%opengl info
+addpath(genpath('/home/jeguerra/Documents/MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 100; % Expansion order matches physical grid
+NZ = 120; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
-iW = 2;
-iP = 1;
+iW = 1;
+iP = 2;
 iT = 3;
 
 %% Set the test case and global parameters
@@ -38,10 +38,10 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
-    %l1 = -6.0E4;
-    %l2 = 6.0E4;
+    %l1 = -1.0E4 * 2.0 * pi;
+    %l2 = 1.0E4 * 2.0 * pi;
+    l1 = -6.0E4;
+    l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -165,18 +165,25 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 
 %% Compute coarse and fine matrices and RHS vectors
 tic;
-[LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
-[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
+%% Compute the initialization and grid
+[REFS, ~] = computeGridRefStateLogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+
+%% Get the boundary conditions
+[SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
+
+%% Compute the LHS coefficient matrix and force vector for the test case
+[LD,FF] = ...
+computeCoeffMatrixForceCBC(BS, RAY, REFS);
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
 % Solve the symmetric normal equations (in the coarsest grid)
 AN = A' * A;
 bN = A' * b(sysDex,1); clear A b;
-
+spparms('piv_tol',1.0);
+spparms('sym_tol',1.0);
 %% Solve the coarse residual system by direct method
-solc = AN \ bN;
+solc = AN \ bN; clear AN;
 SOL(sysDex) = solc; clear solc;
 
 %% Unpack the coarse solution and interpolate up to fine
@@ -185,71 +192,40 @@ dwxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
 dpxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
 dtxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 %%
-save('coarseANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
+%save('coarseANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
+%save('-binary', 'coarseANbN', 'AN', 'bN'); clear AN bN;
 toc; disp('Direct solve on the coarsest mesh and save data... DONE!');
 
 %% Compute a sequence of grids all the way to 100 m resolution
-NX100 = round(L / 100, -1);
-NZ100 = round(zH / 100, -1);
+NX100 = round(L / 100);
+NZ100 = round(zH / 100);
 
 DNX = NX100 - NX;
 DNZ = NZ100 - NZ;
 
-NXF = [(NX + 120) (NX + 200) (NX + 300)];
-NZF = [(NZ + 80) (NZ + 160) (NZ + 260)];
+NXF = [(NX + 60) (NX + 120) (NX + 160) (NX + 220) (NX + 280) (NX + 340)];
+NZF = [(NZ + 40) (NZ + 80) (NZ + 120) (NZ + 160) (NZ + 200) (NZ + 240)];
 OPSF = NXF .* NZF;
-
-%% Restrict the RHS of the fine problem to be the RHS of the coarse problem
-%{
-FP = load('fineANbN');
-%{
-sol = lsqr(FP.AN, 0.0*FP.bN, 0.1, 2);
-SOLF(sysDexF) = sol;
-rsl = zeros(size(SOLF));
-rsl(sysDexF) = FP.bN - FP.AN * sol; clear FP sol;
-%}
-%% Unpack the fine solution and interpolate down to coarse
-ruxz = reshape(FP.b((1:OPSF)),NZF,NXF);
-rwxz = reshape(FP.b((1:OPSF) + iW * OPSF),NZF,NXF);
-rpxz = reshape(FP.b((1:OPSF) + iP * OPSF),NZF,NXF);
-rtxz = reshape(FP.b((1:OPSF) + iT * OPSF),NZF,NXF);
-
-[xh,~] = herdif(NX, 1, 0.5*L, true);
-[zlc, ~] = chebdif(NZ, 1);
-zlc = 0.5 * (zlc + 1.0);
-[ruxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(ruxz), NX, NZ, xh, zlc);
-[rwxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rwxz), NX, NZ, xh, zlc);
-[rpxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rpxz), NX, NZ, xh, zlc);
-[rtxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rtxz), NX, NZ, xh, zlc);
-
-rslc = [reshape(ruxzint, OPS, 1); ...
-        reshape(rpxzint, OPS, 1); ...
-        reshape(rwxzint, OPS, 1); ...
-        reshape(rtxzint, OPS, 1)];
-rslc = rslc(sysDex);
-%}
 
 %% Generate the fine grids and save the coefficient matrices
 tic;
 for nn=1:length(NXF)
-    [LD,FF,REFSF(nn)] = ...
-    computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
-
+    [REFSF(nn), DOPS(nn)] = computeGridRefStateLogPLogTh(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
+    
     [SOLF,sysDexF] = GetAdjust4CBC(REFSF(nn), BC, NXF(nn), NZF(nn), OPSF(nn));
 
     spparms('spumoni',2);
-    A = LD(sysDexF,sysDexF);
-    b = (FF - LD * SOLF); clear LD FF;
-    AN = A;
-    bN = b(sysDexF,1); clear A b;
-    save(['fineANbN' int2str(OPSF(nn))], 'AN', 'bN', 'sysDexF', 'SOLF', '-v7.3'); clear AN bN;
+    b = computeCoeffMatrixMulLogPLogTh(REFSF(nn), DOPS(nn), SOLF, []);
+    bN = - b(sysDexF,1); clear b;
+    save(['fineANbN' int2str(OPSF(nn))], 'bN', 'sysDexF', 'SOLF', '-v7.3'); %clear AN bN;
+    %save('-binary', ['fineANbN' int2str(OPSF(nn))], 'bN', 'sysDexF', 'SOLF'); clear AN bN;
 end
 toc; disp('Save fine meshes... DONE!');
 
 %% Solve up from the coarsest grid!
 tic;
-MITER = [120 60 30];
-IITER = [40 20 10];
+MITER = [100 100 100 100 100 100];
+IITER = [50 50 50 50 50 50];
 for nn=1:length(NXF)
     
     if nn == 1
@@ -275,12 +251,13 @@ for nn=1:length(NXF)
     end
 
     dsol = [reshape(duxzint, OPSF(nn), 1); ...
-            reshape(dpxzint, OPSF(nn), 1); ...
             reshape(dwxzint, OPSF(nn), 1); ...
+            reshape(dpxzint, OPSF(nn), 1); ...
             reshape(dtxzint, OPSF(nn), 1)];
 
     % Apply iterative solve up every level of mesh
-    sol = gmres(FP.AN, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
+    matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSF(nn), DOPS(nn), xVec, FP.sysDexF);
+    sol = gmres(matMul, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
     FP.SOLF(FP.sysDexF) = sol;
     
     % Compute the residual
@@ -292,7 +269,7 @@ for nn=1:length(NXF)
     txz = reshape(FP.SOLF((1:OPSF(nn)) + iT * OPSF(nn)), NZF(nn), NXF(nn));
     clear sol FP;
 end
-toc; disp('Run Full Multigrid Solution (N grids)... DONE!');
+toc; disp('Run Multigrid Solution (N grids)... DONE!');
 % Plot the solution in the native grids
 %{
 % NATIVE GRID PLOTS
@@ -408,12 +385,11 @@ R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^kappa;
 RT = (rho .* pt) - (R .* PT);
 
 %% Compute Ri, Convective Parameter, and BVF
-DDZ_BC = REFSF(nn).DDZ;
+DDZ_BC = REFSF(nn).DDZ_L;
 dlrho = REFSF(nn).dlrref + REFSF(nn).sigma .* (DDZ_BC * (log(rho) - REFSF(nn).lrref));
 duj = REFSF(nn).dujref + REFSF(nn).sigma .* (DDZ_BC * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
-DDZ_BC = REFSF(nn).DDZ;
 dlpt = REFSF(nn).dlthref + REFSF(nn).sigma .* (DDZ_BC * real(txz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
@@ -501,7 +477,8 @@ drawnow
 
 %% Save the data
 %
-close all;
-fileStore = [int2str(NXF(nn)) 'X' int2str(NZF(nn)) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
-save(fileStore);
+clc
+close all; clear DOPS;
+fileStore = ['/media/jeguerra/DATA/' int2str(NXF(nn)) 'X' int2str(NZF(nn)) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
+save(fileStore, '-v7.3');
 %}

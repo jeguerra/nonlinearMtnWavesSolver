@@ -259,8 +259,6 @@ for nn=1:length(NXF)
     sol = gmres(FP.AN, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
     FP.SOLF(FP.sysDexF) = sol;
     
-    % Compute the residual
-    
     % Get the solution fields
     uxz = reshape(FP.SOLF((1:OPSF(nn))), NZF(nn), NXF(nn));
     wxz = reshape(FP.SOLF((1:OPSF(nn)) + iW * OPSF(nn)), NZF(nn), NXF(nn));
