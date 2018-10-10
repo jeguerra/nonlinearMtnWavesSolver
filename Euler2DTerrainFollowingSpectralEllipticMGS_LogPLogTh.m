@@ -10,7 +10,7 @@
 clc
 clear
 close all
-%opengl info
+opengl info
 addpath(genpath('/home/jeguerra/Documents/MATLAB/'))
 
 %% Create the dimensional XZ grid
@@ -203,29 +203,30 @@ NZ100 = round(zH / 100);
 DNX = NX100 - NX;
 DNZ = NZ100 - NZ;
 
-NXF = [(NX + 60) (NX + 120) (NX + 160) (NX + 220) (NX + 280) (NX + 340)];
-NZF = [(NZ + 40) (NZ + 80) (NZ + 120) (NZ + 160) (NZ + 200) (NZ + 240)];
+NXF = [(NX + 80) (NX + 160) (NX + 240) (NX + 320)];
+NZF = [(NZ + 60) (NZ + 120) (NZ + 180) (NZ + 240)];
 OPSF = NXF .* NZF;
 
 %% Generate the fine grids and save the coefficient matrices
 tic;
 for nn=1:length(NXF)
     [REFSF(nn), DOPS(nn)] = computeGridRefStateLogPLogTh(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
-    
+    DOPSF = DOPS(nn);
     [SOLF,sysDexF] = GetAdjust4CBC(REFSF(nn), BC, NXF(nn), NZF(nn), OPSF(nn));
 
     spparms('spumoni',2);
     b = computeCoeffMatrixMulLogPLogTh(REFSF(nn), DOPS(nn), SOLF, []);
     bN = - b(sysDexF,1); clear b;
-    save(['fineANbN' int2str(OPSF(nn))], 'bN', 'sysDexF', 'SOLF', '-v7.3'); %clear AN bN;
+    save(['fineANbN' int2str(OPSF(nn))], 'DOPSF', 'bN', 'sysDexF', 'SOLF', '-v7.3');
     %save('-binary', ['fineANbN' int2str(OPSF(nn))], 'bN', 'sysDexF', 'SOLF'); clear AN bN;
 end
+clear bN DOPS DOPSF;
 toc; disp('Save fine meshes... DONE!');
 
 %% Solve up from the coarsest grid!
 tic;
-MITER = [100 100 100 100 100 100];
-IITER = [50 50 50 50 50 50];
+MITER = [50 50 50 50];
+IITER = [25 25 25 25];
 for nn=1:length(NXF)
     
     if nn == 1
@@ -256,9 +257,13 @@ for nn=1:length(NXF)
             reshape(dtxzint, OPSF(nn), 1)];
 
     % Apply iterative solve up every level of mesh
-    matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSF(nn), DOPS(nn), xVec, FP.sysDexF);
+    matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSF(nn), FP.DOPS, xVec, FP.sysDexF);
+    % Use GMRES to make the initial solution
     sol = gmres(matMul, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
-    FP.SOLF(FP.sysDexF) = sol;
+    % Use LSQR to get some more convergence... why does this work????
+    matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, FP.DOPS, xVec, sysDex, ntrans);
+    dsol = lsqr(matMul1, FP.bN, 1.0E-6, 50, [], [], sol);
+    FP.SOLF(FP.sysDexF) = dsol;
     
     % Compute the residual
     

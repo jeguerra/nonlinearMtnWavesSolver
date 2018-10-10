@@ -233,7 +233,7 @@ matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
 % Use GMRES to make the initial solution
 [sol, ~, ~, ~, rvc1] = gmres(matMul, bN, 25, 1.0E-6, 50, [], [], xsol(sysDex));
 % Use LSQR iterative method to get some more convergence... hopefully
-matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, DOPS, xVec, sysDex, ntrans);
+matMul1 = @(xVec, ntrans) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
 [sol, ~, ~, ~, rvc2] = lsqr(matMul1, bN, 1.0E-6, 100, [], [], sol);
 
 toc; disp('Solve by using iterative method with coarser initial guess... DONE!');
@@ -388,8 +388,7 @@ grid on; grid minor;
 xlabel('$S_p$');
 %ylabel('Height (km)');
 title('Convective Stability');
-xlim([-0.01 0.025]);
-ylim([0.0 30.0]);
+%xlim([-0.3 0.3]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;

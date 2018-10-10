@@ -13,11 +13,13 @@ function mVec = computeCoeffMatrixMulLogPLogTh(REFS, DOPS, xVec, sysDex)
     wdex = udex + OPS;
     pdex = udex + 2 * OPS;
     tdex = udex + 3 * OPS;
-
+    
+    % Compute A * x
     q11 = DOPS.LD11 * zVec(udex, 1) + DOPS.LD12 * zVec(wdex, 1) + DOPS.LD13 * zVec(pdex, 1);
     q21 = DOPS.LD22 * zVec(wdex, 1) + DOPS.LD23 * zVec(pdex, 1) + DOPS.LD24 * zVec(tdex, 1);
     q31 = DOPS.LD31 * zVec(udex, 1) + DOPS.LD32 * zVec(wdex, 1) + DOPS.LD33 * zVec(pdex, 1);
     q41 = DOPS.LD42 * zVec(wdex, 1) + DOPS.LD44 * zVec(tdex, 1);
+        
     zVec = [q11; q21; q31; q41];
     mVec = zVec(sysDex);
 end
