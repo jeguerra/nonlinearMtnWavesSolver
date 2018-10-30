@@ -1,10 +1,11 @@
-% Computes the semi-analytical solution to the steady, linearized Euler equations
-% in terrain following coordinates using a coordinate transformation from
-% XZ to alpha-eta both from -pi to pi. The vertical boundary condition is
-% also tranformed in the vertical so that infinity maps to eta = pi. The
-% reference state is a standard atmosphere of piece-wise linear temperature
-% profiles with a smooth zonal jet given. Pressure and density initialized
-% in hydrostatic balance.
+%% COMPUTES STEADY LNP-LNT 2D MOUNTAIN WAVE PROBLEM IN 4 TEST CONFIGURATIONS:
+%% SUPER HIGH RESOLUTION HORIZONTAL FFT SOLVER (PERIODIC BOUNDARIES ONLY)
+
+% 1) 'ShearJetSchar' Discontinous background with strong shear
+% 2) 'ShearJetScharCBVF' Uniform background with strong shear
+% 3) 'ClassicalSchar' The typical Schar mountain test with uniform
+% background and constant wind
+% 4) 'AndesMtn' Same as 1) but with real input terrain data
 
 clc
 clear
@@ -165,12 +166,10 @@ spparms('spumoni',2);
 AN = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
 bN = b(sysDex,1);
-% Solve the symmetric normal equations (in the coarsest grid)
-%AN = A' * A;
-%bN = A' * b(sysDex,1); clear A b;
 
 %% Solve the coarse residual system by direct method
-solc = AN \ bN; clear AN;
+%solc = AN \ bN; clear AN;
+solc = umfpack(AN, '\', bN); clear AN;
 SOL(sysDex) = solc; clear solc;
 
 %% Plot the solution frequency space
@@ -287,16 +286,15 @@ RT = (rho .* pt) - (R .* PT);
 
 %% Compute Ri, Convective Parameter, and BVF
 DDZ_BC = REFS.DDZ;
-dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
-duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
-Ri = -ga * dlrho ./ (duj.^2);
-
-DDZ_BC = REFS.DDZ;
 dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
-RiREF = -BS.ga * REFS.dlrref(:,1);
+%dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
+duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
+Ri = ga * dlpt ./ (duj.^2);
+
+RiREF = BS.ga * REFS.dlthref(:,1);
 RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
 convREF = REFS.pref ./ (Rd * REFS.rref) .* REFS.dlthref;

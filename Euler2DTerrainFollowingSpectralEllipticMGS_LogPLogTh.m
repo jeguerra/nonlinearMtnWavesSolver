@@ -1,5 +1,7 @@
 
 %% COMPUTES STEADY LNP-LNT 2D MOUNTAIN WAVE PROBLEM IN 4 TEST CONFIGURATIONS:
+%% SUPER HIGH RESOLUTION MULTIGRID SOLVER
+%% CHOLMOD2 -> GMRES AND ALSQR ITERATIVE SOLVERS ON FINER GRIDS
 
 % 1) 'ShearJetSchar' Discontinous background with strong shear
 % 2) 'ShearJetScharCBVF' Uniform background with strong shear
@@ -38,10 +40,10 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -6.0E4;
+    %l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -59,7 +61,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -88,7 +90,7 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -180,10 +182,10 @@ b = (FF - LD * SOL); clear LD FF;
 % Solve the symmetric normal equations (in the coarsest grid)
 AN = A' * A;
 bN = A' * b(sysDex,1); clear A b;
-spparms('piv_tol',1.0);
-spparms('sym_tol',1.0);
-%% Solve the coarse residual system by direct method
-solc = AN \ bN; clear AN;
+%% Solve the coarse residual system by direct method Cholesky decomposition
+%solc = AN \ bN; clear AN;
+[solc, cholParms] = cholmod2(AN, bN); clear AN;
+disp(cholParms);
 SOL(sysDex) = solc; clear solc;
 
 %% Unpack the coarse solution and interpolate up to fine
@@ -203,7 +205,7 @@ NZ100 = round(zH / 100);
 DNX = NX100 - NX;
 DNZ = NZ100 - NZ;
 
-NXF = [(NX + 80) (NX + 160) (NX + 240) (NX + 320)];
+NXF = [(NX + 120) (NX + 240) (NX + 360) (NX + 480)];
 NZF = [(NZ + 60) (NZ + 120) (NZ + 180) (NZ + 240)];
 OPSF = NXF .* NZF;
 
@@ -225,8 +227,10 @@ toc; disp('Save fine meshes... DONE!');
 
 %% Solve up from the coarsest grid!
 tic;
-MITER = [50 50 50 50];
-IITER = [25 25 25 25];
+MITER = [10 10 20 20];
+IITER = [10 10 20 20];
+LITER = [10 10 20 20];
+resVisualCheck = false;
 for nn=1:length(NXF)
     
     if nn == 1
@@ -256,16 +260,33 @@ for nn=1:length(NXF)
             reshape(dpxzint, OPSF(nn), 1); ...
             reshape(dtxzint, OPSF(nn), 1)];
 
+    %
     % Apply iterative solve up every level of mesh
-    matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSF(nn), FP.DOPS, xVec, FP.sysDexF);
     % Use GMRES to make the initial solution
+    matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSF(nn), FP.DOPSF, xVec, FP.sysDexF);
     sol = gmres(matMul, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
-    % Use LSQR to get some more convergence... why does this work????
-    matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, FP.DOPS, xVec, sysDex, ntrans);
-    dsol = lsqr(matMul1, FP.bN, 1.0E-6, 50, [], [], sol);
-    FP.SOLF(FP.sysDexF) = dsol;
     
-    % Compute the residual
+    % Use LSQR to get some more convergence... why does this work????
+    matMulT = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSF(nn), FP.DOPSF, xVec, FP.sysDexF, ntrans);
+    dsol = lsqr(matMulT, FP.bN, 1.0E-6, LITER(nn), [], [], sol);
+    
+    OPTS.LTOL = 1.0E-12;
+    OPTS.K = 20;
+    OPTS.MAXITL = 40;
+    OPTS.MAXITP = 40;
+    [sol,  ~, rvc3] = alsqr(matMulT, FP.bN, dsol, OPTS);
+    FP.SOLF(FP.sysDexF) = sol;
+    disp(rvc3(end,:));
+    
+    % Compute the residual and check!
+    if nn == length(NXF)
+        RV = FP.bN - matMul(sol);
+        SOLR = zeros(4 * OPSF(nn), 1);
+        SOLR(FP.sysDexF) = RV; clear RV;
+        if resVisualCheck
+            SOLF = SOLR;
+        end
+    end
     
     % Get the solution fields
     uxz = reshape(FP.SOLF((1:OPSF(nn))), NZF(nn), NXF(nn));
@@ -350,7 +371,7 @@ disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-screen2png(['UREferenceSolution' mtnh '.png']);
+export_fig(['UREferenceSolution' mtnh '.png']);
 %
 figure;
 colormap(cmap);
@@ -364,7 +385,7 @@ caxis(cm);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Elevation (km)');
-screen2png(['WREferenceSolution' mtnh '.png']);
+export_fig(['WREferenceSolution' mtnh '.png']);
 %
 figure;
 colormap(cmap);
@@ -391,15 +412,15 @@ RT = (rho .* pt) - (R .* PT);
 
 %% Compute Ri, Convective Parameter, and BVF
 DDZ_BC = REFSF(nn).DDZ_L;
-dlrho = REFSF(nn).dlrref + REFSF(nn).sigma .* (DDZ_BC * (log(rho) - REFSF(nn).lrref));
-duj = REFSF(nn).dujref + REFSF(nn).sigma .* (DDZ_BC * real(uxz));
-Ri = -ga * dlrho ./ (duj.^2);
 
 dlpt = REFSF(nn).dlthref + REFSF(nn).sigma .* (DDZ_BC * real(txz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
-RiREF = -BS.ga * REFSF(nn).dlrref(:,1);
+duj = REFSF(nn).dujref + REFSF(nn).sigma .* (DDZ_BC * real(uxz));
+Ri = ga * dlpt ./ (duj.^2);
+
+RiREF = -BS.ga * REFSF(nn).dlthref(:,1);
 RiREF = RiREF ./ (REFSF(nn).dujref(:,1).^2);
 
 xdex = 1:1:NX;
@@ -428,7 +449,7 @@ ylim([0.0 30.0]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
-screen2png(fname);
+export_fig(fname);
 %% Compute N and the local Fr number
 %{
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
@@ -451,7 +472,7 @@ drawnow;
 
 fname = ['FROUDE_' TestCase num2str(hC)];
 drawnow;
-screen2png(fname);
+export_fig(fname);
 %}
 %% Debug
 %{
@@ -482,7 +503,6 @@ drawnow
 
 %% Save the data
 %
-clc
 close all; clear DOPS;
 fileStore = ['/media/jeguerra/DATA/' int2str(NXF(nn)) 'X' int2str(NZF(nn)) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore, '-v7.3');

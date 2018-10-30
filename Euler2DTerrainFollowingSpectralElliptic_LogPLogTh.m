@@ -1,5 +1,7 @@
 
 %% COMPUTES STEADY LNP-LNT 2D MOUNTAIN WAVE PROBLEM IN 4 TEST CONFIGURATIONS:
+%% LIMITED RESOLUTION DIRECT SOLVER: UMFPACK LU
+%% USED TO TEST ITERATIVE SOLVERS: GMRES AND ALSQR
 
 % 1) 'ShearJetSchar' Discontinous background with strong shear
 % 2) 'ShearJetScharCBVF' Uniform background with strong shear
@@ -11,15 +13,16 @@ clc
 clear
 close all
 opengl info
-%addpath(genpath('MATLAB/'))
+addpath(genpath('/home/jeguerra/Documents/MATLAB/'))
+warning('off');
 
 %% Create the dimensional XZ grid
 NX = 80; % Expansion order matches physical grid
 NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
-iW = 2;
-iP = 1;
+iW = 1;
+iP = 2;
 iT = 3;
 
 %% Set the test case and global parameters
@@ -163,135 +166,92 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt
 %% Set up the Rayleigh Layer with a coefficient one order of magnitude less than the order of the wave field
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
-%% Compute coarse and fine matrices and RHS vectors
-tic;
-[LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
-[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
+%% Compute the initialization and grid
+REFS = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+
+%% Get the boundary conditions
+[SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
+
+%% Compute the LHS coefficient matrix and force vector for the test case
+[LD,FF] = ...
+computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
+
+%% Solve the system by letting matlab \ do its thing...
+%
+disp('Solve by direct Cholesky coarse and ALSQR fine.');
+tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
-% Solve the symmetric normal equations (in the coarsest grid)
+% Solve the symmetric normal equations
 AN = A' * A;
 bN = A' * b(sysDex,1); clear A b;
+toc; disp('Compute coarse coefficient matrix... DONE!');
+%sol = (AN \ bN); clear AN bN;
+sol = cholmod2(AN, bN); clear AN bN;
+toc; disp('Solve the first system by \... DONE!');
 
-%% Solve the coarse residual system by direct method
-solc = AN \ bN;
-SOL(sysDex) = solc; clear solc;
+%% Get the solution fields
+SOL(sysDex) = sol;
+clear sol;
+uxz = reshape(SOL((1:OPS)),NZ,NX);
+wxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
+rxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
+pxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 
-%% Unpack the coarse solution and interpolate up to fine
-duxz = reshape(SOL((1:OPS)),NZ,NX);
-dwxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
-dpxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
-dtxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
-%%
-save('coarseANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
-toc; disp('Direct solve on the coarsest mesh and save data... DONE!');
-%% Compute a sequence of grids all the way to 100 m resolution
-NX100 = round(L / 100, -1);
-NZ100 = round(zH / 100, -1);
+%
+%% Use the coarse system solution to accelerate iterative solution of a finer system
+NX = NX + 80;
+NZ = NZ + 100;
+OPS = NX * NZ;
 
-DNX = NX100 - NX;
-DNZ = NZ100 - NZ;
+%% Compute the initialization and grid
+[REFSI, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
-NXF = [(NX + 120) (NX + 200) (NX + 300)];
-NZF = [(NZ + 80) (NZ + 160) (NZ + 260)];
-OPSF = NXF .* NZF;
-
-%% Restrict the RHS of the fine problem to be the RHS of the coarse problem
-%{
-FP = load('fineANbN');
-%{
-sol = lsqr(FP.AN, 0.0*FP.bN, 0.1, 2);
-SOLF(sysDexF) = sol;
-rsl = zeros(size(SOLF));
-rsl(sysDexF) = FP.bN - FP.AN * sol; clear FP sol;
-%}
-%% Unpack the fine solution and interpolate down to coarse
-ruxz = reshape(FP.b((1:OPSF)),NZF,NXF);
-rwxz = reshape(FP.b((1:OPSF) + iW * OPSF),NZF,NXF);
-rpxz = reshape(FP.b((1:OPSF) + iP * OPSF),NZF,NXF);
-rtxz = reshape(FP.b((1:OPSF) + iT * OPSF),NZF,NXF);
+%% Get the boundary conditions
+[SOL,sysDex] = GetAdjust4CBC(REFSI, BC, NX, NZ, OPS);
 
 [xh,~] = herdif(NX, 1, 0.5*L, true);
 [zlc, ~] = chebdif(NZ, 1);
 zlc = 0.5 * (zlc + 1.0);
-[ruxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(ruxz), NX, NZ, xh, zlc);
-[rwxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rwxz), NX, NZ, xh, zlc);
-[rpxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rpxz), NX, NZ, xh, zlc);
-[rtxzint, ~, ~, ~] = HerTransLegInterp(REFSF, DS, RAY, real(rtxz), NX, NZ, xh, zlc);
+[uxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NX, NZ, xh, zlc);
+[wxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NX, NZ, xh, zlc);
+[rxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NX, NZ, xh, zlc);
+[pxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NX, NZ, xh, zlc);
+REFS = REFSI;
 
-rslc = [reshape(ruxzint, OPS, 1); ...
-        reshape(rpxzint, OPS, 1); ...
-        reshape(rwxzint, OPS, 1); ...
-        reshape(rtxzint, OPS, 1)];
-rslc = rslc(sysDex);
+xsol = [reshape(uxzint, OPS, 1); reshape(wxzint, OPS, 1); reshape(rxzint, OPS, 1); reshape(pxzint, OPS, 1)];
+toc; disp('Compute coase/fine interpolation... DONE!');
+
+%% Compute the LHS coefficient matrix and force vector for the test case
+tic;
+spparms('spumoni',2);
+b = computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, SOL, []);
+bN = - b(sysDex,1); clear b;
+toc; disp('Compute fine RHS... DONE!');
+tic;
+matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
+% Use GMRES to make the initial solution
+[sol, ~, ~, ~, rvc1] = gmres(matMul, bN, 10, 1.0E-6, 10, [], [], xsol(sysDex));
+% Use ALSQR iterative method preconditioned with GMRES
+matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, DOPS, xVec, sysDex, ntrans);
+%[sol, ~, ~, ~, rvc2] = lsqr(matMul1, bN, 1.0E-6, 10, [], [], sol);
+OPTS.LTOL = 1.0E-8;
+OPTS.K = 10;
+OPTS.MAXITL = 20;
+OPTS.MAXITP = 20;
+[sol,  ~, rvc3] = alsqr(matMul1, bN, sol, OPTS);
+
+toc; disp('Solve by using iterative method with coarser initial guess... DONE!');
+
+%% Get the solution fields
+SOL(sysDex) = sol;
+clear sol;
+uxz = reshape(SOL((1:OPS)),NZ,NX);
+wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
+rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
+pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 %}
-
-%% Generate the fine grids and save the coefficient matrices
-tic;
-for nn=1:length(NXF)
-    [LD,FF,REFSF(nn)] = ...
-    computeCoeffMatrixForceCBC(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
-
-    [SOLF,sysDexF] = GetAdjust4CBC(REFSF(nn), BC, NXF(nn), NZF(nn), OPSF(nn));
-
-    spparms('spumoni',2);
-    A = LD(sysDexF,sysDexF);
-    b = (FF - LD * SOLF); clear LD FF;
-    AN = A;
-    bN = b(sysDexF,1); clear A b;
-    save(['fineANbN' int2str(OPSF(nn))], 'AN', 'bN', 'sysDexF', 'SOLF', '-v7.3'); clear AN bN;
-end
-toc; disp('Save fine meshes... DONE!');
-tic;
-%% Solve up from the coarsest grid!
-clc
-MITER = [400 200 100];
-IITER = [40 20 10];
-for nn=1:length(NXF)
-    
-    if nn == 1
-        FP = load(['fineANbN' int2str(OPSF(nn))]);
-        [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
-        [zlc, ~] = chebdif(NZF(nn), 1);
-        zlc = 0.5 * (zlc + 1.0);
-        [duxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(duxz), NXF(nn), NZF(nn), xh, zlc);
-        [dwxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dwxz), NXF(nn), NZF(nn), xh, zlc);
-        [dpxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dpxz), NXF(nn), NZF(nn), xh, zlc);
-        [dtxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dtxz), NXF(nn), NZF(nn), xh, zlc);
-        clear duxz dwxz dpxz dtxz;
-    else
-        FP = load(['fineANbN' int2str(OPSF(nn))]);
-        [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
-        [zlc, ~] = chebdif(NZF(nn), 1);
-        zlc = 0.5 * (zlc + 1.0);
-        [duxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(uxz), NXF(nn), NZF(nn), xh, zlc);
-        [dwxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(wxz), NXF(nn), NZF(nn), xh, zlc);
-        [dpxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(pxz), NXF(nn), NZF(nn), xh, zlc);
-        [dtxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(txz), NXF(nn), NZF(nn), xh, zlc);
-        %clear uxz wxz pxz txz;
-    end
-
-    dsol = [reshape(duxzint, OPSF(nn), 1); ...
-            reshape(dpxzint, OPSF(nn), 1); ...
-            reshape(dwxzint, OPSF(nn), 1); ...
-            reshape(dtxzint, OPSF(nn), 1)];
-
-    % Apply iterative solve up every level of mesh
-    sol = gmres(FP.AN, FP.bN, IITER(nn), 1.0E-6, MITER(nn), [], [], dsol(FP.sysDexF));
-    FP.SOLF(FP.sysDexF) = sol;
-    
-    % Compute the residual
-    
-    % Get the solution fields
-    uxz = reshape(FP.SOLF((1:OPSF(nn))), NZF(nn), NXF(nn));
-    wxz = reshape(FP.SOLF((1:OPSF(nn)) + iW * OPSF(nn)), NZF(nn), NXF(nn));
-    pxz = reshape(FP.SOLF((1:OPSF(nn)) + iP * OPSF(nn)), NZF(nn), NXF(nn));
-    txz = reshape(FP.SOLF((1:OPSF(nn)) + iT * OPSF(nn)), NZF(nn), NXF(nn));
-    clear sol FP;
-end
-toc; disp('Run Full Multigrid Solution (N grids)... DONE!');
 % Plot the solution in the native grids
 %{
 % NATIVE GRID PLOTS
@@ -320,11 +280,11 @@ drawnow
 %% Interpolate to a nice regular grid using Hermite and Legendre transforms'
 %
 NXI = 3001;
-NZI = 351;
-[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFSF(nn), DS, RAY, real(uxz), NXI, NZI, 0, 0);
-[wxzint, ~, ~] = HerTransLegInterp(REFSF(nn), DS, RAY, real(wxz), NXI, NZI, 0, 0);
-[pxzint, ~, ~] = HerTransLegInterp(REFSF(nn), DS, RAY, real(pxz), NXI, NZI, 0, 0);
-[txzint, ~, ~] = HerTransLegInterp(REFSF(nn), DS, RAY, real(txz), NXI, NZI, 0, 0);
+NZI = 451;
+[uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
+[wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
+[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
+[pxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NXI, NZI, 0, 0);
 
 XI = l2 * XINT;
 ZI = ZINT;
@@ -358,100 +318,93 @@ contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
 %contourf(1.0E-3 * XI,1.0E-3 * ZI,ujref,31); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
 caxis(cm);
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-%ylim(1.0E-3 * [0.0 zH - depth]);
-%xlim([-200 300]);
-%ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
 title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
-ylabel('Elevation (km)');
-screen2png(['UREferenceSolution' mtnh '.png']);
+ylabel('Height (km)');
+%export_fig(['UREferenceSolution' mtnh '.png']);
 %
 figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,wxzint,31); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XI(1,:),1.0E-3 * ZI(1,:),'FaceColor','k'); hold off;
 caxis(cm);
-%xlim(1.0E-3 * [l1 + width l2 - width]);
-%ylim(1.0E-3 * [0.0 zH - depth]);
-%xlim([-100 100]);
-%ylim([0 15]);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
-ylabel('Elevation (km)');
-screen2png(['WREferenceSolution' mtnh '.png']);
+ylabel('Height (km)');
+%export_fig(['WREferenceSolution' mtnh '.png']);
 %
 figure;
 colormap(cmap);
-subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
+subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln p)^{\prime} ~~ (Pa)$');
-subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,txzint,31); colorbar; grid on;
+subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
 %
 %% Compute some of the fields needed for instability checks
-lpt = REFSF(nn).lthref + txz;
+lpt = REFS.lthref + pxz;
 pt = exp(lpt);
-lp = REFSF(nn).lpref + pxz;
+lp = REFS.lpref + rxz;
 p = exp(lp);
-P = REFSF(nn).pref;
-PT = REFSF(nn).thref;
+P = REFS.pref;
+PT = REFS.thref;
 rho = p ./ (Rd * pt) .* (p0 * p.^(-1)).^kappa;
 R = p ./ (Rd * PT) .* (p0 * P.^(-1)).^kappa;
 RT = (rho .* pt) - (R .* PT);
 
 %% Compute Ri, Convective Parameter, and BVF
-DDZ_BC = REFSF(nn).DDZ;
-dlrho = REFSF(nn).dlrref + REFSF(nn).sigma .* (DDZ_BC * (log(rho) - REFSF(nn).lrref));
-duj = REFSF(nn).dujref + REFSF(nn).sigma .* (DDZ_BC * real(uxz));
+DDZ_BC = REFS.DDZ_L;
+dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
+duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 Ri = -ga * dlrho ./ (duj.^2);
 
-DDZ_BC = REFSF(nn).DDZ;
-dlpt = REFSF(nn).dlthref + REFSF(nn).sigma .* (DDZ_BC * real(txz));
+DDZ_BC = REFS.DDZ_L;
+dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
-RiREF = -BS.ga * REFSF(nn).dlrref(:,1);
-RiREF = RiREF ./ (REFSF(nn).dujref(:,1).^2);
+RiREF = -BS.ga * REFS.dlrref(:,1);
+RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
 xdex = 1:1:NX;
 figure;
-subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFSF(nn).ZTL(:,xdex),'ks');
+subplot(1,2,1); semilogx(Ri(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
 hold on;
 semilogx([0.25 0.25],[0.0 1.0E5],'k--','LineWidth',2.5);
-semilogx(RiREF,1.0E-3*REFSF(nn).ZTL(:,1),'r-s','LineWidth',1.5);
+semilogx(RiREF,1.0E-3*REFS.ZTL(:,1),'r-s','LineWidth',1.5);
 hold off;
 grid on; grid minor;
 xlabel('$Ri$');
-ylabel('Elevation (km)');
+ylabel('Height (km)');
 title('Richardson Number');
 xlim([0.1 1.0E4]);
 ylim([0.0 30.0]);
 
-subplot(1,2,2); plot(conv(:,xdex),1.0E-3*REFSF(nn).ZTL(:,xdex),'ks');
+subplot(1,2,2); plot(conv(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks');
 hold on;
 semilogx([0.0 0.0],[0.0 1.0E-3 * zH],'k--','LineWidth',2.5);
 hold off;
 grid on; grid minor;
 xlabel('$S_p$');
+%ylabel('Height (km)');
 title('Convective Stability');
-%xlim([-0.3 0.3]);
+xlim([-0.01 0.025]);
 ylim([0.0 30.0]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
-screen2png(fname);
+%export_fig(fname);
 %% Compute N and the local Fr number
 %{
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
-DDZ_BC = REFS.DDZ;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(pxz));
+DDZ_BC = REFS.DDZ_L;
+dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
 NBVF = (ga .* dlpt);
 
 Lv = 2.5E3;
@@ -499,8 +452,8 @@ drawnow
 %}
 
 %% Save the data
-%
+%{
 close all;
-fileStore = [int2str(NXF(nn)) 'X' int2str(NZF(nn)) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
+fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);
 %}

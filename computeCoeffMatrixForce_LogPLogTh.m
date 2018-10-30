@@ -1,4 +1,4 @@
-function [LD,FF] = computeCoeffMatrixForceCBC(BS, RAY, REFS)
+function [LD,FF] = computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS)
     %% Set the dimensions
     OPS = REFS.NX * REFS.NZ;
     
