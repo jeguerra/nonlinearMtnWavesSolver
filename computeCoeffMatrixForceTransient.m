@@ -5,45 +5,41 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     
     % Set the domain scale
     dscale = 0.5 * DS.L;
-    %{
-    %% Use a truncated projection space
+    %
+    %% Get the Hermite Function derivative matrix and grid (ALTERNATE METHOD)
     [xo,~] = herdif(NX, 2, dscale, false);
     [xh,~] = herdif(NX, 2, dscale, true);
 
     [~,~,w]=hegs(NX);
     W = spdiags(w, 0, NX, NX);
 
-    [~, HT] = hefunm(NXO-1, xo);
-    [~, HTD] = hefunm(NXO, xo);
+    [~, HT] = hefunm(NX-1, xo);
+    [~, HTD] = hefunm(NX, xo);
     
     %% Compute the coefficients of spectral derivative in matrix form
-    SDIFF = zeros(NXO+1,NXO);
+    SDIFF = zeros(NX+1,NX);
     SDIFF(1,2) = sqrt(0.5);
-    SDIFF(NXO + 1,NXO) = -sqrt(NXO * 0.5);
-    SDIFF(NXO,NXO-1) = -sqrt((NXO - 1) * 0.5);
+    SDIFF(NX + 1,NX) = -sqrt(NX * 0.5);
+    SDIFF(NX,NX-1) = -sqrt((NX - 1) * 0.5);
 
-    for cc = NXO-2:-1:1
+    for cc = NX-2:-1:1
         SDIFF(cc+1,cc+2) = sqrt((cc + 1) * 0.5);
         SDIFF(cc+1,cc) = -sqrt(cc * 0.5);
     end
 
     b = max(xo) / dscale;
     DDX_H = b * HTD' * SDIFF * (HT * W);
-    %rcond(DDX_H)
-    %rank(DDX_H)
-    surf(DDX_H);
-    figure;
     %}
-    %
-    [xh,DDX_H] = herdif(NX, 1, dscale, true);
-    %
+    % Get the Hermite derivative matrix and grid (BAD DEFAULT NX > 240)
+    %[xh,DDX_H] = herdif(NX, 1, dscale, true);
+    % Get the Chebyshev nodes and compute the vertical derivative matrix
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
     alpha = exp(-0.5 * zlc);
     beta = (-0.5) * ones(size(zlc'));
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
+    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
     %}
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh, DS, RAY);
@@ -112,50 +108,6 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
         BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd);
     thref = exp(lthref);
     thref0 = min(min(thref));
-
-%{
-    %% Plot background fields including mean Ri number
-    figure;
-    subplot(2,2,1);
-    plot(ujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Speed $(m s^{-1})$');
-    ylabel('Elevation (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    
-    subplot(2,2,2);
-    plot(pref(:,1) ./ (rref(:,1) * BS.Rd),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    %title('Temperature Profile','FontSize',30);
-    xlabel('Temperature (K)');
-    ylabel('Elevation (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    
-    subplot(2,2,3);
-    plot(0.01*pref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Pressure (hPa)');
-    ylabel('Elevation (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    
-    subplot(2,2,4);
-    plot(thref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('P. Temperature (K)','FontSize',30);
-    ylabel('Elevation (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    dirname = '../ShearJetSchar/';
-    fname = [dirname 'BACKGROUND_PROFILES'];
-    screen2png(fname);
-    
-    figure;
-    plot(dujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Shear $(s^{-1})$');
-    ylabel('Elevation (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    pause
-%}
     
     REFS = struct('ujref',ujref,'dujref',dujref, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref,...
@@ -172,10 +124,10 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     end
 
     % Compute the horizontal derivatives operator (Hermite Function expansion)
-    DDA_OP = spalloc(OPS, OPS, NZ * NX^2);
+    DDX_OP = spalloc(OPS, OPS, NZ * NX^2);
     for rr=1:NZ
         ddex = (1:NZ:OPS) + (rr - 1);
-        DDA_OP(ddex,ddex) = DDX_H;
+        DDX_OP(ddex,ddex) = DDX_H;
     end
 
     %% Assemble the block global operator L
@@ -186,75 +138,32 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
     DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
     DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ);
     POR = spdiags(reshape(pref ./ rref,OPS,1), 0,  OPS, OPS);
-    DX = DDA_OP;
+    DX = DDX_OP;
     U0DX = U0 * DX;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
     RAYM = spdiags(RL,0, OPS, OPS);
     ZSPR = sparse(OPS,OPS);
     % Horizontal momentum LHS
-    L11 = U0DX;
-    L12 = ZSPR;
-    L13 = POR * DX;
-    L14 = ZSPR;
+    LD11 = U0DX + RAY.nu1 * RAYM;
+    LD12 = DUDZ;
+    LD13 = POR * DX;
+    LD14 = ZSPR;
     % Vertical momentum LHS
-    L21 = ZSPR;
-    L22 = U0DX;
-    L23 = POR * SIGMA * DDXI_OP;
-    L24 = ZSPR;
+    LD21 = ZSPR;
+    LD22 = U0DX + RAY.nu2 * RAYM;
+    LD23 = POR * SIGMA * DDXI_OP + BS.ga * (1.0 / BS.gam - 1.0) * unit;
+    LD24 = - BS.ga * unit;
     % Continuity (log pressure) LHS
-    L31 = BS.gam * DDA_OP;
-    L32 = BS.gam * SIGMA * DDXI_OP;
-    L33 = U0DX;
-    L34 = ZSPR;
+    LD31 = BS.gam * DDX_OP;
+    LD32 = BS.gam * SIGMA * DDXI_OP + DLPDZ;
+    LD33 = U0DX + RAY.nu3 * RAYM;
+    LD34 = ZSPR;
     % Thermodynamic LHS
-    L41 = ZSPR;
-    L42 = ZSPR;
-    L43 = ZSPR;
-    L44 = U0DX;
-
-    %% Assemble the algebraic part (Rayleigh layer on the diagonal)
-    % Horizontal momentum LHS
-    B11 = RAY.nu1 * RAYM;
-    B12 = DUDZ;
-    B13 = ZSPR;
-    B14 = ZSPR;
-    % Vertical momentum LHS
-    B21 = ZSPR;
-    B22 = RAY.nu2 * RAYM;
-    B23 = BS.ga * (1.0 / BS.gam - 1.0) * unit;
-    B24 = - BS.ga * unit;
-    % Continuity (log pressure) LHS
-    B31 = ZSPR;
-    B32 = DLPDZ;
-    B33 = RAY.nu3 * RAYM;
-    B34 = ZSPR;
-    % Thermodynamic LHS
-    B41 = ZSPR;
-    B42 = DLPTDZ;
-    B43 = ZSPR;
-    B44 = RAY.nu4 * RAYM;
-    
-    %% Assemble the left hand side operator
-    LD11 = L11 + B11;
-    LD12 = L12 + B12;
-    LD13 = L13 + B13;
-    LD14 = L14 + B14;
-
-    LD21 = L21 + B21;
-    LD22 = L22 + B22;
-    LD23 = L23 + B23;
-    LD24 = L24 + B24;
-
-    LD31 = L31 + B31;
-    LD32 = L32 + B32;
-    LD33 = L33 + B33;
-    LD34 = L34 + B34;
-
-    LD41 = L41 + B41;
-    LD42 = L42 + B42;
-    LD43 = L43 + B43;
-    LD44 = L44 + B44;
+    LD41 = ZSPR;
+    LD42 = DLPTDZ;
+    LD43 = ZSPR;
+    LD44 = U0DX + RAY.nu4 * RAYM;
     
     %% Assemble the LHS operator (reorder u p w t)
     LD = [LD11 LD12 LD13 LD14 ; ...
@@ -263,9 +172,5 @@ function [LD,FF,REFS] = computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCa
           LD41 LD42 LD43 LD44];
       
     %% Assemble the force vector (reorder u p w t)
-    F11 = zeros(OPS,1);
-    F21 = zeros(OPS,1);
-    F31 = zeros(OPS,1);
-    F41 = zeros(OPS,1);
-    FF = [F11 ; F21 ; F31 ; F41];
+    FF = zeros(4 * OPS,1);
 end

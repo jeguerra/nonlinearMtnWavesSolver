@@ -158,15 +158,17 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC);
 %% Set up the Rayleigh Layer with a coefficient one order of magnitude less than the order of the wave field
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
-%% Compute the LHS coefficient matrix and force vector for the test case
-[LD,FF,REFS] = ...
-computeCoeffMatrixForceTransient(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+%% Compute the initialization and grid
+[REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
-%% Get the boundary conditions in the SOL vector and subscript indices sysDex
-[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
+%% Get the boundary conditions
+[SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
+
+[~,bN] = ...
+computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
 
 %% Solve the hyperbolic problem using SSP-RK53
-%
+%{
 disp('Solve with explicit SSP-RK53.');
 tic
 spparms('spumoni',2);
@@ -214,11 +216,11 @@ title('Perturbation $\ln \theta$ $(K)$');
 drawnow
 pause;
 %}
-
+%}
 % Time step (fraction of a second)
 DT = 0.05;
 % End time in seconds (HR hours)
-HR = 0.1;
+HR = 0.5;
 ET = HR * 60 * 60;
 TI = DT:DT:ET;
 % Output times as an integer multiple of DT
@@ -233,13 +235,16 @@ end
 %% Explitcit SSP RK53
 %
 tic
+matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFS, DOPS, xVec, 1:numVar*OPS);
 for tt=1:length(TI)
     % Initialize the RHS
-    RHS = bN - AN * sol(:,1);
+    %RHS = bN - AN * sol(:,1);
+    RHS = bN - matMul(sol(:,1));
     % Stage 1
     c1 = 0.377268915331368;
     sol(sysDex,2) = sol(sysDex,1) + c1 * DT * RHS(sysDex);
-    RHS = bN - AN * sol(:,2);
+    %RHS = bN - AN * sol(:,2);
+    RHS = bN - matMul(sol(:,2));
     sol(sysDex,3) = sol(sysDex,2) + c1 * DT * RHS(sysDex);
     % First linear combination
     LC1_s0 = 0.355909775063327;
@@ -248,7 +253,8 @@ for tt=1:length(TI)
     %
     % Stage 2
     c2 = 0.242995220537396;
-    RHS = bN - AN * sol(:,3);
+    %RHS = bN - AN * sol(:,3);
+    RHS = bN - matMul(sol(:,3));
     sol(sysDex,4) = sol(sysDex,4) + c2 * DT * RHS(sysDex);
     % Second linear combination
     LC2_s0 = 0.367933791638137;
@@ -257,7 +263,8 @@ for tt=1:length(TI)
     %
     % Stage 3
     c3 = 0.238458932846290;
-    RHS = bN - AN * sol(:,4);
+    %RHS = bN - AN * sol(:,4);
+    RHS = bN - matMul(sol(:,4));
     sol(sysDex,1) = sol(sysDex,1) + c3 * DT * RHS(sysDex);
     % Third linear combination
     LC3_s0 = 0.762406163401431;
@@ -266,7 +273,8 @@ for tt=1:length(TI)
     %
     % Stage 4
     c4 = 0.287632146308408;
-    RHS = bN - AN * sol(:,1);
+    %RHS = bN - AN * sol(:,1);
+    RHS = bN - matMul(sol(:,1));
     sol(sysDex,5) = sol(sysDex,5) + c4 * DT * RHS(sysDex);
     %
     % Update the solution (currently NOT storing history...)
@@ -287,8 +295,8 @@ pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 
 %% Interpolate to a regular grid using Hermite and Laguerre transforms'
 %
-NXI = 2000;
-NZI = 200;
+NXI = 3000;
+NZI = 300;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
