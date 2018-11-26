@@ -14,8 +14,8 @@ opengl info;
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 3072; % Expansion order matches physical grid
-NZ = 451; % Expansion order matches physical grid
+NX = 1024; % Expansion order matches physical grid
+NZ = 360; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -23,10 +23,10 @@ iP = 2;
 iT = 3;
 
 %% Set the test case and global parameters
-%TestCase = 'ShearJetSchar'; BC = 2;
+TestCase = 'ShearJetSchar'; BC = 2;
 %TestCase = 'ShearJetScharCBVF'; BC = 2;
 %TestCase = 'ClassicalSchar'; BC = 2;
-TestCase = 'AndesMtn'; BC = 2;
+%TestCase = 'AndesMtn'; BC = 2;
 
 z0 = 0.0;
 gam = 1.4;
@@ -65,8 +65,8 @@ if strcmp(TestCase,'ShearJetSchar') == true
     b = 1.386;
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     zH = 35000.0;
-    l1 = -60000.0;
-    l2 = 60000.0;
+    l1 = - 1.0E4 * (3.0 * pi);
+    l2 = 1.0E4 * (3.0 * pi);
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -80,11 +80,11 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     width = 15000.0;
     nu1 = hfactor * 1.0 * 1.0E-2; nu2 = hfactor * 1.0 * 1.0E-2;
     nu3 = hfactor * 1.0 * 1.0E-2; nu4 = hfactor * 1.0 * 1.0E-2;
-    applyLateralRL = true;
+    applyLateralRL = false;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -290,7 +290,6 @@ dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
-%dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 Ri = ga * dlpt ./ (duj.^2);
 
@@ -461,6 +460,6 @@ drawnow
 %% Save the data
 %
 close all
-fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceFFT' int2str(hC) '.mat'];
+fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceFFT_' TestCase int2str(hC) '.mat'];
 save(fileStore);
 %}

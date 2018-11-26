@@ -8,7 +8,7 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     xh = (x(1:NX))';
     kx = (2*pi / DS.L) * [0:NX/2-1 -NX/2:-1];
     kx(1) = 1.0E-12;
-
+    %{
     [zlc, ~] = chebdif(NZ, 1);
     zl = DS.zH * 0.5 * (zlc + 1.0);
     zlc = 0.5 * (zlc + 1.0);
@@ -16,9 +16,35 @@ function [LD,FF,REFS] = computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX
     beta = (-0.5) * ones(size(zlc'));
     %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
     DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    %}
+    [zlc,w]=legslb(NZ);
+    zl = DS.zH * (0.5 * (zlc + 1.0));
+    W = spdiags(w, 0, NZ, NZ);
+    s = [(0:NZ-2)'+ 0.5;(NZ-1)/2];
+    S = spdiags(s, 0, NZ, NZ);
+
+    [~, HTD] = lepolym(NZ-1, zlc);
+    
+    %% Compute the coefficients of spectral derivative in matrix form
+    NM = NZ;
+    SDIFF = zeros(NM,NM);
+    SDIFF(NM,NM) = 0.0;
+    SDIFF(NM-1,NM) = 2 * NM - 1;
+
+    k = NM - 1;
+    for kk = NM-2:-1:1
+        A = 2 * k - 3;
+        B = 2 * k + 1;
+        SDIFF(kk,:) = A / B * SDIFF(kk+2,:);
+        SDIFF(kk,kk+1) = A;
+
+        k = k - 1;
+    end
+
+    DDZ_L = (2.0 / DS.zH) * HTD' * SDIFF * (S * HTD * W);
        
     %% Compute the terrain and derivatives
-    [ht,~] = computeTopoDerivative(TestCase,xh,DS,RAY);
+    [ht,~] = computeTopoDerivative(TestCase,xh',DS,RAY);
 
     %% XZ grid for Legendre nodes in the vertical
     [HTZL,~] = meshgrid(ht,zl);

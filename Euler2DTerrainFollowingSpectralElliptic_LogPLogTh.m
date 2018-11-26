@@ -70,10 +70,10 @@ if strcmp(TestCase,'ShearJetSchar') == true
     b = 1.386;
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -6.0E4;
+    %l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -91,7 +91,7 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 1000.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -173,7 +173,7 @@ REFS = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTop
 [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
-[LD,FF] = ...
+[LD, FF] = ...
 computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
 
 %% Solve the system by letting matlab \ do its thing...
@@ -184,12 +184,14 @@ spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
 % Solve the symmetric normal equations
+%AN = NLD(sysDex,sysDex); clear NLD;
 AN = A' * A;
 bN = A' * b(sysDex,1); clear A b;
 toc; disp('Compute coarse coefficient matrix... DONE!');
-%sol = (AN \ bN); clear AN bN;
+%sol = umfpack(AN, '\', bN); clear AN bN;
 sol = cholmod2(AN, bN); clear AN bN;
 toc; disp('Solve the first system by \... DONE!');
+%pause;
 
 %% Get the solution fields
 SOL(sysDex) = sol;
@@ -201,8 +203,8 @@ pxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 
 %
 %% Use the coarse system solution to accelerate iterative solution of a finer system
-NX = NX + 80;
-NZ = NZ + 100;
+NX = 100;
+NZ = 128;
 OPS = NX * NZ;
 
 %% Compute the initialization and grid
@@ -235,7 +237,6 @@ matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
 [sol, ~, ~, ~, rvc1] = gmres(matMul, bN, 10, 1.0E-6, 10, [], [], xsol(sysDex));
 % Use ALSQR iterative method preconditioned with GMRES
 matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, DOPS, xVec, sysDex, ntrans);
-%[sol, ~, ~, ~, rvc2] = lsqr(matMul1, bN, 1.0E-6, 10, [], [], sol);
 OPTS.LTOL = 1.0E-8;
 OPTS.K = 10;
 OPTS.MAXITL = 20;
@@ -362,13 +363,12 @@ RT = (rho .* pt) - (R .* PT);
 DDZ_BC = REFS.DDZ_L;
 dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
-Ri = -ga * dlrho ./ (duj.^2);
 
-DDZ_BC = REFS.DDZ_L;
 dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
+Ri = ga * dlpt ./ (duj.^2);
 RiREF = -BS.ga * REFS.dlrref(:,1);
 RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
@@ -399,7 +399,7 @@ ylim([0.0 30.0]);
 
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
-%export_fig(fname);
+export_fig(fname);
 %% Compute N and the local Fr number
 %{
 fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
@@ -452,7 +452,7 @@ drawnow
 %}
 
 %% Save the data
-%{
+%
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

@@ -48,7 +48,7 @@ end
 [XINT,ZI] = meshgrid(xint / max(xint) ,zint);
 
 %% Compute the terrain and derivatives
-[ht,~] = computeTopoDerivative(REFS.TestCase, xint / b, DS, RAY);
+[ht,~] = computeTopoDerivative(REFS.TestCase, xint' / b, DS, RAY);
 
 %% XZ grid for Legendre nodes in the vertical
 [HTZL,~] = meshgrid(ht, DS.zH * zint);

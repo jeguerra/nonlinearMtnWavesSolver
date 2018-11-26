@@ -16,8 +16,8 @@ opengl info
 addpath(genpath('/home/jeguerra/Documents/MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NZ = 120; % Expansion order matches physical grid
+NX = 96; % Expansion order matches physical grid
+NZ = 128; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -25,8 +25,8 @@ iP = 2;
 iT = 3;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 0;
-%TestCase = 'ShearJetScharCBVF'; BC = 0;
+%TestCase = 'ShearJetSchar'; BC = 0;
+TestCase = 'ShearJetScharCBVF'; BC = 0;
 %TestCase = 'ClassicalSchar'; BC = 0;
 %TestCase = 'AndesMtn'; BC = 0;
 
@@ -54,14 +54,14 @@ if strcmp(TestCase,'ShearJetSchar') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 10000.0;
-    width = 15000.0;
+    width = 16000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 1000.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -69,10 +69,10 @@ if strcmp(TestCase,'ShearJetSchar') == true
     b = 1.386;
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -6.0E4;
+    %l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -90,7 +90,7 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 1000.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -119,7 +119,7 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -168,14 +168,14 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 %% Compute coarse and fine matrices and RHS vectors
 tic;
 %% Compute the initialization and grid
-[REFS, ~] = computeGridRefStateLogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+[REFS, ~] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
 [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
 [LD,FF] = ...
-computeCoeffMatrixForceCBC(BS, RAY, REFS);
+computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
@@ -205,14 +205,14 @@ NZ100 = round(zH / 100);
 DNX = NX100 - NX;
 DNZ = NZ100 - NZ;
 
-NXF = [(NX + 120) (NX + 240) (NX + 360) (NX + 480)];
-NZF = [(NZ + 60) (NZ + 120) (NZ + 180) (NZ + 240)];
+NXF = [192 256 384 512];
+NZF = [192 256 360 360];
 OPSF = NXF .* NZF;
 
 %% Generate the fine grids and save the coefficient matrices
 tic;
 for nn=1:length(NXF)
-    [REFSF(nn), DOPS(nn)] = computeGridRefStateLogPLogTh(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
+    [REFSF(nn), DOPS(nn)] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
     DOPSF = DOPS(nn);
     [SOLF,sysDexF] = GetAdjust4CBC(REFSF(nn), BC, NXF(nn), NZF(nn), OPSF(nn));
 
@@ -227,9 +227,9 @@ toc; disp('Save fine meshes... DONE!');
 
 %% Solve up from the coarsest grid!
 tic;
-MITER = [10 10 20 20];
-IITER = [10 10 20 20];
-LITER = [10 10 20 20];
+MITER = [10 10 10 10];
+IITER = [10 10 10 10];
+LITER = [10 10 10 10];
 resVisualCheck = false;
 for nn=1:length(NXF)
     
@@ -268,14 +268,14 @@ for nn=1:length(NXF)
     
     % Use LSQR to get some more convergence... why does this work????
     matMulT = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSF(nn), FP.DOPSF, xVec, FP.sysDexF, ntrans);
-    dsol = lsqr(matMulT, FP.bN, 1.0E-6, LITER(nn), [], [], sol);
+    %dsol = lsqr(matMulT, FP.bN, 1.0E-6, LITER(nn), [], [], sol);
     
     OPTS.LTOL = 1.0E-12;
     OPTS.K = 20;
     OPTS.MAXITL = 40;
     OPTS.MAXITP = 40;
-    [sol,  ~, rvc3] = alsqr(matMulT, FP.bN, dsol, OPTS);
-    FP.SOLF(FP.sysDexF) = sol;
+    [dsol,  ~, rvc3] = alsqr(matMulT, FP.bN, sol, OPTS);
+    FP.SOLF(FP.sysDexF) = dsol;
     disp(rvc3(end,:));
     
     % Compute the residual and check!
@@ -414,6 +414,7 @@ RT = (rho .* pt) - (R .* PT);
 DDZ_BC = REFSF(nn).DDZ_L;
 
 dlpt = REFSF(nn).dlthref + REFSF(nn).sigma .* (DDZ_BC * real(txz));
+%dlpt = REFSF(nn).dlthref + (DDZ_BC * real(txz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
@@ -477,13 +478,20 @@ export_fig(fname);
 %% Debug
 %{
 figure;
-subplot(2,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
+subplot(1,2,1); surf(XI,ZI,uxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
 title('U (m/s)'); %zlim([-0.1 0.1]);
-subplot(2,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
+subplot(1,2,2); surf(XI,ZI,wxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
 title('W (m/s)');
-subplot(2,2,3); surf(XI,ZI,exp(lrref) .* (exp(rxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 2000.0]);
+figure;
+subplot(1,2,1); surf(XI,ZI,pxzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
 title('$(\ln p)^{\prime}$ (Pa)');
-subplot(2,2,4); surf(XI,ZI,exp(lpref) .* (exp(pxzint) - 1.0)); colorbar; xlim([-10000.0 30000.0]); ylim([0.0 2000.0]);
+subplot(1,2,2); surf(XI,ZI,txzint); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]); zlim([-2.0E-3 2.0E-3]);
+title('$(\ln \theta)^{\prime}$ (K)');
+%
+figure;
+subplot(1,2,1); surf(REFSF(nn).XL,1.0E-3*REFSF(nn).ZTL,dlpt); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
+title('$(\ln p)^{\prime}$ (Pa)');
+subplot(1,2,2); surf(REFSF(nn).XL,1.0E-3*REFSF(nn).ZTL,duj); colorbar; xlim([-10000.0 25000.0]); ylim([0.0 2000.0]);
 title('$(\ln \theta)^{\prime}$ (K)');
 drawnow
 %}
@@ -503,7 +511,7 @@ drawnow
 
 %% Save the data
 %
-close all; clear DOPS;
+close all;
 fileStore = ['/media/jeguerra/DATA/' int2str(NXF(nn)) 'X' int2str(NZF(nn)) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore, '-v7.3');
 %}

@@ -1,4 +1,4 @@
-function [LD,FF] = computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS)
+function [LD, FF] = computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS)
     %% Set the dimensions
     OPS = REFS.NX * REFS.NZ;
     
@@ -59,6 +59,12 @@ function [LD,FF] = computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS)
           LD21 LD22 LD23 LD24 ; ...
           LD31 LD32 LD33 LD34 ; ...
           LD41 LD42 LD43 LD44];
+    
+    %% Make the normal equations symmetric coefficient
+    %NLD = [(LD11' * LD11) ZSPR (LD31' * LD31) ZSPR ; ...
+    %       ZSPR (LD22' * LD22) (LD32' * LD32) (LD42' * LD42) ; ...
+    %       (LD13' * LD13) (LD23' * LD23) (LD33' * LD33) ZSPR ; ...
+    %       ZSPR (LD24' * LD24) ZSPR (LD44' * LD44)];
     
     %% Assemble the force vector (reorder u p w t)
     FF = zeros(4 * OPS,1);
