@@ -1,4 +1,4 @@
-function mVec = computeAorATMulLogPLogTh(REFS, DOPS, xVec, sysDex, ntrans)
+function mVec = computeAorATMulFluxForm(REFS, DOPS, xVec, sysDex, ntrans)
     %% Set the dimensions
     OPS = REFS.NX * REFS.NZ;
 

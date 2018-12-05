@@ -194,8 +194,6 @@ dwxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
 dpxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
 dtxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 %%
-%save('coarseANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
-%save('-binary', 'coarseANbN', 'AN', 'bN'); clear AN bN;
 toc; disp('Direct solve on the coarsest mesh and save data... DONE!');
 
 %% Compute a sequence of grids all the way to 100 m resolution

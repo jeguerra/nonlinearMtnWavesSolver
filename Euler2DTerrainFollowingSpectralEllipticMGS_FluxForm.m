@@ -13,8 +13,8 @@ opengl info
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NZ = 120; % Expansion order matches physical grid
+NX = 96; % Expansion order matches physical grid
+NZ = 128; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -37,10 +37,10 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -6.0E4;
+    %l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -51,9 +51,9 @@ if strcmp(TestCase,'ShearJetSchar') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 10000.0;
-    width = 15000.0;
+    width = 16000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
-    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-6;
+    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
@@ -66,8 +66,10 @@ if strcmp(TestCase,'ShearJetSchar') == true
     b = 1.386;
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     zH = 35000.0;
-    l1 = -60000.0;
-    l2 = 60000.0;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
+    %l1 = -6.0E4;
+    %l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -79,8 +81,8 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     hfactor = 1.0;
     depth = 10000.0;
     width = 15000.0;
-    nu1 = hfactor * 1.0 * 1.0E-2; nu2 = hfactor * 1.0 * 1.0E-2;
-    nu3 = hfactor * 1.0 * 1.0E-2; nu4 = hfactor * 1.0 * 1.0E-2;
+    nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
+    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
@@ -93,8 +95,10 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     b = 1.386;
 elseif strcmp(TestCase,'ClassicalSchar') == true
     zH = 35000.0;
-    l1 = -60000.0;
-    l2 = 60000.0;
+    %l1 = -1.0E4 * 2.0 * pi;
+    %l2 = 1.0E4 * 2.0 * pi;
+    l1 = -6.0E4;
+    l2 = 6.0E4;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -107,12 +111,12 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     width = 15000.0;
     hfactor = 1.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
-    nu3 = hfactor * 1.0 * 1.0E-2; nu4 = hfactor * 1.0E-2;
+    nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 10.0;
+    hC = 100.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -120,8 +124,8 @@ elseif strcmp(TestCase,'ClassicalSchar') == true
     b = 0.0;
 elseif strcmp(TestCase,'AndesMtn') == true
     zH = 40000.0;
-    l1 = -250000.0;
-    l2 = 250000.0;
+    l1 = -1.0E5 * 2.0 * pi;
+    l2 = 1.0E5 * 2.0 * pi;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -132,7 +136,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 15000.0;
-    width = 40000.0;
+    width = 101000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
@@ -141,7 +145,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     lC = 4000.0;
     hC = 100.0;
     mtnh = [int2str(hC) 'm'];
-    hfilt = '25km';
+    hfilt = '100m';
     u0 = 10.0;
     uj = 16.822;
     b = 1.386;
@@ -160,18 +164,25 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 
 %% Compute coarse and fine matrices and RHS vectors
 tic;
-[LD,FF,REFS] = ...
-computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
-[SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
+%% Compute the initialization and grid
+[REFS, ~] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+
+%% Get the boundary conditions
+[SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
+
+%% Compute the LHS coefficient matrix and force vector for the test case
+[LD,FF] = ...
+computeCoeffMatrixForce_FluxForm(BS, RAY, REFS);
 spparms('spumoni',2);
-A = LD(sysDex,sysDex); %spy(A); pause;
+A = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
 % Solve the symmetric normal equations (in the coarsest grid)
 AN = A' * A;
 bN = A' * b(sysDex,1); clear A b;
-
-%% Solve the coarse residual system by direct method
-solc = AN \ bN;
+%% Solve the coarse residual system by direct method Cholesky decomposition
+%solc = AN \ bN; clear AN;
+[solc, cholParms] = cholmod2(AN, bN); clear AN;
+disp(cholParms);
 SOL(sysDex) = solc; clear solc;
 
 %% Unpack the coarse solution and interpolate up to fine
@@ -180,36 +191,31 @@ drwxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
 drxz = reshape(SOL((1:OPS) + iR * OPS),NZ,NX);
 drtxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 %%
-save('coarseANbN', 'AN', 'bN', '-v7.3'); clear AN bN;
 toc; disp('Direct solve on the coarsest mesh and save data... DONE!');
 
 %% Compute a sequence of grids all the way to 100 m resolution
-NX100 = round(L / 100, -1);
-NZ100 = round(zH / 100, -1);
+NX100 = round(L / 100);
+NZ100 = round(zH / 100);
 
 DNX = NX100 - NX;
 DNZ = NZ100 - NZ;
 
-NXF = [(NX + 100) (NX + 200) (NX + 300)];
-NZF = [(NZ + 80) (NZ + 160) (NZ + 240)];
-%NXF = [(NX + 60) (NX + 120) (NX + 180)];
-%NZF = [(NZ + 40) (NZ + 80) (NZ + 120)];
+NXF = [192 256 384 512];
+NZF = [192 256 360 360];
 OPSF = NXF .* NZF;
 
 %% Generate the fine grids and save the coefficient matrices
 tic;
 for nn=1:length(NXF)
-    [LD,FF,REFSF(nn)] = ...
-    computeCoeffMatrixForceCBC_FluxForm(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
-
+    [REFSF(nn), DOPS(nn)] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
+    DOPSF = DOPS(nn);
     [SOLF,sysDexF] = GetAdjust4CBC(REFSF(nn), BC, NXF(nn), NZF(nn), OPSF(nn));
 
     spparms('spumoni',2);
-    A = LD(sysDexF,sysDexF);
-    b = (FF - LD * SOLF); clear LD FF;
-    AN = A;
-    bN = b(sysDexF,1); clear A b;
-    save(['fineANbN' int2str(OPSF(nn))], 'AN', 'bN', 'sysDexF', 'SOLF', '-v7.3'); clear AN bN;
+    b = computeCoeffMatrixMulFluxForm(REFSF(nn), DOPS(nn), SOLF, []);
+    bN = - b(sysDexF,1); clear b;
+    save(['fineANbN' int2str(OPSF(nn))], 'DOPSF', 'bN', 'sysDexF', 'SOLF', '-v7.3');
+    %save('-binary', ['fineANbN' int2str(OPSF(nn))], 'bN', 'sysDexF', 'SOLF'); clear AN bN;
 end
 toc; disp('Save fine meshes... DONE!');
 
@@ -465,6 +471,6 @@ drawnow
 %% Save the data
 %{
 close all;
-fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_Flux' char(TestCase) int2str(hC) '.mat'];
+fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_FluxForm' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);
 %}

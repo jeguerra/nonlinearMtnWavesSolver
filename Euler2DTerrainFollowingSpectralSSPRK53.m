@@ -12,8 +12,8 @@ close all
 %addpath(genpath('MATLAB/'))
 
 %% Create the dimensional XZ grid
-NX = 140; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 128; % Expansion order matches physical grid
+NZ = 96; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 
@@ -33,10 +33,8 @@ p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -62,10 +60,8 @@ if strcmp(TestCase,'ShearJetSchar') == true
     b = 1.386;
 elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -91,10 +87,8 @@ elseif strcmp(TestCase,'ShearJetScharCBVF') == true
     b = 1.386;
 elseif strcmp(TestCase,'ClassicalSchar') == true
     zH = 35000.0;
-    %l1 = -1.0E4 * 2.0 * pi;
-    %l2 = 1.0E4 * 2.0 * pi;
-    l1 = -6.0E4;
-    l2 = 6.0E4;
+    l1 = -1.0E4 * 2.0 * pi;
+    l2 = 1.0E4 * 2.0 * pi;
     L = abs(l2 - l1);
     GAMT = 0.0;
     HT = 0.0;
@@ -220,7 +214,7 @@ pause;
 % Time step (fraction of a second)
 DT = 0.05;
 % End time in seconds (HR hours)
-HR = 0.5;
+HR = 10.0;
 ET = HR * 60 * 60;
 TI = DT:DT:ET;
 % Output times as an integer multiple of DT
@@ -279,7 +273,11 @@ for tt=1:length(TI)
     %
     % Update the solution (currently NOT storing history...)
     sol(sysDex,1) = sol(sysDex,5);
-    disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
+    
+    if mod(tt,5) == 0
+        RHS = bN - matMul(sol(:,1));
+        disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
+    end
 end
 toc
 %}

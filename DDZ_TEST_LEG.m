@@ -1,7 +1,7 @@
 % Test a different way of generating the differentiation matrix for DZ
 addpath(genpath('/home/jeguerra/Documents/MATLAB'));
 L = 40000.0;
-NZ = 200;
+NZ = 100;
 %
 %% Compute using a different implementation
 
@@ -37,17 +37,18 @@ DDZ_H2 = poldif(zo, 1);
 figure; surf(DDZ_H2); shading interp;
 
 %% Test the derivative
-Y = (4.0 * zo) .* (cos(2.0 * pi * zo)).^4;
+Y = (4.0 * zo) .* cos(2.0 * pi * zo);
 dY_H1 = DDZ_H1 * Y;
 dY_H2 = DDZ_H2 * Y;
 figure;
 plot(zo, Y, zo, dY_H1, zo, dY_H2);
 
 %% Test spectral differentiation
+%{
 su1 = ((S * HTD * W) * Y);
 dsu1 = SDIFF * su1;
 su2 = ledisctran(NZ, zo, w, Y, 0);
 dsu2 = lefreqdiff(NZ, su2);
 figure;
 plot(su1); hold on; plot(su2); legend('Matrix Operator', 'Rercursion');
-
+%}

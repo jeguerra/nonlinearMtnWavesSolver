@@ -18,11 +18,21 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
         wbdex = ubdex + iW*OPS;
         pbdex = ubdex + iT*OPS;
         
-        disp('Hermite-Lagrange LogP-LogTheta Model, Dirichlet Lateral BC...');
+        % Get indices for the right boundary
+        urdex = (OPS - NZ + 1):OPS;
+        wrdex = urdex + iW*OPS;
+        prdex = urdex + iP*OPS;
+        trdex = urdex + iT*OPS;
+        
+        disp('Hermite-Lagrange LogP-LogTheta Model...');
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
         SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
         rowsOut = [utdex wtdex ptdex wbdex pbdex];
+        
+        % Implement X periodicity
+        %rightOut = [urdex wrdex prdex trdex];
+        %rowsOut = [rowsOut rightOut];
            
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 1
@@ -76,12 +86,22 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
         wbdex = ubdex + iW*OPS;
         pbdex = ubdex + iT*OPS;
         
-        disp('Hermite-Lagrange LogP-LogTheta Model, Transient Solve');
+        % Get indices for the right boundary
+        urdex = (OPS - NZ + 1):OPS;
+        wrdex = urdex + iW*OPS;
+        prdex = urdex + iP*OPS;
+        trdex = urdex + iT*OPS;
+        
+        disp('Hermite-Lagrange LogP-LogTheta Model...');
         SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
         SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
         rowsOut = [utdex wtdex ptdex wbdex pbdex];
-               
+        
+        % Implement X periodicity
+        %rightOut = [urdex wrdex prdex trdex];
+        %rowsOut = [rowsOut rightOut];
+           
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     end
 end

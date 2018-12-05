@@ -27,17 +27,36 @@ function [REFS, DOPS] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, 
 
     b = max(xo) / dscale;
     DDX_H = b * HTD' * SDIFF * (HT * W);
-    %}
-    % Get the Hermite derivative matrix and grid (BAD DEFAULT NX > 240)
-    %[xh,DDX_H] = herdif(NX, 1, dscale, true);
-    % Get the Chebyshev nodes and compute the vertical derivative matrix
-    [zlc, ~] = chebdif(NZ, 1);
-    zl = DS.zH * 0.5 * (zlc + 1.0);
-    zlc = 0.5 * (zlc + 1.0);
-    alpha = exp(-0.5 * zlc);
-    beta = (-0.5) * ones(size(zlc'));
-    %DDZ_L = (1.0 / DS.zH) * poldif(zlc, 1);
-    DDZ_L = (1.0 / DS.zH) * poldif(zlc, alpha, beta);
+    
+    %% Get the Chebyshev nodes and compute the vertical derivative matrix
+    %[zlc, ~] = chebdif(NZ, 1);
+    %zlc = 0.5 * (zlc + 1.0);
+    
+    [zlc,w]=legslb(NZ);
+    zl = DS.zH * (0.5 * (zlc + 1.0));
+    W = spdiags(w, 0, NZ, NZ);
+    s = [(0:NZ-2)'+ 0.5;(NZ-1)/2];
+    S = spdiags(s, 0, NZ, NZ);
+
+    [~, HTD] = lepolym(NZ-1, zlc);
+    
+    %% Compute the coefficients of spectral derivative in matrix form
+    NM = NZ;
+    SDIFF = zeros(NM,NM);
+    SDIFF(NM,NM) = 0.0;
+    SDIFF(NM-1,NM) = 2 * NM - 1;
+
+    k = NM - 1;
+    for kk = NM-2:-1:1
+        A = 2 * k - 3;
+        B = 2 * k + 1;
+        SDIFF(kk,:) = A / B * SDIFF(kk+2,:);
+        SDIFF(kk,kk+1) = A;
+
+        k = k - 1;
+    end
+
+    DDZ_L = (2.0 / DS.zH) * HTD' * SDIFF * (S * HTD * W);
 
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS,RAY);

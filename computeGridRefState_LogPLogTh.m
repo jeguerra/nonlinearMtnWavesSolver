@@ -30,10 +30,10 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     b = max(xo) / dscale;
     DDX_H = b * HTD' * SDIFF * (HT * W);
     
-    %% Get the Chebyshev nodes and compute the vertical derivative matrix
-    %[zlc, ~] = chebdif(NZ, 1);
-    %zlc = 0.5 * (zlc + 1.0);
+    %% Make the X derivative matrix periodic (NOT NEEDED)
+    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
     
+    %% Get the Legendre nodes and compute the vertical derivative matrix
     [zlc,w]=legslb(NZ);
     zl = DS.zH * (0.5 * (zlc + 1.0));
     W = spdiags(w, 0, NZ, NZ);
