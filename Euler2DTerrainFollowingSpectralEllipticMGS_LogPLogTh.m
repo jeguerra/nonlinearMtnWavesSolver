@@ -208,12 +208,13 @@ NZF = [192 256 360 360];
 OPSF = NXF .* NZF;
 
 %% Generate the fine grids and save the coefficient matrices
+%
 tic;
 for nn=1:length(NXF)
     [REFSF(nn), DOPS(nn)] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NXF(nn), NZF(nn), applyTopRL, applyLateralRL);
     DOPSF = DOPS(nn);
     [SOLF,sysDexF] = GetAdjust4CBC(REFSF(nn), BC, NXF(nn), NZF(nn), OPSF(nn));
-
+ 
     spparms('spumoni',2);
     b = computeCoeffMatrixMulLogPLogTh(REFSF(nn), DOPS(nn), SOLF, []);
     bN = - b(sysDexF,1); clear b;
@@ -222,7 +223,7 @@ for nn=1:length(NXF)
 end
 clear bN DOPS DOPSF;
 toc; disp('Save fine meshes... DONE!');
-
+%}
 %% Solve up from the coarsest grid!
 tic;
 MITER = [10 10 10 10];
@@ -231,21 +232,17 @@ LITER = [10 10 10 10];
 resVisualCheck = false;
 for nn=1:length(NXF)
     
+    FP = load(['fineANbN' int2str(OPSF(nn))]);
+    [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
+    [zlc, ~] = chebdif(NZF(nn), 1);
+    zlc = 0.5 * (zlc + 1.0);
     if nn == 1
-        FP = load(['fineANbN' int2str(OPSF(nn))]);
-        [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
-        [zlc, ~] = chebdif(NZF(nn), 1);
-        zlc = 0.5 * (zlc + 1.0);
         [duxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(duxz), NXF(nn), NZF(nn), xh, zlc);
         [dwxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dwxz), NXF(nn), NZF(nn), xh, zlc);
         [dpxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dpxz), NXF(nn), NZF(nn), xh, zlc);
         [dtxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(dtxz), NXF(nn), NZF(nn), xh, zlc);
         %clear duxz dwxz dpxz dtxz;
     else
-        FP = load(['fineANbN' int2str(OPSF(nn))]);
-        [xh,~] = herdif(NXF(nn), 1, 0.5*L, true);
-        [zlc, ~] = chebdif(NZF(nn), 1);
-        zlc = 0.5 * (zlc + 1.0);
         [duxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(uxz), NXF(nn), NZF(nn), xh, zlc);
         [dwxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(wxz), NXF(nn), NZF(nn), xh, zlc);
         [dpxzint, ~, ~, ~] = HerTransLegInterp(REFSF(nn-1), DS, RAY, real(pxz), NXF(nn), NZF(nn), xh, zlc);
