@@ -162,6 +162,19 @@ tic;
 [LD,FF,REFS] = ...
 computeCoeffMatrixForceFFT(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 [SOL,sysDex] = GetAdjust4CBC(REFS,BC,NX,NZ,OPS);
+
+figure;
+contourf(m2km * REFS.XL, m2km * REFS.ZTL, REFS.ujref, 31); colorbar; grid on; cm = caxis;
+hold on; area(1.0E-3 * XINT(1,:), 2.0 * m2km * REFS.ZTL(1,:), 'FaceColor', 'k'); hold off;
+caxis(cm);
+xlim([l1 l2]);
+ylim([0.0 zH]);
+xlabel('Distance (km)');
+ylabel('Height (km)');
+title('Initial Flow Schematich - $U ms^{-1}$');
+export_fig('UREF_INITIAL.png');
+pause;
+
 spparms('spumoni',2);
 AN = LD(sysDex,sysDex);
 b = (FF - LD * SOL); clear LD FF;
@@ -194,7 +207,7 @@ mr = max(max(abs(rxz)));
 mp = max(max(abs(pxz)));
 xd = [1.0E-4 1.0E-1];
 nc = 12;
-%
+%%
 figure;
 subplot(2,1,1);
 colormap(cmap);
@@ -214,7 +227,7 @@ ylabel('Height (km)');
 drawnow
 fname = ['FREQ_RESP01' TestCase num2str(hC) '.png'];
 drawnow;
-screen2png(fname);
+export_fig(fname);
 %
 figure;
 subplot(2,1,1);
@@ -233,7 +246,7 @@ xlabel('Spatial Frequency $(km^{-1})$');
 ylabel('Height (km)');
 fname = ['FREQ_RESP02' TestCase num2str(hC) '.png'];
 drawnow;
-screen2png(fname);
+export_fig(fname);
 %pause;
 %}
 %% Plot the solution using the IFFT to recover the solution in physical space

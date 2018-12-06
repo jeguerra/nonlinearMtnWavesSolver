@@ -176,8 +176,8 @@ AN = A' * A;
 bN = A' * b(sysDex,1);
 toc; disp('Compute coefficient matrix... DONE.');
 clear A b LD FF;
-%sol = (AN \ bN);
-sol = cholmod2(AN, bN);
+sol = (AN \ bN);
+%sol = cholmod2(AN, bN);
 toc; disp('Solve the system... DONE.');
 clear AN bN
 %% Get the solution fields
