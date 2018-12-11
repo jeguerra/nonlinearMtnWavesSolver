@@ -17,8 +17,8 @@ addpath(genpath('/home/jeguerra/Documents/MATLAB/'))
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 96; % Expansion order matches physical grid
-NZ = 128; % Expansion order matches physical grid
+NX = 80; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -253,7 +253,7 @@ wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
 rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 %}
-% Plot the solution in the native grids
+%% Plot the solution in the native grids
 %{
 % NATIVE GRID PLOTS
 figure;
@@ -400,30 +400,7 @@ ylim([0.0 30.0]);
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 export_fig(fname);
-%% Compute N and the local Fr number
-%{
-fig = figure('Position',[0 0 2000 1000]); fig.Color = 'w';
-DDZ_BC = REFS.DDZ_L;
-dlpres = REFS.dlpref + REFS.sigma .* (DDZ_BC * real(rxz));
-NBVF = (ga .* dlpt);
 
-Lv = 2.5E3;
-FR = 2 * pi * abs(REFS.ujref + uxz) ./ (sqrt(NBVF) * Lv);
-
-xdex = 1:1:NX;
-plot(FR(:,xdex),1.0E-3*REFS.ZTL(:,xdex),'ks','LineWidth',1.5);
-grid on; grid minor;
-title('Local Froude Number');
-xlabel('$Fr$');
-%ylabel('\textsf{Altitude (km)}','Interpreter','latex');
-ylim([0.0 25.0]);
-%xlim([-1.0E-3 2.0E-3]);
-drawnow;
-
-fname = ['FROUDE_' TestCase num2str(hC)];
-drawnow;
-screen2png(fname);
-%}
 %% Debug
 %{
 figure;
@@ -452,7 +429,7 @@ drawnow
 %}
 
 %% Save the data
-%
+%{
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

@@ -5,8 +5,8 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
     dLayerL = prs.l1 + width;
     
     % Get the indices for the lateral layers
-    [xr1,xr2] = ind2sub(size(X),find(X >= dLayerR));
-    [xl1,xl2] = ind2sub(size(X),find(X <= dLayerL));
+    %[xr1,xr2] = ind2sub(size(X),find(X >= dLayerR));
+    %[xl1,xl2] = ind2sub(size(X),find(X <= dLayerL));
     %xdex = [xldex xrdex];
     
     % Get the indices for the top layers
@@ -58,15 +58,13 @@ function [rayField, BR] = computeRayleighXZ(prs,nu,depth,width,X,Z,applyTop,appl
         end
     end
     
-    % Get the overlaping indices
+    % Get the overlapping indices
     RO = RLX .* RLZ;
     [oi,ok] = find(RO);
     
     RL = RLX + RLZ;
     
-    % Average the overlaping corners
-    %RL(oi,ok) = 0.5 * (RLX(oi,ok) + RLZ(oi,ok));
-    %RL(oi,ok) = sqrt(RLX(oi,ok).^2 + RLZ(oi,ok).^2);
+    % Handle the corner regions
     for ii = 1:length(oi)
         for kk = 1:length(ok)
             RL(oi(ii),ok(kk)) = ...

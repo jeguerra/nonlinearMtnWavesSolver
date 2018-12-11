@@ -7,10 +7,11 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     dscale = 0.5 * DS.L;
     %
     %% Get the Hermite Function derivative matrix and grid (ALTERNATE METHOD)
-    [xo,~] = herdif(NX, 2, dscale, false);
-    [xh,~] = herdif(NX, 2, dscale, true);
+    [xo,~,w] = hegs(NX);
+    [xh,~,~] = hegs(NX);
+    b = max(xo) / dscale;
+    xh = (1.0 / b) * xh;
 
-    [~,~,w]=hegs(NX);
     W = spdiags(w, 0, NX, NX);
 
     [~, HT] = hefunm(NX-1, xo);
@@ -27,8 +28,10 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
         SDIFF(cc+1,cc) = -sqrt(cc * 0.5);
     end
 
-    b = max(xo) / dscale;
-    DDX_H = b * HTD' * SDIFF * (HT * W);
+    % Hermite function spectral transform in matrix form
+    STR_H = HT * W;
+    % Hermite function spatial derivative based on spectral differentiation
+    DDX_H = b * HTD' * SDIFF * STR_H;
     
     %% Make the X derivative matrix periodic (NOT NEEDED)
     %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
@@ -58,7 +61,10 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
         k = k - 1;
     end
 
-    DDZ_L = (2.0 / DS.zH) * HTD' * SDIFF * (S * HTD * W);
+    % Legendre spectral transform in matrix form
+    STR_L = S * HTD * W;
+    % Legendre spatial derivative based on spectral differentiation
+    DDZ_L = (2.0 / DS.zH) * HTD' * SDIFF * STR_L;
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase, xh', DS, RAY);
     
@@ -171,7 +177,7 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     pause;
 %}
     
-    REFS = struct('ujref',ujref,'dujref',dujref, ...
+    REFS = struct('ujref',ujref,'dujref',dujref,'STR_H',STR_H,'STR_L',STR_L, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref, ...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ_L',DDZ_L, 'RL', RL, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);

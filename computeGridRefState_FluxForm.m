@@ -5,10 +5,11 @@ function [REFS, DOPS] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, 
     % Set the horizontal domain scale
     dscale = 0.5 * DS.L;
     %% Get the Hermite Function derivative matrix and grid (ALTERNATE METHOD)
-    [xo,~] = herdif(NX, 2, dscale, false);
-    [xh,~] = herdif(NX, 2, dscale, true);
-
-    [~,~,w]=hegs(NX);
+    [xo,~,w] = hegs(NX);
+    [xh,~,~] = hegs(NX);
+    b = max(xo) / dscale;
+    xh = (1.0 / b) * xh;
+    
     W = spdiags(w, 0, NX, NX);
 
     [~, HT] = hefunm(NX-1, xo);
@@ -26,12 +27,13 @@ function [REFS, DOPS] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, 
     end
 
     b = max(xo) / dscale;
-    DDX_H = b * HTD' * SDIFF * (HT * W);
+    % Hermite function spectral transform in matrix form
+    STR_H = HT * W;
+    % Hermite function spatial derivative based on spectral differentiation
+    DDX_H = b * HTD' * SDIFF * STR_H;
     
-    %% Get the Chebyshev nodes and compute the vertical derivative matrix
-    %[zlc, ~] = chebdif(NZ, 1);
-    %zlc = 0.5 * (zlc + 1.0);
-    
+    %% Get the Legendre nodes and compute the vertical derivative matrix
+    %{
     [zlc,w]=legslb(NZ);
     zl = DS.zH * (0.5 * (zlc + 1.0));
     W = spdiags(w, 0, NZ, NZ);
@@ -57,7 +59,46 @@ function [REFS, DOPS] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, 
     end
 
     DDZ_L = (2.0 / DS.zH) * HTD' * SDIFF * (S * HTD * W);
+    %}
+    %% Get the Chebyshev nodes and compute the vertical derivative matrix
+    %
+    [zlc,w]=cheblb(NZ);
+    zl = DS.zH * (0.5 * (1.0 - zlc));
+    W = spdiags(w, 0, NZ, NZ);
 
+    HTD = chebpolym(NZ-1, zlc);
+
+    %% Compute scaling for the forward transform
+    s = ones(NZ,1);
+    for ii=1:NZ-1
+        s(ii) = ((HTD(:,ii))' * W * HTD(:,ii))^(-1);
+    end
+    s(NZ) = 1.0 / pi;
+    S = spdiags(s, 0, NZ, NZ);
+    
+    %% Compute the coefficients of spectral derivative in matrix form
+    NM = NZ;
+    SDIFF = zeros(NM,NM);
+    SDIFF(NM,NM) = 0.0;
+    SDIFF(NM-1,NM) = 2.0 * NM;
+
+    for kk = NM-2:-1:1
+        A = 2 * kk;
+        B = 1;
+        if kk > 1
+          c = 1.0;
+        else
+          c = 2.0;
+        end
+        SDIFF(kk,:) = B / c * SDIFF(kk+2,:);
+        SDIFF(kk,kk+1) = A / c;
+    end
+
+    % Chebyshev spectral transform in matrix form
+    STR_L = S * HTD * W;
+    % Chebyshev spatial derivative based on spectral differentiation
+    DDZ_L = - (2.0 / DS.zH) * HTD' * SDIFF * STR_L;
+    %}
     %% Compute the terrain and derivatives
     [ht,dhdx] = computeTopoDerivative(TestCase,xh,DS,RAY);
     
@@ -190,7 +231,7 @@ function [REFS, DOPS] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, 
     pause
 %}
     
-    REFS = struct('ujref',ujref,'dujref',dujref,'dthref',dthref, ...
+    REFS = struct('ujref',ujref,'dujref',dujref,'dthref',dthref,'STR_H',STR_H,'STR_L',STR_L, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref, ...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ_L',DDZ_L, 'RL', RL, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);

@@ -214,11 +214,11 @@ pause;
 % Time step (fraction of a second)
 DT = 0.05;
 % End time in seconds (HR hours)
-HR = 10.0;
+HR = 0.5;
 ET = HR * 60 * 60;
 TI = DT:DT:ET;
 % Output times as an integer multiple of DT
-OTI = 1000;
+OTI = 20;
 
 %% Set storage for solution vectors and initialize
 sol = zeros(length(SOL),5);
@@ -274,7 +274,7 @@ for tt=1:length(TI)
     % Update the solution (currently NOT storing history...)
     sol(sysDex,1) = sol(sysDex,5);
     
-    if mod(tt,5) == 0
+    if mod(tt,OTI) == 0
         RHS = bN - matMul(sol(:,1));
         disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
     end

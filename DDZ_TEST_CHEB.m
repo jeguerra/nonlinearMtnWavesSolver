@@ -40,19 +40,26 @@ end
 %% Compute the spectral based derivative
 b = 1.0 / L;
 DDZ_H1 = HTD' * SDIFF * (S * HTD * W);
-figure; surf(DDZ_H1); shading interp;
+%figure; surf(DDZ_H1); shading interp;
 
 %% Compute using the built-in algorithm (PRODUCES GARBAGE FOR SIZE > 240)
 DDZ_H2 = chebdiff(NZ-1);
-figure; surf(DDZ_H2); shading interp;
+%figure; surf(DDZ_H2); shading interp;
 
 %% Check the difference
-figure; surf(abs(DDZ_H1 - DDZ_H2)); shading interp;
+%figure; surf(abs(DDZ_H1 - DDZ_H2)); shading interp;
 
-%% Test the derivative
-Y = (4.0 * zo) .* cos(2.0 * pi * zo);
-DY = 4.0 * cos(2.0 * pi * zo) - (8.0 * pi * zo) .* sin(2.0 * pi * zo);
-dY_H1 = DDZ_H1 * Y;
-dY_H2 = DDZ_H2 * Y;
+%% Test the derivative on a scaled grid: [-1 1] -> [0 1] (0.5 scaling)
+bs = 0.5;
+zv = bs * (1.0 - zo);
+
+% Make a test function and its derivative
+Y = 4.0 * exp(-2.0 * zv) + cos(4.0 * pi * zv.^2);
+DY = -8.0 * exp(-2.0 * zv) - (8.0 * pi * zv) .* sin(4.0 * pi * zv.^2);
+
+% The grid has been rescaled and so must the derivative matrix
+dY_H1 = -1.0 / bs * DDZ_H1 * Y;
+dY_H2 = -1.0 / bs * DDZ_H2 * Y;
+
 figure;
-plot(zo, Y, zo, dY_H1, zo, dY_H2, zo, DY); legend('Function','Spectral Diff','Built-in Diff','Exact');
+plot(zv, Y, zv, dY_H1, zv, dY_H2, zv, DY); legend('Function','Spectral Diff','Built-in Diff','Exact');

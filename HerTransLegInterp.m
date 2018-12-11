@@ -17,7 +17,7 @@ this way).
 %% Interpolate to a regular grid using Hermite and Legendre transforms
 
 % Get the horizontal Hermite nodes
-xn = herroots(REFS.NX, 1.0);
+[xn,~,~] = hegs(REFS.NX);
 b = max(xn) / DS.l2;
 
 % If the input xint grid is a scalar or all zeros make a regular grid with NXI
@@ -31,7 +31,7 @@ else
 end
 
 % Get the vertical Chebyshev nodes
-[zn,~] = chebdif(REFS.NZ, 1);
+[zn,~] = legslb(REFS.NZ);
 zn = 0.5 * (zn + 1.0);
 
 % If the input zint grid is a scalar or all zeros make a regular grid with NZI
@@ -47,14 +47,13 @@ end
 % Normalize the output grid
 [XINT,ZI] = meshgrid(xint / max(xint) ,zint);
 
-%% Compute the terrain and derivatives
+%% Compute the terrain and derivatives (in the output grid)
 [ht,~] = computeTopoDerivative(REFS.TestCase, xint' / b, DS, RAY);
 
 %% XZ grid for Legendre nodes in the vertical
 [HTZL,~] = meshgrid(ht, DS.zH * zint);
 
-%% High Order Improved Guellrich coordinate
-% 3 parameter function
+% High Order Improved Guellrich coordinate 3 parameter function
 xi = ZI;
 ang = 0.5 * pi * xi;
 AR = 1.0E-3;
@@ -68,13 +67,7 @@ ZINT = (dzdh .* HTZL) + ZI * DS.zH;
 ZLINT = ZI * DS.zH;
 
 %% Get the modal (NX polynomial coefficients) Hermite transform of qxz (NX+1 X NZ)
-HT = hefunm(REFS.NX-1, xn);
-% Compute the weights and apply to all columns
-[~,~,whf] = hegs(REFS.NX);
-whfm = repmat(whf, 1, REFS.NZ);
-% Apply the weighted transformation
-mip = whfm .* qxz';
-qmxz = HT * mip;
+qmxz = REFS.STR_H * qxz';
 
 %% Get the Hermite transform for the interpolated grid and project onto xint
 HT = hefunm(REFS.NX-1, xint);
