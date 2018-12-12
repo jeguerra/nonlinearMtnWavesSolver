@@ -13,7 +13,8 @@ clc
 clear
 close all
 opengl info
-addpath(genpath('/home/jeguerra/Documents/MATLAB/'))
+addpath(genpath('/home/jeguerra/Documents/MATLAB/'));
+startup;
 warning('off');
 
 %% Create the dimensional XZ grid

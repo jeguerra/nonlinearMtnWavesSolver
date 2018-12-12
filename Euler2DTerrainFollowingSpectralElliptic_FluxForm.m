@@ -10,12 +10,13 @@ clc
 clear
 close all
 opengl info
-addpath(genpath('/home/jeguerra/Documents/MATLAB/'))
+addpath(genpath('/home/jeguerra/Documents/MATLAB/'));
+startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 100; % Expansion order matches physical grid
-NZ = 120; % Expansion order matches physical grid
+NX = 80; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 

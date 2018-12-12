@@ -350,7 +350,8 @@ elseif strcmp(TestCase,'AndesMtn') == true
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
 end
 %}
-%
+
+%%
 figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
