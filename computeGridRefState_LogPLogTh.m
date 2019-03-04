@@ -176,49 +176,7 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     thref = exp(lthref);
     thref0 = min(min(thref));
 
-%{
-    %% Plot background fields including mean Ri number
-    figure;
-    subplot(2,2,1);
-    plot(ujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Speed $(m s^{-1})$');
-    ylabel('Height (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    
-    subplot(2,2,2);
-    plot(pref(:,1) ./ (rref(:,1) * BS.Rd),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    %title('Temperature Profile','FontSize',30);
-    xlabel('Temperature (K)');
-    ylabel('Height (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    
-    subplot(2,2,3);
-    plot(thref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Potential Temperature (K)');
-    ylabel('Height (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    
-    subplot(2,2,4);
-    plot(sqrt(BS.ga * dlthref(:,1)),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Brunt-V\"ais\"ala Frequency ($s^{-1}$)');
-    ylabel('Height (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    
-    export_fig('BACKGROUND_PROFILES.png');
-    
-    figure;
-    plot(dujref(:,1),1.0E-3*zl,'k-s','LineWidth',1.5); grid on;
-    xlabel('Shear $(s^{-1})$');
-    ylabel('Height (km)');
-    ylim([0.0 35.0]);
-    drawnow;
-    pause;
-%}
-    
+    %%
     REFS = struct('ujref',ujref,'dujref',dujref,'STR_H',STR_H,'STR_L',STR_L, ...
         'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref, ...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ_L',DDZ_L, 'RL', RL, ...

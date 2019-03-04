@@ -2,7 +2,7 @@
 clc
 addpath(genpath('/home/jeguerra/Documents/MATLAB'));
 L = 40000.0;
-NZ = 400;
+NZ = 128;
 %
 %% Compute using a different implementation
 

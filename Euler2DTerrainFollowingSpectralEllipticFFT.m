@@ -414,9 +414,10 @@ end
 %}
 %% PLOTS
 figure;
-colormap(cmap);
-contourf(XINT,ZINT,uxzint,20); colorbar; grid on; cm = caxis; 
-%contourf(1.0E-3 * XINT,1.0E-3 * ZINT, ujref, 31); colorbar; grid on; cm = caxis;
+%colormap(cmap);
+colormap('jet');
+%contourf(XINT,ZINT,uxzint,20); colorbar; grid on; cm = caxis; 
+contourf(1.0E-3 * XINT,1.0E-3 * ZINT, ujref, 21); colorbar; grid on; cm = caxis;
 %hold on; area(1.0E-3 * XINT(1,:),2.0E-3 * ZINT(1,:),'FaceColor','k'); hold off;
 caxis(cm);
 %xlim(1.0E-3 * [l1 + width l2 - width]);
@@ -425,7 +426,8 @@ caxis(cm);
 %ylim([0 15]);
 disp(['U MAX: ' num2str(max(max(uxz)))]);
 disp(['U MIN: ' num2str(min(min(uxz)))]);
-title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
+%title('\textsf{$U^{\prime} ~~ (ms^{-1})$}');
+title('\textsf{$\bar{U} ~~ (ms^{-1})$}');
 %title('Initial Flow Schematic');
 xlabel('Distance (km)');
 ylabel('Height (km)');
@@ -456,6 +458,41 @@ xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
+
+%%
+%% Plot background fields including mean Ri number
+zl = 1.0E-3 * REFS.ZTL(:,1);
+figure;
+suptitle('Background Profiles');
+subplot(2,2,1);
+plot(REFS.ujref(:,1),zl,'k-s','LineWidth',1.5); grid on;
+xlabel('Speed $(m s^{-1})$');
+ylabel('Height (km)');
+ylim([0.0 35.0]);
+drawnow;
+
+subplot(2,2,2);
+plot(REFS.pref(:,1) ./ (REFS.rref(:,1) * BS.Rd),zl,'k-s','LineWidth',1.5); grid on;
+%title('Temperature Profile','FontSize',30);
+xlabel('Temperature (K)');
+ylabel('Height (km)');
+ylim([0.0 35.0]);
+drawnow;
+
+subplot(2,2,3);
+plot(REFS.thref(:,1),zl,'k-s','LineWidth',1.5); grid on;
+xlabel('Potential Temperature (K)');
+ylabel('Height (km)');
+ylim([0.0 35.0]);
+drawnow;
+
+subplot(2,2,4);
+plot(sqrt(BS.ga * REFS.dlthref(:,1)),zl,'k-s','LineWidth',1.5); grid on;
+xlabel('Brunt-V\"ais\"ala Frequency ($s^{-1}$)');
+ylabel('Height (km)');
+ylim([0.0 35.0]);
+drawnow;
+export_fig('BACKGROUND_PROFILES.png');
 
 %% Debug
 %{

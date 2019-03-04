@@ -18,8 +18,8 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 96; % Expansion order matches physical grid
+NZ = 108; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -204,8 +204,8 @@ pxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 
 %
 %% Use the coarse system solution to accelerate iterative solution of a finer system
-NX = 256;
-NZ = 200;
+NX = 512;
+NZ = 256;
 OPS = NX * NZ;
 
 %% Compute the initialization and grid
