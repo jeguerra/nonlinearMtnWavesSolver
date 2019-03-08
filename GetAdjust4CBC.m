@@ -8,37 +8,26 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
     if BC == 0
         % Create boundary condition indices
         iW = 1;
-        iP = 2;
         iT = 3;
         
         utdex = NZ:NZ:OPS;
         wtdex = utdex + iW*OPS;
-        ptdex = utdex + iT*OPS;    
+        %ttdex = utdex + iT*OPS;    
         ubdex = 1:NZ:(OPS - NZ + 1);
         wbdex = ubdex + iW*OPS;
-        pbdex = ubdex + iT*OPS;
-        
-        % Get indices for the right boundary
-        urdex = (OPS - NZ + 1):OPS;
-        wrdex = urdex + iW*OPS;
-        prdex = urdex + iP*OPS;
-        trdex = urdex + iT*OPS;
+        %tbdex = ubdex + iT*OPS;
         
         disp('Hermite-Lagrange LogP-LogTheta Model...');
-        SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
-        SOL(pbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
+        %SOL(wbdex) = REFS.DZT(1,:) .* REFS.ujref(1,:);
+        %SOL(tbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
-        rowsOut = [utdex wtdex ptdex wbdex pbdex];
-        
-        % Implement X periodicity
-        %rightOut = [urdex wrdex prdex trdex];
-        %rowsOut = [rowsOut rightOut];
+        %rowsOut = [wtdex ttdex wbdex tbdex];
+        rowsOut = [wtdex wbdex];
            
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 1
         % Create boundary condition indices
         iW = 1;
-        iP = 2;
         iT = 3;
         
         utdex = NZ:NZ:OPS;
@@ -55,7 +44,6 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
     elseif BC == 2
         % Create boundary condition indices
         iW = 1;
-        iP = 2;
         iT = 3;
         
         utdex = NZ:NZ:OPS;

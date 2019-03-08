@@ -18,8 +18,8 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 96; % Expansion order matches physical grid
-NZ = 108; % Expansion order matches physical grid
+NX = 80; % Expansion order matches physical grid
+NZ = 100; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -41,9 +41,9 @@ ga = 9.80616;
 p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
-    zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
+    zH = 36000.0;
+    l1 = -1.0E4 * 3.0 * pi;
+    l2 = 1.0E4 * 3.0 * pi;
     %l1 = -6.0E4;
     %l2 = 6.0E4;
     L = abs(l2 - l1);
@@ -63,7 +63,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     applyTopRL = true;
     aC = 5000.0;
     lC = 4000.0;
-    hC = 100.0;
+    hC = 10.0;
     mtnh = [int2str(hC) 'm'];
     hfilt = '';
     u0 = 10.0;
@@ -177,17 +177,25 @@ REFS = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTop
 [LD, FF] = ...
 computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
 
+%% Compute coupled multipoint BC by adjusting columns of LD
+ubdex = 1:NZ:(OPS - NZ + 1);
+wbdex = ubdex + iW*OPS;
+dhdx = spdiags((REFS.DZT(1,:))', 0, NX, NX);
+% Apply column adjustment for the multipoint coupled BC
+LD(:,ubdex) = LD(:,ubdex) + LD(:,wbdex) * dhdx;
+% Compute RHS scaling
+WBC = REFS.DZT(1,:) .* REFS.ujref(1,:);
+
 %% Solve the system by letting matlab \ do its thing...
 %
 disp('Solve by direct Cholesky coarse and ALSQR fine.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = (FF - LD * SOL); clear LD FF;
+b = FF - LD(:,wbdex) * WBC'; clear LD FF;
 % Solve the symmetric normal equations
-%AN = NLD(sysDex,sysDex); clear NLD;
 AN = A' * A;
-bN = A' * b(sysDex,1); clear A b;
+bN = A' * b(sysDex); clear A b;
 toc; disp('Compute coarse coefficient matrix... DONE!');
 %sol = umfpack(AN, '\', bN); clear AN bN;
 sol = cholmod2(AN, bN); clear AN bN;
@@ -196,11 +204,12 @@ toc; disp('Solve the first system by \... DONE!');
 
 %% Get the solution fields
 SOL(sysDex) = sol;
+SOL(wbdex) = REFS.DZT(1,:)' .* (REFS.ujref(1,:)' + SOL(ubdex));
 clear sol;
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 wxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
-rxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
-pxz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
+pxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
+txz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 
 %
 %% Use the coarse system solution to accelerate iterative solution of a finer system
@@ -219,30 +228,46 @@ OPS = NX * NZ;
 zlc = 0.5 * (zlc + 1.0);
 [uxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NX, NZ, xh, zlc);
 [wxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NX, NZ, xh, zlc);
-[rxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NX, NZ, xh, zlc);
 [pxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NX, NZ, xh, zlc);
+[txzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(txz), NX, NZ, xh, zlc);
 REFS = REFSI;
 
-xsol = [reshape(uxzint, OPS, 1); reshape(wxzint, OPS, 1); reshape(rxzint, OPS, 1); reshape(pxzint, OPS, 1)];
+xsol = [reshape(uxzint, OPS, 1); reshape(wxzint, OPS, 1); reshape(pxzint, OPS, 1); reshape(txzint, OPS, 1)];
 toc; disp('Compute coase/fine interpolation... DONE!');
 
 %% Compute the LHS coefficient matrix and force vector for the test case
 tic;
 spparms('spumoni',2);
-b = computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, SOL, []);
+
+%% Compute coupled multipoint BC by adjusting columns of LD
+ZSPR = sparse(OPS,OPS);
+LD = [DOPS.LD11 DOPS.LD12 DOPS.LD13 ZSPR;      ...
+      ZSPR      DOPS.LD22 DOPS.LD23 DOPS.LD24; ...
+      DOPS.LD31 DOPS.LD32 DOPS.LD33 ZSPR;      ...
+      ZSPR      DOPS.LD42 ZSPR      DOPS.LD44];
+ubdex = 1:NZ:(OPS - NZ + 1);
+wbdex = ubdex + iW*OPS;
+dhdx = spdiags((REFSI.DZT(1,:))', 0, NX, NX);
+% Apply column adjustment for the multipoint coupled BC
+LD(:,ubdex) = LD(:,ubdex) + LD(:,wbdex) * dhdx;
+% Compute RHS scaling
+SOL(wbdex) = REFSI.DZT(1,:) .* REFSI.ujref(1,:);
+
+b = computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, SOL, []); clear DOPS;
+AN = LD(sysDex, sysDex);
 bN = - b(sysDex,1); clear b;
 toc; disp('Compute fine RHS... DONE!');
 tic;
 matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
 % Use GMRES to make the initial solution
-[sol, ~, ~, ~, rvc1] = gmres(matMul, bN, 10, 1.0E-6, 10, [], [], xsol(sysDex));
+[sol, ~, ~, ~, rvc1] = gmres(AN, bN, 10, 1.0E-6, 10, [], [], xsol(sysDex));
 % Use ALSQR iterative method preconditioned with GMRES
 matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, DOPS, xVec, sysDex, ntrans);
 OPTS.LTOL = 1.0E-8;
 OPTS.K = 10;
 OPTS.MAXITL = 20;
 OPTS.MAXITP = 20;
-[sol,  ~, rvc3] = alsqr(matMul1, bN, sol, OPTS);
+[sol,  ~, rvc3] = alsqr(AN, bN, sol, OPTS);
 
 toc; disp('Solve by using iterative method with coarser initial guess... DONE!');
 
@@ -251,8 +276,8 @@ SOL(sysDex) = sol;
 clear sol;
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-rxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
-pxz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
+pxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
+txz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
 %}
 %% Plot the solution in the native grids
 %{
@@ -285,8 +310,8 @@ NXI = 3001;
 NZI = 451;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
-[rxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(rxz), NXI, NZI, 0, 0);
 [pxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NXI, NZI, 0, 0);
+[ptxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(txz), NXI, NZI, 0, 0);
 
 XI = l2 * XINT;
 ZI = ZINT;
@@ -339,18 +364,18 @@ ylabel('Height (km)');
 %
 figure;
 colormap(cmap);
-subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,rxzint,31); colorbar; grid on;
+subplot(1,2,1); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln p)^{\prime} ~~ (Pa)$');
-subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,pxzint,31); colorbar; grid on;
+subplot(1,2,2); contourf(1.0E-3 * XI,1.0E-3 * ZI,txzint,31); colorbar; grid on;
 xlim(1.0E-3 * [l1 + width l2 - width]);
 ylim(1.0E-3 * [0.0 zH - depth]);
 title('$(\ln \theta)^{\prime} ~~ (K)$');
 drawnow
 %
 %% Compute some of the fields needed for instability checks
-lpt = REFS.lthref + pxz;
+lpt = REFS.lthref + txz;
 pt = exp(lpt);
 lp = REFS.lpref + rxz;
 p = exp(lp);
@@ -365,7 +390,7 @@ DDZ_BC = REFS.DDZ_L;
 dlrho = REFS.dlrref + REFS.sigma .* (DDZ_BC * (log(rho) - REFS.lrref));
 duj = REFS.dujref + REFS.sigma .* (DDZ_BC * real(uxz));
 
-dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(pxz));
+dlpt = REFS.dlthref + REFS.sigma .* (DDZ_BC * real(txz));
 temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
@@ -430,7 +455,7 @@ drawnow
 %}
 
 %% Save the data
-%{
+%
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);
