@@ -42,6 +42,6 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        # Hermite function spatial derivative based on spectral differentiation
        DDM = b * np.matmul(np.matmul(HTD.T, SDIFF), STR_H);
        
-       return DDM
+       return DDM, STR_H
        
        

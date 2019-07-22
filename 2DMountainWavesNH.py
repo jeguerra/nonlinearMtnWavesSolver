@@ -18,13 +18,13 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 
 import sys
 import numpy as np
-from scipy import linalg as las
 import math as mt
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from computeGrid import computeGrid
+from computeColumnInterp import computeColumnInterp
 from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
 from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
@@ -32,6 +32,7 @@ from computeGuellrichDomain2D import computeGuellrichDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
+from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 
 if __name__ == '__main__':
        
@@ -41,7 +42,9 @@ if __name__ == '__main__':
        cp = 1004.5
        Rd = 287.06
        Kp = Rd / cp
-       PHYS = [gc, P0, cp, Rd, Kp]
+       cv = cp - Rd
+       gam = cp / cv
+       PHYS = [gc, P0, cp, Rd, Kp, cv, gam]
        
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
@@ -61,8 +64,12 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS)
        
        # Compute the raw derivative matrix operators in alpha-xi computational space
-       DDX_OP = computeHermiteFunctionDerivativeMatrix(DIMS)
-       DDZ_OP = computeChebyshevDerivativeMatrix(DIMS)
+       DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
+       DDZ_1D, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
+       
+       # Update the REFS collection
+       REFS.append(DDX_1D)
+       REFS.append(DDZ_1D)
        
        ''' #Spot check the derivative matrix
        fig = plt.figure()
@@ -73,7 +80,7 @@ if __name__ == '__main__':
        surf = ax.plot_surface(X, Y, DDX_OP, cmap=cm.coolwarm, linewidth=0)
        '''
        
-       # Read in topography profile or compute from analytical function
+       #%% Read in topography profile or compute from analytical function
        AGNESI = 1 # "Witch of Agnesi" profile
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
        EXPCOS = 3 # Even exponential and squared cosines product
@@ -82,7 +89,7 @@ if __name__ == '__main__':
        HofX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Compute the terrain derivatives...
-       dHdX = np.matmul(DDX_OP, HofX.T) 
+       dHdX = np.matmul(DDX_1D, HofX.T) 
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
@@ -92,11 +99,7 @@ if __name__ == '__main__':
        REFS.append(DZT)
        REFS.append(sigma)
        
-       # Update the REFS collection
-       REFS.append(DDX_OP)
-       REFS.append(DDZ_OP)
-       
-       # Read in sensible or potential temperature soundings (corner points)
+       #%% Read in sensible or potential temperature soundings (corner points)
        T_in = [300.0, 228.5, 228.5, 244.5]
        Z_in = [0.0, 1.1E4, 2.0E4, 3.6E4]
        SENSIBLE = 1
@@ -105,11 +108,46 @@ if __name__ == '__main__':
        TofZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS)
        # Compute background fields on the vertical
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TofZ, SENSIBLE) 
+              computeThermoMassFields(PHYS, DIMS, REFS, TofZ, SENSIBLE)
+              
+       # Compute the ratio of pressure to density:
+       POR = np.multiply(PZ, np.reciprocal(RHO))
+       plt.plot(POR)
+       plt.figure()
        
        # Read in or compute background horizontal wind profile
        MEANJET = 1 # Analytical smooth jet profile
        JETOPS = [10.0, 16.822, 1.386]
 
-       UofZ, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
-
+       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
+       
+       #%% Compute the background gradients in physical 2D space with SIGMA
+       dUdz = np.expand_dims(dUdz, axis=1)
+       DUDZ = np.tile(dUdz, NX)
+       DUDZ = np.multiply(sigma, DUDZ)
+       dlnPdz = np.expand_dims(dlnPdz, axis=1)
+       DLPDZ = np.tile(dlnPdz, NX)
+       DLPDZ = np.multiply(sigma, DLPDZ)
+       dlnPTdz = np.expand_dims(dlnPTdz, axis=1)
+       DLPTDZ = np.tile(dlnPTdz, NX)
+       DLPTDZ = np.multiply(sigma, DLPTDZ)
+       
+       # The following need to be interpolated on a column basis
+       POR = np.expand_dims(POR, axis=1)
+       PORZ = np.tile(POR, NX)
+       PORZ = computeColumnInterp(DIMS, ZTL, PORZ, CH_TRANS)
+       U = np.expand_dims(U, axis=1)
+       UZ = np.tile(U, NX)
+       UZ = computeColumnInterp(DIMS, ZTL, UZ, CH_TRANS)
+       
+       # Update the REFS collection
+       REFS.append(UZ)
+       REFS.append(PORZ)
+       REFS.append(DUDZ)
+       REFS.append(DLPDZ)
+       REFS.append(DLPTDZ)
+       
+       
+       #%% Get the 2D operators...
+       OPS = NX * NZ
+       DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)

@@ -133,7 +133,7 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, TempType):
        Kp = PHYS[4]
        
        # Get REFS data
-       DDZ = REFS[7]
+       DDZ = REFS[3]
        
        # Solve for background pressure by hydrostatic balance
        if TempType == 1:

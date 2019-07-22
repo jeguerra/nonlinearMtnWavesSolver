@@ -52,10 +52,10 @@ def computeChebyshevDerivativeMatrix(DIMS):
     
        # Chebyshev spectral transform in matrix form
        temp = np.matmul(CTD, W)
-       STR_L = np.matmul(S, temp);
+       STR_C = np.matmul(S, temp);
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
        temp = np.matmul(CTD.T, SDIFF)
-       DDM = - (2.0 / ZH) * np.matmul(temp, STR_L);
+       DDM = - (2.0 / ZH) * np.matmul(temp, STR_C);
        
-       return DDM
+       return DDM, STR_C
