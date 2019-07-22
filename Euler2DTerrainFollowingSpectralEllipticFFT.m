@@ -435,7 +435,7 @@ export_fig(['UREferenceSolution' mtnh '.png']);
 %%
 figure;
 colormap(cmap);
-contourf(XINT,ZINT,wxzint,20); colorbar; grid on; cm = caxis;
+contourf(XINT,ZINT,wxzint,20,'LineWidth',0.25); colorbar; grid on; cm = caxis;
 hold on; area(1.0E-3 * XINT(1,:),1.0E-3 * ZINT(1,:),'FaceColor','k'); hold off;
 caxis(cm);
 %xlim(1.0E-3 * [l1 + width l2 - width]);
@@ -445,7 +445,7 @@ caxis(cm);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 xlabel('Distance (km)');
 ylabel('Height (km)');
-%screen2png(['WREferenceSolution' mtnh '.png']);
+export_fig(['WREferenceSolution' mtnh '.png']);
 %%
 figure;
 colormap(cmap);

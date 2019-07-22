@@ -18,8 +18,8 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 128; % Expansion order matches physical grid
+NZ = 96; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -56,7 +56,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 10000.0;
-    width = 15000.0;
+    width = 20000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
@@ -168,14 +168,19 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the initialization and grid
-REFS = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+[REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 %% Get the boundary conditions
 [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
 
 %% Compute the LHS coefficient matrix and force vector for the test case
-[LD, FF] = ...
-computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
+%[LD, FF] = ...
+%computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
+ZSPR = sparse(OPS,OPS);
+LD = [DOPS.LD11 DOPS.LD12 DOPS.LD13 ZSPR;      ...
+      ZSPR      DOPS.LD22 DOPS.LD23 DOPS.LD24; ...
+      DOPS.LD31 DOPS.LD32 DOPS.LD33 ZSPR;      ...
+      ZSPR      DOPS.LD42 ZSPR      DOPS.LD44];
 
 %% Compute coupled multipoint BC by adjusting columns of LD
 ubdex = 1:NZ:(OPS - NZ + 1);
@@ -192,13 +197,14 @@ disp('Solve by direct Cholesky coarse and ALSQR fine.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = FF - LD(:,wbdex) * WBC'; clear LD FF;
+b = -LD(:,wbdex) * WBC'; clear LD FF;
 % Solve the symmetric normal equations
 AN = A' * A;
 bN = A' * b(sysDex); clear A b;
 toc; disp('Compute coarse coefficient matrix... DONE!');
 %sol = umfpack(AN, '\', bN); clear AN bN;
-sol = cholmod2(AN, bN); clear AN bN;
+%sol = cholmod2(AN, bN); clear AN bN;
+sol = AN \ bN; clear AN bN
 toc; disp('Solve the first system by \... DONE!');
 %pause;
 
@@ -211,10 +217,11 @@ wxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
 txz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 
-%
+%% Here we can turn off the fine grid extension
+%{
 %% Use the coarse system solution to accelerate iterative solution of a finer system
-NX = 512;
-NZ = 256;
+NX = 300;
+NZ = 140;
 OPS = NX * NZ;
 
 %% Compute the initialization and grid
@@ -311,7 +318,7 @@ NZI = 451;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
 [pxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NXI, NZI, 0, 0);
-[ptxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(txz), NXI, NZI, 0, 0);
+[txzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(txz), NXI, NZI, 0, 0);
 
 XI = l2 * XINT;
 ZI = ZINT;
@@ -338,7 +345,7 @@ elseif strcmp(TestCase,'AndesMtn') == true
     [ujref,dujref] = computeJetProfile(UJ, BS.p0, lpref, dlpref);
 end
 %}
-%
+%%
 figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
@@ -377,7 +384,7 @@ drawnow
 %% Compute some of the fields needed for instability checks
 lpt = REFS.lthref + txz;
 pt = exp(lpt);
-lp = REFS.lpref + rxz;
+lp = REFS.lpref + pxz;
 p = exp(lp);
 P = REFS.pref;
 PT = REFS.thref;
@@ -395,7 +402,7 @@ temp = p ./ (Rd * rho);
 conv = temp .* dlpt;
 
 Ri = ga * dlpt ./ (duj.^2);
-RiREF = -BS.ga * REFS.dlrref(:,1);
+RiREF = BS.ga * REFS.dlthref(:,1);
 RiREF = RiREF ./ (REFS.dujref(:,1).^2);
 
 xdex = 1:1:NX;
@@ -455,7 +462,7 @@ drawnow
 %}
 
 %% Save the data
-%
+%{
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

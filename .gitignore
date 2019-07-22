@@ -14,3 +14,5 @@ ResidualMtSolve.m
 *.m~
 
 octave-workspace
+
+*.pyc

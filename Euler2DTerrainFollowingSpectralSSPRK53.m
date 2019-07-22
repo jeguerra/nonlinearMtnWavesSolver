@@ -16,9 +16,12 @@ NX = 128; % Expansion order matches physical grid
 NZ = 96; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
+iW = 1;
+iP = 2;
+iT = 3;
 
 %% Set the test case and global parameters
-TestCase = 'ShearJetSchar'; BC = 3;
+TestCase = 'ShearJetSchar'; BC = 0;
 %TestCase = 'ShearJetScharCBVF'; BC = 3;
 %TestCase = 'ClassicalSchar'; BC = 3;
 %TestCase = 'AndesMtn'; BC = 3;
@@ -32,9 +35,9 @@ ga = 9.80616;
 p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
-    zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
+    zH = 36000.0;
+    l1 = -1.0E4 * 3.0 * pi;
+    l2 = 1.0E4 * 3.0 * pi;
     L = abs(l2 - l1);
     GAMT = -0.0065;
     HT = 11000.0;
@@ -45,7 +48,7 @@ if strcmp(TestCase,'ShearJetSchar') == true
     BVF = 0.0;
     hfactor = 1.0;
     depth = 10000.0;
-    width = 15000.0;
+    width = 20000.0;
     nu1 = hfactor * 1.0E-2; nu2 = hfactor * 1.0E-2;
     nu3 = hfactor * 1.0E-2; nu4 = hfactor * 1.0E-2;
     applyLateralRL = true;
@@ -158,8 +161,41 @@ RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4
 %% Get the boundary conditions
 [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS);
 
-[~,bN] = ...
-computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
+%% Compute the LHS coefficient matrix and force vector for the test case
+%[LD, FF] = ...
+%computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS);
+ZSPR = sparse(OPS,OPS);
+%{
+LD = [DOPS.LD11 DOPS.LD12 DOPS.LD13 ZSPR;      ...
+      ZSPR      DOPS.LD22 DOPS.LD23 DOPS.LD24; ...
+      DOPS.LD31 DOPS.LD32 DOPS.LD33 ZSPR;      ...
+      ZSPR      DOPS.LD42 ZSPR      DOPS.LD44];
+%}
+LD1 = [DOPS.LD11 ZSPR ZSPR ZSPR;            ...
+       ZSPR      DOPS.LD22 ZSPR ZSPR;       ...
+       ZSPR ZSPR            DOPS.LD33 ZSPR; ...
+       ZSPR ZSPR ZSPR                 DOPS.LD44];
+  
+LD2 = [ZSPR      DOPS.LD12 DOPS.LD13 ZSPR;      ...
+       ZSPR      ZSPR      DOPS.LD23 DOPS.LD24; ...
+       DOPS.LD31 DOPS.LD32 ZSPR      ZSPR;      ...
+       ZSPR      DOPS.LD42 ZSPR      ZSPR]; 
+
+%% Compute coupled multipoint BC by adjusting columns of LD
+ubdex = 1:NZ:(OPS - NZ + 1);
+wbdex = ubdex + iW*OPS;
+dhdx = spdiags((REFS.DZT(1,:))', 0, NX, NX);
+% Apply column adjustment for the multipoint coupled BC
+LD1(:,ubdex) = LD1(:,ubdex) + LD1(:,wbdex) * dhdx;
+LD2(:,ubdex) = LD2(:,ubdex) + LD2(:,wbdex) * dhdx;
+% Compute RHS scaling
+WBC = REFS.DZT(1,:) .* REFS.ujref(1,:);
+
+%% Apply boundary forcing and set up the system
+AN1 = LD1(sysDex,sysDex);
+AN2 = LD2(sysDex,sysDex);
+b = -(LD1(:,wbdex) * WBC') - (LD2(:,wbdex) * WBC'); clear LD1 LD2;
+bN = b(sysDex); clear b;
 
 %% Solve the hyperbolic problem using SSP-RK53
 %{
@@ -212,34 +248,114 @@ pause;
 %}
 %}
 % Time step (fraction of a second)
-DT = 0.05;
+DT = 0.06;
 % End time in seconds (HR hours)
-HR = 0.5;
+HR = 5.0;
 ET = HR * 60 * 60;
 TI = DT:DT:ET;
 % Output times as an integer multiple of DT
-OTI = 20;
+OTI = 50;
 
+%% Set storage for solution vectors and initialize
+sol = zeros(length(SOL),3);
+for ss=1:2
+    sol(:,ss) = SOL;
+end
+
+%% Index arrays for prognostic components
+udex = 1:OPS;
+wdex = iW*OPS+1:iP*OPS;
+pdex = iP*OPS+1:iT*OPS;
+tdex = iT*OPS+1:numVar*OPS;
+
+%% Explicit SSP RK93 in low storage form
+tic
+c1 = 1.0 / 6.0;
+c2 = 1.0 / 5.0;
+% Initialize the RHS
+RHS = bN - AN1 * sol(sysDex,1) - AN2 * sol(sysDex,1);
+for tt=1:length(TI)
+    if mod(tt,10) == 0
+        % Compute the nonlinear operator for residual diffusion (EXPENSIVE)
+        sol(sysDex,3) = RHS;
+        RVD = computeResidualViscOperator_LogPLogTh(REFS, sol(:,3));
+        % Apply to potential temperature only
+        rvt = RVD.RVD44 * sol(tdex,1);
+        % Put viscosity tendency in auxiliary storage
+        sol(sysDex,3) = 0.0 * sol(sysDex,3);
+        sol(tdex,3) = rvt; clear rvt;
+    else
+        sol(sysDex,3) = 0.0 * sol(sysDex,3);
+    end
+    % First stage
+    sol(sysDex,1) = sol(sysDex,1) +  c1 * DT * (RHS + sol(sysDex,3));
+    % Copy to the second storage
+    sol(sysDex,2) = sol(sysDex,1);
+    % Compute stages 2 to 5
+    for ii=2:5
+        sol(sysDex,1) = sol(sysDex,1) + c1 * DT * (RHS + sol(sysDex,3));
+        % Update the RHS
+        RHS = bN - AN1 * sol(sysDex,1) - AN2 * sol(sysDex,1);
+        %{
+        spmd(2)
+            if labindex == 1
+                rhs = AN1 * sol(sysDex,1);
+            else
+                rhs = AN2 * sol(sysDex,1);
+            end
+        end
+        RHS = bN - rhs{1} - rhs{2};
+        %}
+    end
+    % Compute stage 6
+    sol(sysDex,1) = 3.0 * sol(sysDex,2) + 2.0 * ...
+        (sol(sysDex,1) +  c1 * DT * (RHS + sol(sysDex,3)));
+    sol(sysDex,1) = c2 * sol(sysDex,1);
+    % Compute stages 7 to 9
+    for ii=7:9
+        sol(sysDex,1) = sol(sysDex,1) + c1 * DT * (RHS + sol(sysDex,3));
+        % Update the RHS
+        RHS = bN - AN1 * sol(sysDex,1) - AN2 * sol(sysDex,1);
+        %{
+        spmd(2)
+            if labindex == 1
+                rhs = AN1 * sol(sysDex,1);
+            else
+                rhs = AN2 * sol(sysDex,1);
+            end
+        end
+        RHS = bN - rhs{1} - rhs{2};
+        %}
+    end
+    
+    % Update the solution 
+    if mod(tt,OTI) == 0
+        disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
+    end
+    
+    % Zero out auxiliary storage
+    sol(sysDex,3) = 0.0 * sol(sysDex,3);
+end
+%{
 %% Set storage for solution vectors and initialize
 sol = zeros(length(SOL),5);
 for ss=1:5
     sol(:,ss) = SOL;
-end 
-
-%% Explitcit SSP RK53
-%
+end     
+    
+%% Explitcit SSP RK53 with full storage
 tic
-matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFS, DOPS, xVec, 1:numVar*OPS);
+%matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFS, DOPS, xVec, 1:numVar*OPS);
 for tt=1:length(TI)
     % Initialize the RHS
-    %RHS = bN - AN * sol(:,1);
-    RHS = bN - matMul(sol(:,1));
+    RHS = bN - AN * sol(sysDex,1);
+    %RHS = bN - matMul(sol(:,1));
     % Stage 1
     c1 = 0.377268915331368;
-    sol(sysDex,2) = sol(sysDex,1) + c1 * DT * RHS(sysDex);
-    %RHS = bN - AN * sol(:,2);
-    RHS = bN - matMul(sol(:,2));
-    sol(sysDex,3) = sol(sysDex,2) + c1 * DT * RHS(sysDex);
+    sol(sysDex,2) = sol(sysDex,1) + c1 * DT * RHS;
+    RHS = bN - AN * sol(sysDex,2);
+    %RHS = bN - matMul(sol(:,2));
+    sol(sysDex,3) = sol(sysDex,2) + c1 * DT * RHS;
     % First linear combination
     LC1_s0 = 0.355909775063327;
     LC1_s2 = 0.644090224936674;
@@ -247,9 +363,9 @@ for tt=1:length(TI)
     %
     % Stage 2
     c2 = 0.242995220537396;
-    %RHS = bN - AN * sol(:,3);
-    RHS = bN - matMul(sol(:,3));
-    sol(sysDex,4) = sol(sysDex,4) + c2 * DT * RHS(sysDex);
+    RHS = bN - AN * sol(sysDex,3);
+    %RHS = bN - matMul(sol(:,3));
+    sol(sysDex,4) = sol(sysDex,4) + c2 * DT * RHS;
     % Second linear combination
     LC2_s0 = 0.367933791638137;
     LC2_s3 = 0.632066208361863;
@@ -257,9 +373,9 @@ for tt=1:length(TI)
     %
     % Stage 3
     c3 = 0.238458932846290;
-    %RHS = bN - AN * sol(:,4);
-    RHS = bN - matMul(sol(:,4));
-    sol(sysDex,1) = sol(sysDex,1) + c3 * DT * RHS(sysDex);
+    RHS = bN - AN * sol(sysDex,4);
+    %RHS = bN - matMul(sol(:,4));
+    sol(sysDex,1) = sol(sysDex,1) + c3 * DT * RHS;
     % Third linear combination
     LC3_s0 = 0.762406163401431;
     LC3_s2 = 0.237593836598569;
@@ -267,15 +383,15 @@ for tt=1:length(TI)
     %
     % Stage 4
     c4 = 0.287632146308408;
-    %RHS = bN - AN * sol(:,1);
-    RHS = bN - matMul(sol(:,1));
-    sol(sysDex,5) = sol(sysDex,5) + c4 * DT * RHS(sysDex);
+    RHS = bN - AN * sol(sysDex,1);
+    %RHS = bN - matMul(sol(:,1));
+    sol(sysDex,5) = sol(sysDex,5) + c4 * DT * RHS;
     %
     % Update the solution (currently NOT storing history...)
     sol(sysDex,1) = sol(sysDex,5);
     
     if mod(tt,OTI) == 0
-        RHS = bN - matMul(sol(:,1));
+        RHS = bN - AN * sol(sysDex,1);
         disp(['Time: ' num2str((tt-1)*DT) ' RHS Norm: ' num2str(norm(RHS))]);
     end
 end
@@ -359,7 +475,7 @@ end
 %}
 dlthref = 1.0 / BS.gam * dlpref - dlrref;
 
-%
+%%
 figure;
 colormap(cmap);
 contourf(1.0E-3 * XI,1.0E-3 * ZI,uxzint,31); colorbar; grid on; cm = caxis;
@@ -419,7 +535,7 @@ drawnow
 %}
 
 %% Save the data
-%
+%{
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER' char(TestCase) int2str(hC) '.mat'];
 save(fileStore);

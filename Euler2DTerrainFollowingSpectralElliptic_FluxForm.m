@@ -15,10 +15,13 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 80; % Expansion order matches physical grid
-NZ = 100; % Expansion order matches physical grid
+NX = 128; % Expansion order matches physical grid
+NZ = 84; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
+iW = 1;
+iP = 2;
+iT = 3;
 
 %% Set the test case and global parameters
 TestCase = 'ShearJetSchar'; BC = 1;
@@ -35,9 +38,9 @@ ga = 9.80616;
 p0 = 1.0E5;
 kappa = Rd / cp;
 if strcmp(TestCase,'ShearJetSchar') == true
-    zH = 35000.0;
-    l1 = -1.0E4 * 2.0 * pi;
-    l2 = 1.0E4 * 2.0 * pi;
+    zH = 36000.0;
+    l1 = -1.0E4 * 3.0 * pi;
+    l2 = 1.0E4 * 3.0 * pi;
     %l1 = -6.0E4;
     %l2 = 6.0E4;
     L = abs(l2 - l1);
@@ -167,24 +170,35 @@ REFS = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopR
 [LD,FF] = ...
 computeCoeffMatrixForce_FluxForm(BS, RAY, REFS);
 
-%% Solve the system using the matlab linear solver
+%% Compute coupled multipoint BC by adjusting columns of LD
+ubdex = 1:NZ:(OPS - NZ + 1);
+wbdex = ubdex + iW*OPS;
+dhdx = spdiags((REFS.DZT(1,:))', 0, NX, NX);
+% Apply column adjustment for the multipoint coupled BC
+LD(:,ubdex) = LD(:,ubdex) + LD(:,wbdex) * dhdx;
+% Compute RHS scaling
+WBC = REFS.DZT(1,:) .* REFS.rref(1,:) .* REFS.ujref(1,:);
+
+%% Solve the system by letting matlab \ do its thing...
 %
-disp('Solve by using matlab \ only.');
+disp('Solve by direct Cholesky coarse and ALSQR fine.');
 tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
-b = (FF - LD * SOL);
-% Normal equations to make the system symmetric
+b = FF - LD(:,wbdex) * WBC'; clear LD FF;
+% Solve the symmetric normal equations
 AN = A' * A;
-bN = A' * b(sysDex,1);
-toc; disp('Compute coefficient matrix... DONE.');
-clear A b LD FF;
-sol = (AN \ bN);
-%sol = cholmod2(AN, bN);
-toc; disp('Solve the system... DONE.');
-clear AN bN
+bN = A' * b(sysDex); clear A b;
+toc; disp('Compute coarse coefficient matrix... DONE!');
+%sol = umfpack(AN, '\', bN); clear AN bN;
+%sol = cholmod2(AN, bN); clear AN bN;
+sol = AN \ bN; clear AN bN
+toc; disp('Solve the first system by \... DONE!');
+%pause; 
+
 %% Get the solution fields
 SOL(sysDex) = sol;
+SOL(wbdex) = REFS.DZT(1,:)' .* ((REFS.rref(1,:) .* REFS.ujref(1,:))' + SOL(ubdex));
 clear sol;
 ruxz = reshape(SOL((1:OPS)),NZ,NX);
 rwxz = reshape(SOL((1:OPS) + OPS),NZ,NX);

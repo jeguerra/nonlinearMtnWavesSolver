@@ -2,32 +2,22 @@ function [LD, FF] = computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS)
     %% Set the dimensions
     OPS = REFS.NX * REFS.NZ;
     
-    %% Unwrap the derivative matrices into operator for 2D implementation
+    %% Fetch the derivative matrices into operator for 2D implementation
     
     % Compute the vertical derivatives operator (Lagrange expansion)
-    DDXI_OP = spalloc(OPS, OPS, REFS.NX *REFS.NZ^2);
-    for cc=1:REFS.NX
-        ddex = (1:REFS.NZ) + (cc - 1) * REFS.NZ;
-        DDXI_OP(ddex,ddex) = REFS.DDZ_L;
-    end
+    DDZ_OP = REFS.DDZ_OP;
 
     % Compute the horizontal derivatives operator (Hermite Function expansion)
-    DDA_OP = spalloc(OPS, OPS, REFS.NZ * REFS.NX^2);
-    for rr=1:REFS.NZ
-        ddex = (1:REFS.NZ:OPS) + (rr - 1);
-        DDA_OP(ddex,ddex) = REFS.DDX_H;
-    end
+    DDX_OP = REFS.DDX_OP;
 
     %% Assemble the block global operator L
-    SIGMA = spdiags(reshape(REFS.sigma,OPS,1), 0, OPS, OPS);
     U0 = spdiags(reshape(REFS.ujref,OPS,1), 0, OPS, OPS);
     DUDZ = spdiags(reshape(REFS.dujref,OPS,1), 0, OPS, OPS);
     DLPDZ = spdiags(reshape(REFS.dlpref,OPS,1), 0, OPS, OPS);
     DLRDZ = spdiags(reshape(REFS.dlrref,OPS,1), 0, OPS, OPS);
     DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ);
     POR = spdiags(reshape(REFS.pref ./ REFS.rref,OPS,1), 0, OPS, OPS);
-    DX = DDA_OP;
-    U0DX = U0 * DX;
+    U0DX = U0 * DDX_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
 
     RAYM = spdiags(REFS.RL,0, OPS, OPS);
@@ -35,16 +25,16 @@ function [LD, FF] = computeCoeffMatrixForce_LogPLogTh(BS, RAY, REFS)
     % Horizontal momentum LHS
     LD11 = U0DX + RAY.nu1 * RAYM;
     LD12 = DUDZ;
-    LD13 = POR * DX;
+    LD13 = POR * DDX_OP;
     LD14 = ZSPR;
     % Vertical momentum LHS
     LD21 = ZSPR;
     LD22 = U0DX + RAY.nu2 * RAYM;
-    LD23 = POR * SIGMA * DDXI_OP + BS.ga * (1.0 / BS.gam - 1.0) * unit;
+    LD23 = POR * DDZ_OP + BS.ga * (1.0 / BS.gam - 1.0) * unit;
     LD24 = - BS.ga * unit;
     % Continuity (log pressure) LHS
-    LD31 = BS.gam * DDA_OP;
-    LD32 = BS.gam * SIGMA * DDXI_OP + DLPDZ;
+    LD31 = BS.gam * DDX_OP;
+    LD32 = BS.gam * DDZ_OP + DLPDZ;
     LD33 = U0DX + RAY.nu3 * RAYM;
     LD34 = ZSPR;
     % Thermodynamic LHS

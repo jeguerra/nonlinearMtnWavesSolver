@@ -36,7 +36,7 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
         wbdex = ubdex + iW*OPS;
         
         disp('Hermite-Lagrange Rho-RhoTheta Model, Dirichlet Lateral BC...');
-        SOL(wbdex) = REFS.DZT(1,:) .* REFS.rref(1,:) .* REFS.ujref(1,:);
+        %SOL(wbdex) = REFS.DZT(1,:) .* REFS.rref(1,:) .* REFS.ujref(1,:);
         
         rowsOut = [wtdex wbdex];
                

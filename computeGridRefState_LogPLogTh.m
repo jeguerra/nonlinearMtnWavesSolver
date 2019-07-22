@@ -7,10 +7,10 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     dscale = 0.5 * DS.L;
     %
     %% Get the Hermite Function derivative matrix and grid (ALTERNATE METHOD)
+    % compute nodes/weights forward transform
     [xo,~,w] = hegs(NX);
-    [xh,~,~] = hegs(NX);
     b = max(xo) / dscale;
-    xh = (1.0 / b) * xh;
+    xh = (1.0 / b) * xo;
 
     W = spdiags(w, 0, NX, NX);
 
@@ -32,6 +32,7 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     STR_H = HT * W;
     % Hermite function spatial derivative based on spectral differentiation
     DDX_H = b * HTD' * SDIFF * STR_H;
+    %DDX2_H = b * HTD' * SDIFF * SDIFF * STR_H;
     
     %% Make the X derivative matrix periodic (NOT NEEDED)
     %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
@@ -105,6 +106,7 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     STR_L = S * HTD * W;
     % Chebyshev spatial derivative based on spectral differentiation
     DDZ_L = - (2.0 / DS.zH) * HTD' * SDIFF * STR_L;
+    %DDZ2_L = - (2.0 / DS.zH) * HTD' * SDIFF * SDIFF * STR_L;
     %}
     
     %% Compute the terrain and derivatives
@@ -175,55 +177,49 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
         BS.Rd / BS.cp * log(BS.p0) - log(BS.Rd);
     thref = exp(lthref);
     thref0 = min(min(thref));
-
-    %%
-    REFS = struct('ujref',ujref,'dujref',dujref,'STR_H',STR_H,'STR_L',STR_L, ...
-        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref, ...
-        'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ_L',DDZ_L, 'RL', RL, ...
-        'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
     
     %% Unwrap the derivative matrices into operator for 2D implementation
     
     % Compute the vertical derivatives operator (Lagrange expansion)
-    DDXI_OP = spalloc(OPS, OPS, REFS.NX *REFS.NZ^2);
-    for cc=1:REFS.NX
-        ddex = (1:REFS.NZ) + (cc - 1) * REFS.NZ;
-        DDXI_OP(ddex,ddex) = REFS.DDZ_L;
+    DDXI_OP = spalloc(OPS, OPS, NX * NZ^2);
+    for cc=1:NX
+        ddex = (1:NZ) + (cc - 1) * NZ;
+        DDXI_OP(ddex,ddex) = DDZ_L;
     end
+    SIGMA = spdiags(reshape(sigma,OPS,1), 0, OPS, OPS);
+    DDZ_OP = SIGMA * DDXI_OP; clear DDXI_OP;
 
     % Compute the horizontal derivatives operator (Hermite Function expansion)
-    DDA_OP = spalloc(OPS, OPS, REFS.NZ * REFS.NX^2);
-    for rr=1:REFS.NZ
-        ddex = (1:REFS.NZ:OPS) + (rr - 1);
-        DDA_OP(ddex,ddex) = REFS.DDX_H;
+    DDX_OP = spalloc(OPS, OPS, NZ * NX^2);
+    for rr=1:NZ
+        ddex = (1:NZ:OPS) + (rr - 1);
+        DDX_OP(ddex,ddex) = DDX_H;
     end
     
     %% Assemble the block global operator L
-    SIGMA = spdiags(reshape(REFS.sigma,OPS,1), 0, OPS, OPS);
-    U0 = spdiags(reshape(REFS.ujref,OPS,1), 0, OPS, OPS);
-    DUDZ = spdiags(reshape(REFS.dujref,OPS,1), 0, OPS, OPS);
-    DLPDZ = spdiags(reshape(REFS.dlpref,OPS,1), 0, OPS, OPS);
-    DLRDZ = spdiags(reshape(REFS.dlrref,OPS,1), 0, OPS, OPS);
+    U0 = spdiags(reshape(ujref,OPS,1), 0, OPS, OPS);
+    DUDZ = spdiags(reshape(dujref,OPS,1), 0, OPS, OPS);
+    DLPDZ = spdiags(reshape(dlpref,OPS,1), 0, OPS, OPS);
+    DLRDZ = spdiags(reshape(dlrref,OPS,1), 0, OPS, OPS);
     DLPTDZ = (1.0 / BS.gam * DLPDZ - DLRDZ);
-    POR = spdiags(reshape(REFS.pref ./ REFS.rref,OPS,1), 0, OPS, OPS);
-    DX = DDA_OP;
-    U0DX = U0 * DX;
+    POR = spdiags(reshape(pref ./ rref,OPS,1), 0, OPS, OPS);
+    U0DX = U0 * DDX_OP;
     unit = spdiags(ones(OPS,1),0, OPS, OPS);
-    RAYM = spdiags(REFS.RL,0, OPS, OPS);
+    RAYM = spdiags(RL,0, OPS, OPS);
     
     % Horizontal momentum LHS
     LD11 = U0DX + RAY.nu1 * RAYM;
     LD12 = DUDZ;
-    LD13 = POR * DX;
+    LD13 = POR * DDX_OP;
     %LD14 = ZSPR;
     % Vertical momentum LHS
     %LD21 = ZSPR;
     LD22 = U0DX + RAY.nu2 * RAYM;
-    LD23 = POR * SIGMA * DDXI_OP + BS.ga * (1.0 / BS.gam - 1.0) * unit;
+    LD23 = POR * DDZ_OP + BS.ga * (1.0 / BS.gam - 1.0) * unit;
     LD24 = - BS.ga * unit;
     % Continuity (log pressure) LHS
-    LD31 = BS.gam * DDA_OP;
-    LD32 = BS.gam * SIGMA * DDXI_OP + DLPDZ;
+    LD31 = BS.gam * DDX_OP;
+    LD32 = BS.gam * DDZ_OP + DLPDZ;
     LD33 = U0DX + RAY.nu3 * RAYM;
     %LD34 = ZSPR;
     % Thermodynamic LHS
@@ -236,5 +232,11 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
                   'LD22', LD22, 'LD23', LD23, 'LD24', LD24, ...
                   'LD31', LD31, 'LD32', LD32, 'LD33', LD33, ...
                   'LD42', LD42, 'LD44', LD44);
+              
+    %%
+    REFS = struct('DDX_OP',DDX_OP,'DDZ_OP',DDZ_OP,'ujref',ujref,'dujref',dujref,'STR_H',STR_H,'STR_L',STR_L, ...
+        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref, ...
+        'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ_L',DDZ_L, 'RL', RL, ...
+        'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
   
 end
