@@ -15,7 +15,7 @@ def computeColumnInterp(DIMS, ZTL, FLD, CH_TRANS):
        NZ = DIMS[4]
        
        # Apply forward transform on the nominal column
-       fcoeffs = np.matmul(CH_TRANS, ZTL[:,0])
+       fcoeffs = np.matmul(CH_TRANS, FLD[:,0])
        
        # Loop over each column
        for cc in range(NX):
@@ -24,7 +24,7 @@ def computeColumnInterp(DIMS, ZTL, FLD, CH_TRANS):
               # Get the Chebyshev matrix for this column
               CTM = hcnw.chebpolym(NZ, xi)
               # Apply the interpolation
-              FLD[:,cc] = np.matmul(CTM, fcoeffs)
+              FLD[:,cc] = np.matmul(CTM.T, fcoeffs)
               
        return FLD
               

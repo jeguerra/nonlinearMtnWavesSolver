@@ -35,6 +35,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        # Vertical derivative
        DDZ_OP = np.empty((OPS,OPS))
        for cc in range(NX):
+              # Compute the terrain adjusment for this column
               terrainFollowScale = np.diag(sigma[:,cc], k=0)
               DDZ_TF1D = np.matmul(terrainFollowScale, DDZ_1D)   
               ddex = np.array(range(NZ)) + cc * NZ
@@ -68,16 +69,16 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        # Horizontal momentum
        LD11 = U0DX
        LD22 = DUDZM
-       LD13 = np.matmul(PORZM, DDX_OP)
+       LD13 = PORZM * DDX_OP
        
        # Vertical momentum
        LD22 = U0DX
-       LD23 = np.add(np.matmul(PORZM, DDZ_OP), gc * (1.0 / gam - 1.0) * unit)
+       LD23 = PORZM * DDZ_OP + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
        
        # Log-P equation
        LD31 = gam * DDX_OP
-       LD32 = np.add(gam * DDZ_OP, DLPDZM)
+       LD32 = gam * DDZ_OP + DLPDZM
        LD33 = U0DX
        
        # Log-Theta equation

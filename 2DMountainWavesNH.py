@@ -112,8 +112,6 @@ if __name__ == '__main__':
               
        # Compute the ratio of pressure to density:
        POR = np.multiply(PZ, np.reciprocal(RHO))
-       plt.plot(POR)
-       plt.figure()
        
        # Read in or compute background horizontal wind profile
        MEANJET = 1 # Analytical smooth jet profile
