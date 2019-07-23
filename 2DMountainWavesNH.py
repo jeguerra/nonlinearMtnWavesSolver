@@ -19,11 +19,14 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 import sys
 import numpy as np
 import math as mt
+import scipy.sparse as sps
+import scipy.sparse.linalg as spl
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from computeGrid import computeGrid
+from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
 from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
 from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
@@ -33,6 +36,7 @@ from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
+from computeRayleighEquations import computeRayleighEquations
 
 if __name__ == '__main__':
        
@@ -50,8 +54,14 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 128
-       NZ = 96
+       NX = 108
+       NZ = 84
+       numVar = 4
+       iU = 0
+       iW = 1
+       iP = 2
+       iT = 3
+       varDex = [iU, iW, iP, iT]
        DIMS = [L1, L2, ZH, NX, NZ]
        
        # Set the terrain options
@@ -59,6 +69,13 @@ if __name__ == '__main__':
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
+       
+       # Set the Rayleigh options
+       depth = 10000.0
+       width = 20000.0
+       applyTop = True
+       applyLateral = True
+       mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        # Define the computational and physical grids
        REFS = computeGrid(DIMS)
@@ -119,6 +136,7 @@ if __name__ == '__main__':
 
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
        
+       
        #%% Compute the background gradients in physical 2D space with SIGMA
        dUdz = np.expand_dims(dUdz, axis=1)
        DUDZ = np.tile(dUdz, NX)
@@ -145,7 +163,57 @@ if __name__ == '__main__':
        REFS.append(DLPDZ)
        REFS.append(DLPTDZ)
        
+       # Get some memory back here
+       del(PORZ)
+       del(DUDZ)
+       del(DLPDZ)
+       del(DLPTDZ)
        
        #%% Get the 2D operators...
-       OPS = NX * NZ
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
+       ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
+       
+       #%% Compute the BC index vector
+       ubdex, wbdex, sysDex = computeAdjust4CBC(DIMS, numVar, varDex)
+       
+       #%% Initialize the global solution vector
+       SOL = np.zeros((NX * NZ,1))
+       
+       #%% Compute the global LHS operator (with Rayleigh terms)
+       LDG = sps.bmat([[DOPS[0] + ROPS[0], DOPS[1], DOPS[2], None], \
+                       [None, DOPS[3] + ROPS[1], DOPS[4], DOPS[5]], \
+                       [DOPS[6], DOPS[7], DOPS[8] + ROPS[2], None], \
+                       [None, DOPS[9], None, DOPS[10] + ROPS[3]]], format='lil')
+       # Get some memory back
+       del(DOPS)
+       del(ROPS)
+       print('Compute global LHS sparse operator: DONE!')
+       
+       #%% Apply the coupled multipoint constraint for terrain
+       tempDiagonal = DZT[0,:]
+       DHDXM = sps.spdiags(tempDiagonal, 0, NX, NX)
+       # Compute LHS column adjustment to LDG
+       LDG[:,ubdex] = LDG[:,ubdex] + LDG[:,wbdex] * DHDXM
+       # Compute RHS adjustment to forcing
+       WBC = np.multiply(DZT[0,:], UZ[0,:])
+       # Get some memory back
+       del(UZ)
+       del(DZT)
+       print('Apply coupled BC adjustments: DONE!')
+       
+       #%% Set up the global solve
+       A = LDG[np.ix_(sysDex,sysDex)]
+       b = -(LDG[:,wbdex] * WBC.T)
+       print('Set up global system: DONE!')
+       
+       #%% Compute the normal equations
+       AN = A.T * A
+       bN = A.T * b[sysDex]
+       del(A, b)
+       print('Compute the normal equations: DONE!')
+       print('Size of the problem:', sys.getsizeof(AN))
+       
+       #%% Solve the system
+       #SOL[sysDex,0] = spl.spsolve(AN, bN)
+       print('Solve the system: DONE!')
+       
