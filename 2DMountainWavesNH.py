@@ -199,11 +199,15 @@ if __name__ == '__main__':
        # Get some memory back
        del(UZ)
        del(DZT)
+       del(sigma)
+       del(DHDXM)
        print('Apply coupled BC adjustments: DONE!')
        
        #%% Set up the global solve
        A = LDG[np.ix_(sysDex,sysDex)]
        b = -(LDG[:,wbdex] * WBC.T)
+       del(LDG)
+       del(WBC)
        print('Set up global system: DONE!')
        
        #%% Compute the normal equations
