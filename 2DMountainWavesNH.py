@@ -54,8 +54,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 108
-       NZ = 84
+       NX = 84
+       NZ = 32
        numVar = 4
        iU = 0
        iW = 1
@@ -63,6 +63,7 @@ if __name__ == '__main__':
        iT = 3
        varDex = [iU, iW, iP, iT]
        DIMS = [L1, L2, ZH, NX, NZ]
+       OPS = NX * NZ
        
        # Set the terrain options
        h0 = 10.0
@@ -87,15 +88,6 @@ if __name__ == '__main__':
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
-       
-       ''' #Spot check the derivative matrix
-       fig = plt.figure()
-       ax = fig.gca(projection='3d')
-       X = np.arange(1, NX+1)
-       Y = np.arange(1, NX+1)
-       X, Y = np.meshgrid(X, Y)
-       surf = ax.plot_surface(X, Y, DDX_OP, cmap=cm.coolwarm, linewidth=0)
-       '''
        
        #%% Read in topography profile or compute from analytical function
        AGNESI = 1 # "Witch of Agnesi" profile
@@ -197,8 +189,6 @@ if __name__ == '__main__':
        # Compute RHS adjustment to forcing
        WBC = np.multiply(DZT[0,:], UZ[0,:])
        # Get some memory back
-       del(UZ)
-       del(DZT)
        del(sigma)
        del(DHDXM)
        print('Apply coupled BC adjustments: DONE!')
@@ -211,13 +201,33 @@ if __name__ == '__main__':
        print('Set up global system: DONE!')
        
        #%% Compute the normal equations
-       AN = A.T * A
-       bN = A.T * b[sysDex]
-       del(A, b)
+       AN = (A.T).dot(A)
+       bN = (A.T).dot(b[sysDex])
+       del(A)
+       del(b)
        print('Compute the normal equations: DONE!')
-       print('Size of the problem:', sys.getsizeof(AN))
+       #print('Size of the problem:', sys.getsizeof(AN.toarray()))
        
        #%% Solve the system
-       #SOL[sysDex,0] = spl.spsolve(AN, bN)
+       sol = spl.spsolve(AN, bN)
        print('Solve the system: DONE!')
        
+       #%% Recover the solution
+       SOL = np.zeros(numVar * NX*NZ)
+       SOL[sysDex] = sol;
+       SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
+       
+       #%% Get the fields in physical space
+       udex = np.array(range(OPS))
+       wdex = np.add(udex, iW * OPS)
+       pdex = np.add(udex, iP * OPS)
+       tdex = np.add(udex, iT * OPS)
+       uxz = np.reshape(SOL[udex], (NX, NZ));
+       wxz = np.reshape(SOL[wdex], (NX, NZ));
+       pxz = np.reshape(SOL[pdex], (NX, NZ));
+       txz = np.reshape(SOL[tdex], (NX, NZ));
+       
+       #%%''' #Spot check the vertical velocity
+       fig = plt.figure()
+       wcont = plt.contourf(XL, ZTL, uxz.T, cmap=cm.coolwarm)
+       #'''

@@ -24,7 +24,7 @@ def hefunclb(NX):
        # Compute the eigenvalues of this matrix (zeros Hermite polys)
        ew = las.eigvals(mm)
        # Sort the eigenvalues in ascending order and store nodes
-       xi = np.real(ew)
+       xi = -np.sort(np.real(ew))
        
        # Compute the Hermite function weights
        hf = hefuncm(NX-1, xi, False)

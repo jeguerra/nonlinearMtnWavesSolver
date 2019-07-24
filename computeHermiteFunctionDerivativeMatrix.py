@@ -33,9 +33,9 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        SDIFF[NX,NX-1] = -mt.sqrt(NX * 0.5);
        SDIFF[NX-1,NX-2] = -mt.sqrt((NX - 1) * 0.5);
 
-       for cc in range(NX-3,0,-1):
-              SDIFF[cc,cc+1] = mt.sqrt((cc + 1) * 0.5);
-              SDIFF[cc,cc-1] = -mt.sqrt(cc * 0.5);
+       for cc in range(NX-3,-1,-1):
+              SDIFF[cc+1,cc+2] = mt.sqrt((cc + 2) * 0.5);
+              SDIFF[cc+1,cc] = -mt.sqrt((cc + 1) * 0.5);
 
        # Hermite function spectral transform in matrix form
        STR_H = np.matmul(HT, W);

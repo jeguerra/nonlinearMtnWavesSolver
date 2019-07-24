@@ -18,8 +18,8 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 128; % Expansion order matches physical grid
-NZ = 96; % Expansion order matches physical grid
+NX = 84; % Expansion order matches physical grid
+NZ = 32; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -211,7 +211,7 @@ toc; disp('Solve the first system by \... DONE!');
 %% Get the solution fields
 SOL(sysDex) = sol;
 SOL(wbdex) = REFS.DZT(1,:)' .* (REFS.ujref(1,:)' + SOL(ubdex));
-clear sol;
+%clear sol;
 uxz = reshape(SOL((1:OPS)),NZ,NX);
 wxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
 pxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
