@@ -54,8 +54,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 84
-       NZ = 32
+       NX = 128
+       NZ = 84
        numVar = 4
        iU = 0
        iW = 1
@@ -78,10 +78,10 @@ if __name__ == '__main__':
        applyLateral = True
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
-       # Define the computational and physical grids
+       # Define the computational and physical grids+
        REFS = computeGrid(DIMS)
        
-       # Compute the raw derivative matrix operators in alpha-xi computational space
+       #%% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
        
@@ -97,8 +97,9 @@ if __name__ == '__main__':
        INFILE = 5 # Data from a file (equally spaced points)
        HofX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
-       # Compute the terrain derivatives...
-       dHdX = np.matmul(DDX_1D, HofX.T) 
+       # Compute the terrain derivatives by Hermite-Function derivative matrix
+       dHdX = DDX_1D.dot(HofX)
+       #plt.plot(REFS[0], dHdX)
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
@@ -127,7 +128,6 @@ if __name__ == '__main__':
        JETOPS = [10.0, 16.822, 1.386]
 
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
-       
        
        #%% Compute the background gradients in physical 2D space with SIGMA
        dUdz = np.expand_dims(dUdz, axis=1)
@@ -201,15 +201,15 @@ if __name__ == '__main__':
        print('Set up global system: DONE!')
        
        #%% Compute the normal equations
-       AN = (A.T).dot(A)
-       bN = (A.T).dot(b[sysDex])
-       del(A)
-       del(b)
+       #AN = (A.T).dot(A)
+       #bN = (A.T).dot(b[sysDex])
+       #del(A)
+       #del(b)
        print('Compute the normal equations: DONE!')
        #print('Size of the problem:', sys.getsizeof(AN.toarray()))
        
        #%% Solve the system
-       sol = spl.spsolve(AN, bN)
+       sol = spl.spsolve(A, b[sysDex])
        print('Solve the system: DONE!')
        
        #%% Recover the solution
@@ -222,12 +222,12 @@ if __name__ == '__main__':
        wdex = np.add(udex, iW * OPS)
        pdex = np.add(udex, iP * OPS)
        tdex = np.add(udex, iT * OPS)
-       uxz = np.reshape(SOL[udex], (NX, NZ));
-       wxz = np.reshape(SOL[wdex], (NX, NZ));
-       pxz = np.reshape(SOL[pdex], (NX, NZ));
-       txz = np.reshape(SOL[tdex], (NX, NZ));
+       uxz = np.reshape(SOL[udex], (NZ, NX));
+       wxz = np.reshape(SOL[wdex], (NZ, NX));
+       pxz = np.reshape(SOL[pdex], (NZ, NX));
+       txz = np.reshape(SOL[tdex], (NZ, NX));
        
        #%%''' #Spot check the vertical velocity
        fig = plt.figure()
-       wcont = plt.contourf(XL, ZTL, uxz.T, cmap=cm.coolwarm)
+       wcont = plt.contourf(XL, ZTL, wxz, cmap=cm.coolwarm)
        #'''

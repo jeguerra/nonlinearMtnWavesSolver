@@ -6,6 +6,7 @@ Created on Wed Jul 17 14:12:01 2019
 @author: TempestGuerra
 """
 
+import numpy as np
 from HerfunChebNodesWeights import hefunclb
 #from HerfunChebNodesWeights import hefuncm
 from HerfunChebNodesWeights import cheblb
@@ -13,8 +14,8 @@ from HerfunChebNodesWeights import cheblb
 
 def computeGrid(DIMS):
        # Get the domain dimensions
-       L2 = DIMS[0]
-       L1 = DIMS[1]
+       L1 = DIMS[0]
+       L2 = DIMS[1]
        ZH = DIMS[2]
        NX = DIMS[3]
        NZ = DIMS[4]
@@ -28,7 +29,7 @@ def computeGrid(DIMS):
        #CPM = chebpolym(NZ, xi)
        
        # Map reference 1D domains to physical 1D domains
-       x = 0.5 * (L2 - L1) / max(alpha) * alpha
+       x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
        z = 0.5 * ZH * (1.0 - xi)
        
        # Return the REFS structure

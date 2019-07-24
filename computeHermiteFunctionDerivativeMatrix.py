@@ -9,12 +9,13 @@ Created on Fri Jul 19 12:10:03 2019
 import numpy as np
 import math as mt
 from HerfunChebNodesWeights import hefuncm, hefunclb
+#import matplotlib.pyplot as plt
 
 def computeHermiteFunctionDerivativeMatrix(DIMS):
        
        # Get data from DIMS
-       L2 = DIMS[0]
-       L1 = DIMS[1]
+       L1 = DIMS[0]
+       L2 = DIMS[1]
        NX = DIMS[3]
        
        alpha, whf = hefunclb(NX)
@@ -22,7 +23,7 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        HTD = hefuncm(NX, alpha, True)
        
        # Get the scale factor
-       b = np.max(alpha) / (0.5 * (L2 - L1))
+       b = (np.amax(alpha) - np.min(alpha)) / abs(L2 - L1)
        
        # Make a diagonal matrix of weights
        W = np.diag(whf, k=0)
@@ -36,11 +37,13 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        for cc in range(NX-3,-1,-1):
               SDIFF[cc+1,cc+2] = mt.sqrt((cc + 2) * 0.5);
               SDIFF[cc+1,cc] = -mt.sqrt((cc + 1) * 0.5);
-
+              
        # Hermite function spectral transform in matrix form
-       STR_H = np.matmul(HT, W);
+       STR_H = (HT).dot(W);
        # Hermite function spatial derivative based on spectral differentiation
-       DDM = b * np.matmul(np.matmul(HTD.T, SDIFF), STR_H);
+       temp = (HTD.T).dot(SDIFF)
+       temp = temp.dot(STR_H)
+       DDM = b * temp
        
        return DDM, STR_H
        
