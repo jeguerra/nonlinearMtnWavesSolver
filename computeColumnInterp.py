@@ -15,16 +15,17 @@ def computeColumnInterp(DIMS, ZTL, FLD, CH_TRANS):
        NZ = DIMS[4]
        
        # Apply forward transform on the nominal column
-       fcoeffs = np.matmul(CH_TRANS, FLD[:,0])
+       fcoeffs = CH_TRANS.dot(FLD[:,0])
        
        # Loop over each column
        for cc in range(NX):
               # Convert to the reference grid at this column
-              xi = (1.0 - 2.0 / ZH * ZTL[:,cc])
+              xi = +1.0 * ((2.0 / ZH * ZTL[:,cc]) - 1.0)
+              print(xi)
               # Get the Chebyshev matrix for this column
-              CTM = hcnw.chebpolym(NZ, xi)
+              CTM = hcnw.chebpolym(NZ-1, xi)
               # Apply the interpolation
-              FLD[:,cc] = np.matmul(CTM.T, fcoeffs)
+              FLD[:,cc] = (CTM.T).dot(fcoeffs)
               
        return FLD
               

@@ -20,7 +20,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        xi, wcp = cheblb(NZ)
    
        # Get the Chebyshev transformation matrix
-       CTD = chebpolym(NZ, xi)
+       CTD = chebpolym(NZ-1, xi)
    
        # Make a diagonal matrix of weights
        W = np.diag(wcp)

@@ -23,8 +23,7 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as spl
 from matplotlib import cm
 import matplotlib.pyplot as plt
-import plotly as py
-import plotly.figure_factory as FF
+import plotly.graph_objects as go
 from scipy.spatial import Delaunay
 # Import from the local library of routines
 from computeGrid import computeGrid
@@ -185,22 +184,23 @@ if __name__ == '__main__':
        print('Compute global LHS sparse operator: DONE!')
        
        #%% Apply the coupled multipoint constraint for terrain
-       tempDiagonal = DZT[0,:]
-       DHDXM = sps.spdiags(tempDiagonal, 0, NX, NX)
+       DHDXM = sps.spdiags(DZT[0,:], 0, NX, NX)
        # Compute LHS column adjustment to LDG
-       LDG[:,ubdex] = LDG[:,ubdex] + LDG[:,wbdex] * DHDXM
+       LDG[:,ubdex] = LDG[:,ubdex] + (LDG[:,wbdex]).dot(DHDXM)
        # Compute RHS adjustment to forcing
        WBC = np.multiply(DZT[0,:], UZ[0,:])
        # Get some memory back
-       del(sigma)
        del(DHDXM)
        print('Apply coupled BC adjustments: DONE!')
        
        #%% Set up the global solve
        AN = LDG[np.ix_(sysDex,sysDex)]
-       bN = -(LDG[:,wbdex] * WBC.T)
-       del(LDG)
-       del(WBC)
+       bN = -(LDG[:,wbdex]).dot(WBC)
+       plt.plot(bN)
+       print('Norm of forcing vector: ', np.linalg.norm(bN))
+       print('Norm of linear WBC: ', np.linalg.norm(WBC))
+       #del(LDG)
+       #del(WBC)
        print('Set up global system: DONE!')
        
        #%% Compute the normal equations
@@ -231,6 +231,6 @@ if __name__ == '__main__':
        txz = np.reshape(SOL[tdex], (NZ, NX), order='F');
        
        #%%''' #Spot check the vertical velocity
-       fig = plt.figure()
-       wcont = plt.contourf(XL, ZTL, uxz, cmap=cm.bwr)
+       fig = go.Figure(data = go.Contour(z=wxz, x=XL, y=ZTL))
+       fig.show()
        #'''

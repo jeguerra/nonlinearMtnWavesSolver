@@ -80,16 +80,16 @@ def cheblb(NZ):
    
        return xi, w
    
-def chebpolym(NZ, xi):
+def chebpolym(NM, xi):
        # Compute Chebyshev pols (first kind) into a matrix transformation
-       N = NZ - 1
-       CTM = np.zeros((N+1, N+1))
+       NX = len(xi)
+       CTM = np.zeros((NX, NM))
        
-       CTM[:,0] = np.ones(N+1)
+       CTM[:,0] = np.ones(NX)
        CTM[:,1] = xi
        
        # 3 Term recursion
-       for ii in range(2, N+1):
+       for ii in range(2, NM):
               CTM[:,ii] = 2.0 * \
               mul(xi, CTM[:,ii-1]) - \
               CTM[:,ii-2]

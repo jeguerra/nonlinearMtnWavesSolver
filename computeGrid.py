@@ -23,6 +23,7 @@ def computeGrid(DIMS):
        # Compute the Hermite function and Chebyshev native grids
        alpha, whf = hefunclb(NX)
        xi, wcp = cheblb(NZ)
+       print(xi)
        
        # Compute the HF and Cheb matrices
        #HFM = hefuncm(NX, alpha, True)

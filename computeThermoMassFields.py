@@ -54,7 +54,7 @@ def computePfromSensibleT(DDZ, TZ, AC, P0, N):
        # Compute adjustment to the derivative matrix operator
        DOP = computeAdjustedOperatorNBC(DDZ, DDZ, DDZ, N-1, True, None)
 
-       # Impose resulting Dirichlet conditions p^K top and bottom
+       # Impose resulting Neumann/Dirichlet conditions lnP top and bottom
        NE = N-1
        DOPS = DOP[1:NE,1:NE]
        
@@ -66,7 +66,7 @@ def computePfromSensibleT(DDZ, TZ, AC, P0, N):
        # Compute the forcing due to matching at the model top
        f = -dpdZ_H / DDZ[N-1,N-1] * DDZ[:,N-1]
        F = np.add(tempBarI, f)
-       # Solve the system for p^K
+       # Solve the system for lnP
        ln_pBar[idex] = AC * lan.solve(DOPS, F[1:NE])
        
        # Compute and set the value at the top that satisfies the BC
