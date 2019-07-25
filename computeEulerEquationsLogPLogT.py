@@ -8,7 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 
 import numpy as np
 import scipy.sparse as sps
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        # Get physical constants
@@ -51,16 +51,16 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
               DDX_OP[np.ix_(ddex,ddex)] = DDX_1D
               
        #%% Compute the various blocks needed
-       tempDiagonal = np.reshape(UZ, (OPS,))
+       tempDiagonal = np.reshape(UZ, (OPS,), order='F')
        UM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(DUDZ, (OPS,))
+       tempDiagonal = np.reshape(DUDZ, (OPS,), order='F')
        DUDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(DLPDZ, (OPS,))
+       tempDiagonal = np.reshape(DLPDZ, (OPS,), order='F')
        DLPDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(DLPTDZ, (OPS,))
+       tempDiagonal = np.reshape(DLPTDZ, (OPS,), order='F')
        DLPTDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        U0DX = UM * DDX_OP
-       tempDiagonal = np.reshape(PORZ, (OPS,))
+       tempDiagonal = np.reshape(PORZ, (OPS,), order='F')
        PORZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        unit = sps.identity(OPS)
        

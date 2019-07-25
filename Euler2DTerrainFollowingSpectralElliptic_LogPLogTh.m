@@ -18,8 +18,8 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 84; % Expansion order matches physical grid
-NZ = 32; % Expansion order matches physical grid
+NX = 128; % Expansion order matches physical grid
+NZ = 84; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;

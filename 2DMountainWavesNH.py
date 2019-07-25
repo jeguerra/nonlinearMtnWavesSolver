@@ -23,8 +23,10 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as spl
 from matplotlib import cm
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
+import plotly as py
+import plotly.figure_factory as FF
+from scipy.spatial import Delaunay
+# Import from the local library of routines
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
@@ -172,6 +174,7 @@ if __name__ == '__main__':
        SOL = np.zeros((NX * NZ,1))
        
        #%% Compute the global LHS operator (with Rayleigh terms)
+       # Format is 'lil' to allow for column adjustments to the operator
        LDG = sps.bmat([[DOPS[0] + ROPS[0], DOPS[1], DOPS[2], None], \
                        [None, DOPS[3] + ROPS[1], DOPS[4], DOPS[5]], \
                        [DOPS[6], DOPS[7], DOPS[8] + ROPS[2], None], \
@@ -194,8 +197,8 @@ if __name__ == '__main__':
        print('Apply coupled BC adjustments: DONE!')
        
        #%% Set up the global solve
-       A = LDG[np.ix_(sysDex,sysDex)]
-       b = -(LDG[:,wbdex] * WBC.T)
+       AN = LDG[np.ix_(sysDex,sysDex)]
+       bN = -(LDG[:,wbdex] * WBC.T)
        del(LDG)
        del(WBC)
        print('Set up global system: DONE!')
@@ -209,7 +212,7 @@ if __name__ == '__main__':
        #print('Size of the problem:', sys.getsizeof(AN.toarray()))
        
        #%% Solve the system
-       sol = spl.spsolve(A, b[sysDex])
+       sol = spl.spsolve(AN.tocsc(), bN[sysDex], use_umfpack=False)
        print('Solve the system: DONE!')
        
        #%% Recover the solution
@@ -222,12 +225,12 @@ if __name__ == '__main__':
        wdex = np.add(udex, iW * OPS)
        pdex = np.add(udex, iP * OPS)
        tdex = np.add(udex, iT * OPS)
-       uxz = np.reshape(SOL[udex], (NZ, NX));
-       wxz = np.reshape(SOL[wdex], (NZ, NX));
-       pxz = np.reshape(SOL[pdex], (NZ, NX));
-       txz = np.reshape(SOL[tdex], (NZ, NX));
+       uxz = np.reshape(SOL[udex], (NZ, NX), order='F');
+       wxz = np.reshape(SOL[wdex], (NZ, NX), order='F');
+       pxz = np.reshape(SOL[pdex], (NZ, NX), order='F');
+       txz = np.reshape(SOL[tdex], (NZ, NX), order='F');
        
        #%%''' #Spot check the vertical velocity
        fig = plt.figure()
-       wcont = plt.contourf(XL, ZTL, wxz, cmap=cm.coolwarm)
+       wcont = plt.contourf(XL, ZTL, uxz, cmap=cm.bwr)
        #'''
