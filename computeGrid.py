@@ -21,16 +21,12 @@ def computeGrid(DIMS):
        NZ = DIMS[4]
        
        # Compute the Hermite function and Chebyshev native grids
-       alpha, whf = hefunclb(NX)
-       xi, wcp = cheblb(NZ)
-       
-       # Compute the HF and Cheb matrices
-       #HFM = hefuncm(NX, alpha, True)
-       #CPM = chebpolym(NZ, xi)
+       alpha, whf = hefunclb(NX) #(-inf inf)
+       xi, wcp = cheblb(NZ) #[-1 +1]
        
        # Map reference 1D domains to physical 1D domains
        x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
-       z = 0.5 * ZH * (1.0 - xi)
+       z = 0.5 * ZH * (1.0 + xi)
        
        # Return the REFS structure
        REFS = [x, z]

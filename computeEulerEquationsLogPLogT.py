@@ -50,6 +50,12 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
               # Advanced slicing used to get submatrix
               DDX_OP[np.ix_(ddex,ddex)] = DDX_1D
               
+       #%% Make the operators sparse
+       DDXM = sps.csc_matrix(DDX_OP)
+       DDZM = sps.csc_matrix(DDZ_OP)
+       del(DDX_OP)
+       del(DDZ_OP)
+              
        #%% Compute the various blocks needed
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
        UM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
@@ -59,7 +65,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        DLPDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(DLPTDZ, (OPS,), order='F')
        DLPTDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       U0DX = UM * DDX_OP
+       U0DX = UM.dot(DDXM)
        tempDiagonal = np.reshape(PORZ, (OPS,), order='F')
        PORZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        unit = sps.identity(OPS)
@@ -68,24 +74,24 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        
        # Horizontal momentum
        LD11 = U0DX
-       LD22 = DUDZM
-       LD13 = PORZM * DDX_OP
+       LD12 = DUDZM
+       LD13 = PORZM.dot(DDXM)
        
        # Vertical momentum
        LD22 = U0DX
-       LD23 = PORZM * DDZ_OP + gc * (1.0 / gam - 1.0) * unit
+       LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
        
        # Log-P equation
-       LD31 = gam * DDX_OP
-       LD32 = gam * DDZ_OP + DLPDZM
+       LD31 = gam * DDXM
+       LD32 = gam * DDZM + DLPDZM
        LD33 = U0DX
        
        # Log-Theta equation
        LD42 = DLPTDZM
        LD44 = U0DX
        
-       DOPS = [LD11, LD22, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
+       DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
        
        return DOPS
        

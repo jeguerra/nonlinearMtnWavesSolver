@@ -12,6 +12,8 @@ Works the old fashioned way with lots of nested loops... so sue me!
 import math as mt
 import numpy as np
 import scipy.sparse as sps
+from matplotlib import cm
+import matplotlib.pyplot as plt
 
 def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
        
@@ -64,6 +66,9 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
                      # Set the binary matrix
                      if RL[ii,jj] != 0.0:
                             SBR[ii,jj] = 1.0
+                            
+       #plt.figure()
+       #plt.contourf(X, Z, RL, 101, cmap=cm.seismic)
                             
        return RL, SBR
 

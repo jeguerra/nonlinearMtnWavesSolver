@@ -72,7 +72,7 @@ def cheblb(NZ):
        # Compute Chebyshev CGL nodes and weights
        ep = NZ - 1
        xc = np.array(range(NZ))
-       xi = np.cos(mt.pi / ep * xc)
+       xi = -np.cos(mt.pi / ep * xc)
        
        w = mt.pi / (ep + 1) * np.ones(NZ)
        w[0] *= 0.5
@@ -82,14 +82,15 @@ def cheblb(NZ):
    
 def chebpolym(NM, xi):
        # Compute Chebyshev pols (first kind) into a matrix transformation
+       # Functions need to be arranged bottom to top!
        NX = len(xi)
-       CTM = np.zeros((NX, NM))
+       CTM = np.zeros((NX, NM+1))
        
        CTM[:,0] = np.ones(NX)
        CTM[:,1] = xi
        
        # 3 Term recursion
-       for ii in range(2, NM):
+       for ii in range(2, NM+1):
               CTM[:,ii] = 2.0 * \
               mul(xi, CTM[:,ii-1]) - \
               CTM[:,ii-2]

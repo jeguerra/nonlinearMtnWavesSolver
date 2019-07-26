@@ -21,10 +21,9 @@ import numpy as np
 import math as mt
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
+import scipy.linalg as sln
 from matplotlib import cm
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from scipy.spatial import Delaunay
 # Import from the local library of routines
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
@@ -55,8 +54,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 128
-       NZ = 84
+       NX = 129
+       NZ = 85
        numVar = 4
        iU = 0
        iW = 1
@@ -100,7 +99,8 @@ if __name__ == '__main__':
        
        # Compute the terrain derivatives by Hermite-Function derivative matrix
        #dHdX = DDX_1D.dot(HofX)
-       plt.plot(REFS[0], dHdX)
+       #plt.figure()
+       #plt.plot(REFS[0], dHdX)
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
@@ -144,12 +144,13 @@ if __name__ == '__main__':
        # The following need to be interpolated on a column basis
        POR = np.expand_dims(POR, axis=1)
        PORZ = np.tile(POR, NX)
-       PORZ = computeColumnInterp(DIMS, ZTL, PORZ, CH_TRANS)
+       PORZ = computeColumnInterp(DIMS, REFS[1], POR, ZTL, PORZ, CH_TRANS)
        U = np.expand_dims(U, axis=1)
        UZ = np.tile(U, NX)
-       UZ = computeColumnInterp(DIMS, ZTL, UZ, CH_TRANS)
+       UZ = computeColumnInterp(DIMS, REFS[1], U, ZTL, UZ, CH_TRANS)
+       plt.figure()
        plt.plot(UZ[0,:])
-       plt.plot(UZ[NZ-1,:])
+       #plt.plot(UZ[NZ-1,:])
        
        # Update the REFS collection
        REFS.append(UZ)
@@ -196,13 +197,12 @@ if __name__ == '__main__':
        print('Apply coupled BC adjustments: DONE!')
        
        #%% Set up the global solve
-       AN = LDG[np.ix_(sysDex,sysDex)]
-       bN = -(LDG[:,wbdex]).dot(WBC)
-       plt.plot(bN)
-       print('Norm of forcing vector: ', np.linalg.norm(bN))
-       print('Norm of linear WBC: ', np.linalg.norm(WBC))
-       #del(LDG)
-       #del(WBC)
+       A = LDG[np.ix_(sysDex,sysDex)]
+       b = -(LDG[:,wbdex]).dot(WBC)
+       #print('Norm of forcing vector: ', np.linalg.norm(bN))
+       #print('Norm of linear WBC: ', np.linalg.norm(WBC))
+       del(LDG)
+       del(WBC)
        print('Set up global system: DONE!')
        
        #%% Compute the normal equations
@@ -214,7 +214,9 @@ if __name__ == '__main__':
        #print('Size of the problem:', sys.getsizeof(AN.toarray()))
        
        #%% Solve the system
-       sol = spl.spsolve(AN.tocsc(), bN[sysDex], use_umfpack=False)
+       sol = spl.spsolve(A.tocsc(), b[sysDex], use_umfpack=False)
+       #sol = spl.spsolve(AN.tocsc(), bN, use_umfpack=False)
+       #sol = sln.solve(AN.toarray(), bN, assume_a='sym')
        print('Solve the system: DONE!')
        
        #%% Recover the solution
@@ -233,6 +235,6 @@ if __name__ == '__main__':
        txz = np.reshape(SOL[tdex], (NZ, NX), order='F');
        
        #%%''' #Spot check the solution
-       plt.plot(uxz[0,:])
-       plt.plot(wxz[0,:])
+       plt.figure()
+       plt.contourf(XL, ZTL, uxz, 101, cmap=cm.seismic)
        #'''
