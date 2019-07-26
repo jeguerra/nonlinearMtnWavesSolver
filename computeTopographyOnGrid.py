@@ -26,10 +26,21 @@ def computeTopographyOnGrid(REFS, profile, opt):
               h0 = opt[0]
               aC = opt[1]
               lC = opt[2]
-              
+              # Compute the height field
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(x, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * x), 2.0);
               ht = mul(ht1, ht2)
+              # Compute the slope field perfectly
+              dht1 = -ht1
+              dht2 = (2.0 / aC**2.0) * x
+              dht3 = ht2
+              dht4 = (mt.pi / lC) * np.sin(2.0 * mt.pi / lC * x)
+              dhdx = mul(dht2, dht3)
+              dhdx = np.add(dhdx, dht4)
+              dhdx = mul(dht1, dhdx)
+              #dhdx = -DS.hC * exp(-xlon.^2/DS.aC^2) .* ( ...
+              #2.0 * xlon / (DS.aC^2) .* (cos(pi * xlon / DS.lC)).^2 + ...
+              #pi/DS.lC * sin(2.0 * pi * xlon / DS.lC));
        elif profile == 3:
               # General even power exponential times a cosine series
               h0 = opt[0]
@@ -45,5 +56,5 @@ def computeTopographyOnGrid(REFS, profile, opt):
               
        # Check that terrain data is positive definite...
        
-       return ht
+       return ht, dhdx
               

@@ -198,6 +198,7 @@ tic
 spparms('spumoni',2);
 A = LD(sysDex,sysDex);
 b = -LD(:,wbdex) * WBC'; clear LD FF;
+figure; plot(b);
 % Solve the symmetric normal equations
 AN = A' * A;
 bN = A' * b(sysDex); clear A b;

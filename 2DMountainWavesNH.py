@@ -96,11 +96,11 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
+       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Compute the terrain derivatives by Hermite-Function derivative matrix
-       dHdX = DDX_1D.dot(HofX)
-       #plt.plot(REFS[0], dHdX)
+       #dHdX = DDX_1D.dot(HofX)
+       plt.plot(REFS[0], dHdX)
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
@@ -148,6 +148,8 @@ if __name__ == '__main__':
        U = np.expand_dims(U, axis=1)
        UZ = np.tile(U, NX)
        UZ = computeColumnInterp(DIMS, ZTL, UZ, CH_TRANS)
+       plt.plot(UZ[0,:])
+       plt.plot(UZ[NZ-1,:])
        
        # Update the REFS collection
        REFS.append(UZ)
@@ -230,7 +232,7 @@ if __name__ == '__main__':
        pxz = np.reshape(SOL[pdex], (NZ, NX), order='F');
        txz = np.reshape(SOL[tdex], (NZ, NX), order='F');
        
-       #%%''' #Spot check the vertical velocity
-       fig = go.Figure(data = go.Contour(z=wxz, x=XL, y=ZTL))
-       fig.show()
+       #%%''' #Spot check the solution
+       plt.plot(uxz[0,:])
+       plt.plot(wxz[0,:])
        #'''

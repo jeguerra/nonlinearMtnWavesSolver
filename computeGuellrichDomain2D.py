@@ -53,5 +53,8 @@ def computeGuellrichDomain2D(DIMS, REFS, hx, dhdx):
        for rr in range(NZ):
               ZTL[rr,:] = np.add(mul(dzdh[rr,:], hx), ZL[rr,:])
               DZT[rr,:] = mul(dzdh[rr,:], dhdx);
+              
+       # Fix the value of ZTL so interpolations work
+       #ZTL[0,0] = 0.0
        
        return XL, ZTL, DZT, sigma

@@ -20,7 +20,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        xi, wcp = cheblb(NZ)
    
        # Get the Chebyshev transformation matrix
-       CTD = chebpolym(NZ-1, xi)
+       CTD = chebpolym(NZ, xi)
    
        # Make a diagonal matrix of weights
        W = np.diag(wcp)
@@ -55,7 +55,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        STR_C = np.matmul(S, temp);
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       temp = np.matmul(CTD.T, SDIFF)
+       temp = np.matmul(CTD, SDIFF)
        DDM = - (2.0 / ZH) * np.matmul(temp, STR_C);
        
        return DDM, STR_C
