@@ -88,7 +88,7 @@ def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLatera
        mu_T = mu[3]
        
        # Compute the blocks
-       tempDiagonal = np.reshape(RL, (OPS,), order='C')
+       tempDiagonal = np.reshape(RL, (OPS,), order='F')
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        
        # Store the diagonal blocks corresponding to Rayleigh damping terms

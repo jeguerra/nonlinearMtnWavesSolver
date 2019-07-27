@@ -54,8 +54,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 85
+       NX = 128
+       NZ = 81
        numVar = 4
        iU = 0
        iW = 1
@@ -177,10 +177,15 @@ if __name__ == '__main__':
        
        #%% Compute the global LHS operator (with Rayleigh terms)
        # Format is 'lil' to allow for column adjustments to the operator
-       LDG = sps.bmat([[DOPS[0] + ROPS[0], DOPS[1], DOPS[2], None], \
-                       [None, DOPS[3] + ROPS[1], DOPS[4], DOPS[5]], \
-                       [DOPS[6], DOPS[7], DOPS[8] + ROPS[2], None], \
-                       [None, DOPS[9], None, DOPS[10] + ROPS[3]]], format='lil')
+       LDG = sps.bmat([[np.add(DOPS[0], ROPS[0]), DOPS[1], DOPS[2], None], \
+                       [None, np.add(DOPS[3], ROPS[1]), DOPS[4], DOPS[5]], \
+                       [DOPS[6], DOPS[7], np.add(DOPS[8], ROPS[2]), None], \
+                       [None, DOPS[9], None, np.add(DOPS[10], ROPS[3])]], format='lil')
+       
+       #LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
+       #                [None, DOPS[3], DOPS[4], DOPS[5]], \
+       #                [DOPS[6], DOPS[7], DOPS[8], None], \
+       #                [None, DOPS[9], None, DOPS[10]]], format='lil')
        # Get some memory back
        del(DOPS)
        del(ROPS)
@@ -189,7 +194,7 @@ if __name__ == '__main__':
        #%% Apply the coupled multipoint constraint for terrain
        DHDXM = sps.spdiags(DZT[0,:], 0, NX, NX)
        # Compute LHS column adjustment to LDG
-       LDG[:,ubdex] = LDG[:,ubdex] + (LDG[:,wbdex]).dot(DHDXM)
+       LDG[:,ubdex] = np.add(LDG[:,ubdex], (LDG[:,wbdex]).dot(DHDXM))
        # Compute RHS adjustment to forcing
        WBC = np.multiply(DZT[0,:], UZ[0,:])
        # Get some memory back

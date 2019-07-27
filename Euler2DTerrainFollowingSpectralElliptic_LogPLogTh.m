@@ -18,8 +18,8 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 128; % Expansion order matches physical grid
-NZ = 84; % Expansion order matches physical grid
+NX = 129; % Expansion order matches physical grid
+NZ = 85; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -196,9 +196,10 @@ WBC = REFS.DZT(1,:) .* REFS.ujref(1,:);
 disp('Solve by direct Cholesky coarse and ALSQR fine.');
 tic
 spparms('spumoni',2);
+BCOP = full(LD(:,wbdex));
 A = LD(sysDex,sysDex);
 b = -LD(:,wbdex) * WBC'; clear LD FF;
-figure; plot(b);
+%figure; plot(b);
 % Solve the symmetric normal equations
 AN = A' * A;
 bN = A' * b(sysDex); clear A b;
