@@ -67,33 +67,51 @@ def chebyshev_coef_1d ( nd, xd, yd ):
 
   return c, xmin, xmax
 
-def computeColumnInterp(DIMS, zdata, fdata, ZTL, FLD, CH_TRANS):
+def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
        NX = DIMS[3]
        NZ = DIMS[4]
        
-       # Apply forward transform on the nominal column
-       fcoeffs1 = CH_TRANS.dot(fdata)
-       #fcoeffs2, zmin, zmax = chebyshev_coef_1d(NZ, zdata, fdata)
-       #plt.figure()
-       #plt.plot(np.ravel(fcoeffs1))
-       #plt.plot(np.ravel(fcoeffs2))
-       #splint = spint.interp1d(zdata, fdata.T, kind='cubic')
-       
-       # Loop over each column
-       for cc in range(NX):
-              # Convert to the reference grid at this column
-              thisZ = ZTL[:,cc]
-              #'''
+       # Interpolate the nominal column profile to TF Chebyshev grid
+       if TypeInt == '1DtoTerrainFollowingCheb':
+              # Check that data is good for self interpolation
+              if (zdata == None) or (fdata == None):
+                     print('ERROR: No reference data for interpolation given!')
+                     return FLD
+              
+              # Compute the total height of nominal column
               zpan = np.amax(zdata) - np.min(zdata)
-              xi = 1.0 * ((2.0 / zpan * thisZ) - 1.0)
-              # Get the Chebyshev matrix for this column
-              CTM = hcnw.chebpolym(NZ-1, -xi)
-              # Apply the interpolation
-              FLDI = (CTM).dot(fcoeffs1)
-              #'''
-              # PUNT... CUBIC SPLINE INTERPOLANT
-              #FLDI = splint(thisZ)
-              FLD[:,cc] = np.ravel(FLDI)
+              # Apply forward transform on the nominal column
+              fcoeffs = CH_TRANS.dot(fdata)
+              #splint = spint.interp1d(zdata, fdata.T, kind='cubic')
+              
+              # Loop over each column
+              for cc in range(NX):
+                     # Convert to the reference grid at this column
+                     thisZ = ZTL[:,cc]
+                     xi = 1.0 * ((2.0 / zpan * thisZ) - 1.0)
+                     # Get the Chebyshev matrix for this column
+                     CTM = hcnw.chebpolym(NZ-1, -xi)
+                     # Apply the interpolation
+                     FLDI = (CTM).dot(fcoeffs)
+                     FLD[:,cc] = np.ravel(FLDI)
+       # Interpolate solution on TF Chebyshev grid to TF linear grid
+       elif TypeInt == 'TerrainFollowingCheb2Lin':
+              # Check
+              if NZI <= 0:
+                     print('ERROR: Invalid number of points in new grid! ', NZI)
+                     return FLD
+              
+              # Compute the new column grid (linear space)
+              xi = np.linspace(-1.0, 1.0, num=NZI, enpoint=True)
+              # Loop over each column
+              for cc in range(NX):
+                     # Apply the forward transform at this column
+                     fcoeffs = CH_TRANS.dot(FLD[:,cc])
+                     # Get the Chebyshev matrix for this column
+                     CTM = hcnw.chebpolym(NZ-1, -xi)
+                     # Apply the interpolation
+                     FLDI = (CTM).dot(fcoeffs)
+                     FLD[:,cc] = np.ravel(FLDI)
               
        return FLD
               

@@ -55,7 +55,7 @@ if __name__ == '__main__':
        L1 = -L2
        ZH = 36000.0
        NX = 128
-       NZ = 81
+       NZ = 85
        numVar = 4
        iU = 0
        iW = 1
@@ -98,7 +98,7 @@ if __name__ == '__main__':
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Compute the terrain derivatives by Hermite-Function derivative matrix
-       #dHdX = DDX_1D.dot(HofX)
+       dHdX = DDX_1D.dot(HofX)
        #plt.figure()
        #plt.plot(REFS[0], dHdX)
        
@@ -130,26 +130,24 @@ if __name__ == '__main__':
 
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
        
-       #%% Compute the background gradients in physical 2D space with SIGMA
+       #%% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(dUdz, axis=1)
        DUDZ = np.tile(dUdz, NX)
-       DUDZ = np.multiply(sigma, DUDZ)
+       DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        dlnPdz = np.expand_dims(dlnPdz, axis=1)
        DLPDZ = np.tile(dlnPdz, NX)
-       DLPDZ = np.multiply(sigma, DLPDZ)
+       DLPDZ = computeColumnInterp(DIMS, REFS[1], dlnPdz, 0, ZTL, DLPDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        dlnPTdz = np.expand_dims(dlnPTdz, axis=1)
        DLPTDZ = np.tile(dlnPTdz, NX)
-       DLPTDZ = np.multiply(sigma, DLPTDZ)
-       
-       # The following need to be interpolated on a column basis
+       DLPTDZ = computeColumnInterp(DIMS, REFS[1], dlnPTdz, 0, ZTL, DLPTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        POR = np.expand_dims(POR, axis=1)
        PORZ = np.tile(POR, NX)
-       PORZ = computeColumnInterp(DIMS, REFS[1], POR, ZTL, PORZ, CH_TRANS)
+       PORZ = computeColumnInterp(DIMS, REFS[1], POR, 0, ZTL, PORZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        U = np.expand_dims(U, axis=1)
        UZ = np.tile(U, NX)
-       UZ = computeColumnInterp(DIMS, REFS[1], U, ZTL, UZ, CH_TRANS)
-       plt.figure()
-       plt.plot(UZ[0,:])
+       UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       #plt.figure()
+       #plt.plot(UZ[0,:])
        #plt.plot(UZ[NZ-1,:])
        
        # Update the REFS collection
@@ -238,8 +236,22 @@ if __name__ == '__main__':
        wxz = np.reshape(SOL[wdex], (NZ, NX), order='F');
        pxz = np.reshape(SOL[pdex], (NZ, NX), order='F');
        txz = np.reshape(SOL[tdex], (NZ, NX), order='F');
+       print('Recover solution on native grid: DONE!')
        
-       #%%''' #Spot check the solution
-       plt.figure()
-       plt.contourf(XL, ZTL, uxz, 101, cmap=cm.seismic)
-       #'''
+       #%% Interpolate columns to a finer grid for plotting
+       NXI = 3000
+       NZI = 500
+       uxzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       wxzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       pxzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, pxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       txzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       print('Interpolate columns to finer grid: DONE!')
+       
+       #%%''' #Spot check the solution on both grids
+       fig = plt.figure()
+       ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
+       cbar = fig.colorbar(ccheck)
+       #
+       fig = plt.figure()
+       ccheck = plt.contourf(wxzint, 101, cmap=cm.seismic)
+       cbar = fig.colorbar(ccheck)
