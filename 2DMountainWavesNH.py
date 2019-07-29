@@ -16,7 +16,7 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 @author: Jorge E. Guerra
 """
 
-import sys
+import time
 import numpy as np
 import math as mt
 import scipy.sparse as sps
@@ -146,9 +146,6 @@ if __name__ == '__main__':
        U = np.expand_dims(U, axis=1)
        UZ = np.tile(U, NX)
        UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       #plt.figure()
-       #plt.plot(UZ[0,:])
-       #plt.plot(UZ[NZ-1,:])
        
        # Update the REFS collection
        REFS.append(UZ)
@@ -180,10 +177,6 @@ if __name__ == '__main__':
                        [DOPS[6], DOPS[7], np.add(DOPS[8], ROPS[2]), None], \
                        [None, DOPS[9], None, np.add(DOPS[10], ROPS[3])]], format='lil')
        
-       #LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
-       #                [None, DOPS[3], DOPS[4], DOPS[5]], \
-       #                [DOPS[6], DOPS[7], DOPS[8], None], \
-       #                [None, DOPS[9], None, DOPS[10]]], format='lil')
        # Get some memory back
        del(DOPS)
        del(ROPS)
@@ -202,29 +195,33 @@ if __name__ == '__main__':
        #%% Set up the global solve
        A = LDG[np.ix_(sysDex,sysDex)]
        b = -(LDG[:,wbdex]).dot(WBC)
-       #print('Norm of forcing vector: ', np.linalg.norm(bN))
-       #print('Norm of linear WBC: ', np.linalg.norm(WBC))
        del(LDG)
        del(WBC)
        print('Set up global system: DONE!')
        
-       #%% Compute the normal equations
-       #AN = (A.T).dot(A)
-       #bN = (A.T).dot(b[sysDex])
-       #del(A)
-       #del(b)
+       #%% Compute the normal equations NO GOOD IN PYTHON! CHOLMOD UNAVAILABLE
+       '''
+       AN = (A.T).dot(A)
+       bN = (A.T).dot(b[sysDex])
+       del(A)
+       del(b)
        print('Compute the normal equations: DONE!')
-       #print('Size of the problem:', sys.getsizeof(AN.toarray()))
-       
+       '''
        #%% Solve the system
-       sol = spl.spsolve(A.tocsc(), b[sysDex], use_umfpack=False)
-       #sol = spl.spsolve(AN.tocsc(), bN, use_umfpack=False)
-       #sol = sln.solve(AN.toarray(), bN, assume_a='sym')
+       start = time.time()
+       # Direct solver
+       decomp = spl.splu(A.tocsc())
+       sol = decomp.solve(b[sysDex])
+       #decomp = spl.spilu(A.tocsc())
+       #sol0 = decomp.solve(b[sysDex])
+       #sol = spl.lgmres(A.tocsc(), b[sysDex], x0=None, atol=1.0E-6, maxiter=1000, inner_m=20)
+       endt = time.time()
        print('Solve the system: DONE!')
+       print('Elapsed time: ', endt - start)
        
        #%% Recover the solution
        SOL = np.zeros(numVar * NX*NZ)
-       SOL[sysDex] = sol;
+       SOL[sysDex] = sol[0];
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
        
        #%% Get the fields in physical space
@@ -241,10 +238,10 @@ if __name__ == '__main__':
        #%% Interpolate columns to a finer grid for plotting
        NXI = 3000
        NZI = 500
-       uxzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       wxzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       pxzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, pxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       txzint = computeColumnInterp(DIMS, None, None, NXI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       uxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       wxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       pxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, pxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       txzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
        print('Interpolate columns to finer grid: DONE!')
        
        #%%''' #Spot check the solution on both grids
