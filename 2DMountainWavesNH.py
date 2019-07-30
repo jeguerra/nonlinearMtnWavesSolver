@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
+from computeHorizontalInterp import computeHorizontalInterp
 from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
 from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
@@ -99,8 +100,6 @@ if __name__ == '__main__':
        
        # Compute the terrain derivatives by Hermite-Function derivative matrix
        dHdX = DDX_1D.dot(HofX)
-       #plt.figure()
-       #plt.plot(REFS[0], dHdX)
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
@@ -209,9 +208,12 @@ if __name__ == '__main__':
        '''
        #%% Solve the system
        start = time.time()
-       # Direct solver
-       decomp = spl.splu(A.tocsc())
-       sol = decomp.solve(b[sysDex])
+       # Direct solver with some last-minute matrix grooming...
+       AN = A.tocsc()
+       bN = b[sysDex]
+       del(A)
+       del(b)
+       sol = spl.spsolve(AN, bN, use_umfpack=False)
        #decomp = spl.spilu(A.tocsc())
        #sol0 = decomp.solve(b[sysDex])
        #sol = spl.lgmres(A.tocsc(), b[sysDex], x0=None, atol=1.0E-6, maxiter=1000, inner_m=20)
@@ -221,7 +223,7 @@ if __name__ == '__main__':
        
        #%% Recover the solution
        SOL = np.zeros(numVar * NX*NZ)
-       SOL[sysDex] = sol[0];
+       SOL[sysDex] = sol;
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
        
        #%% Get the fields in physical space
@@ -236,12 +238,20 @@ if __name__ == '__main__':
        print('Recover solution on native grid: DONE!')
        
        #%% Interpolate columns to a finer grid for plotting
-       NXI = 3000
        NZI = 500
        uxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
        wxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
        pxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, pxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
        txzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       print('Interpolate columns to finer grid: DONE!')
+       
+       #%% Interpolate rows to a finer grid for plotting
+       NXI = 2000
+       temp = ZTLI # Some redundant computations here!
+       uxzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, uxzint, HF_TRANS)
+       wxzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, wxzint, HF_TRANS)
+       pxzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, pxzint, HF_TRANS)
+       txzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, txzint, HF_TRANS)
        print('Interpolate columns to finer grid: DONE!')
        
        #%%''' #Spot check the solution on both grids
@@ -250,5 +260,5 @@ if __name__ == '__main__':
        cbar = fig.colorbar(ccheck)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(wxzint, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)

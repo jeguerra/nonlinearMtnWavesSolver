@@ -33,8 +33,10 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      # Convert to the reference grid at this column
                      thisZ = ZTL[:,cc]
                      xi = 1.0 * ((2.0 / zpan * thisZ) - 1.0)
+                     
                      # Get the Chebyshev matrix for this column
                      CTM = hcnw.chebpolym(NZ-1, -xi)
+                     
                      # Apply the interpolation
                      temp = (CTM).dot(fcoeffs)
                      FLDI[:,cc] = np.ravel(temp)
@@ -53,6 +55,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
               FLDI = np.zeros((NZI, NX))
               # Compute the new column reference grid (linear space)
               xi = np.linspace(-1.0, 1.0, num=NZI, endpoint=True)
+              
               # Loop over each column
               for cc in range(NX):
                      # Compute the new column physical grid
@@ -62,10 +65,13 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      zspan = zmax - zmin
                      zi = zspan * 0.5 * xi + (0.5 * zmax) + (0.5 * zmin)
                      ZTLI[:,cc] = np.ravel(zi)
+                     
                      # Apply the forward transform at this column
                      fcoeffs = CH_TRANS.dot(FLD[:,cc])
+                     
                      # Get the Chebyshev matrix for this column
                      CTM = hcnw.chebpolym(NZ-1, -xi)
+                     
                      # Apply the interpolation
                      temp = (CTM).dot(fcoeffs)
                      FLDI[:,cc] = np.ravel(temp)
