@@ -55,8 +55,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 81
+       NX = 155
+       NZ = 95
        numVar = 4
        iU = 0
        iW = 1
@@ -246,19 +246,45 @@ if __name__ == '__main__':
        print('Interpolate columns to finer grid: DONE!')
        
        #%% Interpolate rows to a finer grid for plotting
-       '''
        NXI = 2500
        uxzint = computeHorizontalInterp(DIMS, NXI, uxzint, HF_TRANS)
        wxzint = computeHorizontalInterp(DIMS, NXI, wxzint, HF_TRANS)
        pxzint = computeHorizontalInterp(DIMS, NXI, pxzint, HF_TRANS)
        txzint = computeHorizontalInterp(DIMS, NXI, txzint, HF_TRANS)
        print('Interpolate columns to finer grid: DONE!')
-       '''
+       
+       #%% Make the new grid XLI, ZTLI
+       import HerfunChebNodesWeights as hcnw
+       xnew, dummy = hcnw.hefunclb(NX)
+       xmax = np.amax(xnew)
+       xmin = np.amin(xnew)
+       # Make new reference domain grid vectors
+       xnew = np.linspace(xmin, xmax, num=NXI, endpoint=True)
+       znew = np.linspace(0.0, ZH, num=NZI, endpoint=True)
+       
+       # Interpolate the terrain profile
+       hcf = HF_TRANS.dot(ZTL[0,:])
+       dhcf = HF_TRANS.dot(DZT[0,:])
+       IHF_TRANS = hcnw.hefuncm(NX-1, xnew, True)
+       hnew = (IHF_TRANS.T).dot(hcf)
+       dhnewdx = (IHF_TRANS.T).dot(dhcf)
+       
+       # Scale znew to physical domain and make the new grid
+       xnew *= L2 / xmax
+       # Compute the new Guellrich domain
+       NDIMS = [L1, L2, ZH, NXI, NZI]
+       NREFS = [xnew, znew]
+       XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
+       
+       #plt.plot(hnew, znew, REFS[0], HofX)
+       #plt.figure()
+       #plt.plot(xnew, dhnewdx, REFS[0], dHdX)
+       
        #%%''' #Spot check the solution on both grids
        fig = plt.figure()
        ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(wxzint, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
