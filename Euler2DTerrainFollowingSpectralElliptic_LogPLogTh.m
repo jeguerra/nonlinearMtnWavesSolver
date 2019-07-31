@@ -18,8 +18,8 @@ startup;
 warning('off');
 
 %% Create the dimensional XZ grid
-NX = 129; % Expansion order matches physical grid
-NZ = 85; % Expansion order matches physical grid
+NX = 100; % Expansion order matches physical grid
+NZ = 75; % Expansion order matches physical grid
 OPS = NX * NZ;
 numVar = 4;
 iW = 1;
@@ -220,10 +220,10 @@ pxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
 txz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 
 %% Here we can turn off the fine grid extension
-%{
+%
 %% Use the coarse system solution to accelerate iterative solution of a finer system
-NX = 300;
-NZ = 140;
+NX = 400;
+NZ = 145;
 OPS = NX * NZ;
 
 %% Compute the initialization and grid
@@ -267,16 +267,17 @@ AN = LD(sysDex, sysDex);
 bN = - b(sysDex,1); clear b;
 toc; disp('Compute fine RHS... DONE!');
 tic;
-matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
+%matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
 % Use GMRES to make the initial solution
-[sol, ~, ~, ~, rvc1] = gmres(AN, bN, 10, 1.0E-6, 10, [], [], xsol(sysDex));
+[sol, ~, ~, ~, rvc1] = gmres(AN, bN, 4, 1.0E-6, 10, [], [], xsol(sysDex));
 % Use ALSQR iterative method preconditioned with GMRES
-matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, DOPS, xVec, sysDex, ntrans);
+%matMul1 = @(xVec, ntrans) computeAorATMulLogPLogTh(REFSI, DOPS, xVec, sysDex, ntrans);
 OPTS.LTOL = 1.0E-8;
-OPTS.K = 10;
-OPTS.MAXITL = 20;
-OPTS.MAXITP = 20;
-[sol,  ~, rvc3] = alsqr(AN, bN, sol, OPTS);
+OPTS.K = 50;
+OPTS.MAXITL = 100;
+OPTS.MAXITP = 100;
+[sol,  solFlag, rvc3] = alsqr(AN, bN, sol, OPTS);
+%[sol, rvc3] = alsqr(AN, bN, sol, OPTS);
 
 toc; disp('Solve by using iterative method with coarser initial guess... DONE!');
 

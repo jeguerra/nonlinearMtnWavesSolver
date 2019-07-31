@@ -55,8 +55,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 128
-       NZ = 85
+       NX = 129
+       NZ = 81
        numVar = 4
        iU = 0
        iW = 1
@@ -238,27 +238,27 @@ if __name__ == '__main__':
        print('Recover solution on native grid: DONE!')
        
        #%% Interpolate columns to a finer grid for plotting
-       NZI = 500
-       uxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       wxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       pxzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, pxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       txzint, ZTLI = computeColumnInterp(DIMS, None, None, NZI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       NZI = 200
+       uxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       wxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       pxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, pxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
+       txzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
        print('Interpolate columns to finer grid: DONE!')
        
        #%% Interpolate rows to a finer grid for plotting
-       NXI = 2000
-       temp = ZTLI # Some redundant computations here!
-       uxzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, uxzint, HF_TRANS)
-       wxzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, wxzint, HF_TRANS)
-       pxzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, pxzint, HF_TRANS)
-       txzint, XLI, ZTLI = computeHorizontalInterp(DIMS, NXI, NZI, temp, txzint, HF_TRANS)
+       '''
+       NXI = 2500
+       uxzint = computeHorizontalInterp(DIMS, NXI, uxzint, HF_TRANS)
+       wxzint = computeHorizontalInterp(DIMS, NXI, wxzint, HF_TRANS)
+       pxzint = computeHorizontalInterp(DIMS, NXI, pxzint, HF_TRANS)
+       txzint = computeHorizontalInterp(DIMS, NXI, txzint, HF_TRANS)
        print('Interpolate columns to finer grid: DONE!')
-       
+       '''
        #%%''' #Spot check the solution on both grids
        fig = plt.figure()
        ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(wxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)

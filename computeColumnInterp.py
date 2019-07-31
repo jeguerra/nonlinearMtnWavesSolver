@@ -51,7 +51,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      return FLD
               
               # Interpolated field has a new size
-              ZTLI = np.zeros((NZI, NX))
+              #ZTLI = np.zeros((NZI, NX))
               FLDI = np.zeros((NZI, NX))
               # Compute the new column reference grid (linear space)
               xi = np.linspace(-1.0, 1.0, num=NZI, endpoint=True)
@@ -59,12 +59,12 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
               # Loop over each column
               for cc in range(NX):
                      # Compute the new column physical grid
-                     zdata = ZTL[:,cc]
-                     zmin = np.min(zdata)
-                     zmax = np.amax(zdata)
-                     zspan = zmax - zmin
-                     zi = zspan * 0.5 * xi + (0.5 * zmax) + (0.5 * zmin)
-                     ZTLI[:,cc] = np.ravel(zi)
+                     #zdata = ZTL[:,cc]
+                     #zmin = np.min(zdata)
+                     #zmax = np.amax(zdata)
+                     #zspan = zmax - zmin
+                     #zi = zspan * 0.5 * xi + (0.5 * zmax) + (0.5 * zmin)
+                     #ZTLI[:,cc] = np.ravel(zi)
                      
                      # Apply the forward transform at this column
                      fcoeffs = CH_TRANS.dot(FLD[:,cc])
@@ -76,5 +76,5 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      temp = (CTM).dot(fcoeffs)
                      FLDI[:,cc] = np.ravel(temp)
               
-              return FLDI, ZTLI
+              return FLDI
               

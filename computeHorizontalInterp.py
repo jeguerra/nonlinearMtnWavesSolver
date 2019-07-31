@@ -7,39 +7,44 @@ Created on Tue Jul 30 09:47:32 2019
 """
 
 import numpy as np
-#import scipy.interpolate as spint
+#import matplotlib.pyplot as plt
 import HerfunChebNodesWeights as hcnw
 
-def computeHorizontalInterp(DIMS, NXI, NZI, ZTL, FLD, HF_TRANS):
+def computeHorizontalInterp(DIMS, NXI, FLD, HF_TRANS):
        # Get DIMS data
-       L2 = DIMS[1]
        NX = DIMS[3]
        
        # Check
        if NXI <= 0:
-              print('ERROR: Invalid number of points in new grid! ', NZI)
+              print('ERROR: Invalid number of points in new grid! ', NXI)
               return FLD
        
        # Compute the new horizontal reference grid (linear space)
-       xh, dummy = hcnw.hefunclb(NXI)
+       xh, dummy = hcnw.hefunclb(NX)
        xmax = np.amax(xh)
        xmin = np.amin(xh)
        xi = np.linspace(xmin, xmax, num=NXI, endpoint=True)
        
        # Compute coefficients for the height field
-       hcoeffs = HF_TRANS.dot(ZTL.T)
+       #hcoeffs = np.matmul(HF_TRANS, ZTL.T)
        # Compute coefficients for the variable field
-       fcoeffs = HF_TRANS.dot(FLD.T)
+       fcoeffs = np.matmul(HF_TRANS, FLD.T)
        
        # Compute backward transform to new grid
        HFM = hcnw.hefuncm(NX-1, xi, True)
+       #HFM_native = hcnw.hefuncm(NX-1, xh, True)
+       
+       #plt.figure()
+       #plt.plot(xh, HFM_native[0,:])
+       #plt.figure()
+       #plt.plot(xi, HFM[0,:])
        
        # Apply the backward transforms
-       ZTLI = (HFM.T).dot(hcoeffs)
-       FLDI = (HFM.T).dot(fcoeffs)
+       #ZTLI = np.matmul(HFM.T, hcoeffs)
+       FLDI = np.matmul(HFM.T, fcoeffs)
        
        # Make a new XLI meshgrid
-       varray = np.array(range(NZI))
-       XLI, dummy = np.meshgrid(L2 / xmax * xi, varray)
+       #varray = np.array(range(NZI))
+       #XLI, dummy = np.meshgrid(L2 / xmax * xi, varray)
        
-       return FLDI.T, XLI, ZTLI.T
+       return FLDI.T
