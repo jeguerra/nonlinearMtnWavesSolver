@@ -40,6 +40,9 @@ from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeRayleighEquations import computeRayleighEquations
 
 if __name__ == '__main__':
+       # Set the solution type
+       StaticSolve = False
+       TransientSolve = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -206,20 +209,67 @@ if __name__ == '__main__':
        del(b)
        print('Compute the normal equations: DONE!')
        '''
-       #%% Solve the system
-       start = time.time()
-       # Direct solver with some last-minute matrix grooming...
-       AN = A.tocsc()
-       bN = b[sysDex]
-       del(A)
-       del(b)
-       sol = spl.spsolve(AN, bN, use_umfpack=False)
-       #decomp = spl.spilu(A.tocsc())
-       #sol0 = decomp.solve(b[sysDex])
-       #sol = spl.lgmres(A.tocsc(), b[sysDex], x0=None, atol=1.0E-6, maxiter=1000, inner_m=20)
-       endt = time.time()
-       print('Solve the system: DONE!')
-       print('Elapsed time: ', endt - start)
+       #%% Solve the system - Static Solution
+       if StaticSolve:
+              start = time.time()
+              # Direct solver with some last-minute matrix grooming...
+              AN = A.tocsc()
+              bN = b[sysDex]
+              del(A)
+              del(b)
+              sol = spl.spsolve(AN, bN, use_umfpack=False)
+              endt = time.time()
+              print('Solve the system: DONE!')
+              print('Elapsed time: ', endt - start)
+       elif TransientSolve:
+              AN = A.tocsc()
+              bN = b[sysDex]
+              del(A)
+              del(b)
+              # Transient solve parameters
+              DT = 0.06
+              HR = 5.0
+              ET = HR * 60 * 60 # End time in seconds
+              TI = np.array(np.arange(DT, ET, DT))
+              OTI = 50 # Stride for diagnostic output
+              # Set the coefficients
+              c1 = 1.0 / 6.0
+              c2 = 1.0 / 5.0
+              # Initialize transient storage
+              SOLT = np.zeros((numVar * NX*NZ, 3))
+              # Initialize the RHS
+              RHS = bN
+              
+              # Start the time loop
+              for tt in range(len(TI)):
+                     # Stage 1
+                     SOLT[sysDex,0] += c1 * DT * RHS
+                     # Copy to storage 2
+                     SOLT[sysDex,1] = SOLT[sysDex,0]
+                     
+                     # Compute stages 2 - 5
+                     for ii in range(2,6):
+                            SOLT[sysDex,0] += c1 * DT * RHS
+                            # Update the RHS
+                            RHS = bN - AN.dot(SOLT[sysDex,0])
+                            
+              # Compute stage 6 with linear combination
+              SOLT[sysDex,0] = 3.0 * SOLT[sysDex,1] + 2.0 * \
+                     (SOLT[sysDex,0] + c1 * DT * RHS)
+              SOLT[sysDex,1] *= c2
+              
+              # Compute stages 7 - 9
+              for ii in range(7,10):
+                     SOLT[sysDex,0] += c1 * DT * RHS
+                     # update the RHS
+                     RHS = bN - AN.dot(SOLT[sysDex,0])
+                     
+              # Print out diagnostics every OTI steps
+              if tt % OTI == 0.0:
+                     print('Time: ', tt * DT, ' RHS 2-norm: ', np.linalg.norm(RHS))
+                     
+              # Recover the last solution
+              sol = SOLT[sysDex,0]
        
        #%% Recover the solution
        SOL = np.zeros(numVar * NX*NZ)
@@ -275,10 +325,6 @@ if __name__ == '__main__':
        NDIMS = [L1, L2, ZH, NXI, NZI]
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
-       
-       #plt.plot(hnew, znew, REFS[0], HofX)
-       #plt.figure()
-       #plt.plot(xnew, dhnewdx, REFS[0], dHdX)
        
        #%%''' #Spot check the solution on both grids
        fig = plt.figure()
