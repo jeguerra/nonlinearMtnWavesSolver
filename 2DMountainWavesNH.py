@@ -288,3 +288,7 @@ if __name__ == '__main__':
        fig = plt.figure()
        ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
+       #
+       fig = plt.figure()
+       plt.plot(XLI[0,:], wxzint[0,:], XL[0,:], wxz[0,:])
+       plt.xlim(-15000.0, 15000.0)
