@@ -26,7 +26,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        utdex = np.array(range(NZ-1, OPS, NZ))
        wtdex = np.add(utdex, iW * OPS)
        
-       # BC: w' = dh/dx (U + u') so that w' is set at top and bottom boundaries
+       # BC: w' = dh/dx (U + u') so that w' is at top and bottom boundaries
        rowsOut = set(np.concatenate((wbdex, wtdex)))
        rowsAll = set(np.array(range(0,numVar*OPS)))
        

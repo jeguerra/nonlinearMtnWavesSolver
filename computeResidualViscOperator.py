@@ -16,6 +16,8 @@ def computeResidualViscOperator(DIMS, REFS, RES, qdex, DX, DZ):
        OPS = NX * NZ
         
        # Get REFS data
+       DDXM = REFS[13]
+       DDZM = REFS[14]
        DDXM2 = REFS[15]
        DDZM2 = REFS[16]
        

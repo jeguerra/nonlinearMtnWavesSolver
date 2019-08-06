@@ -59,8 +59,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 81
+       NX = 115
+       NZ = 75
        numVar = 4
        iU = 0
        iW = 1
@@ -228,12 +228,12 @@ if __name__ == '__main__':
               print('Solve the system: DONE!')
               print('Elapsed time: ', endt - start)
        elif TransientSolve:
-              #AN = A.tocsc()
-              #bN = b[sysDex]
+              AN = A.tocsc()
+              bN = b[sysDex]
               #del(A)
               #del(b)
               # Transient solve parameters
-              DT = 0.06
+              DT = 0.05
               HR = 0.1
               ET = HR * 60 * 60 # End time in seconds
               TI = np.array(np.arange(DT, ET, DT))
@@ -253,25 +253,29 @@ if __name__ == '__main__':
               pdex = np.add(wdex, OPS)
               tdex = np.add(pdex, OPS)
               # Compute DX and DZ grid length scales
-              DX = 2.0 * np.amax(np.diff(REFS[0]))
-              DZ = 2.0 * np.amax(np.diff(REFS[1]))
+              DX = (L2 - L1) / NX
+              DZ = ZH / NZ
               
               # Start the time loop
               for tt in range(len(TI)):
                      # Update SGS tendency
                      #'''
                      if tt % RTI == 0 and tt > 0:
+                            SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RHS
                             # Update the residual viscosity
-                            RVDU = computeResidualViscOperator(DIMS, REFS, SOLT, udex, DX, DZ)
-                            RVDW = computeResidualViscOperator(DIMS, REFS, SOLT, wdex, DX, DZ)
+                            #RVDU = computeResidualViscOperator(DIMS, REFS, SOLT, udex, DX, DZ)
+                            #RVDW = computeResidualViscOperator(DIMS, REFS, SOLT, wdex, DX, DZ)
+                            #RVDP = computeResidualViscOperator(DIMS, REFS, SOLT, pdex, DX, DZ)
                             RVDT = computeResidualViscOperator(DIMS, REFS, SOLT, tdex, DX, DZ)
-                            SOLT[sysDex,2] = 0.0 * SOLT[sysDex,2]
+                            #RVD = sps.block_diag((RVDU, RVDW, RVDP, RVDT))
+                            SOLT[:,2] *= 0.0
+                            #SOLT[:,2] = RVD.dot(SOLT[:,0])
                             # Apply to U, W, and Theta
                             SOLT[udex,2] = RVDT.dot(SOLT[udex,0])
                             SOLT[wdex,2] = RVDT.dot(SOLT[wdex,0])
+                            #SOLT[pdex,2] = RVDT.dot(SOLT[pdex,0])
                             SOLT[tdex,2] = RVDT.dot(SOLT[tdex,0])
-                            print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                      #'''
                             
                      # Stage 1
@@ -301,9 +305,11 @@ if __name__ == '__main__':
                             err = np.linalg.norm(RHS)
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
+                            print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     # Zero out auxiliary storage...
-                     #SOLT[sysDex,2] = 0.0 * SOLT[sysDex,2]
+                     # Zero out auxiliary storage after diffusion
+                     if tt % RTI == 0:
+                            SOLT[:,2] *= 0.0
                      
               # Recover the last solution
               sol = SOLT[sysDex,0]
