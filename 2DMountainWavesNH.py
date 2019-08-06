@@ -21,7 +21,6 @@ import numpy as np
 import math as mt
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
-import scipy.linalg as sln
 from matplotlib import cm
 import matplotlib.pyplot as plt
 # Import from the local library of routines
@@ -29,6 +28,7 @@ from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
 from computeHorizontalInterp import computeHorizontalInterp
+from computePartialDerivativesXZ import computePartialDerivativesXZ
 from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
 from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
@@ -38,6 +38,7 @@ from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeRayleighEquations import computeRayleighEquations
+from computeResidualViscOperator import computeResidualViscOperator
 
 if __name__ == '__main__':
        # Set the solution type
@@ -58,8 +59,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 155
-       NZ = 95
+       NX = 129
+       NZ = 81
        numVar = 4
        iU = 0
        iW = 1
@@ -162,7 +163,12 @@ if __name__ == '__main__':
        del(DLPDZ)
        del(DLPTDZ)
        
-       #%% Get the 2D operators...
+       #%% Get the 2D linear operators...
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)
+       REFS.append(DDXM)
+       REFS.append(DDZM)
+       REFS.append(DDXM.dot(DDXM))
+       REFS.append(DDZM.dot(DDZM))
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -222,16 +228,17 @@ if __name__ == '__main__':
               print('Solve the system: DONE!')
               print('Elapsed time: ', endt - start)
        elif TransientSolve:
-              AN = A.tocsc()
-              bN = b[sysDex]
-              del(A)
-              del(b)
+              #AN = A.tocsc()
+              #bN = b[sysDex]
+              #del(A)
+              #del(b)
               # Transient solve parameters
               DT = 0.06
-              HR = 5.0
+              HR = 0.1
               ET = HR * 60 * 60 # End time in seconds
               TI = np.array(np.arange(DT, ET, DT))
               OTI = 50 # Stride for diagnostic output
+              RTI = 10 # Stride for residual visc update
               # Set the coefficients
               c1 = 1.0 / 6.0
               c2 = 1.0 / 5.0
@@ -239,11 +246,36 @@ if __name__ == '__main__':
               SOLT = np.zeros((numVar * NX*NZ, 3))
               # Initialize the RHS
               RHS = bN
+              error = [np.linalg.norm(RHS)]
+              # Make the equation index vectors
+              udex = np.array(range(OPS))
+              wdex = np.add(udex, OPS)
+              pdex = np.add(wdex, OPS)
+              tdex = np.add(pdex, OPS)
+              # Compute DX and DZ grid length scales
+              DX = 2.0 * np.amax(np.diff(REFS[0]))
+              DZ = 2.0 * np.amax(np.diff(REFS[1]))
               
               # Start the time loop
               for tt in range(len(TI)):
+                     # Update SGS tendency
+                     #'''
+                     if tt % RTI == 0 and tt > 0:
+                            SOLT[sysDex,2] = RHS
+                            # Update the residual viscosity
+                            RVDU = computeResidualViscOperator(DIMS, REFS, SOLT, udex, DX, DZ)
+                            RVDW = computeResidualViscOperator(DIMS, REFS, SOLT, wdex, DX, DZ)
+                            RVDT = computeResidualViscOperator(DIMS, REFS, SOLT, tdex, DX, DZ)
+                            SOLT[sysDex,2] = 0.0 * SOLT[sysDex,2]
+                            # Apply to U, W, and Theta
+                            SOLT[udex,2] = RVDT.dot(SOLT[udex,0])
+                            SOLT[wdex,2] = RVDT.dot(SOLT[wdex,0])
+                            SOLT[tdex,2] = RVDT.dot(SOLT[tdex,0])
+                            print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
+                     #'''
+                            
                      # Stage 1
-                     SOLT[sysDex,0] += c1 * DT * RHS
+                     SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
                      # Copy to storage 2
                      SOLT[sysDex,1] = SOLT[sysDex,0]
                      
@@ -251,22 +283,27 @@ if __name__ == '__main__':
                      for ii in range(2,6):
                             SOLT[sysDex,0] += c1 * DT * RHS
                             # Update the RHS
-                            RHS = bN - AN.dot(SOLT[sysDex,0])
+                            RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
                             
-              # Compute stage 6 with linear combination
-              SOLT[sysDex,0] = 3.0 * SOLT[sysDex,1] + 2.0 * \
-                     (SOLT[sysDex,0] + c1 * DT * RHS)
-              SOLT[sysDex,1] *= c2
-              
-              # Compute stages 7 - 9
-              for ii in range(7,10):
-                     SOLT[sysDex,0] += c1 * DT * RHS
-                     # update the RHS
-                     RHS = bN - AN.dot(SOLT[sysDex,0])
+                     # Compute stage 6 with linear combination
+                     SOLT[sysDex,0] = 3.0 * SOLT[sysDex,1] + 2.0 * \
+                            (SOLT[sysDex,0] + c1 * DT * RHS)
+                     SOLT[sysDex,0] *= c2
                      
-              # Print out diagnostics every OTI steps
-              if tt % OTI == 0.0:
-                     print('Time: ', tt * DT, ' RHS 2-norm: ', np.linalg.norm(RHS))
+                     # Compute stages 7 - 9
+                     for ii in range(7,10):
+                            SOLT[sysDex,0] += c1 * DT * RHS
+                            # update the RHS
+                            RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
+                            
+                     # Print out diagnostics every OTI steps
+                     if tt % OTI == 0:
+                            err = np.linalg.norm(RHS)
+                            error.append(err)
+                            print('Time: ', tt * DT, ' RHS 2-norm: ', err)
+                            
+                     # Zero out auxiliary storage...
+                     #SOLT[sysDex,2] = 0.0 * SOLT[sysDex,2]
                      
               # Recover the last solution
               sol = SOLT[sysDex,0]
@@ -337,4 +374,4 @@ if __name__ == '__main__':
        #
        fig = plt.figure()
        plt.plot(XLI[0,:], wxzint[0,:], XL[0,:], wxz[0,:])
-       plt.xlim(-15000.0, 15000.0)
+       plt.xlim(-12500.0, 12500.0)

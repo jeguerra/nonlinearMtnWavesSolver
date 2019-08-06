@@ -3,8 +3,8 @@ function RVD = computeResidualViscOperator_LogPLogTh(REFS, RHS)
     OPS = REFS.NX * REFS.NZ;
     
     %% Set the characteristic length scales (Nyquist length at the given order)
-    DX = max(diff(REFS.XL(end,:)));
-    DZ = max(diff(REFS.ZTL(:,1)));
+    DX = 2.0 * min(diff(REFS.XL(1,:)));
+    DZ = 2.0 * min(diff(REFS.ZTL(:,1)));
     
     %% Fetch the derivative matrices into operator for 2D implementation
     
@@ -18,7 +18,9 @@ function RVD = computeResidualViscOperator_LogPLogTh(REFS, RHS)
     %URES = abs(RHS(1:OPS)); UF = max(URES);
     %WRES = abs(RHS(OPS+1:2*OPS)); WF = max(WRES);
     %PRES = abs(RHS(2*OPS+1:3*OPS)); PF = max(PRES);
-    TRES = abs(RHS(3*OPS+1:4*OPS)); TF = REFS.thref0; TRES = spdiags(TRES, 0);
+    TRES = abs(RHS(3*OPS+1:4*OPS)); 
+    TF = REFS.thref0; 
+    TRES = spdiags(TRES, 0);
 
     %% Assemble the block global operator RVD
     ZSPR = sparse(OPS,OPS);
