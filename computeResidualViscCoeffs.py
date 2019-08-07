@@ -8,7 +8,7 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 
-def computeResidualViscOperator(RES, qdex, DX, DZ):
+def computeResidualViscCoeffs(RES, qdex, DX, DZ):
        
        ARES = np.abs(RES[qdex,2])
        ASOL = np.abs(RES[qdex,0])

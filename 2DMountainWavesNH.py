@@ -38,7 +38,8 @@ from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeRayleighEquations import computeRayleighEquations
-from computeResidualViscOperator import computeResidualViscOperator
+from computeResidualViscCoeffs import computeResidualViscCoeffs
+from computeNeumannAdjusted import computeNeumannAdjusted
 
 if __name__ == '__main__':
        # Set the solution type
@@ -60,7 +61,7 @@ if __name__ == '__main__':
        L1 = -L2
        ZH = 36000.0
        NX = 129
-       NZ = 81
+       NZ = 85
        numVar = 4
        iU = 0
        iW = 1
@@ -93,6 +94,10 @@ if __name__ == '__main__':
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
+       
+       # Compute 1D Derivative Matrices with Neumann BC (N-2) X (N-2)
+       #DDX_1D_NEUMANN = computeNeumannAdjusted(DDX_1D, True, True)
+       DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_1D, True, True)
        
        #%% Read in topography profile or compute from analytical function
        AGNESI = 1 # "Witch of Agnesi" profile
@@ -164,13 +169,13 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Get the 2D linear operators...
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       DDXM, DDZM_NEUMANN = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D_NEUMANN)
        REFS.append(DDXM)
        REFS.append(DDZM)
+       # Compute 2nd order opearators with Neumann BC
        DDXM2 = DDXM.dot(DDXM)
-       DDZM2 = DDZM.dot(DDZM)
-       REFS.append(DDXM2)
-       REFS.append(DDZM2)
+       DDZM2 = DDZM_NEUMANN.dot(DDZM_NEUMANN)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -201,8 +206,6 @@ if __name__ == '__main__':
        DHDXM = sps.spdiags(DZT[0,:], 0, NX, NX)
        # Compute LHS column adjustment to LDG
        LDG[:,ubdex] = np.add(LDG[:,ubdex], (LDG[:,wbdex]).dot(DHDXM))
-       DX2[:,ubdex] = np.add(DX2[:,ubdex], (DX2[:,wbdex]).dot(DHDXM))
-       DZ2[:,ubdex] = np.add(DZ2[:,ubdex], (DZ2[:,wbdex]).dot(DHDXM))
        # Compute RHS adjustment to forcing
        WBC = np.multiply(DZT[0,:], UZ[0,:])
        # Get some memory back
@@ -211,14 +214,11 @@ if __name__ == '__main__':
        
        #%% Set up the global solve
        A = LDG[np.ix_(sysDex,sysDex)]
-       DiffX = DX2[np.ix_(sysDex,sysDex)]
-       DiffZ = DZ2[np.ix_(sysDex,sysDex)]
        b = -(LDG[:,wbdex]).dot(WBC)
-       #d = -(LAP[:,wbdex]).dot(WBC)
+       # Diffusion operators defined ONLY in the interior
+       DiffX = DX2[np.ix_(intDex,intDex)]
+       DiffZ = DZ2[np.ix_(intDex,intDex)]
        del(LDG)
-       del(LAP)
-       del(DDXM2)
-       del(DDZM2)
        del(WBC)
        print('Set up global system: DONE!')
        
@@ -243,20 +243,22 @@ if __name__ == '__main__':
               print('Solve the system: DONE!')
               print('Elapsed time: ', endt - start)
        elif TransientSolve:
+              #'''
               AN = A.tocsc()
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
               bN = b[sysDex]
               #dN = d[sysDex]
-              del(A)
-              del(b)
+              #del(A)
+              #del(b)
+              #'''
               # Transient solve parameters
               DT = 0.05
               HR = 5.0
               ET = HR * 60 * 60 # End time in seconds
               TI = np.array(np.arange(DT, ET, DT))
               OTI = 50 # Stride for diagnostic output
-              RTI = 10 # Stride for residual visc update
+              RTI = 2 # Stride for residual visc update
               # Set the coefficients
               c1 = 1.0 / 6.0
               c2 = 1.0 / 5.0
@@ -282,20 +284,22 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RHS
                             # Update the residual viscosity
-                            RESUX, RESUZ = computeResidualViscOperator(SOLT, udex, DX, DZ)
-                            RESWX, RESWZ = computeResidualViscOperator(SOLT, wdex, DX, DZ)
-                            RESPX, RESPZ = computeResidualViscOperator(SOLT, pdex, DX, DZ)
-                            RESTX, RESTZ = computeResidualViscOperator(SOLT, tdex, DX, DZ)
+                            RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
+                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
+                            RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
+                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
                             # Apply to U, W, and Theta only in flow interior
+                            ZERS = np.zeros((OPS, ))
                             COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
-                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
+                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPX, RESTZ))
+                            # Use intDex to NOT diffuse at boundaries... EVER
+                            QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
+                            DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
+                            QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
+                            DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
                             
-                            QRES = sps.spdiags(COEFX[sysDex], 0, len(sysDex), len(sysDex))
-                            DynSGSX = QRES.dot(DiffX.dot(SOLT[sysDex,0]))
-                            QRES = sps.spdiags(COEFZ[sysDex], 0, len(sysDex), len(sysDex))
-                            DynSGSZ = QRES.dot(DiffZ.dot(SOLT[sysDex,0]))
-                            
-                            SOLT[sysDex,2] = DynSGSX + DynSGSZ
+                            SOLT[:,2] *= 0.0
+                            SOLT[intDex,2] = DynSGSX + DynSGSZ
                             del(DynSGSX)
                             del(DynSGSZ)
                      #'''
