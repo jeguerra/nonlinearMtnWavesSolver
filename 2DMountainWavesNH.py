@@ -59,8 +59,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 115
-       NZ = 75
+       NX = 129
+       NZ = 81
        numVar = 4
        iU = 0
        iW = 1
@@ -167,13 +167,15 @@ if __name__ == '__main__':
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)
        REFS.append(DDXM)
        REFS.append(DDZM)
-       REFS.append(DDXM.dot(DDXM))
-       REFS.append(DDZM.dot(DDZM))
+       DDXM2 = DDXM.dot(DDXM)
+       DDZM2 = DDZM.dot(DDZM)
+       REFS.append(DDXM2)
+       REFS.append(DDZM2)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
        #%% Compute the BC index vector
-       ubdex, wbdex, sysDex = computeAdjust4CBC(DIMS, numVar, varDex)
+       ubdex, wbdex, sysDex, intDex = computeAdjust4CBC(DIMS, numVar, varDex)
        
        #%% Initialize the global solution vector
        SOL = np.zeros((NX * NZ,1))
@@ -185,15 +187,22 @@ if __name__ == '__main__':
                        [DOPS[6], DOPS[7], np.add(DOPS[8], ROPS[2]), None], \
                        [None, DOPS[9], None, np.add(DOPS[10], ROPS[3])]], format='lil')
        
+       DX2 = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='lil')
+       DZ2 = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='lil')
+       
        # Get some memory back
        del(DOPS)
        del(ROPS)
+       del(DDXM2)
+       del(DDZM2)
        print('Compute global LHS sparse operator: DONE!')
        
        #%% Apply the coupled multipoint constraint for terrain
        DHDXM = sps.spdiags(DZT[0,:], 0, NX, NX)
        # Compute LHS column adjustment to LDG
        LDG[:,ubdex] = np.add(LDG[:,ubdex], (LDG[:,wbdex]).dot(DHDXM))
+       DX2[:,ubdex] = np.add(DX2[:,ubdex], (DX2[:,wbdex]).dot(DHDXM))
+       DZ2[:,ubdex] = np.add(DZ2[:,ubdex], (DZ2[:,wbdex]).dot(DHDXM))
        # Compute RHS adjustment to forcing
        WBC = np.multiply(DZT[0,:], UZ[0,:])
        # Get some memory back
@@ -202,8 +211,14 @@ if __name__ == '__main__':
        
        #%% Set up the global solve
        A = LDG[np.ix_(sysDex,sysDex)]
+       DiffX = DX2[np.ix_(sysDex,sysDex)]
+       DiffZ = DZ2[np.ix_(sysDex,sysDex)]
        b = -(LDG[:,wbdex]).dot(WBC)
+       #d = -(LAP[:,wbdex]).dot(WBC)
        del(LDG)
+       del(LAP)
+       del(DDXM2)
+       del(DDZM2)
        del(WBC)
        print('Set up global system: DONE!')
        
@@ -229,12 +244,15 @@ if __name__ == '__main__':
               print('Elapsed time: ', endt - start)
        elif TransientSolve:
               AN = A.tocsc()
+              DiffX = DiffX.tocsc()
+              DiffZ = DiffZ.tocsc()
               bN = b[sysDex]
-              #del(A)
-              #del(b)
+              #dN = d[sysDex]
+              del(A)
+              del(b)
               # Transient solve parameters
               DT = 0.05
-              HR = 0.1
+              HR = 5.0
               ET = HR * 60 * 60 # End time in seconds
               TI = np.array(np.arange(DT, ET, DT))
               OTI = 50 # Stride for diagnostic output
@@ -247,14 +265,14 @@ if __name__ == '__main__':
               # Initialize the RHS
               RHS = bN
               error = [np.linalg.norm(RHS)]
-              # Make the equation index vectors
+              # Make the equation index vectors for all DOF
               udex = np.array(range(OPS))
               wdex = np.add(udex, OPS)
               pdex = np.add(wdex, OPS)
               tdex = np.add(pdex, OPS)
               # Compute DX and DZ grid length scales
-              DX = (L2 - L1) / NX
-              DZ = ZH / NZ
+              DX = np.amin(np.diff(REFS[0]))
+              DZ = np.amin(np.diff(REFS[1]))
               
               # Start the time loop
               for tt in range(len(TI)):
@@ -264,18 +282,22 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RHS
                             # Update the residual viscosity
-                            #RVDU = computeResidualViscOperator(DIMS, REFS, SOLT, udex, DX, DZ)
-                            #RVDW = computeResidualViscOperator(DIMS, REFS, SOLT, wdex, DX, DZ)
-                            #RVDP = computeResidualViscOperator(DIMS, REFS, SOLT, pdex, DX, DZ)
-                            RVDT = computeResidualViscOperator(DIMS, REFS, SOLT, tdex, DX, DZ)
-                            #RVD = sps.block_diag((RVDU, RVDW, RVDP, RVDT))
-                            SOLT[:,2] *= 0.0
-                            #SOLT[:,2] = RVD.dot(SOLT[:,0])
-                            # Apply to U, W, and Theta
-                            SOLT[udex,2] = RVDT.dot(SOLT[udex,0])
-                            SOLT[wdex,2] = RVDT.dot(SOLT[wdex,0])
-                            #SOLT[pdex,2] = RVDT.dot(SOLT[pdex,0])
-                            SOLT[tdex,2] = RVDT.dot(SOLT[tdex,0])
+                            RESUX, RESUZ = computeResidualViscOperator(SOLT, udex, DX, DZ)
+                            RESWX, RESWZ = computeResidualViscOperator(SOLT, wdex, DX, DZ)
+                            RESPX, RESPZ = computeResidualViscOperator(SOLT, pdex, DX, DZ)
+                            RESTX, RESTZ = computeResidualViscOperator(SOLT, tdex, DX, DZ)
+                            # Apply to U, W, and Theta only in flow interior
+                            COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
+                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
+                            
+                            QRES = sps.spdiags(COEFX[sysDex], 0, len(sysDex), len(sysDex))
+                            DynSGSX = QRES.dot(DiffX.dot(SOLT[sysDex,0]))
+                            QRES = sps.spdiags(COEFZ[sysDex], 0, len(sysDex), len(sysDex))
+                            DynSGSZ = QRES.dot(DiffZ.dot(SOLT[sysDex,0]))
+                            
+                            SOLT[sysDex,2] = DynSGSX + DynSGSZ
+                            del(DynSGSX)
+                            del(DynSGSZ)
                      #'''
                             
                      # Stage 1
@@ -308,8 +330,7 @@ if __name__ == '__main__':
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
                      # Zero out auxiliary storage after diffusion
-                     if tt % RTI == 0:
-                            SOLT[:,2] *= 0.0
+                     #SOLT[:,2] *= 0.0
                      
               # Recover the last solution
               sol = SOLT[sysDex,0]
