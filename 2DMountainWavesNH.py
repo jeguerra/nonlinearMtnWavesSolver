@@ -174,8 +174,8 @@ if __name__ == '__main__':
        REFS.append(DDXM)
        REFS.append(DDZM)
        # Compute 2nd order opearators with Neumann BC
-       DDXM2 = DDXM.dot(DDXM)
-       DDZM2 = DDZM_NEUMANN.dot(DDZM_NEUMANN)
+       DDXM2 = DDXM #.dot(DDXM)
+       DDZM2 = DDZM_NEUMANN #.dot(DDZM_NEUMANN)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -257,7 +257,7 @@ if __name__ == '__main__':
               ET = HR * 60 * 60 # End time in seconds
               TI = np.array(np.arange(DT, ET, DT))
               OTI = 50 # Stride for diagnostic output
-              RTI = 2 # Stride for residual visc update
+              RTI = 10 # Stride for residual visc update
               # Set the coefficients
               c1 = 1.0 / 6.0
               c2 = 1.0 / 5.0
@@ -292,15 +292,33 @@ if __name__ == '__main__':
                             COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
                             COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
                             # Use intDex to NOT diffuse at boundaries... EVER
+                            #QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
+                            #DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
+                            #QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
+                            #DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
+                            
+                            # Full dependence
                             QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
                             DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
+                            DynSGSX = DiffX.dot(DynSGSX)
                             QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
                             DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
+                            DynSGSZ = DiffX.dot(DynSGSZ)
+                            
+                            # Time dependent coefficient only
+                            #QRES = np.amax(COEFX[intDex])
+                            #DynSGSX = QRES * (DiffX.dot(SOLT[intDex,0]))
+                            #QRES = np.amax(COEFZ[intDex])
+                            #DynSGSZ = QRES * (DiffZ.dot(SOLT[intDex,0]))
                             
                             SOLT[:,2] *= 0.0
                             SOLT[intDex,2] = DynSGSX + DynSGSZ
                             del(DynSGSX)
                             del(DynSGSZ)
+                     else:
+                            # Zero out auxiliary storage after diffusion
+                            SOLT[:,2] *= 0.0
+                            
                      #'''
                             
                      # Stage 1
@@ -331,9 +349,6 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
-                            
-                     # Zero out auxiliary storage after diffusion
-                     #SOLT[:,2] *= 0.0
                      
               # Recover the last solution
               sol = SOLT[sysDex,0]

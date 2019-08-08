@@ -11,10 +11,10 @@ import numpy as np
 def computeResidualViscCoeffs(RES, qdex, DX, DZ):
        
        ARES = np.abs(RES[qdex,2])
-       ASOL = np.abs(RES[qdex,0])
+       DSOL = np.abs(RES[qdex,0] - np.mean(RES[qdex,0]))
        
        # Get the normalization from the current estimate
-       QM = np.amax(ASOL)
+       QM = np.amax(DSOL)
        
        # Compute the anisotropic coefficients
        QRESX = (DX**2 / QM) * ARES
