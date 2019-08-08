@@ -248,7 +248,6 @@ if __name__ == '__main__':
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
               bN = b[sysDex]
-              #dN = d[sysDex]
               #del(A)
               #del(b)
               #'''
@@ -273,8 +272,8 @@ if __name__ == '__main__':
               pdex = np.add(wdex, OPS)
               tdex = np.add(pdex, OPS)
               # Compute DX and DZ grid length scales
-              DX = np.amin(np.diff(REFS[0]))
-              DZ = np.amin(np.diff(REFS[1]))
+              DX = np.min(np.diff(REFS[0]))
+              DZ = np.min(np.diff(REFS[1]))
               
               # Start the time loop
               for tt in range(len(TI)):
@@ -291,7 +290,7 @@ if __name__ == '__main__':
                             # Apply to U, W, and Theta only in flow interior
                             ZERS = np.zeros((OPS, ))
                             COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
-                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPX, RESTZ))
+                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
                             # Use intDex to NOT diffuse at boundaries... EVER
                             QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
                             DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
