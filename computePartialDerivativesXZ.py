@@ -16,6 +16,7 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        OPS = NX * NZ
        
        # Get REFS data
+       DZT = REFS[6]
        sigma = REFS[7]
        
        # Unwrap the 1D derivative matrices into 2D operators
@@ -41,5 +42,10 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        #%% Make the operators sparse
        DDXM = sps.csc_matrix(DDX_OP)
        DDZM = sps.csc_matrix(DDZ_OP)
+       
+       #%% Apply chain rule to the horizontal derivative
+       dZdX = np.reshape(DZT, (OPS,), order='F')
+       dZdX = sps.spdiags(dZdX, 0, OPS, OPS)
+       DDXM += dZdX.dot(DDZM)
        
        return DDXM, DDZM

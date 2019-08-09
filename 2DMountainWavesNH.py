@@ -43,9 +43,9 @@ from computeNeumannAdjusted import computeNeumannAdjusted
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = False
-       TransientSolve = True
-       DynSGS = True
+       StaticSolve = True
+       TransientSolve = False
+       DynSGS = False
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -97,7 +97,7 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        # Compute 1D Derivative Matrices with Neumann BC (N-2) X (N-2)
-       #DDX_1D_NEUMANN = computeNeumannAdjusted(DDX_1D, True, True)
+       DDX_1D_NEUMANN = DDX_1D
        DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_1D, True, True)
        
        #%% Read in topography profile or compute from analytical function
@@ -171,11 +171,11 @@ if __name__ == '__main__':
        
        #%% Get the 2D linear operators...
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       DDXM, DDZM_NEUMANN = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D_NEUMANN)
+       DDXM_NEUMANN, DDZM_NEUMANN = computePartialDerivativesXZ(DIMS, REFS, DDX_1D_NEUMANN, DDZ_1D_NEUMANN)
        REFS.append(DDXM)
        REFS.append(DDZM)
        # Compute 2nd order opearators with Neumann BC
-       DDXM2 = DDXM #.dot(DDXM)
+       DDXM2 = DDXM_NEUMANN #.dot(DDXM)
        DDZM2 = DDZM_NEUMANN #.dot(DDZM_NEUMANN)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
