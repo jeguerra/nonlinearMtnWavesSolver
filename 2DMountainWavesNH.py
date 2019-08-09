@@ -45,6 +45,7 @@ if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
        TransientSolve = True
+       DynSGS = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -230,18 +231,15 @@ if __name__ == '__main__':
        del(b)
        print('Compute the normal equations: DONE!')
        '''
-       #%% Solve the system - Static Solution
+       #%% Solve the system - Static or Transient Solution
+       start = time.time()
        if StaticSolve:
-              start = time.time()
               # Direct solver with some last-minute matrix grooming...
               AN = A.tocsc()
               bN = b[sysDex]
               del(A)
               del(b)
               sol = spl.spsolve(AN, bN, use_umfpack=False)
-              endt = time.time()
-              print('Solve the system: DONE!')
-              print('Elapsed time: ', endt - start)
        elif TransientSolve:
               #'''
               AN = A.tocsc()
@@ -257,7 +255,7 @@ if __name__ == '__main__':
               ET = HR * 60 * 60 # End time in seconds
               TI = np.array(np.arange(DT, ET, DT))
               OTI = 50 # Stride for diagnostic output
-              RTI = 10 # Stride for residual visc update
+              RTI = 1 # Stride for residual visc update
               # Set the coefficients
               c1 = 1.0 / 6.0
               c2 = 1.0 / 5.0
@@ -278,26 +276,28 @@ if __name__ == '__main__':
               # Start the time loop
               for tt in range(len(TI)):
                      # Update SGS tendency
-                     #'''
-                     if tt % RTI == 0 and tt > 0:
+                     if DynSGS and tt % RTI == 0 and tt > 0:
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RHS
-                            # Update the residual viscosity
+                            # Compute the local DynSGS coefficients
                             RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
                             RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
                             RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
                             RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
-                            # Apply to U, W, and Theta only in flow interior
+                            
+                            # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
                             COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
                             COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
                             # Use intDex to NOT diffuse at boundaries... EVER
+                            
+                            # Laplacian term only
                             #QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
                             #DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
                             #QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
                             #DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
                             
-                            # Full dependence
+                            # Divergence of the residual stress
                             QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
                             DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
                             DynSGSX = DiffX.dot(DynSGSX)
@@ -305,7 +305,7 @@ if __name__ == '__main__':
                             DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
                             DynSGSZ = DiffX.dot(DynSGSZ)
                             
-                            # Time dependent coefficient only
+                            # Time dependent coefficient only with 2nd order diffusion
                             #QRES = np.amax(COEFX[intDex])
                             #DynSGSX = QRES * (DiffX.dot(SOLT[intDex,0]))
                             #QRES = np.amax(COEFZ[intDex])
@@ -318,8 +318,6 @@ if __name__ == '__main__':
                      else:
                             # Zero out auxiliary storage after diffusion
                             SOLT[:,2] *= 0.0
-                            
-                     #'''
                             
                      # Stage 1
                      SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
@@ -350,13 +348,20 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                      
-              # Recover the last solution
+              # Get the last solution
               sol = SOLT[sysDex,0]
+              res = SOLT[sysDex,2]
+              del(SOLT)
+              
+       endt = time.time()
+       print('Solve the system: DONE!')
+       print('Elapsed time: ', endt - start)
        
-       #%% Recover the solution
+       #%% Recover the solution (or check the residual)
        SOL = np.zeros(numVar * NX*NZ)
        SOL[sysDex] = sol;
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
+       #SOL[sysDex] = res;
        
        #%% Get the fields in physical space
        udex = np.array(range(OPS))
