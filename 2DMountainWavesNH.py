@@ -43,9 +43,9 @@ from computeNeumannAdjusted import computeNeumannAdjusted
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = True
-       TransientSolve = False
-       DynSGS = False
+       StaticSolve = False
+       TransientSolve = True
+       DynSGS = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -73,7 +73,7 @@ if __name__ == '__main__':
        OPS = NX * NZ
        
        # Set the terrain options
-       h0 = 10.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -88,7 +88,7 @@ if __name__ == '__main__':
        # Define the computational and physical grids+
        REFS = computeGrid(DIMS)
        
-       #%% Compute the raw derivative matrix operators in alpha-xi computational space
+       #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
        
@@ -100,8 +100,8 @@ if __name__ == '__main__':
        DDX_1D_NEUMANN = DDX_1D
        DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_1D, True, True)
        
-       #%% Read in topography profile or compute from analytical function
-       AGNESI = 1 # "Witch of Agnesi" profile
+       #% Read in topography profile or compute from analytical function
+       AGNESI = 1 # "Witch of Agnesi" profil e
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
@@ -109,7 +109,7 @@ if __name__ == '__main__':
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Compute the terrain derivatives by Hermite-Function derivative matrix
-       dHdX = DDX_1D.dot(HofX)
+       #dHdX = DDX_1D.dot(HofX)
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
@@ -251,7 +251,7 @@ if __name__ == '__main__':
               #'''
               # Transient solve parameters
               DT = 0.05
-              HR = 5.0
+              HR = 1.0
               ET = HR * 60 * 60 # End time in seconds
               TI = np.array(np.arange(DT, ET, DT))
               OTI = 50 # Stride for diagnostic output
@@ -415,11 +415,11 @@ if __name__ == '__main__':
        
        #%%''' #Spot check the solution on both grids
        fig = plt.figure()
-       ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XL, ZTL, uxz, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XLI, ZTLI, uxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
        #
        fig = plt.figure()
