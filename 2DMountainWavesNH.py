@@ -40,6 +40,7 @@ from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeRayleighEquations import computeRayleighEquations
 from computeResidualViscCoeffs import computeResidualViscCoeffs
 from computeNeumannAdjusted import computeNeumannAdjusted
+from computeTimeIntegration import computeTimeIntegration
 
 if __name__ == '__main__':
        # Set the solution type
@@ -149,12 +150,20 @@ if __name__ == '__main__':
        dlnPTdz = np.expand_dims(dlnPTdz, axis=1)
        DLPTDZ = np.tile(dlnPTdz, NX)
        DLPTDZ = computeColumnInterp(DIMS, REFS[1], dlnPTdz, 0, ZTL, DLPTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       # Compute the background (initial) fields
        POR = np.expand_dims(POR, axis=1)
        PORZ = np.tile(POR, NX)
        PORZ = computeColumnInterp(DIMS, REFS[1], POR, 0, ZTL, PORZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        U = np.expand_dims(U, axis=1)
        UZ = np.tile(U, NX)
        UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       LPZ = np.expand_dims(LPZ, axis=1)
+       LOGP = np.tile(LPZ, NX)
+       LOGP = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, LOGP, CH_TRANS, '1DtoTerrainFollowingCheb')
+       LPT = np.expand_dims(LPT, axis=1)
+       LOGT = np.tile(LPT, NX)
+       LOGT = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
+       
        
        # Update the REFS collection
        REFS.append(UZ)
@@ -241,14 +250,13 @@ if __name__ == '__main__':
               del(b)
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
-              #'''
+              # Linear transient solution by explicit method
               AN = A.tocsc()
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
               bN = b[sysDex]
               #del(A)
               #del(b)
-              #'''
               # Transient solve parameters
               DT = 0.05
               HR = 1.0
@@ -256,9 +264,6 @@ if __name__ == '__main__':
               TI = np.array(np.arange(DT, ET, DT))
               OTI = 50 # Stride for diagnostic output
               RTI = 1 # Stride for residual visc update
-              # Set the coefficients
-              c1 = 1.0 / 6.0
-              c2 = 1.0 / 5.0
               # Initialize transient storage
               SOLT = np.zeros((numVar * NX*NZ, 3))
               # Initialize the RHS
@@ -319,27 +324,7 @@ if __name__ == '__main__':
                             # Zero out auxiliary storage after diffusion
                             SOLT[:,2] *= 0.0
                             
-                     # Stage 1
-                     SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
-                     # Copy to storage 2
-                     SOLT[sysDex,1] = SOLT[sysDex,0]
-                     
-                     # Compute stages 2 - 5
-                     for ii in range(2,6):
-                            SOLT[sysDex,0] += c1 * DT * RHS
-                            # Update the RHS
-                            RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
-                            
-                     # Compute stage 6 with linear combination
-                     SOLT[sysDex,0] = 3.0 * SOLT[sysDex,1] + 2.0 * \
-                            (SOLT[sysDex,0] + c1 * DT * RHS)
-                     SOLT[sysDex,0] *= c2
-                     
-                     # Compute stages 7 - 9
-                     for ii in range(7,10):
-                            SOLT[sysDex,0] += c1 * DT * RHS
-                            # update the RHS
-                            RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
+                     SOLT, RHS = computeTimeIntegration(bN, AN, DT, RHS, SOLT, sysDex)
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -352,6 +337,16 @@ if __name__ == '__main__':
               sol = SOLT[sysDex,0]
               res = SOLT[sysDex,2]
               del(SOLT)
+       elif NonLinSolve:
+              # Nonlinear transient solution by explicit method
+              
+              # Initialize the solution fields
+              bdex = ubdex # Each equation is treated independently (parallel setup)
+              uxz = np.reshape(UZ, (OPS,), order='F')
+              wxz = np.zeros((OPS,))
+              wxz[bdex] = np.multiply(DZT[0,:], UZ[0,:])
+              pxz = np.reshape(LOGP, (OPS,), order='F')
+              txz = np.reshape(LOGT, (OPS,), order='F')
               
        endt = time.time()
        print('Solve the system: DONE!')

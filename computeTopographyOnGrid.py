@@ -60,7 +60,6 @@ def computeTopographyOnGrid(REFS, profile, opt):
               sys.exit(2)
               
        # Compute derivative by FFT
-       #Linp = 0.5 * (l2 - l1)
        if NP % 2 == 0:
               posRange = list(range(0, int(NP / 2)))
               negRange = list(range(-int(NP / 2 + 1), 0))
@@ -88,7 +87,6 @@ def computeTopographyOnGrid(REFS, profile, opt):
        # Compute the inverse Fourier interpolation
        ht = np.dot(FIM, HF)
        dhdx = np.dot(FIM, DHDX)
-       plt.plot(xh, np.real(dhdx))
        
        return np.real(ht), np.real(dhdx)
               
