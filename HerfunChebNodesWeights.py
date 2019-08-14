@@ -66,7 +66,7 @@ def hefuncm(NX, xi, fullMat):
               else:
                      HFM = polyn
        
-       return HFM
+       return HFM.T
 
 def cheblb(NZ):
        # Compute Chebyshev CGL nodes and weights
