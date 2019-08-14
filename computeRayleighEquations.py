@@ -12,8 +12,8 @@ Works the old fashioned way with lots of nested loops... so sue me!
 import math as mt
 import numpy as np
 import scipy.sparse as sps
-from matplotlib import cm
-import matplotlib.pyplot as plt
+#from matplotlib import cm
+#import matplotlib.pyplot as plt
 
 def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
        

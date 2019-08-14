@@ -8,7 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 
 import numpy as np
 import scipy.sparse as sps
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
@@ -70,7 +70,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        return DOPS
 
 # Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(DIMS, PHYS, REFS, uxz, wxz, pxz, txz):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, sysDex, udex, wdex, pdex, tdex):
        # Get physical constants
        gc = PHYS[0]
        P0 = PHYS[1]
@@ -78,16 +78,15 @@ def computeEulerEquationsLogPLogT_NL(DIMS, PHYS, REFS, uxz, wxz, pxz, txz):
        kap = PHYS[4]
        gam = PHYS[6]
        
-       # Get the dimensions
-       NX = DIMS[3]
-       NZ = DIMS[4]
-       OPS = NX * NZ
-       
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
        
-       #%% Compute the terms in the equations
+       # Get the solution components
+       uxz = SOLT[udex]
+       wxz = SOLT[wdex]
+       pxz = SOLT[pdex]
+       txz = SOLT[tdex]
        
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(txz + kap * pxz)
@@ -97,22 +96,30 @@ def computeEulerEquationsLogPLogT_NL(DIMS, PHYS, REFS, uxz, wxz, pxz, txz):
         
        # Horizontal Momentum
        LD11 = 0.5 * DDXM.dot(np.power(uxz, 2.0))
+       #LD11 = np.multiply(uxz, DDXM.dot(uxz))
+       plt.plot(LD11)
        LD12 = np.multiply(wxz, DDZM.dot(uxz))
        LD13 = np.multiply(RdT, DlpDx)
        
        # Vertical Momentum
        LD21 = 0.5 * DDZM.dot(np.power(wxz, 2.0))
        LD22 = np.multiply(uxz, DDXM.dot(wxz))
-       LD23 = np.multiply(RdT, DlpDz) + gc * sps.spdiags(np.ones((OPS,)), 0, OPS, OPS)
+       plt.figure()
+       plt.plot(LD22)
+       LD23 = np.add(np.multiply(RdT, DlpDz), gc)
        
        # Pressure (mass) equation
        LD31 = np.multiply(uxz, DlpDx)
+       plt.figure()
+       plt.plot(LD31)
        LD32 = np.multiply(wxz, DlpDz)
        LD33 = gam * DDXM.dot(uxz)
        LD34 = gam * DDXM.dot(wxz)
        
        # Potential Temperature equation
        LD41 = np.multiply(uxz, DDXM.dot(txz))
+       plt.figure()
+       plt.plot(LD41)
        LD42 = np.multiply(wxz, DDZM.dot(txz))
        
        # Compute the combined terms
@@ -121,5 +128,8 @@ def computeEulerEquationsLogPLogT_NL(DIMS, PHYS, REFS, uxz, wxz, pxz, txz):
        DpDt = -(LD31 + LD32 + LD33 + LD34)
        DtDt = -(LD41 + LD42)
        
-       return RHSU, RHSW, RHSP, RHST
+       # Concatenate
+       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       
+       return DqDt[sysDex]
        

@@ -37,15 +37,18 @@ from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
+from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 from computeRayleighEquations import computeRayleighEquations
 from computeResidualViscCoeffs import computeResidualViscCoeffs
 from computeNeumannAdjusted import computeNeumannAdjusted
-from computeTimeIntegration import computeTimeIntegration
+from computeTimeIntegration import computeTimeIntegrationLN
+from computeTimeIntegration import computeTimeIntegrationNL
 
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
+       TransientSolve = False
+       NonLinSolve = True
        DynSGS = True
        
        # Set physical constants (dry air)
@@ -62,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 85
+       NX = 100
+       NZ = 72
        numVar = 4
        iU = 0
        iW = 1
@@ -72,8 +75,13 @@ if __name__ == '__main__':
        varDex = [iU, iW, iP, iT]
        DIMS = [L1, L2, ZH, NX, NZ]
        OPS = NX * NZ
+       # Make the equation index vectors for all DOF
+       udex = np.array(range(OPS))
+       wdex = np.add(udex, OPS)
+       pdex = np.add(wdex, OPS)
+       tdex = np.add(pdex, OPS)
        
-       # Set the terrain options
+       # Set the terrain options0
        h0 = 100.0
        aC = 5000.0
        lC = 4000.0
@@ -86,8 +94,20 @@ if __name__ == '__main__':
        applyLateral = True
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
+       # Transient solve parameters
+       DT = 0.01
+       HR = 0.01
+       ET = HR * 60 * 60 # End time in seconds
+       TI = np.array(np.arange(DT, ET, DT))
+       OTI = 50 # Stride for diagnostic output
+       RTI = 1 # Stride for residual visc update
+       
        # Define the computational and physical grids+
        REFS = computeGrid(DIMS)
+       
+       # Compute DX and DZ grid length scales
+       DX = np.min(np.diff(REFS[0]))
+       DZ = np.min(np.diff(REFS[1]))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -108,9 +128,6 @@ if __name__ == '__main__':
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
-       
-       # Compute the terrain derivatives by Hermite-Function derivative matrix
-       #dHdX = DDX_1D.dot(HofX)
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
@@ -159,11 +176,10 @@ if __name__ == '__main__':
        UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        LPZ = np.expand_dims(LPZ, axis=1)
        LOGP = np.tile(LPZ, NX)
-       LOGP = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, LOGP, CH_TRANS, '1DtoTerrainFollowingCheb')
+       LOGP = computeColumnInterp(DIMS, REFS[1], LPZ, 0, ZTL, LOGP, CH_TRANS, '1DtoTerrainFollowingCheb')
        LPT = np.expand_dims(LPT, axis=1)
        LOGT = np.tile(LPT, NX)
-       LOGT = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
-       
+       LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
        
        # Update the REFS collection
        REFS.append(UZ)
@@ -197,10 +213,16 @@ if __name__ == '__main__':
        
        #%% Compute the global LHS operator (with Rayleigh terms)
        # Format is 'lil' to allow for column adjustments to the operator
-       LDG = sps.bmat([[np.add(DOPS[0], ROPS[0]), DOPS[1], DOPS[2], None], \
-                       [None, np.add(DOPS[3], ROPS[1]), DOPS[4], DOPS[5]], \
-                       [DOPS[6], DOPS[7], np.add(DOPS[8], ROPS[2]), None], \
-                       [None, DOPS[9], None, np.add(DOPS[10], ROPS[3])]], format='lil')
+       LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
+                       [None, DOPS[3], DOPS[4], DOPS[5]], \
+                       [DOPS[6], DOPS[7], DOPS[8], None], \
+                       [None, DOPS[9], None, DOPS[10]]], format='lil')
+       
+       
+       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
+       
+       # Update the raw operator with Rayleigh terms
+       LDG += RAY
        
        DX2 = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='lil')
        DZ2 = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='lil')
@@ -228,18 +250,13 @@ if __name__ == '__main__':
        # Diffusion operators defined ONLY in the interior
        DiffX = DX2[np.ix_(intDex,intDex)]
        DiffZ = DZ2[np.ix_(intDex,intDex)]
+       # Rayleigh opearator
+       RAYOP = RAY[np.ix_(sysDex,sysDex)]
        del(LDG)
+       del(RAY)
        del(WBC)
        print('Set up global system: DONE!')
        
-       #%% Compute the normal equations NO GOOD IN PYTHON! CHOLMOD UNAVAILABLE
-       '''
-       AN = (A.T).dot(A)
-       bN = (A.T).dot(b[sysDex])
-       del(A)
-       del(b)
-       print('Compute the normal equations: DONE!')
-       '''
        #%% Solve the system - Static or Transient Solution
        start = time.time()
        if StaticSolve:
@@ -255,28 +272,13 @@ if __name__ == '__main__':
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
               bN = b[sysDex]
-              #del(A)
-              #del(b)
-              # Transient solve parameters
-              DT = 0.05
-              HR = 1.0
-              ET = HR * 60 * 60 # End time in seconds
-              TI = np.array(np.arange(DT, ET, DT))
-              OTI = 50 # Stride for diagnostic output
-              RTI = 1 # Stride for residual visc update
+              del(A)
+              del(b)
               # Initialize transient storage
               SOLT = np.zeros((numVar * NX*NZ, 3))
               # Initialize the RHS
               RHS = bN
               error = [np.linalg.norm(RHS)]
-              # Make the equation index vectors for all DOF
-              udex = np.array(range(OPS))
-              wdex = np.add(udex, OPS)
-              pdex = np.add(wdex, OPS)
-              tdex = np.add(pdex, OPS)
-              # Compute DX and DZ grid length scales
-              DX = np.min(np.diff(REFS[0]))
-              DZ = np.min(np.diff(REFS[1]))
               
               # Start the time loop
               for tt in range(len(TI)):
@@ -323,8 +325,9 @@ if __name__ == '__main__':
                      else:
                             # Zero out auxiliary storage after diffusion
                             SOLT[:,2] *= 0.0
-                            
-                     SOLT, RHS = computeTimeIntegration(bN, AN, DT, RHS, SOLT, sysDex)
+                     
+                     # Compute the SSPRK93 stages
+                     SOLT, RHS = computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex)
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -340,13 +343,88 @@ if __name__ == '__main__':
        elif NonLinSolve:
               # Nonlinear transient solution by explicit method
               
+              # Initialize transient storage
+              SOLT = np.zeros((numVar * OPS, 3))
+              
               # Initialize the solution fields
-              bdex = ubdex # Each equation is treated independently (parallel setup)
-              uxz = np.reshape(UZ, (OPS,), order='F')
-              wxz = np.zeros((OPS,))
-              wxz[bdex] = np.multiply(DZT[0,:], UZ[0,:])
-              pxz = np.reshape(LOGP, (OPS,), order='F')
-              txz = np.reshape(LOGT, (OPS,), order='F')
+              SOLT[udex,0] = np.reshape(UZ, (OPS,), order='F')
+              SOLT[wdex,0] = np.zeros((OPS,))
+              SOLT[wbdex,0] = np.multiply(DZT[0,:], UZ[0,:])
+              SOLT[pdex,0] = np.reshape(LOGP, (OPS,), order='F')
+              SOLT[tdex,0] = np.reshape(LOGT, (OPS,), order='F')
+              
+              # Store the initial state
+              INITS = SOLT[sysDex,0]
+              
+              # Initialize the RHS for each field
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
+              error = [np.linalg.norm(RHS)]
+              
+              # Get the diffusion operators
+              DiffX = DiffX.tocsc()
+              DiffZ = DiffZ.tocsc()
+              
+              # Start the time loop
+              for tt in range(1):
+                     # Update SGS and Rayleigh tendency
+                     if DynSGS and tt % RTI == 0 and tt > 0:
+                            SOLT[:,2] *= 0.0
+                            SOLT[sysDex,2] = RHS
+                            # Compute the local DynSGS coefficients
+                            RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
+                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
+                            RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
+                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
+                            
+                            # Make the state vector of DynSGS coefficients
+                            ZERS = np.zeros((OPS, ))
+                            COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
+                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
+                            # Use intDex to NOT diffuse at boundaries... EVER
+                            
+                            # Laplacian term only
+                            #QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
+                            #DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
+                            #QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
+                            #DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
+                            
+                            # Divergence of the residual stress
+                            QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
+                            DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
+                            DynSGSX = DiffX.dot(DynSGSX)
+                            QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
+                            DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
+                            DynSGSZ = DiffX.dot(DynSGSZ)
+                            
+                            # Time dependent coefficient only with 2nd order diffusion
+                            #QRES = np.amax(COEFX[intDex])
+                            #DynSGSX = QRES * (DiffX.dot(SOLT[intDex,0]))
+                            #QRES = np.amax(COEFZ[intDex])
+                            #DynSGSZ = QRES * (DiffZ.dot(SOLT[intDex,0]))
+                            
+                            SOLT[:,2] *= 0.0
+                            SOLT[intDex,2] = DynSGSX + DynSGSZ
+                            
+                            # Add the Rayleigh damping
+                            SOLT[sysDex,2] -= RAYOP.dot(SOLT[sysDex,0] - INITS)
+                            del(DynSGSX)
+                            del(DynSGSZ)
+                     
+                     # Compute the SSPRK93 stages
+                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, sysDex, udex, wdex, pdex, tdex)
+                     SOLT[wbdex,0] = np.multiply(DZT[0,:], SOLT[ubdex,0]);
+                     
+                     # Print out diagnostics every OTI steps
+                     if tt % OTI == 0:
+                            err = np.linalg.norm(RHS)
+                            error.append(err)
+                            print('Time: ', tt * DT, ' RHS 2-norm: ', err)
+                            print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
+                     
+              # Get the last solution
+              sol = SOLT[sysDex,0]
+              res = SOLT[sysDex,2]
+              del(SOLT)
               
        endt = time.time()
        print('Solve the system: DONE!')
@@ -355,7 +433,8 @@ if __name__ == '__main__':
        #%% Recover the solution (or check the residual)
        SOL = np.zeros(numVar * NX*NZ)
        SOL[sysDex] = sol;
-       SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
+       #SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
+       SOL[wbdex] = np.multiply(DZT[0,:], SOL[ubdex]);
        #SOL[sysDex] = res;
        
        #%% Get the fields in physical space
