@@ -89,22 +89,37 @@ def computeEulerEquationsLogPLogT_NL(DIMS, PHYS, REFS, uxz, wxz, pxz, txz):
        
        #%% Compute the terms in the equations
        
-       # Compute the sensible temperature
+       # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(txz + kap * pxz)
+       
+       DlpDx = DDXM.dot(pxz)
+       DlpDz = DDZM.dot(pxz)
         
        # Horizontal Momentum
        LD11 = 0.5 * DDXM.dot(np.power(uxz, 2.0))
        LD12 = np.multiply(wxz, DDZM.dot(uxz))
-       LD13 = np.multiply(RdT, DDXM.dot(pxz))
+       LD13 = np.multiply(RdT, DlpDx)
        
        # Vertical Momentum
        LD21 = 0.5 * DDZM.dot(np.power(wxz, 2.0))
        LD22 = np.multiply(uxz, DDXM.dot(wxz))
-       LD23 = np.multiply(RdT, DDZM.dot(pxz)) + gc * sps.spdiags(np.ones((OPS,)), 0, OPS, OPS)
+       LD23 = np.multiply(RdT, DlpDz) + gc * sps.spdiags(np.ones((OPS,)), 0, OPS, OPS)
        
        # Pressure (mass) equation
+       LD31 = np.multiply(uxz, DlpDx)
+       LD32 = np.multiply(wxz, DlpDz)
+       LD33 = gam * DDXM.dot(uxz)
+       LD34 = gam * DDXM.dot(wxz)
        
        # Potential Temperature equation
+       LD41 = np.multiply(uxz, DDXM.dot(txz))
+       LD42 = np.multiply(wxz, DDZM.dot(txz))
+       
+       # Compute the combined terms
+       DuDt = -(LD11 + LD12 + LD13)
+       DwDt = -(LD21 + LD22 + LD23)
+       DpDt = -(LD31 + LD32 + LD33 + LD34)
+       DtDt = -(LD41 + LD42)
        
        return RHSU, RHSW, RHSP, RHST
        
