@@ -21,7 +21,7 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
        L1 = DIMS[0]
        L2 = DIMS[1]
        ZH = DIMS[2]
-       NX = DIMS[3]
+       NX = DIMS[3] + 1
        NZ = DIMS[4]
        
        # Get REFS data
@@ -74,7 +74,7 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
 
 def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral):
        # Get DIMS data
-       NX = DIMS[3]
+       NX = DIMS[3] + 1
        NZ = DIMS[4]
        OPS = NX * NZ
        

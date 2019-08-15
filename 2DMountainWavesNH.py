@@ -65,23 +65,23 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 100
-       NZ = 72
+       NX = 121
+       NZ = 81
+       OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
        iW = 1
        iP = 2
        iT = 3
        varDex = [iU, iW, iP, iT]
-       DIMS = [L1, L2, ZH, NX, NZ]
-       OPS = NX * NZ
+       DIMS = [L1, L2, ZH, NX, NZ, OPS]
        # Make the equation index vectors for all DOF
        udex = np.array(range(OPS))
        wdex = np.add(udex, OPS)
        pdex = np.add(wdex, OPS)
        tdex = np.add(pdex, OPS)
        
-       # Set the terrain options0
+       # Set the terrain options
        h0 = 100.0
        aC = 5000.0
        lC = 4000.0
@@ -159,26 +159,26 @@ if __name__ == '__main__':
        
        #%% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(dUdz, axis=1)
-       DUDZ = np.tile(dUdz, NX)
+       DUDZ = np.tile(dUdz, NX+1)
        DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        dlnPdz = np.expand_dims(dlnPdz, axis=1)
-       DLPDZ = np.tile(dlnPdz, NX)
+       DLPDZ = np.tile(dlnPdz, NX+1)
        DLPDZ = computeColumnInterp(DIMS, REFS[1], dlnPdz, 0, ZTL, DLPDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        dlnPTdz = np.expand_dims(dlnPTdz, axis=1)
-       DLPTDZ = np.tile(dlnPTdz, NX)
+       DLPTDZ = np.tile(dlnPTdz, NX+1)
        DLPTDZ = computeColumnInterp(DIMS, REFS[1], dlnPTdz, 0, ZTL, DLPTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        # Compute the background (initial) fields
        POR = np.expand_dims(POR, axis=1)
-       PORZ = np.tile(POR, NX)
+       PORZ = np.tile(POR, NX+1)
        PORZ = computeColumnInterp(DIMS, REFS[1], POR, 0, ZTL, PORZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        U = np.expand_dims(U, axis=1)
-       UZ = np.tile(U, NX)
+       UZ = np.tile(U, NX+1)
        UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        LPZ = np.expand_dims(LPZ, axis=1)
-       LOGP = np.tile(LPZ, NX)
+       LOGP = np.tile(LPZ, NX+1)
        LOGP = computeColumnInterp(DIMS, REFS[1], LPZ, 0, ZTL, LOGP, CH_TRANS, '1DtoTerrainFollowingCheb')
        LPT = np.expand_dims(LPT, axis=1)
-       LOGT = np.tile(LPT, NX)
+       LOGT = np.tile(LPT, NX+1)
        LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
        
        # Update the REFS collection
@@ -235,7 +235,7 @@ if __name__ == '__main__':
        print('Compute global LHS sparse operator: DONE!')
        
        #%% Apply the coupled multipoint constraint for terrain
-       DHDXM = sps.spdiags(DZT[0,:], 0, NX, NX)
+       DHDXM = sps.spdiags(DZT[0,:], 0, NX+1, NX+1)
        # Compute LHS column adjustment to LDG
        LDG[:,ubdex] = np.add(LDG[:,ubdex], (LDG[:,wbdex]).dot(DHDXM))
        # Compute RHS adjustment to forcing
@@ -431,7 +431,7 @@ if __name__ == '__main__':
        print('Elapsed time: ', endt - start)
        
        #%% Recover the solution (or check the residual)
-       SOL = np.zeros(numVar * NX*NZ)
+       SOL = np.zeros(numVar * OPS)
        SOL[sysDex] = sol;
        #SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
        SOL[wbdex] = np.multiply(DZT[0,:], SOL[ubdex]);
@@ -442,10 +442,10 @@ if __name__ == '__main__':
        wdex = np.add(udex, iW * OPS)
        pdex = np.add(udex, iP * OPS)
        tdex = np.add(udex, iT * OPS)
-       uxz = np.reshape(SOL[udex], (NZ, NX), order='F');
-       wxz = np.reshape(SOL[wdex], (NZ, NX), order='F');
-       pxz = np.reshape(SOL[pdex], (NZ, NX), order='F');
-       txz = np.reshape(SOL[tdex], (NZ, NX), order='F');
+       uxz = np.reshape(SOL[udex], (NZ, NX+1), order='F');
+       wxz = np.reshape(SOL[wdex], (NZ, NX+1), order='F');
+       pxz = np.reshape(SOL[pdex], (NZ, NX+1), order='F');
+       txz = np.reshape(SOL[tdex], (NZ, NX+1), order='F');
        print('Recover solution on native grid: DONE!')
        
        #%% Interpolate columns to a finer grid for plotting
@@ -476,14 +476,14 @@ if __name__ == '__main__':
        # Interpolate the terrain profile
        hcf = HF_TRANS.dot(ZTL[0,:])
        dhcf = HF_TRANS.dot(DZT[0,:])
-       IHF_TRANS = hcnw.hefuncm(NX-1, xnew, True)
-       hnew = (IHF_TRANS.T).dot(hcf)
-       dhnewdx = (IHF_TRANS.T).dot(dhcf)
+       IHF_TRANS = hcnw.hefuncm(NX, xnew, True)
+       hnew = (IHF_TRANS).dot(hcf)
+       dhnewdx = (IHF_TRANS).dot(dhcf)
        
        # Scale znew to physical domain and make the new grid
        xnew *= L2 / xmax
        # Compute the new Guellrich domain
-       NDIMS = [L1, L2, ZH, NXI, NZI]
+       NDIMS = [L1, L2, ZH, NXI-1, NZI]
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        

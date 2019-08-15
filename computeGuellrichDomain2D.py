@@ -13,7 +13,7 @@ import math as mt
 def computeGuellrichDomain2D(DIMS, REFS, hx, dhdx):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
-       NX = DIMS[3]
+       NX = DIMS[3] + 1
        NZ = DIMS[4]
        
        # input REFS = [x, z, HFM, whf, CPM, wcp]
@@ -49,7 +49,8 @@ def computeGuellrichDomain2D(DIMS, REFS, hx, dhdx):
        
        # Make the global array of terrain height and slope features
        ZTL = np.zeros((NZ,NX))
-       DZT = np.zeros((NZ,NX));
+       DZT = np.zeros((NZ,NX))
+       
        for rr in range(NZ):
               ZTL[rr,:] = np.add(mul(dzdh[rr,:], hx), ZL[rr,:])
               DZT[rr,:] = mul(dzdh[rr,:], dhdx);

@@ -27,7 +27,7 @@ def hefunclb(NX):
        xi = np.sort(np.real(ew))
        
        # Compute the Hermite function weights
-       hf = hefuncm(NX-1, xi, False)
+       hf = hefuncm(NX+1, xi, False)
        w = 1.0 / (NX + 1) * np.power(hf, -2.0)
        
        return xi, w

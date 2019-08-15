@@ -10,7 +10,7 @@ import numpy as np
 
 def computeAdjust4CBC(DIMS, numVar, varDex):
        # Get DIMS data
-       NX = DIMS[3]
+       NX = DIMS[3] + 1
        NZ = DIMS[4]
        OPS = NX * NZ
        

@@ -11,7 +11,7 @@ import numpy as np
 import HerfunChebNodesWeights as hcnw
 
 def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
-       NX = DIMS[3]
+       NX = DIMS[3] + 1
        NZ = DIMS[4]
        
        # Interpolate the nominal column profile to TF Chebyshev grid

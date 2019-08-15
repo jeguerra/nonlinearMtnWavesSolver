@@ -12,7 +12,7 @@ import HerfunChebNodesWeights as hcnw
 
 def computeHorizontalInterp(DIMS, NXI, FLD, HF_TRANS):
        # Get DIMS data
-       NX = DIMS[3]
+       NX = DIMS[3] + 1
        
        # Check
        if NXI <= 0:
@@ -41,7 +41,7 @@ def computeHorizontalInterp(DIMS, NXI, FLD, HF_TRANS):
        
        # Apply the backward transforms
        #ZTLI = np.matmul(HFM.T, hcoeffs)
-       FLDI = np.matmul(HFM.T, fcoeffs)
+       FLDI = np.matmul(HFM, fcoeffs)
        
        # Make a new XLI meshgrid
        #varray = np.array(range(NZI))

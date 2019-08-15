@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from computeGrid import computeGrid
 import computeHermiteFunctionDerivativeMatrix as hfd
 import computeChebyshevDerivativeMatrix as chd
+import computeTopographyOnGrid as top
 
 #%%
 # Make a test function and its derivative (DEBUG)
@@ -20,8 +21,8 @@ import computeChebyshevDerivativeMatrix as chd
 L2 = 1.0E4 * 3.0 * mt.pi
 L1 = -L2
 ZH = 36000.0
-NX = 64
-NZ = 64
+NX = 512
+NZ = 128
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
@@ -47,29 +48,38 @@ plt.plot(zv, Y, label='Function')
 plt.plot(zv, DY, 'r-', label='Analytical Derivative')
 plt.plot(zv, DYD, 'k--', label='Spectral Derivative')
 plt.xlabel('Domain')
-plt.ylabel('Function')
+plt.ylabel('Functions')
 plt.title('Chebyshev Derivative Test')
 plt.grid(b=True, which='both', axis='both')
 plt.legend()
 plt.savefig("DerivativeTestZ.png")
 
 # HERMITE FUNCTION DERIVATIVE TEST
-xv = (1.0 / L2) * REFS[0]
+xv = REFS[0]
+''' Hermite Functions are NO GOOD for asymmetrical functions
 xv2 = np.multiply(xv, xv)
 #Y = 4.0 * np.exp(-5.0 * xv) + \
 Y = np.cos(4.0 * mt.pi * xv2);
 #DY = -20.0 * np.exp(-5.0 * xv)
 term1 = 8.0 * mt.pi * xv
-term2 = np.sin(4.0 * mt.pi * xv2)
+term2 = -np.sin(4.0 * mt.pi * xv2)
 DY = np.multiply(term1, term2);
+'''
+# Set the terrain options0
+h0 = 100.0
+aC = 5000.0
+lC = 4000.0
+HOPT = [h0, aC, lC]
+HofX, dHdX = top.computeTopographyOnGrid(REFS, 2, HOPT)
     
-DYD = -L2 * DDX_1D.dot(Y)
+DYD = DDX_1D.dot(HofX)
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(xv, Y, label='Function')
-plt.plot(xv, DY, 'r-', label='Analytical Derivative')
-plt.plot(xv, DYD, 'k--', label='Spectral Derivative')
+#plt.plot(xv, HofX, label='Function')
+plt.plot(xv, dHdX, 'r-', label='Fourier Derivative')
+plt.plot(xv, DYD, 'k--', label='Hermite Derivative')
+plt.xlim(-12500.0, 12500.0)
 plt.xlabel('Domain')
-plt.ylabel('Function')
+plt.ylabel('Derivatives HF')
 plt.title('Hermite Function Derivative Test')
 plt.grid(b=True, which='both', axis='both')
 plt.legend()

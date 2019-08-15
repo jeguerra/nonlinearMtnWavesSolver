@@ -17,7 +17,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        gam = PHYS[6]
        
        # Get the dimensions
-       NX = DIMS[3]
+       NX = DIMS[3] + 1
        NZ = DIMS[4]
        OPS = NX * NZ
        

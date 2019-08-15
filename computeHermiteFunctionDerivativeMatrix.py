@@ -18,11 +18,11 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        L2 = DIMS[1]
        NX = DIMS[3]
        
-       alpha, whf = hefunclb(NX)
+       alpha, whf = hefunclb(NX+1)
+       #print(alpha)
+       #print(whf)
        HT = hefuncm(NX, alpha, True)
        HTD = hefuncm(NX+1, alpha, True)
-       print(HT.shape)
-       print(HTD.shape)
        
        # Get the scale factor
        b = (np.amax(alpha) - np.min(alpha)) / abs(L2 - L1)
@@ -32,13 +32,13 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        
        # Compute the coefficients of spectral derivative in matrix form
        SDIFF = np.zeros((NX+2,NX+1));
-       SDIFF[NX+1,NX] = -mt.sqrt((NX + 1) * 0.5);
+       SDIFF[0,1] = mt.sqrt(0.5)
        SDIFF[NX,NX-1] = -mt.sqrt(NX * 0.5);
-
-       for rr in range(NX-1,-1,-1):
+       SDIFF[NX+1,NX] = -mt.sqrt((NX + 1) * 0.5);
+                     
+       for rr in range(1,NX):
               SDIFF[rr,rr+1] = mt.sqrt((rr + 1) * 0.5);
-              if rr > 0:
-                     SDIFF[rr,rr-1] = -mt.sqrt(rr * 0.5);
+              SDIFF[rr,rr-1] = -mt.sqrt(rr * 0.5);
               
        # Hermite function spectral transform in matrix form
        STR_H = (HT.T).dot(W);
