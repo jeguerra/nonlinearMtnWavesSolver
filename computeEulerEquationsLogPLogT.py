@@ -89,9 +89,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, INIT, sysDex, udex, wdex,
        txz = SOLT[tdex]
        
        # Make the total quatities
-       U = uxz + INIT[udex]
-       LP = pxz + INIT[pdex]
-       LT = txz + INIT[tdex]
+       #temp = INIT[int(udex)]
+       U = np.add(uxz, INIT[udex])
+       LP = np.add(pxz, INIT[pdex])
+       LT = np.add(txz, INIT[tdex])
        
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(txz + kap * pxz)
@@ -113,16 +114,16 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, INIT, sysDex, udex, wdex,
        
        # Pressure (mass) equation
        LD31 = np.multiply(U, DlpDx)
-       plt.figure()
-       plt.plot(LD31)
+       #plt.figure()
+       #plt.plot(LD31)
        LD32 = np.multiply(wxz, DlpDz)
        LD33 = gam * DDXM.dot(uxz)
        LD34 = gam * DDXM.dot(wxz)
        
        # Potential Temperature equation
        LD41 = np.multiply(U, DDXM.dot(txz))
-       plt.figure()
-       plt.plot(LD41)
+       #plt.figure()
+       #plt.plot(LD41)
        LD42 = np.multiply(wxz, DDZM.dot(LT))
        
        # Compute the combined terms

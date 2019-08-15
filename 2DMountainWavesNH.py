@@ -47,8 +47,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        DynSGS = True
        
        # Set physical constants (dry air)
@@ -65,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 85
+       NX = 108
+       NZ = 72
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -95,8 +95,8 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        # Transient solve parameters
-       DT = 0.05
-       HR = 1.0
+       DT = 0.025
+       HR = 0.1
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 50 # Stride for diagnostic output
@@ -106,8 +106,8 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS)
        
        # Compute DX and DZ grid length scales
-       DX = np.mean(np.diff(REFS[0]))
-       DZ = np.mean(np.diff(REFS[1]))
+       DX = np.min(np.diff(REFS[0]))
+       DZ = np.min(np.diff(REFS[1]))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -345,14 +345,14 @@ if __name__ == '__main__':
               
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
-              INIT = np.zeros((numVar * OPS, 1))
+              INIT = np.zeros((numVar * OPS,))
               
               # Initialize the solution fields
-              INIT[udex,0] = np.reshape(UZ, (OPS,), order='F')
-              INIT[wdex,0] = np.zeros((OPS,))
-              INIT[wbdex,0] = np.multiply(DZT[0,:], UZ[0,:])
-              INIT[pdex,0] = np.reshape(LOGP, (OPS,), order='F')
-              INIT[tdex,0] = np.reshape(LOGT, (OPS,), order='F')
+              INIT[udex] = np.reshape(UZ, (OPS,), order='F')
+              INIT[wdex] = np.zeros((OPS,))
+              INIT[wbdex] = np.multiply(DZT[0,:], UZ[0,:])
+              INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
+              INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
               # Initialize the RHS for each field
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex)
@@ -363,7 +363,7 @@ if __name__ == '__main__':
               DiffZ = DiffZ.tocsc()
               
               # Start the time loop
-              for tt in range(1):
+              for tt in range(len(TI)):
                      # Update SGS and Rayleigh tendency
                      if DynSGS and tt % RTI == 0 and tt > 0:
                             SOLT[:,2] *= 0.0
@@ -410,6 +410,7 @@ if __name__ == '__main__':
                      
                      # Compute the SSPRK93 stages
                      SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex)
+                     # Update the boundary condition (may need to be done inside RK stages)
                      SOLT[wbdex,0] = np.multiply(DZT[0,:], SOLT[ubdex,0]);
                      
                      # Print out diagnostics every OTI steps
