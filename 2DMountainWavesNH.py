@@ -47,8 +47,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
+       TransientSolve = True
+       NonLinSolve = False
        DynSGS = True
        
        # Set physical constants (dry air)
@@ -65,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 121
-       NZ = 81
+       NX = 129
+       NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -95,8 +95,8 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        # Transient solve parameters
-       DT = 0.01
-       HR = 0.01
+       DT = 0.05
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 50 # Stride for diagnostic output
@@ -106,8 +106,8 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS)
        
        # Compute DX and DZ grid length scales
-       DX = np.min(np.diff(REFS[0]))
-       DZ = np.min(np.diff(REFS[1]))
+       DX = np.mean(np.diff(REFS[0]))
+       DZ = np.mean(np.diff(REFS[1]))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -272,10 +272,10 @@ if __name__ == '__main__':
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
               bN = b[sysDex]
-              del(A)
-              del(b)
+              #del(A)
+              #del(b)
               # Initialize transient storage
-              SOLT = np.zeros((numVar * NX*NZ, 3))
+              SOLT = np.zeros((numVar * OPS, 3))
               # Initialize the RHS
               RHS = bN
               error = [np.linalg.norm(RHS)]
@@ -345,19 +345,17 @@ if __name__ == '__main__':
               
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
+              INIT = np.zeros((numVar * OPS, 1))
               
               # Initialize the solution fields
-              SOLT[udex,0] = np.reshape(UZ, (OPS,), order='F')
-              SOLT[wdex,0] = np.zeros((OPS,))
-              SOLT[wbdex,0] = np.multiply(DZT[0,:], UZ[0,:])
-              SOLT[pdex,0] = np.reshape(LOGP, (OPS,), order='F')
-              SOLT[tdex,0] = np.reshape(LOGT, (OPS,), order='F')
-              
-              # Store the initial state
-              INITS = SOLT[sysDex,0]
+              INIT[udex,0] = np.reshape(UZ, (OPS,), order='F')
+              INIT[wdex,0] = np.zeros((OPS,))
+              INIT[wbdex,0] = np.multiply(DZT[0,:], UZ[0,:])
+              INIT[pdex,0] = np.reshape(LOGP, (OPS,), order='F')
+              INIT[tdex,0] = np.reshape(LOGT, (OPS,), order='F')
               
               # Initialize the RHS for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex)
               error = [np.linalg.norm(RHS)]
               
               # Get the diffusion operators
@@ -406,12 +404,12 @@ if __name__ == '__main__':
                             SOLT[intDex,2] = DynSGSX + DynSGSZ
                             
                             # Add the Rayleigh damping
-                            SOLT[sysDex,2] -= RAYOP.dot(SOLT[sysDex,0] - INITS)
+                            SOLT[sysDex,2] -= RAYOP.dot(SOLT[sysDex,0])
                             del(DynSGSX)
                             del(DynSGSZ)
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, sysDex, udex, wdex, pdex, tdex)
+                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex)
                      SOLT[wbdex,0] = np.multiply(DZT[0,:], SOLT[ubdex,0]);
                      
                      # Print out diagnostics every OTI steps
@@ -433,8 +431,8 @@ if __name__ == '__main__':
        #%% Recover the solution (or check the residual)
        SOL = np.zeros(numVar * OPS)
        SOL[sysDex] = sol;
-       #SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
-       SOL[wbdex] = np.multiply(DZT[0,:], SOL[ubdex]);
+       SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
+       #SOL[wbdex] = np.multiply(DZT[0,:], SOL[ubdex]);
        #SOL[sysDex] = res;
        
        #%% Get the fields in physical space
