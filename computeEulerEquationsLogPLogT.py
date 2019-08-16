@@ -103,18 +103,18 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, INIT, RAYOP, sysDex, udex
        # Horizontal Momentum
        LD11 = np.multiply(U, DDXM.dot(uxz))
        LD12 = np.multiply(wxz, DDZM.dot(U))
-       LD13 = np.multiply(RdT, DlpDx)
+       LD13 = 1.0 * np.multiply(RdT, DlpDx)
        
        # Vertical Momentum
        LD21 = 0.5 * DDZM.dot(np.power(wxz, 2.0))
        LD22 = np.multiply(U, DDXM.dot(wxz))
-       LD23 = np.add(np.multiply(RdT, DlpDz), gc)
+       LD23 = 1.0 * np.add(np.multiply(RdT, DlpDz), gc)
        
        # Pressure (mass) equation
        LD31 = np.multiply(U, DlpDx)
        LD32 = np.multiply(wxz, DlpDz)
        LD33 = gam * DDXM.dot(uxz)
-       LD34 = gam * DDXM.dot(wxz)
+       LD34 = gam * DDZM.dot(wxz)
        
        # Potential Temperature equation
        LD41 = np.multiply(U, DDXM.dot(txz))

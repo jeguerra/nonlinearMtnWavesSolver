@@ -65,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 108
-       NZ = 72
+       NX = 110
+       NZ = 75
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -94,15 +94,15 @@ if __name__ == '__main__':
        applyLateral = True
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
-       # Transient solve parameters
-       DT = 0.025
-       HR = 0.1
+       #%% Transient solve parameters
+       DT = 0.05
+       HR = 60.0 / 3600.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
-       OTI = 50 # Stride for diagnostic output
+       OTI = 10 # Stride for diagnostic output
        RTI = 1 # Stride for residual visc update
        
-       # Define the computational and physical grids+
+       #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
        
        # Compute DX and DZ grid length scales
@@ -212,50 +212,52 @@ if __name__ == '__main__':
        SOL = np.zeros((NX * NZ,1))
        
        #%% Compute the global LHS operator (with Rayleigh terms)
-       # Format is 'lil' to allow for column adjustments to the operator
-       LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
-                       [None, DOPS[3], DOPS[4], DOPS[5]], \
-                       [DOPS[6], DOPS[7], DOPS[8], None], \
-                       [None, DOPS[9], None, DOPS[10]]], format='lil')
-       
-       
        RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
+       del(ROPS)
        
-       # Update the raw operator with Rayleigh terms
-       LDG += RAY
+       if StaticSolve or TransientSolve:
+              # Format is 'lil' to allow for column adjustments to the operator
+              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
+                              [None, DOPS[3], DOPS[4], DOPS[5]], \
+                              [DOPS[6], DOPS[7], DOPS[8], None], \
+                              [None, DOPS[9], None, DOPS[10]]], format='lil')
+              
+              # Update the raw operator with Rayleigh terms
+              LDG += RAY
+              # Get some memory back
+              del(DOPS)
        
        DX2 = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='lil')
        DZ2 = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='lil')
-       
-       # Get some memory back
-       del(DOPS)
-       del(ROPS)
        del(DDXM2)
        del(DDZM2)
-       print('Compute global LHS sparse operator: DONE!')
+       print('Compute global sparse operators: DONE!')
        
        #%% Apply the coupled multipoint constraint for terrain
-       DHDXM = sps.spdiags(DZT[0,:], 0, NX+1, NX+1)
-       # Compute LHS column adjustment to LDG
-       LDG[:,ubdex] = np.add(LDG[:,ubdex], (LDG[:,wbdex]).dot(DHDXM))
-       # Compute RHS adjustment to forcing
-       WBC = np.multiply(DZT[0,:], UZ[0,:])
-       # Get some memory back
-       del(DHDXM)
-       print('Apply coupled BC adjustments: DONE!')
+       if StaticSolve or TransientSolve:
+              DHDXM = sps.spdiags(DZT[0,:], 0, NX+1, NX+1)
+              # Compute LHS column adjustment to LDG
+              LDG[:,ubdex] = np.add(LDG[:,ubdex], (LDG[:,wbdex]).dot(DHDXM))
+              # Compute RHS adjustment to forcing
+              WBC = np.multiply(DZT[0,:], UZ[0,:])
+              # Get some memory back
+              del(DHDXM)
+              print('Apply coupled BC adjustments: DONE!')
        
        #%% Set up the global solve
-       A = LDG[np.ix_(sysDex,sysDex)]
-       b = -(LDG[:,wbdex]).dot(WBC)
+       if StaticSolve or TransientSolve:
+              A = LDG[np.ix_(sysDex,sysDex)]
+              b = -(LDG[:,wbdex]).dot(WBC)
+              del(LDG)
+              del(WBC)
+              
        # Diffusion operators defined ONLY in the interior
        DiffX = DX2[np.ix_(intDex,intDex)]
        DiffZ = DZ2[np.ix_(intDex,intDex)]
        # Rayleigh opearator
        RAYOP = RAY[np.ix_(sysDex,sysDex)]
-       del(LDG)
        del(RAY)
-       del(WBC)
-       print('Set up global system: DONE!')
+       print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
        start = time.time()
@@ -352,7 +354,7 @@ if __name__ == '__main__':
               INIT[wdex] = np.zeros((OPS,))
               INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
               INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-              
+              # Initialize the boundary condition
               SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]));
               
               # Initialize the RHS for each field
@@ -366,7 +368,7 @@ if __name__ == '__main__':
               DiffZ = DiffZ.tocsc()
               
               # Start the time loop
-              for tt in range(1):
+              for tt in range(len(TI)):
                      # Update SGS and Rayleigh tendency
                      if DynSGS and tt % RTI == 0 and tt > 0:
                             SOLT[:,2] *= 0.0
@@ -397,10 +399,8 @@ if __name__ == '__main__':
                             del(DynSGSX)
                             del(DynSGSZ)
                      
-                     # Compute the SSPRK93 stages
-                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
-                     # Update the boundary condition (may need to be done inside RK stages)
-                     SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
+                     # Compute the SSPRK93 stages at this time step
+                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -418,14 +418,13 @@ if __name__ == '__main__':
        print('Solve the system: DONE!')
        print('Elapsed time: ', endt - start)
        
-       #%% Recover the solution (or check the residual)
+       #% Recover the solution (or check the residual)
        SOL = np.zeros(numVar * OPS)
        SOL[sysDex] = sol;
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]))
-       #SOL[wbdex] = np.multiply(DZT[0,:], SOL[ubdex]);
        #SOL[sysDex] = res;
        
-       #%% Get the fields in physical space
+       #% Get the fields in physical space
        udex = np.array(range(OPS))
        wdex = np.add(udex, iW * OPS)
        pdex = np.add(udex, iP * OPS)
@@ -436,7 +435,7 @@ if __name__ == '__main__':
        txz = np.reshape(SOL[tdex], (NZ, NX+1), order='F');
        print('Recover solution on native grid: DONE!')
        
-       #%% Interpolate columns to a finer grid for plotting
+       #% Interpolate columns to a finer grid for plotting
        NZI = 200
        uxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
        wxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
@@ -444,7 +443,7 @@ if __name__ == '__main__':
        txzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
        print('Interpolate columns to finer grid: DONE!')
        
-       #%% Interpolate rows to a finer grid for plotting
+       #% Interpolate rows to a finer grid for plotting
        NXI = 2500
        uxzint = computeHorizontalInterp(DIMS, NXI, uxzint, HF_TRANS)
        wxzint = computeHorizontalInterp(DIMS, NXI, wxzint, HF_TRANS)
@@ -452,7 +451,7 @@ if __name__ == '__main__':
        txzint = computeHorizontalInterp(DIMS, NXI, txzint, HF_TRANS)
        print('Interpolate columns to finer grid: DONE!')
        
-       #%% Make the new grid XLI, ZTLI
+       #% Make the new grid XLI, ZTLI
        import HerfunChebNodesWeights as hcnw
        xnew, dummy = hcnw.hefunclb(NX)
        xmax = np.amax(xnew)
@@ -475,15 +474,19 @@ if __name__ == '__main__':
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        
-       #%%''' #Spot check the solution on both grids
+       #%% #Spot check the solution on both grids
        fig = plt.figure()
-       ccheck = plt.contourf(XL, ZTL, uxz, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
+       plt.xlim(-25000.0, 25000.0)
+       plt.ylim(0.0, 5000.0)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, uxzint, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
+       plt.xlim(-25000.0, 25000.0)
+       plt.ylim(0.0, 5000.0)
        #
        fig = plt.figure()
-       plt.plot(XLI[0,:], wxzint[0,:], XL[0,:], wxz[0,:])
-       plt.xlim(-12500.0, 12500.0)
+       plt.plot(XLI[0,:], uxzint[0:2,:].T, XL[0,:], uxz[0:2,:].T)
+       plt.xlim(-15000.0, 15000.0)
