@@ -36,7 +36,9 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
               
        return SOLT, RHS
 
-def computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex):
+def computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex):
+       # Get the solution at the bottom of the time step
+       OLD = SOLT[sysDex,0]
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -49,7 +51,7 @@ def computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, sysDex, udex, wdex
        for ii in range(2,6):
               SOLT[sysDex,0] += c1 * DT * RHS
               # Update the RHS
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
               RHS += SOLT[sysDex,2]
               
        # Compute stage 6 with linear combination
@@ -61,7 +63,10 @@ def computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, sysDex, udex, wdex
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
               RHS += SOLT[sysDex,2]
               
-       return SOLT, RHS
+       # Compute an estimate of the residual
+       RES = 1.0 / (c1 * DT) * (SOLT[sysDex,0] - OLD) - RHS
+              
+       return SOLT, RHS, RES

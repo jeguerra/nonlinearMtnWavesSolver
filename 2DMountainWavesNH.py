@@ -350,24 +350,27 @@ if __name__ == '__main__':
               # Initialize the solution fields
               INIT[udex] = np.reshape(UZ, (OPS,), order='F')
               INIT[wdex] = np.zeros((OPS,))
-              INIT[wbdex] = np.multiply(DZT[0,:], UZ[0,:])
               INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
               INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
+              SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]));
+              
               # Initialize the RHS for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex)
-              error = [np.linalg.norm(RHS)]
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
+              # Initialize the residual
+              RES = RHS
+              error = [np.linalg.norm(RES)]
               
               # Get the diffusion operators
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
               
               # Start the time loop
-              for tt in range(len(TI)):
+              for tt in range(1):
                      # Update SGS and Rayleigh tendency
                      if DynSGS and tt % RTI == 0 and tt > 0:
                             SOLT[:,2] *= 0.0
-                            SOLT[sysDex,2] = RHS
+                            SOLT[sysDex,2] = RES
                             # Compute the local DynSGS coefficients
                             RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
                             RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
@@ -380,12 +383,6 @@ if __name__ == '__main__':
                             COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
                             # Use intDex to NOT diffuse at boundaries... EVER
                             
-                            # Laplacian term only
-                            #QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
-                            #DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
-                            #QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
-                            #DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
-                            
                             # Divergence of the residual stress
                             QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
                             DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
@@ -394,30 +391,22 @@ if __name__ == '__main__':
                             DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
                             DynSGSZ = DiffX.dot(DynSGSZ)
                             
-                            # Time dependent coefficient only with 2nd order diffusion
-                            #QRES = np.amax(COEFX[intDex])
-                            #DynSGSX = QRES * (DiffX.dot(SOLT[intDex,0]))
-                            #QRES = np.amax(COEFZ[intDex])
-                            #DynSGSZ = QRES * (DiffZ.dot(SOLT[intDex,0]))
-                            
                             SOLT[:,2] *= 0.0
                             SOLT[intDex,2] = DynSGSX + DynSGSZ
                             
-                            # Add the Rayleigh damping
-                            SOLT[sysDex,2] -= RAYOP.dot(SOLT[sysDex,0])
                             del(DynSGSX)
                             del(DynSGSZ)
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex)
+                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
                      # Update the boundary condition (may need to be done inside RK stages)
-                     SOLT[wbdex,0] = np.multiply(DZT[0,:], SOLT[ubdex,0]);
+                     SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
-                            err = np.linalg.norm(RHS)
+                            err = np.linalg.norm(RES)
                             error.append(err)
-                            print('Time: ', tt * DT, ' RHS 2-norm: ', err)
+                            print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                      
               # Get the last solution
@@ -432,7 +421,7 @@ if __name__ == '__main__':
        #%% Recover the solution (or check the residual)
        SOL = np.zeros(numVar * OPS)
        SOL[sysDex] = sol;
-       SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]));
+       SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]))
        #SOL[wbdex] = np.multiply(DZT[0,:], SOL[ubdex]);
        #SOL[sysDex] = res;
        
