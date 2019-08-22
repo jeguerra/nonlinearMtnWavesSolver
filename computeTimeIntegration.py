@@ -13,7 +13,7 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        # Stage 1
-       SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
+       SOLT[sysDex,0] += c1 * DT * RHS
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
@@ -36,46 +36,36 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
               
        return SOLT, RHS
 
-def computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
-       # Get the boundary terrain
-       DZT = REFS[6]
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
        # Get the solution at the bottom of the time step
        OLD = SOLT[sysDex,0]
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        # Stage 1
-       SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
-       # Update the boundary condition
-       SOLT[wbdex,0] = DZT[0,:] * (INIT[ubdex] + SOLT[ubdex,0])
+       SOLT[sysDex,0] += c1 * DT * RHS
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
        # Compute stages 2 - 5
        for ii in range(2,6):
               SOLT[sysDex,0] += c1 * DT * RHS
-              # Update the boundary condition
-              SOLT[wbdex,0] = DZT[0,:] * (INIT[ubdex] + SOLT[ubdex,0])
               # Update the RHS
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS -= RAYOP.dot(SOLT[sysDex,0])
               RHS += SOLT[sysDex,2]
               
        # Compute stage 6 with linear combination
        SOLT[sysDex,0] = 3.0 * SOLT[sysDex,1] + 2.0 * \
               (SOLT[sysDex,0] + c1 * DT * RHS)
-       # Update the boundary condition
-       SOLT[wbdex,0] = DZT[0,:] * (INIT[ubdex] + SOLT[ubdex,0])
        SOLT[sysDex,0] *= c2
-       # Update the boundary condition
-       SOLT[wbdex,0] = DZT[0,:] * (INIT[ubdex] + SOLT[ubdex,0])
        
        # Compute stages 7 - 9
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
-              # Update the boundary condition
-              SOLT[wbdex,0] = DZT[0,:] * (INIT[ubdex] + SOLT[ubdex,0])
               # update the RHS
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS -= RAYOP.dot(SOLT[sysDex,0])
               RHS += SOLT[sysDex,2]
               
        # Compute an estimate of the residual

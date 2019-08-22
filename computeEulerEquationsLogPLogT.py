@@ -70,7 +70,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        return DOPS
 
 # Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, bdex):
        # Get physical constants
        gc = PHYS[0]
        P0 = PHYS[1]
@@ -78,9 +78,17 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, INIT, RAYOP, sysDex, udex
        kap = PHYS[4]
        gam = PHYS[6]
        
+       # Get the boundary terrain
+       DZT = REFS[6]
+       
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
+       
+       # Get the static vertical gradients
+       DUDZ = REFG[0]
+       DLPDZ = REFG[1]
+       DLPTDZ = REFG[2]
        
        # Get the solution components
        uxz = SOLT[udex]
@@ -89,36 +97,38 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, INIT, RAYOP, sysDex, udex
        txz = SOLT[tdex]
        
        # Make the total quatities
-       #temp = INIT[int(udex)]
        U = np.add(uxz, INIT[udex])
        LP = np.add(pxz, INIT[pdex])
        LT = np.add(txz, INIT[tdex])
        
+       # Apply boundary condition
+       wxz[bdex] = DZT[0,:] * U[bdex]
+        
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        DlpDx = DDXM.dot(pxz)
-       DlpDz = DDZM.dot(LP)
+       DlpDz = DDZM.dot(pxz)
         
        # Horizontal Momentum
-       LD11 = np.multiply(U, DDXM.dot(uxz))
-       LD12 = np.multiply(wxz, DDZM.dot(U))
-       LD13 = 1.0 * np.multiply(RdT, DlpDx)
+       LD11 = U * (DDXM.dot(uxz))
+       LD12 = wxz * (DDZM.dot(uxz) + DUDZ)
+       LD13 = RdT * DlpDx
        
        # Vertical Momentum
        LD21 = 0.5 * DDZM.dot(np.power(wxz, 2.0))
-       LD22 = np.multiply(U, DDXM.dot(wxz))
-       LD23 = 1.0 * np.add(np.multiply(RdT, DlpDz), gc)
+       LD22 = U * (DDXM.dot(wxz))
+       LD23 = RdT * (DlpDz + DLPDZ) + gc
        
        # Pressure (mass) equation
-       LD31 = np.multiply(U, DlpDx)
-       LD32 = np.multiply(wxz, DlpDz)
+       LD31 = U * DlpDx
+       LD32 = wxz * (DlpDz + DLPDZ)
        LD33 = gam * DDXM.dot(uxz)
        LD34 = gam * DDZM.dot(wxz)
        
        # Potential Temperature equation
-       LD41 = np.multiply(U, DDXM.dot(txz))
-       LD42 = np.multiply(wxz, DDZM.dot(LT))
+       LD41 = U * (DDXM.dot(txz))
+       LD42 = wxz * (DDZM.dot(txz) + DLPTDZ)
        
        # Compute the combined terms
        DuDt = -(LD11 + LD12 + LD13)
@@ -129,8 +139,5 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT, INIT, RAYOP, sysDex, udex
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       # Apply the Rayleigh damping
-       DqDt = DqDt[sysDex] - RAYOP.dot(SOLT[sysDex])
-       
-       return DqDt
+       return DqDt[sysDex]
        

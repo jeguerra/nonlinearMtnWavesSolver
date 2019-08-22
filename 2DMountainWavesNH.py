@@ -96,10 +96,10 @@ if __name__ == '__main__':
        
        #%% Transient solve parameters
        DT = 0.05
-       HR = 60.0 / 3600.0
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
-       OTI = 10 # Stride for diagnostic output
+       OTI = 100 # Stride for diagnostic output
        RTI = 1 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
@@ -237,9 +237,9 @@ if __name__ == '__main__':
        if StaticSolve or TransientSolve:
               DHDXM = sps.spdiags(DZT[0,:], 0, NX+1, NX+1)
               # Compute LHS column adjustment to LDG
-              LDG[:,ubdex] = np.add(LDG[:,ubdex], (LDG[:,wbdex]).dot(DHDXM))
+              LDG[:,ubdex] += (LDG[:,wbdex]).dot(DHDXM)
               # Compute RHS adjustment to forcing
-              WBC = np.multiply(DZT[0,:], UZ[0,:])
+              WBC = DZT[0,:] * UZ[0,:]
               # Get some memory back
               del(DHDXM)
               print('Apply coupled BC adjustments: DONE!')
@@ -348,20 +348,27 @@ if __name__ == '__main__':
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
               INIT = np.zeros((numVar * OPS,))
+              RES = np.zeros((numVar * OPS,))
               
               # Initialize the solution fields
               INIT[udex] = np.reshape(UZ, (OPS,), order='F')
               INIT[wdex] = np.zeros((OPS,))
               INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
               INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-              # Initialize the boundary condition
-              SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]));
               
-              # Initialize the RHS for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, SOLT[:,0], INIT, RAYOP, sysDex, udex, wdex, pdex, tdex)
+              # Get the static vertical gradients
+              DUDZ = np.reshape(REFS[10], (OPS,), order='F')
+              DLPDZ = np.reshape(REFS[11], (OPS,), order='F')
+              DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
+              REFG = [DUDZ, DLPDZ, DLPTDZ]
+              
+              # Initialize the boundary condition
+              SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
+              
+              # Initialize the RHS and forcing for each field
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               # Initialize the residual
-              RES = RHS
-              error = [np.linalg.norm(RES)]
+              error = [0.0]
               
               # Get the diffusion operators
               DiffX = DiffX.tocsc()
@@ -400,7 +407,7 @@ if __name__ == '__main__':
                             del(DynSGSZ)
                      
                      # Compute the SSPRK93 stages at this time step
-                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, DT, RHS, SOLT, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
+                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -408,6 +415,9 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
+                            
+                     if tt * DT >= 300.0:
+                            break
                      
               # Get the last solution
               sol = SOLT[sysDex,0]
@@ -422,7 +432,6 @@ if __name__ == '__main__':
        SOL = np.zeros(numVar * OPS)
        SOL[sysDex] = sol;
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]))
-       #SOL[sysDex] = res;
        
        #% Get the fields in physical space
        udex = np.array(range(OPS))
@@ -484,9 +493,9 @@ if __name__ == '__main__':
        fig = plt.figure()
        ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
-       plt.xlim(-25000.0, 25000.0)
-       plt.ylim(0.0, 5000.0)
+       plt.xlim(-35000.0, 35000.0)
+       plt.ylim(0.0, 25000.0)
        #
        fig = plt.figure()
-       plt.plot(XLI[0,:], uxzint[0:2,:].T, XL[0,:], uxz[0:2,:].T)
+       plt.plot(XLI[0,:], wxzint[0:2,:].T, XL[0,:], wxz[0:2,:].T)
        plt.xlim(-15000.0, 15000.0)
