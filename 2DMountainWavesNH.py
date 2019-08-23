@@ -47,8 +47,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
+       TransientSolve = True
+       NonLinSolve = False
        DynSGS = True
        
        # Set physical constants (dry air)
@@ -200,8 +200,8 @@ if __name__ == '__main__':
        REFS.append(DDXM)
        REFS.append(DDZM)
        # Compute 2nd order opearators with Neumann BC
-       DDXM2 = DDXM_NEUMANN #.dot(DDXM)
-       DDZM2 = DDZM_NEUMANN #.dot(DDZM_NEUMANN)
+       DDXM2 = DDXM_NEUMANN
+       DDZM2 = DDZM_NEUMANN
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -222,8 +222,6 @@ if __name__ == '__main__':
                               [DOPS[6], DOPS[7], DOPS[8], None], \
                               [None, DOPS[9], None, DOPS[10]]], format='lil')
               
-              # Update the raw operator with Rayleigh terms
-              LDG += RAY
               # Get some memory back
               del(DOPS)
        
@@ -250,6 +248,11 @@ if __name__ == '__main__':
               b = -(LDG[:,wbdex]).dot(WBC)
               del(LDG)
               del(WBC)
+              # Prepare operators for solver
+              AN = A.tocsc()
+              bN = b[sysDex]
+              del(A)
+              del(b)
               
        # Diffusion operators defined ONLY in the interior
        DiffX = DX2[np.ix_(intDex,intDex)]
@@ -263,19 +266,14 @@ if __name__ == '__main__':
        start = time.time()
        if StaticSolve:
               # Direct solver with some last-minute matrix grooming...
-              AN = A.tocsc()
-              bN = b[sysDex]
-              del(A)
-              del(b)
+              AN += RAYOP.tocsc()
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
               # Linear transient solution by explicit method
-              AN = A.tocsc()
+              AN += RAYOP.tocsc()
+              # Get the diffusion operators
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
-              bN = b[sysDex]
-              #del(A)
-              #del(b)
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
               # Initialize the RHS
@@ -300,12 +298,6 @@ if __name__ == '__main__':
                             COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
                             # Use intDex to NOT diffuse at boundaries... EVER
                             
-                            # Laplacian term only
-                            #QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
-                            #DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
-                            #QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
-                            #DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
-                            
                             # Divergence of the residual stress
                             QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
                             DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
@@ -313,12 +305,6 @@ if __name__ == '__main__':
                             QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
                             DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
                             DynSGSZ = DiffX.dot(DynSGSZ)
-                            
-                            # Time dependent coefficient only with 2nd order diffusion
-                            #QRES = np.amax(COEFX[intDex])
-                            #DynSGSX = QRES * (DiffX.dot(SOLT[intDex,0]))
-                            #QRES = np.amax(COEFZ[intDex])
-                            #DynSGSZ = QRES * (DiffZ.dot(SOLT[intDex,0]))
                             
                             SOLT[:,2] *= 0.0
                             SOLT[intDex,2] = DynSGSX + DynSGSZ
@@ -337,6 +323,9 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
+                            
+                     if DT * tt > 300.0:
+                            break
                      
               # Get the last solution
               sol = SOLT[sysDex,0]
@@ -412,11 +401,13 @@ if __name__ == '__main__':
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             err = np.linalg.norm(RES)
+                            # Estimate the time rate of change of residual norm
+                            edelta = err / error[len(error)-1]
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if tt * DT >= 300.0:
+                     if tt > OTI and edelta >= 2.0:
                             break
                      
               # Get the last solution
