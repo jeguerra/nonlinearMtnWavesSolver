@@ -47,8 +47,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        DynSGS = True
        
        # Set physical constants (dry air)
@@ -65,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 110
-       NZ = 75
+       NX = 129
+       NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -95,8 +95,8 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.05
-       HR = 1.0
+       DT = 0.075
+       HR = 10.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
@@ -271,8 +271,8 @@ if __name__ == '__main__':
        elif TransientSolve:
               # Set up the Rayleigh damping implicitly for transient
               SYS = len(sysDex)
-              DRAY = 6.0 * sps.identity(SYS) - RAYOP
-              IRAY = np.reciprocal(DRAY.diagonal(0))
+              DRAY = np.ones(SYS) - 1.0 / 6.0 * DT * RAYOP.diagonal(0)
+              IRAY = np.reciprocal(DRAY)
               del(DRAY)
               # Get the diffusion operators
               DiffX = DiffX.tocsc()
@@ -327,7 +327,7 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if DT * tt > 45.0:
+                     if DT * tt > 600.0:
                             break
                      
               # Get the last solution
@@ -335,7 +335,11 @@ if __name__ == '__main__':
               res = SOLT[sysDex,2]
               del(SOLT)
        elif NonLinSolve:
-              # Nonlinear transient solution by explicit method
+              # Set up the Rayleigh damping implicitly for transient
+              SYS = len(sysDex)
+              DRAY = np.ones(SYS) - 1.0 / 6.0 * DT * RAYOP.diagonal(0)
+              IRAY = np.reciprocal(DRAY)
+              del(DRAY)
               
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
@@ -399,18 +403,16 @@ if __name__ == '__main__':
                             del(DynSGSZ)
                      
                      # Compute the SSPRK93 stages at this time step
-                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
+                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, IRAY, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             err = np.linalg.norm(RES)
-                            # Estimate the time rate of change of residual norm
-                            edelta = err / error[len(error)-1]
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if tt > OTI and edelta >= 2.0:
+                     if DT * tt >= 600.0:
                             break
                      
               # Get the last solution

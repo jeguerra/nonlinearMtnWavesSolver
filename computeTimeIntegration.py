@@ -5,7 +5,7 @@ Created on Tue Aug 13 10:09:52 2019
 
 @author: jorge.guerra
 """
-import numpy as np
+#import numpy as np
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 
 def computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex):
@@ -15,7 +15,7 @@ def computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex):
        # Stage 1
        SOLT[sysDex,0] += c1 * DT * RHS
        # Implicit update of the Rayleigh terms
-       SOLT[sysDex,0] *= c1 * DT * IRAY
+       SOLT[sysDex,0] *= IRAY
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
@@ -34,13 +34,13 @@ def computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex):
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
               # Implicit update of the Rayleigh terms
-              SOLT[sysDex,0] *= c1 * DT * IRAY
+              SOLT[sysDex,0] *= IRAY
               # update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
               
        return SOLT, RHS
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RAYOP, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, IRAY, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
        # Get the solution at the bottom of the time step
        OLD = SOLT[sysDex,0]
        # Set the coefficients
@@ -48,6 +48,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RAYOP, sysDe
        c2 = 1.0 / 5.0
        # Stage 1
        SOLT[sysDex,0] += c1 * DT * RHS
+       # Implicit update of the Rayleigh terms
+       SOLT[sysDex,0] *= IRAY
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
@@ -56,7 +58,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RAYOP, sysDe
               SOLT[sysDex,0] += c1 * DT * RHS
               # Update the RHS
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              RHS -= RAYOP.dot(SOLT[sysDex,0])
               RHS += SOLT[sysDex,2]
               
        # Compute stage 6 with linear combination
@@ -67,9 +68,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RAYOP, sysDe
        # Compute stages 7 - 9
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
+              # Implicit update of the Rayleigh terms
+              SOLT[sysDex,0] *= IRAY
               # update the RHS
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              RHS -= RAYOP.dot(SOLT[sysDex,0])
               RHS += SOLT[sysDex,2]
               
        # Compute an estimate of the residual
