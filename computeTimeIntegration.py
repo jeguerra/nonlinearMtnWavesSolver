@@ -8,12 +8,14 @@ Created on Tue Aug 13 10:09:52 2019
 import numpy as np
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 
-def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
+def computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        # Stage 1
        SOLT[sysDex,0] += c1 * DT * RHS
+       # Implicit update of the Rayleigh terms
+       SOLT[sysDex,0] *= c1 * DT * IRAY
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
@@ -31,6 +33,8 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        # Compute stages 7 - 9
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
+              # Implicit update of the Rayleigh terms
+              SOLT[sysDex,0] *= c1 * DT * IRAY
               # update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
               

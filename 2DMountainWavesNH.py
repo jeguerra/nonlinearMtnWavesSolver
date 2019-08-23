@@ -269,8 +269,11 @@ if __name__ == '__main__':
               AN += RAYOP.tocsc()
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
-              # Linear transient solution by explicit method
-              AN += RAYOP.tocsc()
+              # Set up the Rayleigh damping implicitly for transient
+              SYS = len(sysDex)
+              DRAY = 6.0 * sps.identity(SYS) - RAYOP
+              IRAY = np.reciprocal(DRAY.diagonal(0))
+              del(DRAY)
               # Get the diffusion operators
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
@@ -315,7 +318,7 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS = computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex)
+                     SOLT, RHS = computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex)
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -324,7 +327,7 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if DT * tt > 300.0:
+                     if DT * tt > 45.0:
                             break
                      
               # Get the last solution
