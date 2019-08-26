@@ -40,7 +40,7 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
 
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
        # Get the solution at the bottom of the time step
-       OLD = SOLT[sysDex,0]
+       #OLD = SOLT[sysDex,0]
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -68,6 +68,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex
               RHS += SOLT[sysDex,2]
               
        # Compute an estimate of the residual
-       RES = 1.0 / (c1 * DT) * (SOLT[sysDex,0] - OLD) - RHS
+       RES = RHS
               
        return SOLT, RHS, RES
