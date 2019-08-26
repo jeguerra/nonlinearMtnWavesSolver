@@ -13,7 +13,7 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        # Stage 1
-       SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
+       SOLT[sysDex,0] += c1 * DT * RHS
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
@@ -22,17 +22,19 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
               SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
               # Update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
+              RHS += SOLT[sysDex,2]
               
        # Compute stage 6 with linear combination
        SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * \
-              (SOLT[sysDex,0] + c1 * DT * (RHS + SOLT[sysDex,2])))
+              (SOLT[sysDex,0] + c1 * DT * RHS))
        
        # Compute stages 7 - 9
        for ii in range(7,10):
               # Update the solution
-              SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
+              SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
+              RHS += SOLT[sysDex,2]
               
        return SOLT, RHS
 

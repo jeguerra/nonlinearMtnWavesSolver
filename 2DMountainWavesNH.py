@@ -395,7 +395,7 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if DT * tt >= 600.0:
+                     if DT * tt >= 3600.0:
                             break
                      
               # Get the last solution
@@ -462,7 +462,7 @@ if __name__ == '__main__':
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        
-       #%% #Spot check the solution on both grids
+       #% #Spot check the solution on both grids
        fig = plt.figure()
        ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
