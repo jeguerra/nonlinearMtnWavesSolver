@@ -13,30 +13,31 @@ def computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex):
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        # Stage 1
-       SOLT[sysDex,0] += c1 * DT * RHS
-       # Implicit update of the Rayleigh terms
-       SOLT[sysDex,0] *= IRAY
+       SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
        # Compute stages 2 - 5
        for ii in range(2,6):
-              SOLT[sysDex,0] += c1 * DT * RHS
+              SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
               # Update the RHS
-              RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
+              RHS = bN - AN.dot(SOLT[sysDex,0])
               
        # Compute stage 6 with linear combination
-       SOLT[sysDex,0] = 3.0 * SOLT[sysDex,1] + 2.0 * \
-              (SOLT[sysDex,0] + c1 * DT * RHS)
-       SOLT[sysDex,0] *= c2
+       SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * \
+              (SOLT[sysDex,0] + c1 * DT * (RHS + SOLT[sysDex,2])))
        
        # Compute stages 7 - 9
        for ii in range(7,10):
-              SOLT[sysDex,0] += c1 * DT * RHS
-              # Implicit update of the Rayleigh terms
-              SOLT[sysDex,0] *= IRAY
+              # Update the solution
+              SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
               # update the RHS
-              RHS = bN - AN.dot(SOLT[sysDex,0]) + SOLT[sysDex,2]
+              RHS = bN - AN.dot(SOLT[sysDex,0])
+              
+       # Implicit update of the Rayleigh terms
+       #SOLT[sysDex,0] *= IRAY
+       # update the RHS
+       #RHS = bN - AN.dot(SOLT[sysDex,0])
               
        return SOLT, RHS
 
@@ -48,8 +49,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, IRAY, sysDex
        c2 = 1.0 / 5.0
        # Stage 1
        SOLT[sysDex,0] += c1 * DT * RHS
-       # Implicit update of the Rayleigh terms
-       SOLT[sysDex,0] *= IRAY
        # Copy to storage 2
        SOLT[sysDex,1] = SOLT[sysDex,0]
        
@@ -61,15 +60,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, IRAY, sysDex
               RHS += SOLT[sysDex,2]
               
        # Compute stage 6 with linear combination
-       SOLT[sysDex,0] = 3.0 * SOLT[sysDex,1] + 2.0 * \
-              (SOLT[sysDex,0] + c1 * DT * RHS)
-       SOLT[sysDex,0] *= c2
+       SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * \
+              (SOLT[sysDex,0] + c1 * DT * RHS))
        
        # Compute stages 7 - 9
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
-              # Implicit update of the Rayleigh terms
-              SOLT[sysDex,0] *= IRAY
               # update the RHS
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               RHS += SOLT[sysDex,2]

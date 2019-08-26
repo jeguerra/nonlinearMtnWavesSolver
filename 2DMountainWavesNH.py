@@ -47,9 +47,9 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
-       DynSGS = True
+       TransientSolve = True
+       NonLinSolve = False
+       DynSGS = False
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -65,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 85
+       NX = 112
+       NZ = 75
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -95,12 +95,13 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.075
-       HR = 10.0
+       #DT = 0.1 # Linear transient
+       DT = 0.05 # Nonlinear transient
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
-       RTI = 1 # Stride for residual visc update
+       RTI = 10 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
@@ -212,7 +213,7 @@ if __name__ == '__main__':
        SOL = np.zeros((NX * NZ,1))
        
        #%% Compute the global LHS operator (with Rayleigh terms)
-       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
+       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='csc')
        del(ROPS)
        
        if StaticSolve or TransientSolve:
@@ -265,15 +266,17 @@ if __name__ == '__main__':
        #%% Solve the system - Static or Transient Solution
        start = time.time()
        if StaticSolve:
-              # Direct solver with some last-minute matrix grooming...
-              AN += RAYOP.tocsc()
+              # Add the Rayleigh terms and solve
+              AN += RAYOP
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
+              # Add the Rayleigh terms and send to time integrator
+              AN += RAYOP
               # Set up the Rayleigh damping implicitly for transient
-              SYS = len(sysDex)
-              DRAY = np.ones(SYS) - 1.0 / 6.0 * DT * RAYOP.diagonal(0)
-              IRAY = np.reciprocal(DRAY)
-              del(DRAY)
+              #SYS = len(sysDex)
+              #DRAY = np.ones(SYS) - DT * RAYOP.diagonal(0)
+              #IRAY = np.reciprocal(DRAY)
+              #del(DRAY)
               # Get the diffusion operators
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
@@ -327,7 +330,7 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if DT * tt > 600.0:
+                     if DT * tt >= 1800.0:
                             break
                      
               # Get the last solution
@@ -424,7 +427,7 @@ if __name__ == '__main__':
        print('Solve the system: DONE!')
        print('Elapsed time: ', endt - start)
        
-       #% Recover the solution (or check the residual)
+       #%% Recover the solution (or check the residual)
        SOL = np.zeros(numVar * OPS)
        SOL[sysDex] = sol;
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]))
@@ -489,8 +492,8 @@ if __name__ == '__main__':
        fig = plt.figure()
        ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
-       plt.xlim(-35000.0, 35000.0)
-       plt.ylim(0.0, 25000.0)
+       #plt.xlim(-35000.0, 35000.0)
+       #plt.ylim(0.0, 25000.0)
        #
        fig = plt.figure()
        plt.plot(XLI[0,:], wxzint[0:2,:].T, XL[0,:], wxz[0:2,:].T)
