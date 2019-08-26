@@ -49,7 +49,7 @@ if __name__ == '__main__':
        StaticSolve = False
        TransientSolve = True
        NonLinSolve = False
-       DynSGS = False
+       DynSGS = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -65,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 112
-       NZ = 75
+       NX = 129
+       NZ = 81
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -212,10 +212,7 @@ if __name__ == '__main__':
        #%% Initialize the global solution vector
        SOL = np.zeros((NX * NZ,1))
        
-       #%% Compute the global LHS operator (with Rayleigh terms)
-       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='csc')
-       del(ROPS)
-       
+       #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
               # Format is 'lil' to allow for column adjustments to the operator
               LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
@@ -258,7 +255,9 @@ if __name__ == '__main__':
        # Diffusion operators defined ONLY in the interior
        DiffX = DX2[np.ix_(intDex,intDex)]
        DiffZ = DZ2[np.ix_(intDex,intDex)]
+       
        # Rayleigh opearator
+       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
        RAYOP = RAY[np.ix_(sysDex,sysDex)]
        del(RAY)
        print('Set up global solution operators: DONE!')
@@ -267,16 +266,11 @@ if __name__ == '__main__':
        start = time.time()
        if StaticSolve:
               # Add the Rayleigh terms and solve
-              AN += RAYOP
+              AN += RAYOP.tocsc()
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
               # Add the Rayleigh terms and send to time integrator
-              AN += RAYOP
-              # Set up the Rayleigh damping implicitly for transient
-              #SYS = len(sysDex)
-              #DRAY = np.ones(SYS) - DT * RAYOP.diagonal(0)
-              #IRAY = np.reciprocal(DRAY)
-              #del(DRAY)
+              AN += RAYOP.tocsc()
               # Get the diffusion operators
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
@@ -321,7 +315,7 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS = computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex)
+                     SOLT, RHS = computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex)
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -338,12 +332,6 @@ if __name__ == '__main__':
               res = SOLT[sysDex,2]
               del(SOLT)
        elif NonLinSolve:
-              # Set up the Rayleigh damping implicitly for transient
-              SYS = len(sysDex)
-              DRAY = np.ones(SYS) - 1.0 / 6.0 * DT * RAYOP.diagonal(0)
-              IRAY = np.reciprocal(DRAY)
-              del(DRAY)
-              
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
               INIT = np.zeros((numVar * OPS,))
@@ -355,11 +343,11 @@ if __name__ == '__main__':
               INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
               INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
-              # Get the static vertical gradients
+              # Get the static vertical gradients and store
               DUDZ = np.reshape(REFS[10], (OPS,), order='F')
               DLPDZ = np.reshape(REFS[11], (OPS,), order='F')
               DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
-              REFG = [DUDZ, DLPDZ, DLPTDZ]
+              REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
               
               # Initialize the boundary condition
               SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
@@ -406,7 +394,7 @@ if __name__ == '__main__':
                             del(DynSGSZ)
                      
                      # Compute the SSPRK93 stages at this time step
-                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, IRAY, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
+                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:

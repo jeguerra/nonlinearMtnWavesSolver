@@ -8,7 +8,7 @@ Created on Tue Aug 13 10:09:52 2019
 #import numpy as np
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 
-def computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex):
+def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -34,14 +34,9 @@ def computeTimeIntegrationLN(bN, AN, IRAY, DT, RHS, SOLT, sysDex):
               # update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
               
-       # Implicit update of the Rayleigh terms
-       #SOLT[sysDex,0] *= IRAY
-       # update the RHS
-       #RHS = bN - AN.dot(SOLT[sysDex,0])
-              
        return SOLT, RHS
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, IRAY, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
        # Get the solution at the bottom of the time step
        OLD = SOLT[sysDex,0]
        # Set the coefficients

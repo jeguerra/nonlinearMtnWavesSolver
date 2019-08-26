@@ -8,7 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 
 import numpy as np
 import scipy.sparse as sps
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
@@ -89,6 +89,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT, INIT, sysDex, udex,
        DUDZ = REFG[0]
        DLPDZ = REFG[1]
        DLPTDZ = REFG[2]
+       ROPS = REFG[3]
        
        # Get the solution components
        uxz = SOLT[udex]
@@ -131,10 +132,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT, INIT, sysDex, udex,
        LD42 = wxz * (DDZM.dot(txz) + DLPTDZ)
        
        # Compute the combined terms
-       DuDt = -(LD11 + LD12 + LD13)
-       DwDt = -(LD21 + LD22 + LD23)
-       DpDt = -(LD31 + LD32 + LD33 + LD34)
-       DtDt = -(LD41 + LD42)
+       DuDt = -(LD11 + LD12 + LD13) + ROPS[0].dot(uxz)
+       DwDt = -(LD21 + LD22 + LD23) + ROPS[1].dot(wxz)
+       DpDt = -(LD31 + LD32 + LD33 + LD34) + ROPS[2].dot(pxz)
+       DtDt = -(LD41 + LD42) + ROPS[3].dot(txz)
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
