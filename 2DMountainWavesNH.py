@@ -44,6 +44,10 @@ from computeNeumannAdjusted import computeNeumannAdjusted
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 
+# Truncated spectral derivative matrices
+import computeHermiteFunctionDerivativeMatrix_Truncated as hfd
+import computeChebyshevDerivativeMatrix_Truncated as chd
+
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
@@ -119,8 +123,10 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        # Compute 1D Derivative Matrices with Neumann BC (N-2) X (N-2)
-       DDX_1D_NEUMANN = DDX_1D
-       DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_1D, True, True)
+       DDX_1D_NEUMANN, temp = hfd.computeHermiteFunctionDerivativeMatrix(DIMS)
+       DDZ_TR, temp = chd.computeChebyshevDerivativeMatrix(DIMS)
+       #DDX_1D_NEUMANN = DDX_1D
+       DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_TR, True, True)
        
        #% Read in topography profile or compute from analytical function
        AGNESI = 1 # "Witch of Agnesi" profil e

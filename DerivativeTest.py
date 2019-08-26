@@ -10,8 +10,8 @@ import numpy as np
 import math as mt
 import matplotlib.pyplot as plt
 from computeGrid import computeGrid
-import computeHermiteFunctionDerivativeMatrix as hfd
-import computeChebyshevDerivativeMatrix as chd
+import computeHermiteFunctionDerivativeMatrix_Truncated as hfd
+import computeChebyshevDerivativeMatrix_Truncated as chd
 import computeTopographyOnGrid as top
 
 #%%
@@ -56,7 +56,7 @@ plt.savefig("DerivativeTestZ.png")
 
 # HERMITE FUNCTION DERIVATIVE TEST
 xv = REFS[0]
-''' Hermite Functions are NO GOOD for asymmetrical functions
+''' Hermite Functions are NO GOOD for asymmetrical functions in bounded intervals
 xv2 = np.multiply(xv, xv)
 #Y = 4.0 * np.exp(-5.0 * xv) + \
 Y = np.cos(4.0 * mt.pi * xv2);
