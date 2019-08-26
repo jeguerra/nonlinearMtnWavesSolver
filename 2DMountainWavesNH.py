@@ -65,8 +65,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 81
+       NX = 112
+       NZ = 75
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -96,7 +96,7 @@ if __name__ == '__main__':
        
        #%% Transient solve parameters
        #DT = 0.1 # Linear transient
-       DT = 0.05 # Nonlinear transient
+       DT = 0.075 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
@@ -212,6 +212,11 @@ if __name__ == '__main__':
        #%% Initialize the global solution vector
        SOL = np.zeros((NX * NZ,1))
        
+       #%% Rayleigh opearator
+       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
+       RAYOP = RAY[np.ix_(sysDex,sysDex)]
+       del(RAY)
+       
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
               # Format is 'lil' to allow for column adjustments to the operator
@@ -222,15 +227,9 @@ if __name__ == '__main__':
               
               # Get some memory back
               del(DOPS)
+              print('Compute global sparse linear Euler operator: DONE!')
        
-       DX2 = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='lil')
-       DZ2 = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='lil')
-       del(DDXM2)
-       del(DDZM2)
-       print('Compute global sparse operators: DONE!')
-       
-       #%% Apply the coupled multipoint constraint for terrain
-       if StaticSolve or TransientSolve:
+              # Apply the coupled multipoint constraint for terrain
               DHDXM = sps.spdiags(DZT[0,:], 0, NX+1, NX+1)
               # Compute LHS column adjustment to LDG
               LDG[:,ubdex] += (LDG[:,wbdex]).dot(DHDXM)
@@ -240,8 +239,7 @@ if __name__ == '__main__':
               del(DHDXM)
               print('Apply coupled BC adjustments: DONE!')
        
-       #%% Set up the global solve
-       if StaticSolve or TransientSolve:
+              # Set up the global solve
               A = LDG[np.ix_(sysDex,sysDex)]
               b = -(LDG[:,wbdex]).dot(WBC)
               del(LDG)
@@ -251,29 +249,27 @@ if __name__ == '__main__':
               bN = b[sysDex]
               del(A)
               del(b)
-              
-       # Diffusion operators defined ONLY in the interior
-       DiffX = DX2[np.ix_(intDex,intDex)]
-       DiffZ = DZ2[np.ix_(intDex,intDex)]
+              # Add the Rayleigh terms and solve
+              AN += RAYOP.tocsc()
+              print('Set up global solution operators: DONE!')
        
-       # Rayleigh opearator
-       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
-       RAYOP = RAY[np.ix_(sysDex,sysDex)]
-       del(RAY)
-       print('Set up global solution operators: DONE!')
+       if DynSGS:
+              DX2 = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='lil')
+              DZ2 = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='lil')
+              del(DDXM2)
+              del(DDZM2)       
+              # Diffusion operators defined ONLY in the interior
+              DiffX = DX2[np.ix_(intDex,intDex)]
+              DiffZ = DZ2[np.ix_(intDex,intDex)]
+              # Convert to column ordering
+              DiffX = DiffX.tocsc()
+              DiffZ = DiffZ.tocsc()
        
        #%% Solve the system - Static or Transient Solution
        start = time.time()
        if StaticSolve:
-              # Add the Rayleigh terms and solve
-              AN += RAYOP.tocsc()
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
-              # Add the Rayleigh terms and send to time integrator
-              AN += RAYOP.tocsc()
-              # Get the diffusion operators
-              DiffX = DiffX.tocsc()
-              DiffZ = DiffZ.tocsc()
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
               # Initialize the RHS
@@ -324,7 +320,7 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if DT * tt >= 1800.0:
+                     if DT * tt >= 3600.0:
                             break
                      
               # Get the last solution
@@ -356,11 +352,7 @@ if __name__ == '__main__':
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               # Initialize the residual
               error = [0.0]
-              
-              # Get the diffusion operators
-              DiffX = DiffX.tocsc()
-              DiffZ = DiffZ.tocsc()
-              
+
               # Start the time loop
               for tt in range(len(TI)):
                      # Update SGS and Rayleigh tendency
