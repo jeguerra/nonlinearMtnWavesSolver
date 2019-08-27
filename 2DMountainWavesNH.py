@@ -53,7 +53,7 @@ if __name__ == '__main__':
        StaticSolve = False
        TransientSolve = False
        NonLinSolve = True
-       DynSGS = False
+       DynSGS = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -100,12 +100,12 @@ if __name__ == '__main__':
        
        #%% Transient solve parameters
        #DT = 0.1 # Linear transient
-       DT = 0.05 # Nonlinear transient
+       DT = 0.1 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
-       RTI = 2 # Stride for residual visc update
+       RTI = 1 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
@@ -270,6 +270,7 @@ if __name__ == '__main__':
               # Convert to column ordering
               DiffX = DiffX.tocsc()
               DiffZ = DiffZ.tocsc()
+              print('Precompute Diffusion Operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
        start = time.time()
@@ -289,15 +290,15 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RHS
                             # Compute the local DynSGS coefficients
-                            RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
-                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
-                            RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
+                            #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
+                            #RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
+                            #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
                             RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
-                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
+                            COEFX = np.concatenate((RESTX, RESTX, RESTX, RESTX))
+                            COEFZ = np.concatenate((RESTZ, RESTZ, RESTZ, RESTZ))
                             # Use intDex to NOT diffuse at boundaries... EVER
                             
                             # Divergence of the residual stress
@@ -317,7 +318,7 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS = computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex)
+                     SOLT, RHS, RES = computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex)
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -334,6 +335,7 @@ if __name__ == '__main__':
               res = SOLT[sysDex,2]
               del(SOLT)
        elif NonLinSolve:
+              print('Starting Nonlinear Transient Solver...')
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
               INIT = np.zeros((numVar * OPS,))
@@ -366,15 +368,15 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RES
                             # Compute the local DynSGS coefficients
-                            RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
-                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
-                            RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
+                            #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
+                            #RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
+                            #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
                             RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            COEFX = np.concatenate((RESUX, RESWX, RESPX, RESTX))
-                            COEFZ = np.concatenate((RESUZ, RESWZ, RESPZ, RESTZ))
+                            COEFX = np.concatenate((RESTX, RESTX, RESTX, RESTX))
+                            COEFZ = np.concatenate((RESTZ, RESTZ, RESTZ, RESTZ))
                             # Use intDex to NOT diffuse at boundaries... EVER
                             
                             # Divergence of the residual stress

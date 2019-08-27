@@ -34,9 +34,12 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
+              # Estimate the residual
+              RES = RHS
+              # Add in the diffusion tendency
               RHS += SOLT[sysDex,2]
               
-       return SOLT, RHS
+       return SOLT, RHS, RES
 
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
        # Get the solution at the bottom of the time step
@@ -65,9 +68,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              # Estimate the residual
+              RES = RHS
+              # Add in the diffusion tendency
               RHS += SOLT[sysDex,2]
-              
-       # Compute an estimate of the residual
-       RES = RHS
               
        return SOLT, RHS, RES
