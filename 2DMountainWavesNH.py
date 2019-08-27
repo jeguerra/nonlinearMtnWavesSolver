@@ -51,9 +51,9 @@ import computeChebyshevDerivativeMatrix_Truncated as chd
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
-       DynSGS = True
+       TransientSolve = False
+       NonLinSolve = True
+       DynSGS = False
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -100,12 +100,12 @@ if __name__ == '__main__':
        
        #%% Transient solve parameters
        #DT = 0.1 # Linear transient
-       DT = 0.075 # Nonlinear transient
+       DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
-       RTI = 10 # Stride for residual visc update
+       RTI = 2 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
@@ -123,10 +123,10 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        # Compute 1D Derivative Matrices with Neumann BC (N-2) X (N-2)
-       DDX_1D_NEUMANN, temp = hfd.computeHermiteFunctionDerivativeMatrix(DIMS)
-       DDZ_TR, temp = chd.computeChebyshevDerivativeMatrix(DIMS)
-       #DDX_1D_NEUMANN = DDX_1D
-       DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_TR, True, True)
+       #DDX_1D_NEUMANN, temp = hfd.computeHermiteFunctionDerivativeMatrix(DIMS)
+       #DDZ_TR, temp = chd.computeChebyshevDerivativeMatrix(DIMS)
+       DDX_1D_NEUMANN = DDX_1D
+       DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_1D, True, True)
        
        #% Read in topography profile or compute from analytical function
        AGNESI = 1 # "Witch of Agnesi" profil e
@@ -401,7 +401,7 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
-                     if DT * tt >= 3600.0:
+                     if DT * tt >= 1800.0:
                             break
                      
               # Get the last solution
