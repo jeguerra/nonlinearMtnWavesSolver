@@ -122,12 +122,6 @@ if __name__ == '__main__':
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
        
-       # Compute 1D Derivative Matrices with Neumann BC (N-2) X (N-2)
-       #DDX_1D_NEUMANN, temp = hfd.computeHermiteFunctionDerivativeMatrix(DIMS)
-       #DDZ_TR, temp = chd.computeChebyshevDerivativeMatrix(DIMS)
-       DDX_1D_NEUMANN = DDX_1D
-       DDZ_1D_NEUMANN = computeNeumannAdjusted(DDZ_1D, True, True)
-       
        #% Read in topography profile or compute from analytical function
        AGNESI = 1 # "Witch of Agnesi" profil e
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
@@ -203,12 +197,11 @@ if __name__ == '__main__':
        
        #%% Get the 2D linear operators...
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       DDXM_NEUMANN, DDZM_NEUMANN = computePartialDerivativesXZ(DIMS, REFS, DDX_1D_NEUMANN, DDZ_1D_NEUMANN)
        REFS.append(DDXM)
        REFS.append(DDZM)
        # Compute 2nd order opearators with Neumann BC
-       DDXM2 = DDXM_NEUMANN
-       DDZM2 = DDZM_NEUMANN
+       DDXM2 = DDXM#.dot(DDXM)
+       DDZM2 = DDZM#.dot(DDZM)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -264,12 +257,6 @@ if __name__ == '__main__':
               DiffZ = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='csc')
               del(DDXM2)
               del(DDZM2)       
-              # Diffusion operators defined ONLY in the interior
-              #DiffX = DX2[np.ix_(intDex,intDex)]
-              #DiffZ = DZ2[np.ix_(intDex,intDex)]
-              # Convert to column ordering
-              #DiffX = DiffX.tocsc()
-              #DiffZ = DiffZ.tocsc()
               print('Precompute Diffusion Operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -291,23 +278,23 @@ if __name__ == '__main__':
                             SOLT[sysDex,2] = RHS
                             # Compute the local DynSGS coefficients
                             #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
-                            #RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
+                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
                             #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
                             RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            COEFX = np.concatenate((RESTX, RESTX, RESTX, RESTX))
-                            COEFZ = np.concatenate((RESTZ, RESTZ, RESTZ, RESTZ))
+                            COEFX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
+                            COEFZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
                             
                             # Divergence of the residual stress
                             DynSGSX = COEFX * (DiffX.dot(SOLT[:,0]))
                             DynSGSX = DiffX.dot(DynSGSX)
-                            DynSGSZ = COEFX * (DiffZ.dot(SOLT[:,0]))
-                            DynSGSZ = DiffX.dot(DynSGSZ)
+                            DynSGSZ = COEFZ * (DiffZ.dot(SOLT[:,0]))
+                            DynSGSZ = DiffZ.dot(DynSGSZ)
                             
                             SOLT[:,2] *= 0.0
-                            SOLT[intDex,2] = DynSGSX[intDex] + DynSGSZ[intDex]
+                            SOLT[sysDex,2] = DynSGSX[sysDex] + DynSGSZ[sysDex]
                             del(DynSGSX)
                             del(DynSGSZ)
                      else:
@@ -378,11 +365,11 @@ if __name__ == '__main__':
                             # Divergence of the residual stress
                             DynSGSX = COEFX * (DiffX.dot(SOLT[:,0]))
                             DynSGSX = DiffX.dot(DynSGSX)
-                            DynSGSZ = COEFX * (DiffZ.dot(SOLT[:,0]))
-                            DynSGSZ = DiffX.dot(DynSGSZ)
+                            DynSGSZ = COEFZ * (DiffZ.dot(SOLT[:,0]))
+                            DynSGSZ = DiffZ.dot(DynSGSZ)
                             
                             SOLT[:,2] *= 0.0
-                            SOLT[intDex,2] = DynSGSX[intDex] + DynSGSZ[intDex]
+                            SOLT[sysDex,2] = DynSGSX[sysDex] + DynSGSZ[sysDex]
                             
                             del(DynSGSX)
                             del(DynSGSZ)
