@@ -100,7 +100,7 @@ if __name__ == '__main__':
        
        #%% Transient solve parameters
        #DT = 0.1 # Linear transient
-       DT = 0.1 # Nonlinear transient
+       DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
@@ -260,16 +260,16 @@ if __name__ == '__main__':
               print('Set up global solution operators: DONE!')
        
        if DynSGS:
-              DX2 = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='lil')
-              DZ2 = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='lil')
+              DiffX = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='csc')
+              DiffZ = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='csc')
               del(DDXM2)
               del(DDZM2)       
               # Diffusion operators defined ONLY in the interior
-              DiffX = DX2[np.ix_(intDex,intDex)]
-              DiffZ = DZ2[np.ix_(intDex,intDex)]
+              #DiffX = DX2[np.ix_(intDex,intDex)]
+              #DiffZ = DZ2[np.ix_(intDex,intDex)]
               # Convert to column ordering
-              DiffX = DiffX.tocsc()
-              DiffZ = DiffZ.tocsc()
+              #DiffX = DiffX.tocsc()
+              #DiffZ = DiffZ.tocsc()
               print('Precompute Diffusion Operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -299,18 +299,15 @@ if __name__ == '__main__':
                             ZERS = np.zeros((OPS, ))
                             COEFX = np.concatenate((RESTX, RESTX, RESTX, RESTX))
                             COEFZ = np.concatenate((RESTZ, RESTZ, RESTZ, RESTZ))
-                            # Use intDex to NOT diffuse at boundaries... EVER
                             
                             # Divergence of the residual stress
-                            QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
-                            DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
+                            DynSGSX = COEFX * (DiffX.dot(SOLT[:,0]))
                             DynSGSX = DiffX.dot(DynSGSX)
-                            QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
-                            DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
+                            DynSGSZ = COEFX * (DiffZ.dot(SOLT[:,0]))
                             DynSGSZ = DiffX.dot(DynSGSZ)
                             
                             SOLT[:,2] *= 0.0
-                            SOLT[intDex,2] = DynSGSX + DynSGSZ
+                            SOLT[intDex,2] = DynSGSX[intDex] + DynSGSZ[intDex]
                             del(DynSGSX)
                             del(DynSGSZ)
                      else:
@@ -369,26 +366,23 @@ if __name__ == '__main__':
                             SOLT[sysDex,2] = RES
                             # Compute the local DynSGS coefficients
                             #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
-                            #RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
+                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
                             #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
                             RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            COEFX = np.concatenate((RESTX, RESTX, RESTX, RESTX))
-                            COEFZ = np.concatenate((RESTZ, RESTZ, RESTZ, RESTZ))
-                            # Use intDex to NOT diffuse at boundaries... EVER
+                            COEFX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
+                            COEFZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
                             
                             # Divergence of the residual stress
-                            QRES = sps.spdiags(COEFX[intDex], 0, len(intDex), len(intDex))
-                            DynSGSX = QRES.dot(DiffX.dot(SOLT[intDex,0]))
+                            DynSGSX = COEFX * (DiffX.dot(SOLT[:,0]))
                             DynSGSX = DiffX.dot(DynSGSX)
-                            QRES = sps.spdiags(COEFZ[intDex], 0, len(intDex), len(intDex))
-                            DynSGSZ = QRES.dot(DiffZ.dot(SOLT[intDex,0]))
+                            DynSGSZ = COEFX * (DiffZ.dot(SOLT[:,0]))
                             DynSGSZ = DiffX.dot(DynSGSZ)
                             
                             SOLT[:,2] *= 0.0
-                            SOLT[intDex,2] = DynSGSX + DynSGSZ
+                            SOLT[intDex,2] = DynSGSX[intDex] + DynSGSZ[intDex]
                             
                             del(DynSGSX)
                             del(DynSGSZ)

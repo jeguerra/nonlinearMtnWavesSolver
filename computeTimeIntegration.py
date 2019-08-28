@@ -19,7 +19,7 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        
        # Compute stages 2 - 5
        for ii in range(2,6):
-              SOLT[sysDex,0] += c1 * DT * (RHS + SOLT[sysDex,2])
+              SOLT[sysDex,0] += c1 * DT * RHS
               # Update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
               RHS += SOLT[sysDex,2]
@@ -42,8 +42,6 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        return SOLT, RHS, RES
 
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex):
-       # Get the solution at the bottom of the time step
-       #OLD = SOLT[sysDex,0]
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
