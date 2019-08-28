@@ -51,8 +51,8 @@ import computeChebyshevDerivativeMatrix_Truncated as chd
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
+       TransientSolve = True
+       NonLinSolve = False
        DynSGS = True
        
        # Set physical constants (dry air)
@@ -199,9 +199,6 @@ if __name__ == '__main__':
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        REFS.append(DDXM)
        REFS.append(DDZM)
-       # Compute 2nd order opearators with Neumann BC
-       DDXM2 = DDXM#.dot(DDXM)
-       DDZM2 = DDZM#.dot(DDZM)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -252,13 +249,6 @@ if __name__ == '__main__':
               AN += RAYOP.tocsc()
               print('Set up global solution operators: DONE!')
        
-       if DynSGS:
-              DiffX = sps.block_diag((DDXM2, DDXM2, DDXM2, DDXM2), format='csc')
-              DiffZ = sps.block_diag((DDZM2, DDZM2, DDZM2, DDZM2), format='csc')
-              del(DDXM2)
-              del(DDZM2)       
-              print('Precompute Diffusion Operators: DONE!')
-       
        #%% Solve the system - Static or Transient Solution
        start = time.time()
        if StaticSolve:
@@ -277,21 +267,15 @@ if __name__ == '__main__':
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RHS
                             # Compute the local DynSGS coefficients
-                            #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
-                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
-                            #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
-                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
+                            #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ, DDXM, DDZM)
+                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM, DDZM)
+                            #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ, DDXM, DDZM)
+                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDXM, DDZM)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            COEFX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
-                            COEFZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
-                            
-                            # Divergence of the residual stress
-                            DynSGSX = COEFX * (DiffX.dot(SOLT[:,0]))
-                            DynSGSX = DiffX.dot(DynSGSX)
-                            DynSGSZ = COEFZ * (DiffZ.dot(SOLT[:,0]))
-                            DynSGSZ = DiffZ.dot(DynSGSZ)
+                            DynSGSX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
+                            DynSGSZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
                             
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = DynSGSX[sysDex] + DynSGSZ[sysDex]
@@ -353,20 +337,14 @@ if __name__ == '__main__':
                             SOLT[sysDex,2] = RES
                             # Compute the local DynSGS coefficients
                             #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
-                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ)
+                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM)
                             #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
-                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ)
+                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDZM)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            COEFX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
-                            COEFZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
-                            
-                            # Divergence of the residual stress
-                            DynSGSX = COEFX * (DiffX.dot(SOLT[:,0]))
-                            DynSGSX = DiffX.dot(DynSGSX)
-                            DynSGSZ = COEFZ * (DiffZ.dot(SOLT[:,0]))
-                            DynSGSZ = DiffZ.dot(DynSGSZ)
+                            DynSGSX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
+                            DynSGSZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
                             
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = DynSGSX[sysDex] + DynSGSZ[sysDex]
