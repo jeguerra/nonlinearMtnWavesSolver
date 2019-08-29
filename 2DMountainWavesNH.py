@@ -50,8 +50,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        ResDiff = True
        
        # Set physical constants (dry air)
@@ -254,43 +254,28 @@ if __name__ == '__main__':
        elif TransientSolve:
               AN += RAYOP.tocsc()
               # Initialize transient storage
-              SOLT = np.zeros((numVar * OPS, 3))
+              SOLT = np.zeros((numVar * OPS, 2))
+              RESI = np.zeros((numVar * OPS,))
               # Initialize the RHS
               RHS = bN
               error = [np.linalg.norm(RHS)]
               
               # Start the time loop
               for tt in range(len(TI)):
-                     # Update SGS tendency
-                     if ResDiff and tt % RTI == 0 and tt > 0:
-                            SOLT[:,2] *= 0.0
-                            SOLT[sysDex,2] = RHS
+                     # Get the DynSGS Coefficients
+                     if ResDiff and tt % RTI == 0:
                             # Compute the local DynSGS coefficients
-                            DynSGS_U = computeResidualViscCoeffs(SOLT, udex, DX, DZ, DDXM, DDZM)
-                            DynSGS_W = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM, DDZM)
-                            DynSGS_P = computeResidualViscCoeffs(SOLT, pdex, DX, DZ, DDXM, DDZM)
-                            DynSGS_T = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDXM, DDZM)
-                            
-                            # Make the state vector of DynSGS coefficients
-                            ZERS = np.zeros((OPS, ))
-                            DynSGS = np.concatenate((DynSGS_U, DynSGS_W, DynSGS_P, DynSGS_T))
-                            
-                            SOLT[:,2] *= 0.0
-                            SOLT[sysDex,2] = DynSGS[sysDex]                            
-                            del(DynSGS) 
-                     else:
-                            # Zero out auxiliary storage after diffusion
-                            SOLT[:,2] *= 0.0
+                            RESI[sysDex] = RHS
+                            RESCF = computeResidualViscCoeffs(SOLT, RESI, DX, DZ)
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS, RES = computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex)
+                     SOLT, RHS = computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex, udex, wdex, pdex, tdex)
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             err = np.linalg.norm(RHS)
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
-                            print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
                      if DT * tt >= 3600.0:
                             break
@@ -302,9 +287,9 @@ if __name__ == '__main__':
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
               # Initialize transient storage
-              SOLT = np.zeros((numVar * OPS, 3))
+              SOLT = np.zeros((numVar * OPS, 2))
               INIT = np.zeros((numVar * OPS,))
-              RES = np.zeros((numVar * OPS,))
+              RESI = np.zeros((numVar * OPS,))
               
               # Initialize the solution fields
               INIT[udex] = np.reshape(UZ, (OPS,), order='F')
@@ -325,36 +310,26 @@ if __name__ == '__main__':
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               # Initialize the residual
               error = [0.0]
+              
+              # Initialize residual coefficients
+              RESCF = computeResidualViscCoeffs(SOLT, RHS, DX, DZ)
 
               # Start the time loop
               for tt in range(len(TI)):
-                     # Update SGS and Rayleigh tendency
-                     if ResDiff and tt % RTI == 0 and tt > 0:
-                            SOLT[:,2] *= 0.0
-                            SOLT[sysDex,2] = RES
+                     # Get the DynSGS Coefficients
+                     if ResDiff and tt % RTI == 0:
                             # Compute the local DynSGS coefficients
-                            DynSGS_U = computeResidualViscCoeffs(SOLT, udex, DX, DZ, DDXM, DDZM)
-                            DynSGS_W = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM, DDZM)
-                            DynSGS_P = computeResidualViscCoeffs(SOLT, pdex, DX, DZ, DDXM, DDZM)
-                            DynSGS_T = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDXM, DDZM)
-                            
-                            # Make the state vector of DynSGS coefficients
-                            ZERS = np.zeros((OPS, ))
-                            DynSGS = np.concatenate((DynSGS_U, DynSGS_W, DynSGS_P, DynSGS_T))
-                            
-                            SOLT[:,2] *= 0.0
-                            SOLT[sysDex,2] = DynSGS[sysDex]                            
-                            del(DynSGS)    
+                            RESI[sysDex] = RHS
+                            RESCF = computeResidualViscCoeffs(SOLT, RESI, DX, DZ)
                             
                      # Compute the SSPRK93 stages at this time step
-                     SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
+                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex)
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
-                            err = np.linalg.norm(RES)
+                            err = np.linalg.norm(RHS)
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
-                            print('SGS Norm: ', np.linalg.norm(SOLT[sysDex,2]))
                             
                      if DT * tt >= 1800.0:
                             break

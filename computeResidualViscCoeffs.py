@@ -8,10 +8,10 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 
-def computeResidualViscCoeffs(RES, qdex, DX, DZ, DDXM, DDZM):
+def computeResidualViscCoeffs(SOL, RES, DX, DZ):
        
-       ARES = np.abs(RES[qdex,2])
-       DSOL = np.abs(RES[qdex,0])
+       ARES = np.abs(RES)
+       DSOL = np.abs(SOL[:,0])
        
        # Get the normalization from the current estimate
        QM = np.amax(DSOL)
@@ -25,7 +25,7 @@ def computeResidualViscCoeffs(RES, qdex, DX, DZ, DDXM, DDZM):
        QRESX[updex] = 0.5 * DX * np.ones((len(updex),1))
        updex = np.argwhere(QRESZ >= 0.5 * DZ)
        QRESZ[updex] = 0.5 * DZ * np.ones((len(updex),1))
-       
+       '''
        # Compute the SGS stress estimates
        TauX = QRESX * DDXM.dot(RES[qdex,0])
        TauZ = QRESZ * DDZM.dot(RES[qdex,0])
@@ -36,5 +36,5 @@ def computeResidualViscCoeffs(RES, qdex, DX, DZ, DDXM, DDZM):
        
        # Compute the damping tendency
        dqdt = DynSGSX + DynSGSZ
-       
-       return dqdt
+       '''
+       return (QRESX, QRESZ)

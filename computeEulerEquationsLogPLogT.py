@@ -152,7 +152,7 @@ def computeRayleighTendency(REFG, SOLT, sysDex, udex, wdex, pdex, tdex):
        pxz = SOLT[pdex]
        txz = SOLT[tdex]
        
-       # Compute the combined terms
+       # Compute the tendencies
        DuDt = - ROPS[0].dot(uxz)
        DwDt = - ROPS[1].dot(wxz)
        DpDt = - ROPS[2].dot(pxz)
@@ -163,7 +163,29 @@ def computeRayleighTendency(REFG, SOLT, sysDex, udex, wdex, pdex, tdex):
        
        return DqDt[sysDex]
 
-def computeDynSGSTendency(SOLT, RES, sysDex, udex, wdex, pdex, tdex):
+def computeDynSGSTendency(RESCF, REFS, SOLT, sysDex, udex, wdex, pdex, tdex):
+       # Get the derivative operators
+       DDXM = REFS[13]
+       DDZM = REFS[14]
        
-       return None
+       # Get the solution components
+       uxz = SOLT[udex]
+       wxz = SOLT[wdex]
+       pxz = SOLT[pdex]
+       txz = SOLT[tdex]
+       
+       # Get the anisotropic coefficients
+       RESCFX = RESCF[0]
+       RESCFZ = RESCF[1]
+       
+       # Compute the tendencies
+       DuDt = DDXM.dot(RESCFX[udex] * DDXM.dot(uxz)) + DDZM.dot(RESCFZ[udex] * DDZM.dot(uxz))
+       DwDt = DDXM.dot(RESCFX[wdex] * DDXM.dot(wxz)) + DDZM.dot(RESCFZ[wdex] * DDZM.dot(wxz))
+       DpDt = DDXM.dot(RESCFX[pdex] * DDXM.dot(pxz)) + DDZM.dot(RESCFZ[pdex] * DDZM.dot(pxz))
+       DtDt = DDXM.dot(RESCFX[tdex] * DDXM.dot(txz)) + DDZM.dot(RESCFZ[tdex] * DDZM.dot(txz))
+       
+       # Concatenate
+       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       
+       return DqDt[sysDex]
        
