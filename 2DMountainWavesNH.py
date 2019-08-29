@@ -40,20 +40,19 @@ from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 from computeRayleighEquations import computeRayleighEquations
 from computeResidualViscCoeffs import computeResidualViscCoeffs
-from computeNeumannAdjusted import computeNeumannAdjusted
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 
 # Truncated spectral derivative matrices
-import computeHermiteFunctionDerivativeMatrix_Truncated as hfd
-import computeChebyshevDerivativeMatrix_Truncated as chd
+#import computeHermiteFunctionDerivativeMatrix_Truncated as hfd
+#import computeChebyshevDerivativeMatrix_Truncated as chd
 
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
        TransientSolve = True
        NonLinSolve = False
-       DynSGS = True
+       ResDiff = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -245,15 +244,15 @@ if __name__ == '__main__':
               bN = b[sysDex]
               del(A)
               del(b)
-              # Add the Rayleigh terms and solve
-              AN += RAYOP.tocsc()
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
        start = time.time()
        if StaticSolve:
+              AN += RAYOP.tocsc()
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
+              AN += RAYOP.tocsc()
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 3))
               # Initialize the RHS
@@ -263,24 +262,22 @@ if __name__ == '__main__':
               # Start the time loop
               for tt in range(len(TI)):
                      # Update SGS tendency
-                     if DynSGS and tt % RTI == 0 and tt > 0:
+                     if ResDiff and tt % RTI == 0 and tt > 0:
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RHS
                             # Compute the local DynSGS coefficients
-                            #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ, DDXM, DDZM)
-                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM, DDZM)
-                            #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ, DDXM, DDZM)
-                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDXM, DDZM)
+                            DynSGS_U = computeResidualViscCoeffs(SOLT, udex, DX, DZ, DDXM, DDZM)
+                            DynSGS_W = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM, DDZM)
+                            DynSGS_P = computeResidualViscCoeffs(SOLT, pdex, DX, DZ, DDXM, DDZM)
+                            DynSGS_T = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDXM, DDZM)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            DynSGSX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
-                            DynSGSZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
+                            DynSGS = np.concatenate((DynSGS_U, DynSGS_W, DynSGS_P, DynSGS_T))
                             
                             SOLT[:,2] *= 0.0
-                            SOLT[sysDex,2] = DynSGSX[sysDex] + DynSGSZ[sysDex]
-                            del(DynSGSX)
-                            del(DynSGSZ)
+                            SOLT[sysDex,2] = DynSGS[sysDex]                            
+                            del(DynSGS) 
                      else:
                             # Zero out auxiliary storage after diffusion
                             SOLT[:,2] *= 0.0
@@ -332,26 +329,23 @@ if __name__ == '__main__':
               # Start the time loop
               for tt in range(len(TI)):
                      # Update SGS and Rayleigh tendency
-                     if DynSGS and tt % RTI == 0 and tt > 0:
+                     if ResDiff and tt % RTI == 0 and tt > 0:
                             SOLT[:,2] *= 0.0
                             SOLT[sysDex,2] = RES
                             # Compute the local DynSGS coefficients
-                            #RESUX, RESUZ = computeResidualViscCoeffs(SOLT, udex, DX, DZ)
-                            RESWX, RESWZ = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM)
-                            #RESPX, RESPZ = computeResidualViscCoeffs(SOLT, pdex, DX, DZ)
-                            RESTX, RESTZ = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDZM)
+                            DynSGS_U = computeResidualViscCoeffs(SOLT, udex, DX, DZ, DDXM, DDZM)
+                            DynSGS_W = computeResidualViscCoeffs(SOLT, wdex, DX, DZ, DDXM, DDZM)
+                            DynSGS_P = computeResidualViscCoeffs(SOLT, pdex, DX, DZ, DDXM, DDZM)
+                            DynSGS_T = computeResidualViscCoeffs(SOLT, tdex, DX, DZ, DDXM, DDZM)
                             
                             # Make the state vector of DynSGS coefficients
                             ZERS = np.zeros((OPS, ))
-                            DynSGSX = np.concatenate((ZERS, RESWX, ZERS, RESTX))
-                            DynSGSZ = np.concatenate((ZERS, RESWZ, ZERS, RESTZ))
+                            DynSGS = np.concatenate((DynSGS_U, DynSGS_W, DynSGS_P, DynSGS_T))
                             
                             SOLT[:,2] *= 0.0
-                            SOLT[sysDex,2] = DynSGSX[sysDex] + DynSGSZ[sysDex]
+                            SOLT[sysDex,2] = DynSGS[sysDex]                            
+                            del(DynSGS)    
                             
-                            del(DynSGSX)
-                            del(DynSGSZ)
-                     
                      # Compute the SSPRK93 stages at this time step
                      SOLT, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, wbdex)
                      

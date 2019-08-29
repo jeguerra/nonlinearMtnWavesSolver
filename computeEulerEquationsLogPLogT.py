@@ -132,13 +132,38 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT, INIT, sysDex, udex,
        LD42 = wxz * (DDZM.dot(txz) + DLPTDZ)
        
        # Compute the combined terms
-       DuDt = -(LD11 + LD12 + LD13) - ROPS[0].dot(uxz)
-       DwDt = -(LD21 + LD22 + LD23) - ROPS[1].dot(wxz)
-       DpDt = -(LD31 + LD32 + LD33 + LD34) - ROPS[2].dot(pxz)
-       DtDt = -(LD41 + LD42) - ROPS[3].dot(txz)
+       DuDt = -(LD11 + LD12 + LD13)
+       DwDt = -(LD21 + LD22 + LD23)
+       DpDt = -(LD31 + LD32 + LD33 + LD34)
+       DtDt = -(LD41 + LD42)
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
        return DqDt[sysDex]
+
+def computeRayleighTendency(REFG, SOLT, sysDex, udex, wdex, pdex, tdex):
+       # Get the static vertical gradients
+       ROPS = REFG[3]
+       
+       # Get the solution components
+       uxz = SOLT[udex]
+       wxz = SOLT[wdex]
+       pxz = SOLT[pdex]
+       txz = SOLT[tdex]
+       
+       # Compute the combined terms
+       DuDt = - ROPS[0].dot(uxz)
+       DwDt = - ROPS[1].dot(wxz)
+       DpDt = - ROPS[2].dot(pxz)
+       DtDt = - ROPS[3].dot(txz)
+       
+       # Concatenate
+       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       
+       return DqDt[sysDex]
+
+def computeDynSGSTendency(SOLT, RES, sysDex, udex, wdex, pdex, tdex):
+       
+       return None
        

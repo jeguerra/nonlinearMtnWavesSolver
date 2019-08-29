@@ -6,7 +6,7 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 #import numpy as np
-from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
+import computeEulerEquationsLogPLogT as tendency
 
 def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        # Set the coefficients
@@ -19,6 +19,7 @@ def computeTimeIntegrationLN(bN, AN, DT, RHS, SOLT, sysDex):
        
        # Compute stages 2 - 5
        for ii in range(2,6):
+              # Update the solution
               SOLT[sysDex,0] += c1 * DT * RHS
               # Update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
@@ -54,7 +55,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex
        for ii in range(2,6):
               SOLT[sysDex,0] += c1 * DT * RHS
               # Update the RHS
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS += tendency.computeRayleighTendency(REFG, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
               RHS += SOLT[sysDex,2]
               
        # Compute stage 6 with linear combination
@@ -65,9 +67,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, sysDex, udex
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              # Estimate the residual
-              RES = RHS
+              RES = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = RES + tendency.computeRayleighTendency(REFG, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
               # Add in the diffusion tendency
               RHS += SOLT[sysDex,2]
               
