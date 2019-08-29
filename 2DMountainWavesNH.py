@@ -50,8 +50,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        ResDiff = True
        
        # Set physical constants (dry air)
@@ -252,6 +252,7 @@ if __name__ == '__main__':
               AN += RAYOP.tocsc()
               sol = spl.spsolve(AN, bN, use_umfpack=False)
        elif TransientSolve:
+              print('Starting Linear Transient Solver...')
               AN += RAYOP.tocsc()
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -259,6 +260,9 @@ if __name__ == '__main__':
               # Initialize the RHS
               RHS = bN
               error = [np.linalg.norm(RHS)]
+              
+              # Initialize residual coefficients
+              RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
               
               # Start the time loop
               for tt in range(len(TI)):
@@ -312,7 +316,7 @@ if __name__ == '__main__':
               error = [0.0]
               
               # Initialize residual coefficients
-              RESCF = computeResidualViscCoeffs(SOLT, RHS, DX, DZ)
+              RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
 
               # Start the time loop
               for tt in range(len(TI)):
@@ -336,7 +340,6 @@ if __name__ == '__main__':
                      
               # Get the last solution
               sol = SOLT[sysDex,0]
-              res = SOLT[sysDex,2]
               del(SOLT)
               
        endt = time.time()
