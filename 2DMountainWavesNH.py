@@ -50,8 +50,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
+       TransientSolve = True
+       NonLinSolve = False
        ResDiff = True
        
        # Set physical constants (dry air)
@@ -266,7 +266,7 @@ if __name__ == '__main__':
                      if ResDiff and tt % RTI == 0:
                             # Compute the local DynSGS coefficients
                             RESI[sysDex] = RHS
-                            RESCF = computeResidualViscCoeffs(SOLT, RESI, DX, DZ)
+                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
                      
                      # Compute the SSPRK93 stages
                      SOLT, RHS = computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex, udex, wdex, pdex, tdex)
@@ -320,7 +320,7 @@ if __name__ == '__main__':
                      if ResDiff and tt % RTI == 0:
                             # Compute the local DynSGS coefficients
                             RESI[sysDex] = RHS
-                            RESCF = computeResidualViscCoeffs(SOLT, RESI, DX, DZ)
+                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
                             
                      # Compute the SSPRK93 stages at this time step
                      SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex)

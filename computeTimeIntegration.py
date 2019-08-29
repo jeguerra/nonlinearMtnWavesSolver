@@ -8,7 +8,7 @@ Created on Tue Aug 13 10:09:52 2019
 #import numpy as np
 import computeEulerEquationsLogPLogT as tendency
 
-def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex):
+def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex, udex, wdex, pdex, tdex):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -35,8 +35,8 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex):
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
-              # Add in the diffusion tendency
-              RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
+              if ii < 9:
+                     RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
               
        return SOLT, RHS
 
@@ -55,7 +55,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RESCF, sysDe
               # Update the RHS
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               RHS += tendency.computeRayleighTendency(REFG, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
               
        # Compute stage 6 with linear combination
        SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * \
@@ -67,6 +67,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RESCF, sysDe
               # update the RHS
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               RHS += tendency.computeRayleighTendency(REFG, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
+              if ii < 9:
+                     RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
               
        return SOLT, RHS
