@@ -50,8 +50,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        ResDiff = True
        
        # Set physical constants (dry air)
@@ -98,13 +98,13 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.1 # Linear transient
-       #DT = 0.05 # Nonlinear transient
+       #DT = 0.1 # Linear transient
+       DT = 0.1 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
-       RTI = 2 # Stride for residual visc update
+       RTI = 1 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
@@ -335,7 +335,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 1800.0:
+                     if DT * tt >= 3600.0:
                             break
                      
               # Get the last solution

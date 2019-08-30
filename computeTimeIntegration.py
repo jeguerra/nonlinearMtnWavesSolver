@@ -12,15 +12,14 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex, udex, w
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
-       # Stage 1
-       SOLT[sysDex,0] += c1 * DT * RHS
-       # Copy to storage 2
-       SOLT[sysDex,1] = SOLT[sysDex,0]
        
        # Compute stages 2 - 5
-       for ii in range(2,6):
+       for ii in range(1,6):
               # Update the solution
               SOLT[sysDex,0] += c1 * DT * RHS
+              if ii == 1:
+                     # Copy to storage 2
+                     SOLT[sysDex,1] = SOLT[sysDex,0]
               # Update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
               RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
@@ -28,6 +27,10 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex, udex, w
        # Compute stage 6 with linear combination
        SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * \
               (SOLT[sysDex,0] + c1 * DT * RHS))
+       
+       # Update the RHS
+       RHS = bN - AN.dot(SOLT[sysDex,0])
+       RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
        
        # Compute stages 7 - 9
        for ii in range(7,10):
@@ -44,14 +47,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RESCF, sysDe
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
-       # Stage 1
-       SOLT[sysDex,0] += c1 * DT * RHS
-       # Copy to storage 2
-       SOLT[sysDex,1] = SOLT[sysDex,0]
        
-       # Compute stages 2 - 5
-       for ii in range(2,6):
+       # Compute stages 1 - 5
+       for ii in range(1,6):
               SOLT[sysDex,0] += c1 * DT * RHS
+              if ii == 1:
+                     # Copy to storage 2
+                     SOLT[sysDex,1] = SOLT[sysDex,0]       
+              
               # Update the RHS
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               RHS += tendency.computeRayleighTendency(REFG, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
@@ -60,6 +63,11 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RESCF, sysDe
        # Compute stage 6 with linear combination
        SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * \
               (SOLT[sysDex,0] + c1 * DT * RHS))
+       
+       # Update the RHS
+       RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+       RHS += tendency.computeRayleighTendency(REFG, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
+       RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], sysDex, udex, wdex, pdex, tdex)
        
        # Compute stages 7 - 9
        for ii in range(7,10):
