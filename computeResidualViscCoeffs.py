@@ -31,16 +31,5 @@ def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, OPS):
        QRESX[updex] = 0.5 * DX * np.ones((len(updex),1))
        updex = np.argwhere(QRESZ >= 0.5 * DZ)
        QRESZ[updex] = 0.5 * DZ * np.ones((len(updex),1))
-       '''
-       # Compute the SGS stress estimates
-       TauX = QRESX * DDXM.dot(RES[qdex,0])
-       TauZ = QRESZ * DDZM.dot(RES[qdex,0])
        
-       # Compute divergence of the stress
-       DynSGSX = DDXM.dot(TauX)
-       DynSGSZ = DDZM.dot(TauZ)
-       
-       # Compute the damping tendency
-       dqdt = DynSGSX + DynSGSZ
-       '''
        return (QRESX, QRESZ)

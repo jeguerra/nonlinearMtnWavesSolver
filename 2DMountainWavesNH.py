@@ -52,7 +52,7 @@ if __name__ == '__main__':
        StaticSolve = False
        TransientSolve = False
        NonLinSolve = True
-       ResDiff = True
+       ResDiff = False
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -99,7 +99,7 @@ if __name__ == '__main__':
        
        #%% Transient solve parameters
        #DT = 0.1 # Linear transient
-       DT = 0.1 # Nonlinear transient
+       DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
