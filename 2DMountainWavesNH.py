@@ -68,7 +68,7 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 112
+       NX = 115
        NZ = 75
        OPS = (NX + 1) * NZ
        numVar = 4
@@ -202,7 +202,12 @@ if __name__ == '__main__':
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
        #%% Compute the BC index vector
-       ubdex, wbdex, sysDex, intDex = computeAdjust4CBC(DIMS, numVar, varDex)
+       ubdex, wbdex, sysDexST, sysDexTR = computeAdjust4CBC(DIMS, numVar, varDex)
+       
+       if StaticSolve:
+              sysDex = sysDexST
+       elif TransientSolve or NonLinSolve:
+              sysDex = sysDexTR
        
        #%% Initialize the global solution vector
        SOL = np.zeros((NX * NZ,1))
@@ -290,7 +295,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 3600.0:
+                     if DT * tt >= 420.0:
                             break
                      
               # Get the last solution
@@ -319,8 +324,14 @@ if __name__ == '__main__':
               # Initialize the boundary condition
               SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
               
+              # Get the solution components
+              uxz = SOLT[udex,0]
+              wxz = SOLT[wdex,0]
+              pxz = SOLT[pdex,0]
+              txz = SOLT[tdex,0]
+              
               # Initialize the RHS and forcing for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
               # Initialize the residual
               error = [0.0]
               
@@ -344,7 +355,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 720:
+                     if DT * tt >= 420:
                             break
                      
               # Get the last solution

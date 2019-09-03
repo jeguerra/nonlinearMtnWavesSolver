@@ -8,6 +8,30 @@ Created on Tue Aug 13 10:09:52 2019
 import numpy as np
 import computeEulerEquationsLogPLogT as tendency
 
+def computePrepareFields(REFS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, bdex):
+       # Get the boundary terrain
+       DZT = REFS[6]
+       NZ = DZT.shape[0]
+       NX = DZT.shape[1]
+       
+       # Get the solution components
+       uxz = SOLT[udex]
+       wxz = SOLT[wdex]
+       pxz = SOLT[pdex]
+       txz = SOLT[tdex]
+       
+       # Make the total quatities
+       U = np.add(uxz, INIT[udex])
+       
+       # Apply boundary condition
+       wxz[bdex] = DZT[0,:] * U[bdex]
+       #uxz[bdex + (NZ-1)] = np.zeros(NX)
+       #wxz[bdex + (NZ-1)] = np.zeros(NX)
+       #pxz[bdex + (NZ-1)] = np.zeros(NX)
+       #txz[bdex + (NZ-1)] = np.zeros(NX)
+       
+       return uxz, wxz, pxz, txz
+
 def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex):
        # Set the coefficients
        c1 = 1.0 / 6.0
@@ -23,7 +47,8 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, u
                      SOLT[sysDex,1] = SOLT[sysDex,0]
               # Update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
-              RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              uxz, wxz, pxz, txz = computePrepareFields(REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
               
        # Compute stage 6 with linear combination
        SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * SOLT[sysDex,0])
@@ -34,7 +59,8 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, u
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
               RHS = bN - AN.dot(SOLT[sysDex,0])
-              RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              uxz, wxz, pxz, txz = computePrepareFields(REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
               
        return SOLT, RHS
 
@@ -52,9 +78,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, sysDe
                      SOLT[sysDex,1] = SOLT[sysDex,0]       
               
               # Update the RHS
-              RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              RHS += tendency.computeRayleighTendency(REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              uxz, wxz, pxz, txz = computePrepareFields(REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
+              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
               
        # Compute stage 6 with linear combination
        SOLT[sysDex,0] = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * SOLT[sysDex,0])
@@ -63,9 +90,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, sysDe
        for ii in range(7,10):
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
-              RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              RHS += tendency.computeRayleighTendency(REFS, REFG, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              uxz, wxz, pxz, txz = computePrepareFields(REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
+              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
        #'''
        
        #%% Optimal SSPRK(5,3)

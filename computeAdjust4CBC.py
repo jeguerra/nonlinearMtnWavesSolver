@@ -31,16 +31,17 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        ttdex = np.add(utdex, iT * OPS)
        
        # BC: w' = dh/dx (U + u') so that w' is at top and bottom boundaries
-       rowsOut = set(np.concatenate((wbdex, wtdex, ttdex)))
-       rowsTopBot = set(np.concatenate((wbdex, wtdex, pbdex, ptdex, tbdex, ttdex)))
+       rowsOutST = set(np.concatenate((wbdex, utdex, wtdex, ptdex, ttdex)))
+       #rowsOutTR = set(np.concatenate((wbdex, )))
+       rowsOutTR = set(wbdex)
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
-       # Compute set difference from all rows to rows to be taken out
-       sysDex = rowsAll.difference(rowsOut)
-       sysDex = sorted(sysDex)
+       # Compute set difference from all rows to rows to be taken out LINEAR
+       sysDexST = rowsAll.difference(rowsOutST)
+       sysDexST = sorted(sysDexST)
        
-       # Compute set difference for all DOF interior to vertical boundaries
-       intDex = rowsAll.difference(rowsTopBot)
-       intDex = sorted(intDex)
+       # Compute set difference from all rows to rows to be taken out NONLINEAR
+       sysDexTR = rowsAll.difference(rowsOutTR)
+       sysDexTR = sorted(sysDexTR)
        
-       return ubdex, wbdex, sysDex, intDex
+       return ubdex, wbdex, sysDexST, sysDexTR

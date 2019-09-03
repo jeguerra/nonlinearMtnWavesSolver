@@ -70,18 +70,13 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        return DOPS
 
 # Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, bdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, bdex):
        # Get physical constants
        gc = PHYS[0]
        P0 = PHYS[1]
        Rd = PHYS[3]
        kap = PHYS[4]
        gam = PHYS[6]
-       
-       # Get the boundary terrain
-       DZT = REFS[6]
-       NZ = DZT.shape[0]
-       NX = DZT.shape[1]
        
        # Get the derivative operators
        DDXM = REFS[13]
@@ -92,21 +87,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT, INIT, sysDex, udex,
        DLPDZ = REFG[1]
        DLPTDZ = REFG[2]
        
-       # Get the solution components
-       uxz = SOLT[udex]
-       wxz = SOLT[wdex]
-       pxz = SOLT[pdex]
-       txz = SOLT[tdex]
-       
        # Make the total quatities
        U = np.add(uxz, INIT[udex])
        LP = np.add(pxz, INIT[pdex])
        LT = np.add(txz, INIT[tdex])
-       
-       # Apply boundary conditions
-       wxz[bdex] = DZT[0,:] * U[bdex]
-       wxz[bdex + (NZ-1)] = np.zeros(NX)
-       txz[bdex + (NZ-1)] = np.zeros(NX)
         
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
@@ -145,28 +129,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, SOLT, INIT, sysDex, udex,
        
        return DqDt[sysDex]
 
-def computeRayleighTendency(REFS, REFG, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, bdex):
-       # Get the boundary terrain
-       DZT = REFS[6]
-       NZ = DZT.shape[0]
-       NX = DZT.shape[1]
+def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, bdex):
        
        # Get the static vertical gradients
        ROPS = REFG[3]
-       
-       # Get the solution components
-       uxz = SOLT[udex]
-       wxz = SOLT[wdex]
-       pxz = SOLT[pdex]
-       txz = SOLT[tdex]
-       
-       # Make the total quatities
-       U = np.add(uxz, INIT[udex])
-       
-       # Apply boundary condition
-       wxz[bdex] = DZT[0,:] * U[bdex]
-       wxz[bdex + (NZ-1)] = np.zeros(NX)
-       txz[bdex + (NZ-1)] = np.zeros(NX)
        
        # Compute the tendencies
        DuDt = - ROPS[0].dot(uxz)
@@ -179,29 +145,11 @@ def computeRayleighTendency(REFS, REFG, SOLT, INIT, sysDex, udex, wdex, pdex, td
        
        return DqDt[sysDex]
 
-def computeDynSGSTendency(RESCF, REFS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, bdex):
-       # Get the boundary terrain
-       DZT = REFS[6]
-       NZ = DZT.shape[0]
-       NX = DZT.shape[1]
+def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, bdex):
        
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
-       
-       # Get the solution components
-       uxz = SOLT[udex]
-       wxz = SOLT[wdex]
-       pxz = SOLT[pdex]
-       txz = SOLT[tdex]
-       
-       # Make the total quatities
-       U = np.add(uxz, INIT[udex])
-       
-       # Apply boundary condition
-       wxz[bdex] = DZT[0,:] * U[bdex]
-       wxz[bdex + (NZ-1)] = np.zeros(NX)
-       txz[bdex + (NZ-1)] = np.zeros(NX)
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
