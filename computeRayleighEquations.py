@@ -52,6 +52,8 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
                                    dNormX = 1.0
                             # Evaluate the strength of the field
                             RFX = (mt.cos(0.5 * mt.pi * dNormX))**4
+                     else:
+                            RFX = 0.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ:
@@ -60,6 +62,8 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
                                    dNormZ = 1.0
                             # Evaluate the strength of the field
                             RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**4
+                     else:
+                            RFZ = 0.0
                      
                      # Set the field to max(lateral, top) to handle corners
                      RL[ii,jj] = np.amax([RFX, RFZ])

@@ -254,12 +254,21 @@ if __name__ == '__main__':
        elif TransientSolve:
               print('Starting Linear Transient Solver...')
               AN += RAYOP.tocsc()
+              
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 2))
+              INIT = np.zeros((numVar * OPS,))
               RESI = np.zeros((numVar * OPS,))
+              
               # Initialize the RHS
               RHS = bN
               error = [np.linalg.norm(RHS)]
+              
+              # Initialize the solution fields
+              INIT[udex] = np.reshape(UZ, (OPS,), order='F')
+              INIT[wdex] = np.zeros((OPS,))
+              INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
+              INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
               # Initialize residual coefficients
               RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
@@ -273,7 +282,7 @@ if __name__ == '__main__':
                             RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS = computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, RESCF, sysDex, udex, wdex, pdex, tdex)
+                     SOLT, RHS = computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex)
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -327,7 +336,7 @@ if __name__ == '__main__':
                             RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
                             
                      # Compute the SSPRK93 stages at this time step
-                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, SOLT, RHS, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex)
+                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex)
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -335,7 +344,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 3600.0:
+                     if DT * tt >= 720:
                             break
                      
               # Get the last solution
@@ -409,7 +418,7 @@ if __name__ == '__main__':
        plt.ylim(0.0, 5000.0)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
        cbar = fig.colorbar(ccheck)
        #plt.xlim(-35000.0, 35000.0)
        #plt.ylim(0.0, 25000.0)
