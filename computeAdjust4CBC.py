@@ -32,8 +32,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        
        # BC: w' = dh/dx (U + u') so that w' is at top and bottom boundaries
        rowsOutST = set(np.concatenate((wbdex, utdex, wtdex, ptdex, ttdex)))
-       #rowsOutTR = set(np.concatenate((wbdex, )))
-       rowsOutTR = set(wbdex)
+       rowsOutTR = set(np.concatenate((wbdex, utdex, wtdex)))
+       #rowsOutTR = set(wbdex)
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
        # Compute set difference from all rows to rows to be taken out LINEAR
