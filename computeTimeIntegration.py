@@ -79,7 +79,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, sysDe
               
               # Update the RHS
               uxz, wxz, pxz, txz = computePrepareFields(REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS_ln, RHS_nl = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = RHS_ln
               RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
               #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
               
@@ -91,7 +92,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, sysDe
               SOLT[sysDex,0] += c1 * DT * RHS
               # update the RHS
               uxz, wxz, pxz, txz = computePrepareFields(REFS, SOLT[:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS_ln, RHS_nl = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = RHS_ln
               RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
               #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
        #'''

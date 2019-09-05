@@ -95,39 +95,54 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
+       # Compute derivative of perturbations
+       DuDx = DDXM.dot(uxz)
+       DuDz = DDZM.dot(uxz)
+       DwDx = DDXM.dot(wxz)
+       DwDz = DDZM.dot(wxz)
        DlpDx = DDXM.dot(pxz)
        DlpDz = DDZM.dot(pxz)
+       DltDx = DDXM.dot(txz)
+       DltDz = DDZM.dot(txz)
         
        # Horizontal Momentum
-       LD11 = U * (DDXM.dot(uxz))
-       LD12 = wxz * (DDZM.dot(uxz) + DUDZ)
+       LD11 = U * DuDx
+       LD12nl = wxz * DuDz
+       LD12ln = wxz * DUDZ
        LD13 = RdT * DlpDx
        
        # Vertical Momentum
-       LD21 = U * (DDXM.dot(wxz))
-       LD22 = wxz * (DDZM.dot(wxz))
+       LD21 = U * DwDx
+       LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        
        # Pressure (mass) equation
        LD31 = U * DlpDx
-       LD32 = wxz * (DlpDz + DLPDZ)
-       LD33 = gam * DDXM.dot(uxz)
-       LD34 = gam * DDZM.dot(wxz)
+       LD32nl = (wxz * DlpDz)
+       LD32ln = wxz * DLPDZ
+       LD33 = gam * DuDx
+       LD34 = gam * DwDz
        
        # Potential Temperature equation
-       LD41 = U * (DDXM.dot(txz))
-       LD42 = wxz * (DDZM.dot(txz) + DLPTDZ)
+       LD41 = U * DltDx
+       LD42nl = (wxz * DltDz)
+       LD42ln = (wxz * DLPTDZ)
+
+       # Compute tendency for semilinear terms
+       DqDt_ln = np.zeros(4 * len(udex))
+       DqDt_ln[udex] = -(LD11 + LD12ln + LD13)
+       DqDt_ln[wdex] = -(LD21 + LD22 + LD23)
+       DqDt_ln[pdex] = -(LD31 + LD32ln + LD33 + LD34)
+       DqDt_ln[tdex] = -(LD41 + LD42ln)
        
-       # Compute the combined terms
-       DuDt = -(LD11 + LD12 + LD13)
-       DwDt = -(LD21 + LD22 + LD23)
-       DpDt = -(LD31 + LD32 + LD33 + LD34)
-       DtDt = -(LD41 + LD42)
+       # Compute tendency for nonlinear terms (subcycle)
+       DqDt_nl = np.zeros(4 * len(udex))
+       DqDt_nl[udex] = -(LD12nl)
+       #DqDt_nl[wdex] = -(add nonlinear bouyancy terms if necessary)
+       DqDt_nl[pdex] = -(LD32nl)
+       DqDt_nl[tdex] = -(LD42nl)
        
-       # Concatenate
-       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
-       
-       return DqDt[sysDex]
+       return DqDt_ln[sysDex], DqDt_nl[sysDex]
 
 def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, bdex):
        

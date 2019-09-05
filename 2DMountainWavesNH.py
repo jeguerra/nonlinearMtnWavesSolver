@@ -69,7 +69,7 @@ if __name__ == '__main__':
        L1 = -L2
        ZH = 36000.0
        NX = 115
-       NZ = 75
+       NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -98,8 +98,8 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       #DT = 0.1 # Linear transient
-       DT = 0.05 # Nonlinear transient
+       DT = 0.1 # Linear transient
+       #DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
@@ -300,8 +300,8 @@ if __name__ == '__main__':
                      
               # Get the last solution
               sol = SOLT[sysDex,0]
-              res = SOLT[sysDex,2]
               del(SOLT)
+              
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
               # Initialize transient storage
@@ -331,7 +331,8 @@ if __name__ == '__main__':
               txz = SOLT[tdex,0]
               
               # Initialize the RHS and forcing for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS_ln, RHS_nl = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS = RHS_ln + RHS_nl
               # Initialize the residual
               error = [0.0]
               

@@ -17,7 +17,7 @@ def computeTopographyOnGrid(REFS, profile, opt):
        xh = REFS[0]
        l2 = np.amax(xh)
        l1 = np.amin(xh)
-       DX = 50.0 # maximum resolution...
+       DX = 10.0 # maximum resolution...
        NP = int((l2 - l1) / DX)
        x = np.linspace(l1, l2, num=NP, endpoint=False)
        
