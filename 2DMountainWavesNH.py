@@ -130,7 +130,7 @@ if __name__ == '__main__':
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Make the 2D physical domains from reference grids and topography
-       XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
+       XL, ZTL, DZT, sigma, dzdh = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -195,14 +195,14 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Get the 2D linear operators...
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D)
        REFS.append(DDXM)
        REFS.append(DDZM)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
        #%% Compute the BC index vector
-       ubdex, wbdex, sysDexST, sysDexTR = computeAdjust4CBC(DIMS, numVar, varDex)
+       ubdex, utdex, wbdex, sysDexST, sysDexTR = computeAdjust4CBC(DIMS, numVar, varDex)
        
        if StaticSolve:
               sysDex = sysDexST
@@ -213,9 +213,10 @@ if __name__ == '__main__':
        SOL = np.zeros((NX * NZ,1))
        
        #%% Rayleigh opearator
-       RAY = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
-       RAYOP = RAY[np.ix_(sysDex,sysDex)]
-       del(RAY)
+       RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='csc')
+       #RAYOP = RAY.tocsc()
+       #RAYOP = RAY[np.ix_(sysDex,sysDex)]
+       #del(RAY)
        
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
@@ -240,25 +241,22 @@ if __name__ == '__main__':
               print('Apply coupled BC adjustments: DONE!')
        
               # Set up the global solve
-              A = LDG[np.ix_(sysDex,sysDex)]
-              b = -(LDG[:,wbdex]).dot(WBC)
+              A = LDG + RAYOP
+              AN = A[np.ix_(sysDex,sysDex)]
+              AN = AN.tocsc()
+              bN = -(LDG[:,wbdex]).dot(WBC)
+              del(A)
               del(LDG)
               del(WBC)
-              # Prepare operators for solver
-              AN = A.tocsc()
-              bN = b[sysDex]
-              del(A)
-              del(b)
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
        start = time.time()
        if StaticSolve:
-              AN += RAYOP.tocsc()
-              sol = spl.spsolve(AN, bN, use_umfpack=False)
+              sol = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
        elif TransientSolve:
               print('Starting Linear Transient Solver...')
-              AN += RAYOP.tocsc()
+              bN = bN[sysDex]
               
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -276,33 +274,32 @@ if __name__ == '__main__':
               INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
               # Initialize residual coefficients
-              RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
+              RESI[sysDex] = RHS
+              RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
               
               # Start the time loop
               for tt in range(len(TI)):
                      # Get the DynSGS Coefficients
                      if ResDiff and tt % RTI == 0:
-                            # Compute the local DynSGS coefficients
                             RESI[sysDex] = RHS
+                            # Compute the local DynSGS coefficients
                             RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
                      
                      # Compute the SSPRK93 stages
-                     SOLT, RHS = computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex)
-                            
+                     sol, RHS = computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex, utdex)
+                     SOLT[sysDex,0] = sol
+                     
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             err = np.linalg.norm(RHS)
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 420.0:
+                     if DT * tt >= 720.0:
                             break
-                     
-              # Get the last solution
-              sol = SOLT[sysDex,0]
-              del(SOLT)
               
        elif NonLinSolve:
+              sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -331,8 +328,8 @@ if __name__ == '__main__':
               txz = SOLT[tdex,0]
               
               # Initialize the RHS and forcing for each field
-              RHS_ln, RHS_nl = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, ubdex)
-              RHS = RHS_ln + RHS_nl
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              bN = RHS
               # Initialize the residual
               error = [0.0]
               
@@ -344,11 +341,11 @@ if __name__ == '__main__':
                      # Get the DynSGS Coefficients
                      if ResDiff and tt % RTI == 0:
                             # Compute the local DynSGS coefficients
-                            RESI[sysDex] = RHS
-                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
+                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
                             
                      # Compute the SSPRK93 stages at this time step
-                     SOLT, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex)
+                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex)
+                     SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
@@ -356,12 +353,8 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 420:
+                     if DT * tt >= 1800:
                             break
-                     
-              # Get the last solution
-              sol = SOLT[sysDex,0]
-              del(SOLT)
               
        endt = time.time()
        print('Solve the system: DONE!')
@@ -420,7 +413,7 @@ if __name__ == '__main__':
        # Compute the new Guellrich domain
        NDIMS = [L1, L2, ZH, NXI-1, NZI]
        NREFS = [xnew, znew]
-       XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
+       XLI, ZTLI, DZTI, sigmaI, dzdhI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        
        #% #Spot check the solution on both grids
        fig = plt.figure()

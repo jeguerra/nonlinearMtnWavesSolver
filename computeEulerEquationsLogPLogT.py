@@ -70,7 +70,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        return DOPS
 
 # Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, sysDex, udex, wdex, pdex, tdex, bdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, udex, wdex, pdex, tdex, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        P0 = PHYS[1]
@@ -127,24 +127,30 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        LD41 = U * DltDx
        LD42nl = (wxz * DltDz)
        LD42ln = (wxz * DLPTDZ)
+       
+       # No transport of horizontal momentum or entropy to the boundary
+       #LD12nl[botdex] = np.zeros(len(botdex))
+       #LD42nl[botdex] = np.zeros(len(botdex))
+       #LD12nl[topdex] = np.zeros(len(botdex))
+       #LD42nl[topdex] = np.zeros(len(botdex))
 
        # Compute tendency for semilinear terms
-       DqDt_ln = np.zeros(4 * len(udex))
-       DqDt_ln[udex] = -(LD11 + LD12ln + LD13)
-       DqDt_ln[wdex] = -(LD21 + LD22 + LD23)
-       DqDt_ln[pdex] = -(LD31 + LD32ln + LD33 + LD34)
-       DqDt_ln[tdex] = -(LD41 + LD42ln)
+       DuDt = -(LD11 + LD12ln + LD12nl + LD13)
+       DwDt = -(LD21 + LD22 + LD23)
+       DpDt = -(LD31 + LD32ln + LD32nl + LD33 + LD34)
+       DtDt = -(LD41 + LD42ln + LD42nl)
        
-       # Compute tendency for nonlinear terms (subcycle)
-       DqDt_nl = np.zeros(4 * len(udex))
-       DqDt_nl[udex] = -(LD12nl)
-       #DqDt_nl[wdex] = -(add nonlinear bouyancy terms if necessary)
-       DqDt_nl[pdex] = -(LD32nl)
-       DqDt_nl[tdex] = -(LD42nl)
+       # Apply BC to the tendency
+       DwDt[botdex] = np.zeros(len(botdex))
+       DuDt[topdex] = np.zeros(len(topdex))
+       DwDt[topdex] = np.zeros(len(topdex))
+       DtDt[topdex] = np.zeros(len(topdex))
        
-       return DqDt_ln[sysDex], DqDt_nl[sysDex]
+       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       
+       return DqDt #_ln[sysDex], DqDt_nl[sysDex]
 
-def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, bdex):
+def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the static vertical gradients
        ROPS = REFG[3]
@@ -155,12 +161,18 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, 
        DpDt = - ROPS[2].dot(pxz)
        DtDt = - ROPS[3].dot(txz)
        
+       # Apply BC to the tendency
+       DwDt[botdex] = np.zeros(len(botdex))
+       DuDt[topdex] = np.zeros(len(topdex))
+       DwDt[topdex] = np.zeros(len(topdex))
+       DtDt[topdex] = np.zeros(len(topdex))
+       
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       return DqDt[sysDex]
+       return DqDt
 
-def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, bdex):
+def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
        DDXM = REFS[13]
@@ -179,5 +191,5 @@ def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, p
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       return DqDt[sysDex]
+       return DqDt
        

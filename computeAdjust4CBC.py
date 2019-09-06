@@ -44,4 +44,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        sysDexTR = rowsAll.difference(rowsOutTR)
        sysDexTR = sorted(sysDexTR)
        
-       return ubdex, wbdex, sysDexST, sysDexTR
+       return ubdex, utdex, wbdex, sysDexST, sysDexTR
