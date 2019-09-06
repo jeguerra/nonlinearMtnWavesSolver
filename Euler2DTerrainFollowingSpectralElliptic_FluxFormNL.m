@@ -151,7 +151,8 @@ DS = struct('z0',z0,'zH',zH,'l1',l1,'l2',l2,'L',L,'aC',aC,'lC',lC,'hC',hC,'hfilt
 RAY = struct('depth',depth,'width',width,'nu1',nu1,'nu2',nu2,'nu3',nu3,'nu4',nu4);
 
 %% Compute the grid and initialization state
-REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+%REFS = computeGridInitializationNL(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
+REFS = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, NX, NZ, applyTopRL, applyLateralRL);
 
 [SOL,sysDex] = computeBCIndexNL(REFS,BC,NX,NZ,OPS);
 ruxz = 0.0 * SOL(1:OPS);

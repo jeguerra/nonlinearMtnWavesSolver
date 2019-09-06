@@ -232,13 +232,13 @@ OPS = NX * NZ;
 %% Get the boundary conditions
 [SOL,sysDex] = GetAdjust4CBC(REFSI, BC, NX, NZ, OPS);
 
-[xh,~] = herdif(NX, 1, 0.5*L, true);
-[zlc, ~] = chebdif(NZ, 1);
-zlc = 0.5 * (zlc + 1.0);
+xh = REFSI.XL(1,:);
+zlc = REFSI.xi(:,1);
 [uxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NX, NZ, xh, zlc);
 [wxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NX, NZ, xh, zlc);
 [pxzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(pxz), NX, NZ, xh, zlc);
 [txzint, ~, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(txz), NX, NZ, xh, zlc);
+REFSO = REFS;
 REFS = REFSI;
 
 xsol = [reshape(uxzint, OPS, 1); reshape(wxzint, OPS, 1); reshape(pxzint, OPS, 1); reshape(txzint, OPS, 1)];
@@ -256,15 +256,15 @@ LD = [DOPS.LD11 DOPS.LD12 DOPS.LD13 ZSPR;      ...
       ZSPR      DOPS.LD42 ZSPR      DOPS.LD44];
 ubdex = 1:NZ:(OPS - NZ + 1);
 wbdex = ubdex + iW*OPS;
-dhdx = spdiags((REFSI.DZT(1,:))', 0, NX, NX);
+dhdx = spdiags((REFS.DZT(1,:) + 1.0)', 0, NX, NX);
 % Apply column adjustment for the multipoint coupled BC
 LD(:,ubdex) = LD(:,ubdex) + LD(:,wbdex) * dhdx;
 % Compute RHS scaling
-SOL(wbdex) = REFSI.DZT(1,:) .* REFSI.ujref(1,:);
+WBC = REFS.DZT(1,:) .* REFS.ujref(1,:);
 
-b = computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, SOL, []); clear DOPS;
 AN = LD(sysDex, sysDex);
-bN = - b(sysDex,1); clear b;
+b = - LD(:,wbdex) * WBC'; clear LD WBC;
+bN = b(sysDex); clear b;
 toc; disp('Compute fine RHS... DONE!');
 tic;
 %matMul = @(xVec) computeCoeffMatrixMulLogPLogTh(REFSI, DOPS, xVec, sysDex);
@@ -285,12 +285,12 @@ toc; disp('Solve by using iterative method with coarser initial guess... DONE!')
 SOL(sysDex) = sol;
 clear sol;
 uxz = reshape(SOL((1:OPS)),NZ,NX);
-wxz = reshape(SOL((1:OPS) + OPS),NZ,NX);
-pxz = reshape(SOL((1:OPS) + 2*OPS),NZ,NX);
-txz = reshape(SOL((1:OPS) + 3*OPS),NZ,NX);
+wxz = reshape(SOL((1:OPS) + iW * OPS),NZ,NX);
+pxz = reshape(SOL((1:OPS) + iP * OPS),NZ,NX);
+txz = reshape(SOL((1:OPS) + iT * OPS),NZ,NX);
 %}
 %% Plot the solution in the native grids
-%{
+%
 % NATIVE GRID PLOTS
 figure;
 subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(REFS.ujref + uxz),31); colorbar;
@@ -303,7 +303,7 @@ ylim([0.0 zH]);
 title('\textsf{$W^{\prime} ~~ (ms^{-1})$}');
 
 figure;
-subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(rxz),31); colorbar;
+subplot(1,2,1); contourf(REFS.XL,REFS.ZTL,real(txz),31); colorbar;
 xlim([l1 l2]);
 ylim([0.0 zH]);
 title('$(\ln p)^{\prime} ~~ (Pa)$');
@@ -316,7 +316,7 @@ drawnow
 
 %% Interpolate to a nice regular grid using Hermite and Legendre transforms'
 %
-NXI = 3001;
+NXI = 2001;
 NZI = 451;
 [uxzint, XINT, ZINT, ZLINT] = HerTransLegInterp(REFS, DS, RAY, real(uxz), NXI, NZI, 0, 0);
 [wxzint, ~, ~] = HerTransLegInterp(REFS, DS, RAY, real(wxz), NXI, NZI, 0, 0);
@@ -325,7 +325,6 @@ NZI = 451;
 
 XI = l2 * XINT;
 ZI = ZINT;
-%}
 
 % Use the NCL hotcold colormap
 cmap = load('NCLcolormap254.txt');
@@ -436,7 +435,7 @@ ylim([0.0 30.0]);
 fname = ['RI_CONV_N2_' TestCase num2str(hC)];
 drawnow;
 export_fig(fname);
-
+%}
 %% Debug
 %{
 figure;
@@ -468,5 +467,5 @@ drawnow
 %{
 close all;
 fileStore = [int2str(NX) 'X' int2str(NZ) 'SpectralReferenceHER_LnP' char(TestCase) int2str(hC) '.mat'];
-save(fileStore);
+save(fileStore, '-v7.3');
 %}

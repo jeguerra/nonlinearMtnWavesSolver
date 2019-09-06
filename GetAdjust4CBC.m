@@ -12,7 +12,7 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
         
         utdex = NZ:NZ:OPS;
         wtdex = utdex + iW*OPS;
-        %ttdex = utdex + iT*OPS;    
+        ttdex = utdex + iT*OPS;    
         ubdex = 1:NZ:(OPS - NZ + 1);
         wbdex = ubdex + iW*OPS;
         %tbdex = ubdex + iT*OPS;
@@ -22,7 +22,7 @@ function [SOL,sysDex] = GetAdjust4CBC(REFS, BC, NX, NZ, OPS)
         %SOL(tbdex) = -REFS.ZTL(1,:) .* REFS.dlthref(1,:);
         
         %rowsOut = [wtdex ttdex wbdex tbdex];
-        rowsOut = [wtdex wbdex];
+        rowsOut = [utdex ttdex wtdex wbdex];
            
         sysDex = setdiff(1:numVar*OPS, rowsOut);
     elseif BC == 1
