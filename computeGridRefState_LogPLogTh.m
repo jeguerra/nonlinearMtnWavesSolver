@@ -34,9 +34,6 @@ function [REFS, DOPS] = computeGridRefState_LogPLogTh(DS, BS, UJ, RAY, TestCase,
     DDX_H = b * HTD' * SDIFF * STR_H;
     %DDX2_H = b * HTD' * SDIFF * SDIFF * STR_H;
     
-    %% Make the X derivative matrix periodic (NOT NEEDED)
-    %DDX_H(:,1) = DDX_H(:,1) + DDX_H(:,end);
-    
     %% Get the Legendre nodes and compute the vertical derivative matrix
     %{
     [zlc,w]=legslb(NZ);

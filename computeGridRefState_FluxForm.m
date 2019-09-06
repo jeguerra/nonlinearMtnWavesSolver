@@ -168,6 +168,8 @@ function [REFS, DOPS] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, 
     % Background RhoTheta gradient
     dthref = thref .* dlthref;
     drref = rref .* dlrref;
+    drthref = (rref .* thref) .* (dlrref + dlthref);
+    
 %{
     %% Check plots background fields including mean Ri number
     fig = figure('Position',[0 0 1600 1200]); fig.Color = 'w';
@@ -232,7 +234,7 @@ function [REFS, DOPS] = computeGridRefState_FluxForm(DS, BS, UJ, RAY, TestCase, 
 %}
     
     REFS = struct('ujref',ujref,'dujref',dujref,'dthref',dthref,'STR_H',STR_H,'STR_L',STR_L, ...
-        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref, ...
+        'lpref',lpref,'dlpref',dlpref,'lrref',lrref,'dlrref',dlrref,'lthref',lthref,'dlthref',dlthref,'drthref',drthref, ...
         'pref',pref,'rref',rref,'thref',thref,'XL',XL,'xi',xi,'ZTL',ZTL,'DZT',DZT,'DDZ_L',DDZ_L, 'RL', RL, ...
         'DDX_H',DDX_H,'sigma',sigma,'NX',NX,'NZ',NZ,'TestCase',TestCase,'rref0',rref0,'thref0',thref0);
 
