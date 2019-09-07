@@ -52,7 +52,7 @@ if __name__ == '__main__':
        StaticSolve = False
        TransientSolve = False
        NonLinSolve = True
-       ResDiff = False
+       ResDiff = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -68,7 +68,7 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 115
+       NX = 121
        NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
@@ -295,7 +295,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 720.0:
+                     if DT * tt >= 3600.0:
                             break
               
        elif NonLinSolve:
@@ -353,7 +353,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 1800:
+                     if DT * tt >= 3600:
                             break
               
        endt = time.time()

@@ -84,10 +84,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
                      SOLT[:,1] = sol
               # Update the RHS
               uxz, wxz, pxz, txz = computePrepareFields(REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS = bN
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               
        # Compute stage 6 with linear combination
        sol = c2 * (3.0 * SOLT[:,1] + 2.0 * sol)
@@ -98,10 +97,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
                      
               # Update the RHS
               uxz, wxz, pxz, txz = computePrepareFields(REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS = bN
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, sysDex, udex, wdex, pdex, tdex, ubdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
        #'''
        
        #%% Optimal SSPRK(5,3)

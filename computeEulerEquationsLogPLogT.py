@@ -129,16 +129,16 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        LD42ln = (wxz * DLPTDZ)
        
        # No transport of horizontal momentum or entropy to the boundary
-       LD12nl[botdex] = np.zeros(len(botdex))
-       LD42nl[botdex] = np.zeros(len(botdex))
-       LD12nl[topdex] = np.zeros(len(botdex))
-       LD42nl[topdex] = np.zeros(len(botdex))
+       #LD12nl[botdex] = np.zeros(len(botdex))
+       #LD42nl[botdex] = np.zeros(len(botdex))
+       #LD12nl[topdex] = np.zeros(len(botdex))
+       #LD42nl[topdex] = np.zeros(len(botdex))
 
        # Compute tendency for semilinear terms
-       DuDt = -(LD11 + LD12ln + LD12nl + LD13)
+       DuDt = -(LD11 + LD12ln + 0.0*LD12nl + LD13)
        DwDt = -(LD21 + LD22 + LD23)
        DpDt = -(LD31 + LD32ln + LD32nl + LD33 + LD34)
-       DtDt = -(LD41 + LD42ln + LD42nl)
+       DtDt = -(LD41 + LD42ln + 0.0*LD42nl)
        
        # Apply BC to the tendency
        DwDt[botdex] = np.zeros(len(botdex))
@@ -187,6 +187,12 @@ def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tde
        DwDt = DDXM.dot(RESCFX[wdex] * DDXM.dot(wxz)) + DDZM.dot(RESCFZ[wdex] * DDZM.dot(wxz))
        DpDt = DDXM.dot(RESCFX[pdex] * DDXM.dot(pxz)) + DDZM.dot(RESCFZ[pdex] * DDZM.dot(pxz))
        DtDt = DDXM.dot(RESCFX[tdex] * DDXM.dot(txz)) + DDZM.dot(RESCFZ[tdex] * DDZM.dot(txz))
+       
+       # Apply BC to the tendency
+       DwDt[botdex] = np.zeros(len(botdex))
+       DuDt[topdex] = np.zeros(len(topdex))
+       DwDt[topdex] = np.zeros(len(topdex))
+       DtDt[topdex] = np.zeros(len(topdex))
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
