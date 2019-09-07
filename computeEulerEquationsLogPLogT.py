@@ -129,10 +129,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        LD42ln = (wxz * DLPTDZ)
        
        # No transport of horizontal momentum or entropy to the boundary
-       #LD12nl[botdex] = np.zeros(len(botdex))
-       #LD42nl[botdex] = np.zeros(len(botdex))
-       #LD12nl[topdex] = np.zeros(len(botdex))
-       #LD42nl[topdex] = np.zeros(len(botdex))
+       LD12nl[botdex] = np.zeros(len(botdex))
+       LD42nl[botdex] = np.zeros(len(botdex))
+       LD12nl[topdex] = np.zeros(len(botdex))
+       LD42nl[topdex] = np.zeros(len(botdex))
 
        # Compute tendency for semilinear terms
        DuDt = -(LD11 + LD12ln + LD12nl + LD13)

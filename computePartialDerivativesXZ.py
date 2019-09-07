@@ -42,9 +42,9 @@ def computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D):
        
        # Apply terrain following adjustments
        SIGMA = sps.diags(np.reshape(sigma, (OPS,), order='F'), format='csc')
-       DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), format='csc')
+       #DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), format='csc')
        
        DDZM = SIGMA.dot(DDZM)
-       DDXM = DDXM - DZDX.dot(DDZM)
+       #DDXM = DDXM + DZDX.dot(DDZM)
        
        return DDXM, DDZM
