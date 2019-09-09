@@ -81,6 +81,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
+       DZDX = REFS[15]
        
        # Get the static vertical gradients
        DUDZ = REFG[0]
@@ -104,27 +105,33 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        DlpDz = DDZM.dot(pxz)
        DltDx = DDXM.dot(txz)
        DltDz = DDZM.dot(txz)
-        
+       
+       # Terrain following horizontal derivatives
+       DUDX = DuDx - DZDX * (DuDz + DUDZ)
+       DWDX = DwDx - DZDX * DwDz
+       DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
+       DLTDX = DltDx - DZDX * (DltDz + DLPTDZ)
+       
        # Horizontal Momentum
-       LD11 = U * DuDx
+       LD11 = U * DUDX
        LD12nl = wxz * DuDz
        LD12ln = wxz * DUDZ
-       LD13 = RdT * DlpDx
+       LD13 = RdT * DLPDX
        
        # Vertical Momentum
-       LD21 = U * DwDx
+       LD21 = U * DWDX
        LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        
        # Pressure (mass) equation
-       LD31 = U * DlpDx
+       LD31 = U * DLPDX
        LD32nl = (wxz * DlpDz)
        LD32ln = wxz * DLPDZ
-       LD33 = gam * DuDx
+       LD33 = gam * DUDX
        LD34 = gam * DwDz
        
        # Potential Temperature equation
-       LD41 = U * DltDx
+       LD41 = U * DLTDX
        LD42nl = (wxz * DltDz)
        LD42ln = (wxz * DLPTDZ)
        
@@ -135,10 +142,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        #LD42nl[topdex] = np.zeros(len(botdex))
 
        # Compute tendency for semilinear terms
-       DuDt = -(LD11 + LD12ln + 0.0*LD12nl + LD13)
+       DuDt = -(LD11 + LD12ln + LD12nl + LD13)
        DwDt = -(LD21 + LD22 + LD23)
        DpDt = -(LD31 + LD32ln + LD32nl + LD33 + LD34)
-       DtDt = -(LD41 + LD42ln + 0.0*LD42nl)
+       DtDt = -(LD41 + LD42ln + LD42nl)
        
        # Apply BC to the tendency
        DwDt[botdex] = np.zeros(len(botdex))

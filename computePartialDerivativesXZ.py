@@ -40,11 +40,10 @@ def computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D):
        DDXM = sps.csc_matrix(DDX_OP)
        DDZM = sps.csc_matrix(DDZ_OP)
        
-       # Apply terrain following adjustments
+       # Apply terrain following adjustments (Terrain metric)
        SIGMA = sps.diags(np.reshape(sigma, (OPS,), order='F'), format='csc')
-       #DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), format='csc')
+       DZDX = np.reshape(DZT, (OPS,), order='F')
        
        DDZM = SIGMA.dot(DDZM)
-       #DDXM = DDXM + DZDX.dot(DDZM)
        
-       return DDXM, DDZM
+       return DDXM, DDZM, DZDX

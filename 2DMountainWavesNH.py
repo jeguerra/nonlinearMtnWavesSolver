@@ -52,7 +52,7 @@ if __name__ == '__main__':
        StaticSolve = False
        TransientSolve = False
        NonLinSolve = True
-       ResDiff = True
+       ResDiff = False
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -68,8 +68,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 121
-       NZ = 85
+       NX = 129
+       NZ = 89
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -100,7 +100,7 @@ if __name__ == '__main__':
        #%% Transient solve parameters
        DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 1.0
+       HR = 5.0
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
@@ -195,9 +195,10 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Get the 2D linear operators...
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D)
+       DDXM, DDZM, DZDX = computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D)
        REFS.append(DDXM)
        REFS.append(DDZM)
+       REFS.append(DZDX)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -214,9 +215,6 @@ if __name__ == '__main__':
        
        #%% Rayleigh opearator
        RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='csc')
-       #RAYOP = RAY.tocsc()
-       #RAYOP = RAY[np.ix_(sysDex,sysDex)]
-       #del(RAY)
        
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
