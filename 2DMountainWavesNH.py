@@ -69,8 +69,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 117
-       NZ = 85
+       NX = 115
+       NZ = 75
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -131,7 +131,7 @@ if __name__ == '__main__':
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Make the 2D physical domains from reference grids and topography
-       XL, ZTL, DZT, sigma, dzdh = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
+       XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -196,10 +196,9 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Get the 2D linear operators...
-       DDXM, DDZM, DZDX = computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D)
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        REFS.append(DDXM)
        REFS.append(DDZM)
-       REFS.append(DZDX)
        DOPS, F = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -220,10 +219,10 @@ if __name__ == '__main__':
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
               # Format is 'lil' to allow for column adjustments to the operator
-              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
-                              [None, DOPS[3], DOPS[4], DOPS[5]], \
-                              [DOPS[6], DOPS[7], DOPS[8], None], \
-                              [None, DOPS[9], None, DOPS[10]]], format='lil')
+              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], DOPS[3]], \
+                              [None, DOPS[4], DOPS[5], DOPS[6]], \
+                              [DOPS[7], DOPS[8], DOPS[9], None], \
+                              [DOPS[10], DOPS[11], None, DOPS[12]]], format='lil')
               
               # Get some memory back
               del(DOPS)
@@ -242,9 +241,9 @@ if __name__ == '__main__':
               # Set up the global solve
               A = LDG + RAYOP
               AN = A[np.ix_(sysDex,sysDex)]
+              del(A)
               AN = AN.tocsc()
               bN = F - (LDG[:,wbdex]).dot(WBC)
-              del(A)
               del(LDG)
               del(WBC)
               print('Set up global solution operators: DONE!')
@@ -348,7 +347,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 600:
+                     if DT * tt >= 900:
                             break
               
        endt = time.time()
@@ -408,7 +407,7 @@ if __name__ == '__main__':
        # Compute the new Guellrich domain
        NDIMS = [L1, L2, ZH, NXI-1, NZI]
        NREFS = [xnew, znew]
-       XLI, ZTLI, DZTI, sigmaI, dzdhI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
+       XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        
        #% #Spot check the solution on both grids
        fig = plt.figure()

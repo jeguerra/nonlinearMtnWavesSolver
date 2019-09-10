@@ -22,6 +22,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        OPS = NX * NZ
        
        # Get REFS data
+       DZT = REFS[6]
        UZ = REFS[8]
        PORZ = REFS[9]
        DUDZ = REFS[10]
@@ -29,10 +30,9 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        DLPTDZ = REFS[12]
        DDXM = REFS[13]
        DDZM = REFS[14]
-       DzDx = np.reshape(REFS[15], (NZ,NX), order='F')
               
        #%% Compute the various blocks needed
-       tempDiagonal = np.reshape(DzDx, (OPS,), order='F')
+       tempDiagonal = np.reshape(DZT, (OPS,), order='F')
        DZDX = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
        UM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
@@ -42,7 +42,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        DLPDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(DLPTDZ, (OPS,), order='F')
        DLPTDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       U0DX = UM.dot(DDXM)
        tempDiagonal = np.reshape(PORZ, (OPS,), order='F')
        PORZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        unit = sps.identity(OPS)
@@ -54,8 +53,9 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        # Horizontal momentum
        LD11 = U0DXTF - DZDX.dot(DUDZM)
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXTF)
-       FU = UZ * DzDx * DUDZ + PORZ * DzDx * DLPDZ + gc * DzDx
+       LD13 = PORZM.dot(DDXTF) - (gc * (1.0 / gam - 1.0) * DZDX)
+       LD14 = -gc * DZDX
+       FU = DZT * UZ * DUDZ
        FU = np.reshape(FU, (OPS,), order='F')
        
        # Vertical momentum
@@ -68,17 +68,17 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        LD31 = gam * DDXTF - DZDX.dot(DLPDZM)
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0DXTF
-       FP = gam * DzDx * DUDZ + UZ * DzDx * DLPDZ
+       FP = DZT * (gam * DUDZ + UZ * DLPDZ)
        FP = np.reshape(FP, (OPS,), order='F')
        
        # Log-Theta equation
        LD41 = -DZDX.dot(DLPTDZM)
        LD42 = DLPTDZM
        LD44 = U0DXTF
-       FT = UZ * DzDx * DLPTDZ
+       FT = UZ * DZT * DLPTDZ
        FT = np.reshape(FT, (OPS,), order='F')
        
-       DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
+       DOPS = [LD11, LD12, LD13, LD14, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
        F = np.concatenate((FU, FW, FP, FT))
        
        return DOPS, F
@@ -92,7 +92,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
-       DZDX = REFS[15]
+       DZT = REFS[6]
+       NX = DZT.shape[0]
+       NZ = DZT.shape[1]
+       DZDX = np.reshape(DZT, (NX*NZ,), order='F')
        
        # Get the static vertical gradients
        DUDZ = REFG[0]
@@ -110,8 +113,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        DltDz = DDZM.dot(txz)
        
        # Terrain following horizontal derivatives
-       #WXZ = wxz - U * DZDX
-       WXZ = wxz
+       WXZ = wxz - U * DZDX
        DUDX = DuDx - DZDX * (DuDz + DUDZ)
        DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
        
@@ -164,6 +166,16 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
        DwDt = - ROPS[1].dot(wxz)
        DpDt = - ROPS[2].dot(pxz)
        DtDt = - ROPS[3].dot(txz)
+       
+       # Null tendencies at vertical boundaries
+       DuDt[topdex] = np.zeros(len(topdex))
+       DuDt[botdex] = np.zeros(len(botdex))
+       DwDt[topdex] = np.zeros(len(topdex))
+       DwDt[botdex] = np.zeros(len(botdex))
+       DpDt[topdex] = np.zeros(len(topdex))
+       DpDt[botdex] = np.zeros(len(botdex))
+       DtDt[topdex] = np.zeros(len(topdex))
+       DtDt[botdex] = np.zeros(len(botdex))
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))

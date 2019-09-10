@@ -49,7 +49,7 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, u
        
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
-       for ii in range(1,6):
+       for ii in range(6):
               # Update the solution
               sol += c1 * DT * RHS
               if ii == 1:
@@ -65,7 +65,7 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, u
        sol = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * sol)
        
        # Compute stages 7 - 9
-       for ii in range(7,10):
+       for ii in range(2):
               # Update the solution
               sol += c1 * DT * RHS
               # update the RHS
@@ -84,7 +84,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
        #'''
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
-       for ii in range(1,6):
+       for ii in range(7):
               # Update the solution
               sol += c1 * DT * RHS
               if ii == 1:
@@ -97,11 +97,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
               #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               
        # Compute stage 6 with linear combination
-       #sol += c1 * DT * RHS
        sol = c2 * (3.0 * SOLT[:,1] + 2.0 * sol)
        
        # Compute stages 7 - 9
-       for ii in range(6,10):
+       for ii in range(2):
               sol += c1 * DT * RHS
                      
               # Update the RHS

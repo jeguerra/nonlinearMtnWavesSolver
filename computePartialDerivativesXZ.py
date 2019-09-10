@@ -9,7 +9,7 @@ Created on Fri Aug  2 17:10:18 2019
 import numpy as np
 import scipy.sparse as sps
 
-def computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D):
+def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        # Get the dimensions
        NX = DIMS[3] + 1
        NZ = DIMS[4]
@@ -41,9 +41,7 @@ def computePartialDerivativesXZ(DIMS, REFS, dzdh, DDX_1D, DDZ_1D):
        DDZM = sps.csc_matrix(DDZ_OP)
        
        # Apply terrain following adjustments (Terrain metric)
-       SIGMA = sps.diags(np.reshape(sigma, (OPS,), order='F'), format='csc')
-       DZDX = np.reshape(DZT, (OPS,), order='F')
-       
+       SIGMA = sps.diags(np.reshape(sigma, (OPS,), order='F'), format='csc')       
        DDZM = SIGMA.dot(DDZM)
        
-       return DDXM, DDZM, DZDX
+       return DDXM, DDZM
