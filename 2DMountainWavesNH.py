@@ -68,8 +68,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 89
+       NX = 117
+       NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -214,7 +214,7 @@ if __name__ == '__main__':
        SOL = np.zeros((NX * NZ,1))
        
        #%% Rayleigh opearator
-       RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='csc')
+       RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
        
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
@@ -351,7 +351,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 3600:
+                     if DT * tt >= 720:
                             break
               
        endt = time.time()

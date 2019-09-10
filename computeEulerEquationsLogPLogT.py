@@ -107,55 +107,46 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        DltDz = DDZM.dot(txz)
        
        # Terrain following horizontal derivatives
+       WXZ = wxz - U * DZDX
        DUDX = DuDx - DZDX * (DuDz + DUDZ)
-       DWDX = DwDx - DZDX * DwDz
        DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
-       DLTDX = DltDx - DZDX * (DltDz + DLPTDZ)
+       
+       # Apply BC
+       WXZ[botdex] = np.zeros(len(botdex))
+       WXZ[topdex] = np.zeros(len(topdex))
        
        # Horizontal Momentum
-       LD11 = U * DUDX
-       LD12nl = wxz * DuDz
-       LD12ln = wxz * DUDZ
-       LD13 = RdT * DLPDX
+       LD11 = U * DuDx
+       LD12 = WXZ * (DuDz + DUDZ)
+       LD13 = RdT * DLPDX - gc * DZDX
        
        # Vertical Momentum
-       LD21 = U * DWDX
-       LD22 = wxz * DwDz
+       LD21 = U * DwDx
+       LD22 = WXZ * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        
        # Pressure (mass) equation
-       LD31 = U * DLPDX
-       LD32nl = (wxz * DlpDz)
-       LD32ln = wxz * DLPDZ
+       LD31 = U * DlpDx
+       LD32 = WXZ * (DlpDz + DLPDZ)
        LD33 = gam * DUDX
        LD34 = gam * DwDz
        
        # Potential Temperature equation
-       LD41 = U * DLTDX
-       LD42nl = (wxz * DltDz)
-       LD42ln = (wxz * DLPTDZ)
-       
-       # No transport of horizontal momentum or entropy to the boundary
-       #LD12nl[botdex] = np.zeros(len(botdex))
-       #LD42nl[botdex] = np.zeros(len(botdex))
-       #LD12nl[topdex] = np.zeros(len(botdex))
-       #LD42nl[topdex] = np.zeros(len(botdex))
+       LD41 = U * DltDx
+       LD42 = WXZ * (DltDz + DLPTDZ)
 
        # Compute tendency for semilinear terms
-       DuDt = -(LD11 + LD12ln + LD12nl + LD13)
+       DuDt = -(LD11 + LD12 + LD13)
        DwDt = -(LD21 + LD22 + LD23)
-       DpDt = -(LD31 + LD32ln + LD32nl + LD33 + LD34)
-       DtDt = -(LD41 + LD42ln + LD42nl)
+       DpDt = -(LD31 + LD32 + LD33 + LD34)
+       DtDt = -(LD41 + LD42)
        
-       # Apply BC to the tendency
-       DwDt[botdex] = np.zeros(len(botdex))
-       DuDt[topdex] = np.zeros(len(topdex))
        DwDt[topdex] = np.zeros(len(topdex))
-       DtDt[topdex] = np.zeros(len(topdex))
+       DwDt[botdex] = np.zeros(len(botdex))
        
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       return DqDt #_ln[sysDex], DqDt_nl[sysDex]
+       return DqDt
 
 def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
@@ -167,12 +158,6 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
        DwDt = - ROPS[1].dot(wxz)
        DpDt = - ROPS[2].dot(pxz)
        DtDt = - ROPS[3].dot(txz)
-       
-       # Apply BC to the tendency
-       DwDt[botdex] = np.zeros(len(botdex))
-       DuDt[topdex] = np.zeros(len(topdex))
-       DwDt[topdex] = np.zeros(len(topdex))
-       DtDt[topdex] = np.zeros(len(topdex))
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
@@ -197,9 +182,7 @@ def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tde
        
        # Apply BC to the tendency
        DwDt[botdex] = np.zeros(len(botdex))
-       DuDt[topdex] = np.zeros(len(topdex))
        DwDt[topdex] = np.zeros(len(topdex))
-       DtDt[topdex] = np.zeros(len(topdex))
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
