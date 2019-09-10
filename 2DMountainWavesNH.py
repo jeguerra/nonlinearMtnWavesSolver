@@ -40,6 +40,7 @@ from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 from computeRayleighEquations import computeRayleighEquations
 from computeResidualViscCoeffs import computeResidualViscCoeffs
+from computeTimeIntegration import computePrepareFields
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 
@@ -319,14 +320,10 @@ if __name__ == '__main__':
               # Initialize the boundary condition
               SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
               
-              # Get the solution components
-              uxz = SOLT[udex,0]
-              wxz = SOLT[wdex,0]
-              pxz = SOLT[pdex,0]
-              txz = SOLT[tdex,0]
-              
+              # Initialize fields
+              uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               # Initialize the RHS and forcing for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, ubdex, utdex)
               bN = RHS
               # Initialize the residual
               error = [0.0]
@@ -351,7 +348,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 720:
+                     if DT * tt >= 600:
                             break
               
        endt = time.time()

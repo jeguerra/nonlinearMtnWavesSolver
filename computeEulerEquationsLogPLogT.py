@@ -70,12 +70,9 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        return DOPS
 
 # Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
-       P0 = PHYS[1]
-       Rd = PHYS[3]
-       kap = PHYS[4]
        gam = PHYS[6]
        
        # Get the derivative operators
@@ -87,14 +84,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        DUDZ = REFG[0]
        DLPDZ = REFG[1]
        DLPTDZ = REFG[2]
-       
-       # Make the total quatities
-       U = np.add(uxz, INIT[udex])
-       LP = np.add(pxz, INIT[pdex])
-       LT = np.add(txz, INIT[tdex])
-        
-       # Compute the sensible temperature scaling to PGF
-       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        # Compute derivative of perturbations
        DuDx = DDXM.dot(uxz)
@@ -111,7 +100,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        DUDX = DuDx - DZDX * (DuDz + DUDZ)
        DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
        
-       # Apply BC
+       # Make sure cancellations are exact
        WXZ[botdex] = np.zeros(len(botdex))
        WXZ[topdex] = np.zeros(len(topdex))
        
@@ -141,8 +130,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, INIT,
        DpDt = -(LD31 + LD32 + LD33 + LD34)
        DtDt = -(LD41 + LD42)
        
+       # Null tendencies at boundaries
        DwDt[topdex] = np.zeros(len(topdex))
        DwDt[botdex] = np.zeros(len(botdex))
+       DtDt[topdex] = np.zeros(len(topdex))
+       DtDt[botdex] = np.zeros(len(botdex))
        
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
