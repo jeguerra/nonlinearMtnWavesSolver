@@ -35,7 +35,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        wxz[botdex] = DZT[0,:] * U[botdex]
        wxz[topdex] = np.zeros(len(topdex))
        
-       txz[botdex] = np.zeros(len(botdex))
+       # Potential temperature perturbation vanishes along top boundary       
        txz[topdex] = np.zeros(len(topdex))
        
        return uxz, wxz, pxz, txz, U, LP, LT, RdT
@@ -81,7 +81,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[:,0]
-       '''
+       #'''
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
        for ii in range(1,6):
@@ -97,7 +97,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
               #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               
        # Compute stage 6 with linear combination
-       sol += c1 * DT * RHS
+       #sol += c1 * DT * RHS
        sol = c2 * (3.0 * SOLT[:,1] + 2.0 * sol)
        
        # Compute stages 7 - 9
@@ -109,9 +109,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex)
               RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-       '''
+       #'''
        
        #%% THE KETCHENSON SSP(10,4) METHOD
+       '''
        SOLT[:,1] = SOLT[:,0]
        for ii in range(1,6):
               # Update the solution
@@ -140,5 +141,5 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
        RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex)
        RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
        #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-       
+       '''
        return sol, RHS

@@ -99,7 +99,7 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.1 # Linear transient
+       DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
        HR = 5.0
        ET = HR * 60 * 60 # End time in seconds
@@ -200,7 +200,7 @@ if __name__ == '__main__':
        REFS.append(DDXM)
        REFS.append(DDZM)
        REFS.append(DZDX)
-       DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
+       DOPS, F = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
        #%% Compute the BC index vector
@@ -243,7 +243,7 @@ if __name__ == '__main__':
               A = LDG + RAYOP
               AN = A[np.ix_(sysDex,sysDex)]
               AN = AN.tocsc()
-              bN = -(LDG[:,wbdex]).dot(WBC)
+              bN = F - (LDG[:,wbdex]).dot(WBC)
               del(A)
               del(LDG)
               del(WBC)

@@ -29,8 +29,10 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        DLPTDZ = REFS[12]
        DDXM = REFS[13]
        DDZM = REFS[14]
+       DzDx = REFS[15]
               
        #%% Compute the various blocks needed
+       DZDX = sps.spdiags(DzDx, 0, OPS, OPS)
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
        UM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(DUDZ, (OPS,), order='F')
@@ -45,29 +47,37 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        unit = sps.identity(OPS)
        
        #%% Compute the terms in the equations
+       DDXTF = DDXM - DZDX.dot(DDZM)
+       U0DXTF = UM.dot(DDXTF) 
        
        # Horizontal momentum
-       LD11 = U0DX
+       LD11 = U0DXTF - DZDX.dot(DUDZM)
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXM)
+       LD13 = PORZM.dot(DDXTF)
+       FU = UZ * DzDx * DUDZ + PORZ * DzDx * DLPDZ + gc * DzDx
        
        # Vertical momentum
-       LD22 = U0DX
+       LD22 = U0DXTF
        LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
+       FW = np.zeros(OPS)
        
        # Log-P equation
-       LD31 = gam * DDXM
+       LD31 = gam * DDXTF - DZDX.dot(DLPDZM)
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0DX
+       LD33 = U0DXTF
+       FP = gam * DzDx * DUDZ + UZ * DzDx * DLPDZ
        
        # Log-Theta equation
+       LD41 = -DZDX.dot(DLPTDZM)
        LD42 = DLPTDZM
-       LD44 = U0DX
+       LD44 = U0DXTF
+       FT = UZ * DzDx * DLPTDZ
        
-       DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
+       DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
+       F = np.concatenate((FU, FW, FP, FT))
        
-       return DOPS
+       return DOPS, F
 
 # Function evaluation of the non linear equations
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex):
@@ -134,7 +144,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        DwDt[topdex] = np.zeros(len(topdex))
        DwDt[botdex] = np.zeros(len(botdex))
        DtDt[topdex] = np.zeros(len(topdex))
-       DtDt[botdex] = np.zeros(len(botdex))
        
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
