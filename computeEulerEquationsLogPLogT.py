@@ -29,10 +29,11 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        DLPTDZ = REFS[12]
        DDXM = REFS[13]
        DDZM = REFS[14]
-       DzDx = REFS[15]
+       DzDx = np.reshape(REFS[15], (NZ,NX), order='F')
               
        #%% Compute the various blocks needed
-       DZDX = sps.spdiags(DzDx, 0, OPS, OPS)
+       tempDiagonal = np.reshape(DzDx, (OPS,), order='F')
+       DZDX = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
        UM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(DUDZ, (OPS,), order='F')
@@ -55,6 +56,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        LD12 = DUDZM
        LD13 = PORZM.dot(DDXTF)
        FU = UZ * DzDx * DUDZ + PORZ * DzDx * DLPDZ + gc * DzDx
+       FU = np.reshape(FU, (OPS,), order='F')
        
        # Vertical momentum
        LD22 = U0DXTF
@@ -67,12 +69,14 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0DXTF
        FP = gam * DzDx * DUDZ + UZ * DzDx * DLPDZ
+       FP = np.reshape(FP, (OPS,), order='F')
        
        # Log-Theta equation
        LD41 = -DZDX.dot(DLPTDZM)
        LD42 = DLPTDZM
        LD44 = U0DXTF
        FT = UZ * DzDx * DLPTDZ
+       FT = np.reshape(FT, (OPS,), order='F')
        
        DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
        F = np.concatenate((FU, FW, FP, FT))
@@ -106,7 +110,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        DltDz = DDZM.dot(txz)
        
        # Terrain following horizontal derivatives
-       WXZ = wxz - U * DZDX
+       #WXZ = wxz - U * DZDX
+       WXZ = wxz
        DUDX = DuDx - DZDX * (DuDz + DUDZ)
        DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
        
