@@ -219,10 +219,10 @@ if __name__ == '__main__':
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
               # Format is 'lil' to allow for column adjustments to the operator
-              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], DOPS[3]], \
-                              [None, DOPS[4], DOPS[5], DOPS[6]], \
-                              [DOPS[7], DOPS[8], DOPS[9], None], \
-                              [DOPS[10], DOPS[11], None, DOPS[12]]], format='lil')
+              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
+                              [None, DOPS[3], DOPS[4], DOPS[5]], \
+                              [DOPS[6], DOPS[7], DOPS[8], None], \
+                              [DOPS[9], DOPS[10], None, DOPS[11]]], format='lil')
               
               # Get some memory back
               del(DOPS)
