@@ -50,9 +50,9 @@ from computeTimeIntegration import computeTimeIntegrationNL
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = False
+       StaticSolve = True
        TransientSolve = False
-       NonLinSolve = True
+       NonLinSolve = False
        ResDiff = False
        
        # Set physical constants (dry air)
@@ -293,7 +293,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 3600.0:
+                     if DT * tt >= 720.0:
                             break
               
        elif NonLinSolve:
@@ -347,7 +347,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 900:
+                     if DT * tt >= 720:
                             break
               
        endt = time.time()
