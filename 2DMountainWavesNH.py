@@ -293,7 +293,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 600.0:
+                     if DT * tt >= 720.0:
                             break
               
        elif NonLinSolve:
@@ -347,7 +347,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 600:
+                     if DT * tt >= 240:
                             break
               
        endt = time.time()

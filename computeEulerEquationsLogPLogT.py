@@ -8,8 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 
 import numpy as np
 import scipy.sparse as sps
-import threading as thr
-
+from multiprocessing import Pool
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        # Get physical constants
@@ -47,15 +46,15 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        unit = sps.identity(OPS)
        
        #%% Compute the terms in the equations
-       DDXTF = DDXM - DZDX.dot(DDZM)
+       DDXTF = DDXM + DZDX.dot(DDZM)
        U0DXTF = UM.dot(DDXTF)
        
        # Horizontal momentum
-       LD11 = U0DXTF - DZDX.dot(DUDZM)
+       LD11 = U0DXTF + DZDX.dot(DUDZM)
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXTF) - (gc * (1.0 / gam - 1.0) * DZDX)
-       LD14 = gc * DZDX
-       FU = DZT * UZ * DUDZ
+       LD13 = PORZM.dot(DDXTF) + (gc * (1.0 / gam - 1.0) * DZDX)
+       LD14 = -gc * DZDX
+       FU = -DZT * UZ * DUDZ
        FU = np.reshape(FU, (OPS,), order='F')
        
        # Vertical momentum
@@ -65,17 +64,17 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        FW = np.zeros(OPS)
        
        # Log-P equation
-       LD31 = gam * DDXTF - DZDX.dot(DLPDZM)
+       LD31 = gam * DDXTF + DZDX.dot(DLPDZM)
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0DXTF
-       FP = DZT * (gam * DUDZ + UZ * DLPDZ)
+       FP = -DZT * (gam * DUDZ + UZ * DLPDZ)
        FP = np.reshape(FP, (OPS,), order='F')
        
        # Log-Theta equation
-       LD41 = -DZDX.dot(DLPTDZM)
+       LD41 = DZDX.dot(DLPTDZM)
        LD42 = DLPTDZM
        LD44 = U0DXTF
-       FT = UZ * DZT * DLPTDZ
+       FT = -UZ * DZT * DLPTDZ
        FT = np.reshape(FT, (OPS,), order='F')
        
        DOPS = [LD11, LD12, LD13, LD14, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
@@ -113,19 +112,15 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        DltDz = DDZM.dot(txz)
        
        # Terrain following horizontal derivatives
-       WXZ = wxz - U * DZDX
-       DUDX = DuDx - DZDX * (DuDz + DUDZ)
-       DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
-       
-       # Make sure cancellations are exact
-       WXZ[botdex] = np.zeros(len(botdex))
-       WXZ[topdex] = np.zeros(len(topdex))
+       WXZ = wxz + U * DZDX
+       DUDX = DuDx + DZDX * (DuDz + DUDZ)
+       DLPDX = DlpDx + DZDX * (DlpDz + DLPDZ)
        
        # Horizontal Momentum
        def uTendency(U, DuDx, WXZ, DuDz, DUDZ, RdT, DLPDX, gc, DZDX):
               LD11 = U * DuDx
               LD12 = WXZ * (DuDz + DUDZ)
-              LD13 = RdT * DLPDX - gc * DZDX
+              LD13 = RdT * DLPDX + gc * DZDX
               DuDt = -(LD11 + LD12 + LD13)
               
               return DuDt
@@ -141,9 +136,9 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        
        # Pressure (mass) equation
        def pTendency(U, DlpDx, WXZ, DlpDz, DLPDZ, DUDX, DwDz, gam, RdT):
-              RdTI = np.reciprocal(RdT)
+              #RdTI = np.reciprocal(RdT)
               LD31 = U * DlpDx
-              LD32 = WXZ * (DlpDz + DLPDZ + gc*RdTI)
+              LD32 = WXZ * (DlpDz + DLPDZ )#+ gc*RdTI)
               LD33 = gam * DUDX
               LD34 = gam * DwDz
               DpDt = -(LD31 + LD32 + LD33 + LD34)
@@ -158,7 +153,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
               
               return DtDt
        
-       # Compute tendencies on separate threads
+       # Compute tendencies
        DuDt = uTendency(U, DuDx, WXZ, DuDz, DUDZ, RdT, DLPDX, gc, DZDX)
        DwDt = wTendency(U, DwDx, WXZ, DwDz, RdT, DlpDz, DLPDZ, gc)
        DpDt = pTendency(U, DlpDx, WXZ, DlpDz, DLPDZ, DUDX, DwDz, gam, RdT)
