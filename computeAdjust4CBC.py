@@ -17,7 +17,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # Get prognostic ordering
        #iU = varDex[0]
        iW = varDex[1]
-       iP = varDex[2]
+       #iP = varDex[2]
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
@@ -25,9 +25,9 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        utdex = np.array(range(NZ-1, OPS, NZ))
        wbdex = np.add(ubdex, iW * OPS)
        wtdex = np.add(utdex, iW * OPS)
-       pbdex = np.add(ubdex, iP * OPS)
-       ptdex = np.add(utdex, iP * OPS)
-       tbdex = np.add(ubdex, iT * OPS)
+       #pbdex = np.add(ubdex, iP * OPS)
+       #ptdex = np.add(utdex, iP * OPS)
+       #tbdex = np.add(ubdex, iT * OPS)
        ttdex = np.add(utdex, iT * OPS)
        
        # BC: w' = dh/dx (U + u') so that w' is at top and bottom boundaries

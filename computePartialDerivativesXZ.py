@@ -16,7 +16,6 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        OPS = NX * NZ
        
        # Get REFS data
-       DZT = REFS[6]
        sigma = REFS[7]
        
        # Unwrap the 1D derivative matrices into 2D operators

@@ -48,13 +48,14 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        
        #%% Compute the terms in the equations
        DDXTF = DDXM - DZDX.dot(DDZM)
-       U0DXTF = UM.dot(DDXTF) 
+       U0DXTF = UM.dot(DDXTF)
        
        # Horizontal momentum
        LD11 = U0DXTF - DZDX.dot(DUDZM)
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXTF)
-       FU = DZT * (UZ * DUDZ + PORZ * DLPDZ + gc)
+       LD13 = PORZM.dot(DDXTF) - (gc * (1.0 / gam - 1.0) * DZDX)
+       LD14 = gc * DZDX
+       FU = DZT * UZ * DUDZ
        FU = np.reshape(FU, (OPS,), order='F')
        
        # Vertical momentum
@@ -66,7 +67,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        # Log-P equation
        LD31 = gam * DDXTF - DZDX.dot(DLPDZM)
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0DXTF - UM.dot(DZDX.dot(DLPDZM))
+       LD33 = U0DXTF
        FP = DZT * (gam * DUDZ + UZ * DLPDZ)
        FP = np.reshape(FP, (OPS,), order='F')
        
@@ -77,7 +78,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        FT = UZ * DZT * DLPTDZ
        FT = np.reshape(FT, (OPS,), order='F')
        
-       DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
+       DOPS = [LD11, LD12, LD13, LD14, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
        F = np.concatenate((FU, FW, FP, FT))
        
        return DOPS, F

@@ -409,18 +409,19 @@ if __name__ == '__main__':
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        
-       #% #Spot check the solution on both grids
+       #%% #Spot check the solution on both grids
        fig = plt.figure()
        ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
-       plt.xlim(-25000.0, 25000.0)
-       plt.ylim(0.0, 5000.0)
+       #plt.xlim(-25000.0, 25000.0)
+       #plt.ylim(0.0, 5000.0)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, wxzint, 101, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
+       ccheck = plt.contour(XLI, ZTLI, wxzint, 501, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        cbar = fig.colorbar(ccheck)
-       #plt.xlim(-35000.0, 35000.0)
-       #plt.ylim(0.0, 25000.0)
+       #plt.xlim(-20000.0, 20000.0)
+       #plt.ylim(0.0, 1000.0)
+       #plt.yscale('symlog')
        #
        fig = plt.figure()
        plt.plot(XLI[0,:], wxzint[0:2,:].T, XL[0,:], wxz[0:2,:].T)
