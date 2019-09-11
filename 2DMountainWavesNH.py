@@ -50,9 +50,9 @@ from computeTimeIntegration import computeTimeIntegrationNL
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = True
+       StaticSolve = False
        TransientSolve = False
-       NonLinSolve = False
+       NonLinSolve = True
        ResDiff = False
        
        # Set physical constants (dry air)
@@ -219,10 +219,10 @@ if __name__ == '__main__':
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
               # Format is 'lil' to allow for column adjustments to the operator
-              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
-                              [None, DOPS[3], DOPS[4], DOPS[5]], \
-                              [DOPS[6], DOPS[7], DOPS[8], None], \
-                              [DOPS[9], DOPS[10], None, DOPS[11]]], format='lil')
+              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], DOPS[3]], \
+                              [None, DOPS[4], DOPS[5], DOPS[6]], \
+                              [DOPS[7], DOPS[8], DOPS[9], None], \
+                              [DOPS[10], DOPS[11], None, DOPS[12]]], format='lil')
               
               # Get some memory back
               del(DOPS)
@@ -293,7 +293,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 720.0:
+                     if DT * tt >= 600.0:
                             break
               
        elif NonLinSolve:
@@ -347,7 +347,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 720:
+                     if DT * tt >= 600:
                             break
               
        endt = time.time()
@@ -417,7 +417,7 @@ if __name__ == '__main__':
        #plt.ylim(0.0, 5000.0)
        #
        fig = plt.figure()
-       ccheck = plt.contour(XLI, ZTLI, wxzint, 501, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+       ccheck = plt.contourf(XLI, ZTLI, wxzint, 501, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        cbar = fig.colorbar(ccheck)
        #plt.xlim(-20000.0, 20000.0)
        #plt.ylim(0.0, 1000.0)

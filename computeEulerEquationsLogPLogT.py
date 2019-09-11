@@ -140,9 +140,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
               return DwDt
        
        # Pressure (mass) equation
-       def pTendency(U, DlpDx, WXZ, DlpDz, DLPDZ, DUDX, DwDz, gam):
+       def pTendency(U, DlpDx, WXZ, DlpDz, DLPDZ, DUDX, DwDz, gam, RdT):
+              RdTI = np.reciprocal(RdT)
               LD31 = U * DlpDx
-              LD32 = WXZ * (DlpDz + DLPDZ)
+              LD32 = WXZ * (DlpDz + DLPDZ + gc*RdTI)
               LD33 = gam * DUDX
               LD34 = gam * DwDz
               DpDt = -(LD31 + LD32 + LD33 + LD34)
@@ -160,7 +161,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        # Compute tendencies on separate threads
        DuDt = uTendency(U, DuDx, WXZ, DuDz, DUDZ, RdT, DLPDX, gc, DZDX)
        DwDt = wTendency(U, DwDx, WXZ, DwDz, RdT, DlpDz, DLPDZ, gc)
-       DpDt = pTendency(U, DlpDx, WXZ, DlpDz, DLPDZ, DUDX, DwDz, gam)
+       DpDt = pTendency(U, DlpDx, WXZ, DlpDz, DLPDZ, DUDX, DwDz, gam, RdT)
        DtDt = tTendency(U, DltDx, WXZ, DltDz, DLPTDZ)
        
        # Null tendencies at boundaries
