@@ -19,7 +19,7 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        NX = DIMS[3]
        
        # Make a truncation index
-       tdex = np.array(range(NX-10,NX), dtype=int)
+       tdex = np.array(range(NX-1), dtype=int)
        
        alpha, whf = hefunclb(NX+1)
        HT = hefuncm(NX, alpha, True)
@@ -46,8 +46,15 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        # Hermite function spatial derivative based on spectral differentiation
        temp = (HTD[:,tdex]).dot(SDIFF[np.ix_(tdex,tdex)])
        temp = temp.dot(STR_H)
-       DDM = b * temp
+       DDMT = b * temp
        
-       return DDM, STR_H
+       # Output the full interpolation matrix
+       STR_H = (HT.T).dot(W);
+       # Hermite function spatial derivative based on spectral differentiation
+       temp = HTD.dot(SDIFF)
+       temp = temp.dot(STR_H)
+       DDMF = b * temp
+       
+       return DDMF, DDMT, STR_H
        
        

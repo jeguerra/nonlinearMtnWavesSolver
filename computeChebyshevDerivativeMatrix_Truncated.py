@@ -17,7 +17,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        NZ = DIMS[4]
        
        # Make a truncation index
-       tdex = np.array(range(NZ-10,NZ), dtype=int)
+       tdex = np.array(range(NZ-1), dtype=int)
        
        # Initialize grid and make column vector
        xi, wcp = cheblb(NZ)
@@ -59,6 +59,14 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
        temp = (CTD[:,tdex]).dot(SDIFF[np.ix_(tdex,tdex)])
-       DDM = - (2.0 / ZH) * temp.dot(STR_C);
+       DDMT = - (2.0 / ZH) * temp.dot(STR_C);
        
-       return DDM, STR_C
+       # Output the complete matrices as well
+       temp = CTD.dot(W)
+       STR_C = S.dot(temp);
+       # Chebyshev spatial derivative based on spectral differentiation
+       # Domain scale factor included here
+       temp = CTD.dot(SDIFF)
+       DDMF = - (2.0 / ZH) * temp.dot(STR_C);
+       
+       return DDMF, DDMT, STR_C

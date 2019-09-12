@@ -29,8 +29,8 @@ from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
 from computeHorizontalInterp import computeHorizontalInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
-from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
-from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
+from computeHermiteFunctionDerivativeMatrix_Truncated import computeHermiteFunctionDerivativeMatrix
+from computeChebyshevDerivativeMatrix_Truncated import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
@@ -115,8 +115,8 @@ if __name__ == '__main__':
        DZ = np.min(np.diff(REFS[1]))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
-       DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
-       DDZ_1D, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
+       DDX_1D, DDX_1DT, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
+       DDZ_1D, DDZ_1DT, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -196,10 +196,17 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Get the 2D linear operators...
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       
+       if StaticSolve or TransientSolve:
+              DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       elif NonLinSolve:
+              DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1DT, DDZ_1DT)
+       else:
+              DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+              
        REFS.append(DDXM)
        REFS.append(DDZM)
-       DOPS, F = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
+       DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
        #%% Compute the BC index vector
@@ -219,10 +226,10 @@ if __name__ == '__main__':
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
               # Format is 'lil' to allow for column adjustments to the operator
-              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], DOPS[3]], \
-                              [None, DOPS[4], DOPS[5], DOPS[6]], \
-                              [DOPS[7], DOPS[8], DOPS[9], None], \
-                              [DOPS[10], DOPS[11], None, DOPS[12]]], format='lil')
+              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
+                              [None, DOPS[3], DOPS[4], DOPS[5]], \
+                              [DOPS[6], DOPS[7], DOPS[8], None], \
+                              [None, DOPS[9], None, DOPS[10]]], format='lil')
               
               # Get some memory back
               del(DOPS)
@@ -243,7 +250,7 @@ if __name__ == '__main__':
               AN = A[np.ix_(sysDex,sysDex)]
               del(A)
               AN = AN.tocsc()
-              bN = F - (LDG[:,wbdex]).dot(WBC)
+              bN = -(LDG[:,wbdex]).dot(WBC)
               del(LDG)
               del(WBC)
               print('Set up global solution operators: DONE!')
@@ -293,7 +300,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 720.0:
+                     if DT * tt >= 240.0:
                             break
               
        elif NonLinSolve:
@@ -347,7 +354,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 240:
+                     if DT * tt >= 720:
                             break
               
        endt = time.time()
