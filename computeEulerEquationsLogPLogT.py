@@ -92,10 +92,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
-       DZT = REFS[6]
-       NX = DZT.shape[0]
-       NZ = DZT.shape[1]
-       DZDX = np.reshape(DZT, (NX*NZ,), order='F')
+       #DZT = REFS[6]
+       #NX = DZT.shape[0]
+       #NZ = DZT.shape[1]
+       #DZDX = np.reshape(DZT, (NX*NZ,), order='F')
        
        # Get the static vertical gradients
        DUDZ = REFG[0]
@@ -177,23 +177,36 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
 def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
-       DDXM = REFS[13]
-       DDZM = REFS[14]
+       #DDXM = REFS[13]
+       #DDZM = REFS[14]
+       DDXM2 = REFS[15]
+       DDZM2 = REFS[16]
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute the tendencies
-       DuDt = DDXM.dot(RESCFX[udex] * DDXM.dot(uxz)) + DDZM.dot(RESCFZ[udex] * DDZM.dot(uxz))
-       DwDt = DDXM.dot(RESCFX[wdex] * DDXM.dot(wxz)) + DDZM.dot(RESCFZ[wdex] * DDZM.dot(wxz))
-       DpDt = DDXM.dot(RESCFX[pdex] * DDXM.dot(pxz)) + DDZM.dot(RESCFZ[pdex] * DDZM.dot(pxz))
-       DtDt = DDXM.dot(RESCFX[tdex] * DDXM.dot(txz)) + DDZM.dot(RESCFZ[tdex] * DDZM.dot(txz))
+       #DuDt = DDXM.dot(RESCFX[udex] * DDXM.dot(uxz)) + DDZM.dot(RESCFZ[udex] * DDZM.dot(uxz))
+       #DwDt = DDXM.dot(RESCFX[wdex] * DDXM.dot(wxz)) + DDZM.dot(RESCFZ[wdex] * DDZM.dot(wxz))
+       #DpDt = DDXM.dot(RESCFX[pdex] * DDXM.dot(pxz)) + DDZM.dot(RESCFZ[pdex] * DDZM.dot(pxz))
+       #DtDt = DDXM.dot(RESCFX[tdex] * DDXM.dot(txz)) + DDZM.dot(RESCFZ[tdex] * DDZM.dot(txz))
+       
+       # Compute tendencies (2nd derivative term only)
+       DuDt = RESCFX[udex] * DDXM2.dot(uxz) + RESCFZ[udex] * DDZM2.dot(uxz)
+       DwDt = RESCFX[wdex] * DDXM2.dot(wxz) + RESCFZ[udex] * DDZM2.dot(wxz)
+       DpDt = RESCFX[pdex] * DDXM2.dot(pxz) + RESCFZ[udex] * DDZM2.dot(pxz)
+       DtDt = RESCFX[tdex] * DDXM2.dot(txz) + RESCFZ[udex] * DDZM2.dot(txz)
        
        # Null tendencies at vertical boundaries
+       DuDt[topdex] = np.zeros(len(topdex))
+       DuDt[botdex] = np.zeros(len(botdex))
        DwDt[topdex] = np.zeros(len(topdex))
        DwDt[botdex] = np.zeros(len(botdex))
+       DpDt[topdex] = np.zeros(len(topdex))
+       DpDt[botdex] = np.zeros(len(botdex))
        DtDt[topdex] = np.zeros(len(topdex))
+       DtDt[botdex] = np.zeros(len(botdex))
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))

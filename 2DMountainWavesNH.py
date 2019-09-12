@@ -29,8 +29,8 @@ from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
 from computeHorizontalInterp import computeHorizontalInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
-from computeHermiteFunctionDerivativeMatrix_Truncated import computeHermiteFunctionDerivativeMatrix
-from computeChebyshevDerivativeMatrix_Truncated import computeChebyshevDerivativeMatrix
+from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
+from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
@@ -53,7 +53,7 @@ if __name__ == '__main__':
        StaticSolve = False
        TransientSolve = False
        NonLinSolve = True
-       ResDiff = False
+       ResDiff = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -105,7 +105,7 @@ if __name__ == '__main__':
        ET = HR * 60 * 60 # End time in seconds
        TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
-       RTI = 1 # Stride for residual visc update
+       RTI = 10 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
@@ -115,8 +115,8 @@ if __name__ == '__main__':
        DZ = np.min(np.diff(REFS[1]))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
-       DDX_1D, DDX_1DT, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
-       DDZ_1D, DDZ_1DT, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
+       DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
+       DDZ_1D, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -196,16 +196,11 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Get the 2D linear operators...
-       
-       if StaticSolve or TransientSolve:
-              DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       elif NonLinSolve:
-              DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1DT, DDZ_1DT)
-       else:
-              DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-              
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)              
        REFS.append(DDXM)
        REFS.append(DDZM)
+       REFS.append(DDXM.dot(DDXM))
+       REFS.append(DDZM.dot(DDZM))
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
        
@@ -300,7 +295,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 240.0:
+                     if DT * tt >= 1800.0:
                             break
               
        elif NonLinSolve:
@@ -354,7 +349,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 720:
+                     if DT * tt >= 1200:
                             break
               
        endt = time.time()
@@ -416,7 +411,7 @@ if __name__ == '__main__':
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        
-       #%% #Spot check the solution on both grids
+       #% #Spot check the solution on both grids
        fig = plt.figure()
        ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)

@@ -94,7 +94,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
               uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex)
               RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               
        # Compute stage 6 with linear combination
        sol = c2 * (3.0 * SOLT[:,1] + 2.0 * sol)
@@ -107,7 +107,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
               uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex)
               RHS += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
        #'''
        
        #%% THE KETCHENSON SSP(10,4) METHOD
