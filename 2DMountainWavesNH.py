@@ -51,8 +51,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
+       TransientSolve = True
+       NonLinSolve = False
        ResDiff = True
        
        # Set physical constants (dry air)
@@ -69,8 +69,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 115
-       NZ = 75
+       NX = 129
+       NZ = 81
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -286,7 +286,7 @@ if __name__ == '__main__':
                             RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
                      
                      # Compute the SSPRK93 stages
-                     sol, RHS = computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex, utdex)
+                     sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex, utdex)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps

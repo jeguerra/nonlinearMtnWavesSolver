@@ -40,7 +40,9 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return uxz, wxz, pxz, txz, U, LP, LT, RdT
 
-def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, botdex, topdex):
+def computeRHSUpdate():
+
+def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, botdex, topdex):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -57,9 +59,8 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, u
                      SOLT[sysDex,1] = sol
               # Update the RHS
               RHS = bN - AN.dot(sol)
-              #uxz, wxz, pxz, txz = computePrepareFields(REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              #SGS = tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS += SGS[sysDex]
+              uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               
        # Compute stage 6 with linear combination
        sol = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * sol)
@@ -70,9 +71,8 @@ def computeTimeIntegrationLN(REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, u
               sol += c1 * DT * RHS
               # update the RHS
               RHS = bN - AN.dot(sol)
-              #uxz, wxz, pxz, txz = computePrepareFields(REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              #SGS = tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              #RHS += SGS[sysDex]
+              uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               
        return sol, RHS
 
