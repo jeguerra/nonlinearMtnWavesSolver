@@ -24,9 +24,9 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        txz = SOLT[tdex]
        
        # Make the total quatities
-       U = np.add(uxz, INIT[udex])
-       LP = np.add(pxz, INIT[pdex])
-       LT = np.add(txz, INIT[tdex])
+       U = uxz + INIT[udex]
+       LP = pxz + INIT[pdex]
+       LT = txz + INIT[tdex]
        
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
