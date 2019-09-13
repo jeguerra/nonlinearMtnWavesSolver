@@ -51,8 +51,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        ResDiff = True
        
        # Set physical constants (dry air)
@@ -286,7 +286,7 @@ if __name__ == '__main__':
                             RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
                      
                      # Compute the SSPRK93 stages
-                     sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex, utdex)
+                     sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
@@ -295,8 +295,8 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' RHS 2-norm: ', err)
                             
-                     if DT * tt >= 1800.0:
-                            break
+                     #if DT * tt >= 1800.0:
+                     #       break
               
        elif NonLinSolve:
               sysDex = np.array(range(0, numVar * OPS))
@@ -340,7 +340,7 @@ if __name__ == '__main__':
                             RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
                             
                      # Compute the SSPRK93 stages at this time step
-                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex)
+                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
@@ -349,8 +349,8 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 1200:
-                            break
+                     #if DT * tt >= 1200:
+                     #       break
               
        endt = time.time()
        print('Solve the system: DONE!')
@@ -419,7 +419,7 @@ if __name__ == '__main__':
        #plt.ylim(0.0, 5000.0)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, wxzint, 501, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+       ccheck = plt.contourf(XLI, ZTLI, wxzint, 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        cbar = fig.colorbar(ccheck)
        #plt.xlim(-20000.0, 20000.0)
        #plt.ylim(0.0, 1000.0)

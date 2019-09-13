@@ -21,7 +21,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        OPS = NX * NZ
        
        # Get REFS data
-       DZT = REFS[6]
        UZ = REFS[8]
        PORZ = REFS[9]
        DUDZ = REFS[10]
@@ -46,42 +45,31 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        unit = sps.identity(OPS)
        
        #%% Compute the terms in the equations
-       DDXTF = DDXM# - DZDX.dot(DDZM)
+       DDXTF = DDXM
        U0DXTF = UM.dot(DDXTF)
        
        # Horizontal momentum
-       LD11 = U0DXTF# - DZDX.dot(DUDZM)
+       LD11 = U0DXTF
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXTF)# - (gc * (1.0 / gam - 1.0) * DZDX)
-       #LD14 = gc * DZDX
-       #FU = -DZT * UZ * DUDZ
-       #FU = np.reshape(FU, (OPS,), order='F')
+       LD13 = PORZM.dot(DDXTF)
        
        # Vertical momentum
        LD22 = U0DXTF
        LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
-       #FW = np.zeros(OPS)
        
        # Log-P equation
        LD31 = gam * DDXTF# - DZDX.dot(DLPDZM)
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0DXTF
-       #FP = -DZT * (gam * DUDZ + UZ * DLPDZ)
-       #FP = np.reshape(FP, (OPS,), order='F')
        
        # Log-Theta equation
-       #LD41 = -DZDX.dot(DLPTDZM)
        LD42 = DLPTDZM
        LD44 = U0DXTF
-       #FT = -UZ * DZT * DLPTDZ
-       #FT = np.reshape(FT, (OPS,), order='F')
        
        DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
-       #DOPS = [LD11, LD12, LD13, LD14, LD22, LD23, LD24, LD31, LD32, LD33, LD41, LD42, LD44]
-       #F = np.concatenate((FU, FW, FP, FT))
        
-       return DOPS#, F
+       return DOPS
 
 # Function evaluation of the non linear equations
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex):
@@ -92,10 +80,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
-       #DZT = REFS[6]
-       #NX = DZT.shape[0]
-       #NZ = DZT.shape[1]
-       #DZDX = np.reshape(DZT, (NX*NZ,), order='F')
        
        # Get the static vertical gradients
        DUDZ = REFG[0]
@@ -112,36 +96,28 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        DltDx = DDXM.dot(txz)
        DltDz = DDZM.dot(txz)
        
-       # Terrain following horizontal derivatives
-       WXZ = wxz# - U * DZDX
-       DUDX = DuDx# - DZDX * (DuDz + DUDZ)
-       DLPDX = DlpDx# - DZDX * (DlpDz + DLPDZ)
-       
-       WXZ[topdex] = np.zeros(len(topdex))
-       WXZ[botdex] = np.zeros(len(botdex))
-       
        # Horizontal Momentum
        LD11 = U * DuDx
-       LD12 = WXZ * (DuDz + DUDZ)
-       LD13 = RdT * DLPDX# - gc * DZDX
+       LD12 = wxz * (DuDz + DUDZ)
+       LD13 = RdT * DlpDx
        DuDt = -(LD11 + LD12 + LD13)
                      
        # Vertical Momentum
        LD21 = U * DwDx
-       LD22 = WXZ * DwDz
+       LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        DwDt = -(LD21 + LD22 + LD23)
                      
        # Pressure (mass) equation
        LD31 = U * DlpDx
-       LD32 = WXZ * (DlpDz + DLPDZ)
-       LD33 = gam * DUDX
+       LD32 = wxz * (DlpDz + DLPDZ)
+       LD33 = gam * DuDx
        LD34 = gam * DwDz
        DpDt = -(LD31 + LD32 + LD33 + LD34)
               
        # Potential Temperature equation
        LD41 = U * DltDx
-       LD42 = WXZ * (DltDz + DLPTDZ)
+       LD42 = wxz * (DltDz + DLPTDZ)
        DtDt = -(LD41 + LD42)
        
        # Null tendencies at boundaries
