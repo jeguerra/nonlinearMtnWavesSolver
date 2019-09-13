@@ -38,7 +38,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        # Potential temperature perturbation vanishes along top boundary       
        txz[topdex] = np.zeros(len(topdex))
        
-       return uxz, wxz, pxz, txz, U, LP, LT, RdT
+       return uxz, wxz, pxz, txz, U, RdT
 
 def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
        # Set the coefficients
@@ -49,7 +49,7 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
        def computeRHSUpdate():
               rhs = bN - AN.dot(sol)
               if DynSGS:
-                     uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      rhs += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
                      
               return rhs
@@ -79,8 +79,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, u
        sol = SOLT[:,0]
        
        def computeRHSUpdate():
-              uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex)
+              uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               if DynSGS:
                      rhs += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)

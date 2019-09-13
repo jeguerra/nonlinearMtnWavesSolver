@@ -322,9 +322,9 @@ if __name__ == '__main__':
               SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
               
               # Initialize fields
-              uxz, wxz, pxz, txz, U, LP, LT, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               # Initialize the RHS and forcing for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, ubdex, utdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
               bN = RHS
               # Initialize the residual
               error = [0.0]

@@ -30,8 +30,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        DDZM = REFS[14]
               
        #%% Compute the various blocks needed
-       #tempDiagonal = np.reshape(DZT, (OPS,), order='F')
-       #DZDX = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
        UM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(DUDZ, (OPS,), order='F')
@@ -45,34 +43,33 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        unit = sps.identity(OPS)
        
        #%% Compute the terms in the equations
-       DDXTF = DDXM
-       U0DXTF = UM.dot(DDXTF)
+       U0DDX = UM.dot(DDXM)
        
        # Horizontal momentum
-       LD11 = U0DXTF
+       LD11 = U0DDX
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXTF)
+       LD13 = PORZM.dot(DDXM)
        
        # Vertical momentum
-       LD22 = U0DXTF
+       LD22 = U0DDX
        LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
        
        # Log-P equation
-       LD31 = gam * DDXTF# - DZDX.dot(DLPDZM)
+       LD31 = gam * DDXM
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0DXTF
+       LD33 = U0DDX
        
        # Log-Theta equation
        LD42 = DLPTDZM
-       LD44 = U0DXTF
+       LD44 = U0DDX
        
        DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
        
        return DOPS
 
 # Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP, LT, RdT, botdex, topdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        gam = PHYS[6]
@@ -111,9 +108,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, LP
        # Pressure (mass) equation
        LD31 = U * DlpDx
        LD32 = wxz * (DlpDz + DLPDZ)
-       LD33 = gam * DuDx
-       LD34 = gam * DwDz
-       DpDt = -(LD31 + LD32 + LD33 + LD34)
+       LD33 = gam * (DuDx + DwDz)
+       DpDt = -(LD31 + LD32 + LD33)
               
        # Potential Temperature equation
        LD41 = U * DltDx
