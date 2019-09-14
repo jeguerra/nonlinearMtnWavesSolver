@@ -72,7 +72,7 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
               
        return sol, RHS
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0

@@ -15,8 +15,9 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 
 @author: Jorge E. Guerra
 """
-
+import sys
 import time
+import shelve
 import numpy as np
 import math as mt
 import scipy.sparse as sps
@@ -54,6 +55,10 @@ if __name__ == '__main__':
        TransientSolve = False
        NonLinSolve = True
        ResDiff = True
+       
+       # Set restarting
+       toRestart = True
+       isRestart = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -101,9 +106,8 @@ if __name__ == '__main__':
        #%% Transient solve parameters
        DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 5.0
+       HR = 0.04
        ET = HR * 60 * 60 # End time in seconds
-       TI = np.array(np.arange(DT, ET, DT))
        OTI = 100 # Stride for diagnostic output
        RTI = 10 # Stride for residual visc update
        
@@ -263,16 +267,41 @@ if __name__ == '__main__':
               INIT = np.zeros((numVar * OPS,))
               RESI = np.zeros((numVar * OPS,))
               
-              # Initialize the RHS
-              RHS = bN
-              error = [np.linalg.norm(RHS)]
-              
-              # Initialize the solution fields
+              # Initialize the Background fields
               INIT[udex] = np.reshape(UZ, (OPS,), order='F')
               INIT[wdex] = np.zeros((OPS,))
               INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
               INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
+              if isRestart:
+                     rdb = shelve.open('restartDB', flag='r')
+                     SOLT[udex] = rdb['uxz']
+                     SOLT[wdex] = rdb['wxz']
+                     SOLT[pdex] = rdb['pxz']
+                     SOLT[tdex] = rdb['txz']
+                     RHS = rdb['RHS']
+                     NX_in = rdb['NX']
+                     NZ_in = rdb['NZ']
+                     IT = rdb['ET']
+                     rdb.close()
+                     
+                     if NX_in != NX or NZ_in != NZ:
+                            print('ERROR: RESTART DATA IS INVALID')
+                            sys.exit(2)
+                            
+                     if ET <= IT:
+                            print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
+                            sys.exit(2)
+                            
+                     # Initialize the restart time array
+                     TI = np.array(np.arange(IT + DT, ET, DT))
+              else:
+                     # Initialize time array
+                     TI = np.array(np.arange(DT, ET, DT))
+                     # Initialize the RHS
+                     RHS = bN
+                     
+              error = [np.linalg.norm(RHS)]
               # Initialize residual coefficients
               RESI[sysDex] = RHS
               RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
@@ -318,20 +347,41 @@ if __name__ == '__main__':
               DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
               REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
               
-              # Initialize the boundary condition
-              SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
-              
-              # Initialize fields
-              uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              # Initialize the RHS and forcing for each field
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
-              bN = RHS
-              # Initialize the residual
-              error = [0.0]
-              
+              if isRestart:
+                     rdb = shelve.open('restartDB')
+                     SOLT[udex,0] = rdb['uxz']
+                     SOLT[wdex,0] = rdb['wxz']
+                     SOLT[pdex,0] = rdb['pxz']
+                     SOLT[tdex,0] = rdb['txz']
+                     RHS = rdb['RHS']
+                     NX_in = rdb['NX']
+                     NZ_in = rdb['NZ']
+                     IT = rdb['ET']
+                     rdb.close()
+                     
+                     if NX_in != NX or NZ_in != NZ:
+                            print('ERROR: RESTART DATA IS INVALID')
+                            sys.exit(2)
+                            
+                     if ET <= IT:
+                            print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
+                            sys.exit(2)
+                            
+                     # Initialize the restart time array
+                     TI = np.array(np.arange(IT + DT, ET, DT))
+              else:
+                     # Initialize time array
+                     TI = np.array(np.arange(DT, ET, DT))
+                     # Initialize the boundary condition
+                     SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
+                     # Initialize fields
+                     uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     # Initialize the RHS and forcing for each field
+                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                     
               # Initialize residual coefficients
               RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
-
+              error = [np.linalg.norm(RHS)]
               # Start the time loop
               for tt in range(len(TI)):
                      # Get the DynSGS Coefficients
@@ -340,7 +390,7 @@ if __name__ == '__main__':
                             RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
                             
                      # Compute the SSPRK93 stages at this time step
-                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, bN, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
@@ -349,7 +399,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     #if DT * tt >= 1200:
+                     #if DT * tt >= 360:
                      #       break
               
        endt = time.time()
@@ -360,6 +410,19 @@ if __name__ == '__main__':
        SOL = np.zeros(numVar * OPS)
        SOL[sysDex] = sol;
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]))
+       
+       #% Make a database for restart
+       if toRestart:
+              rdb = shelve.open('restartDB', flag='n')
+              rdb['uxz'] = SOL[udex]
+              rdb['wxz'] = SOL[wdex]
+              rdb['pxz'] = SOL[pdex]
+              rdb['txz'] = SOL[tdex]
+              rdb['RHS'] = RHS
+              rdb['NX'] = NX
+              rdb['NZ'] = NZ
+              rdb['ET'] = ET
+              rdb.close()
        
        #% Get the fields in physical space
        udex = np.array(range(OPS))

@@ -5,7 +5,6 @@ Created on Mon Jul 22 13:11:11 2019
 
 @author: -
 """
-
 import numpy as np
 import scipy.sparse as sps
 
@@ -92,33 +91,27 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, Rd
        DlpDz = DDZM.dot(pxz)
        DltDx = DDXM.dot(txz)
        DltDz = DDZM.dot(txz)
-       
-       # Horizontal Momentum
+       # Horizontal momentum equation
        LD11 = U * DuDx
        LD12 = wxz * (DuDz + DUDZ)
        LD13 = RdT * DlpDx
        DuDt = -(LD11 + LD12 + LD13)
-                     
-       # Vertical Momentum
+       # Vertical momentum equation
        LD21 = U * DwDx
        LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        DwDt = -(LD21 + LD22 + LD23)
-                     
+       DwDt[topdex] = np.zeros(len(topdex))
+       DwDt[botdex] = np.zeros(len(botdex))             
        # Pressure (mass) equation
        LD31 = U * DlpDx
        LD32 = wxz * (DlpDz + DLPDZ)
        LD33 = gam * (DuDx + DwDz)
-       DpDt = -(LD31 + LD32 + LD33)
-              
+       DpDt = -(LD31 + LD32 + LD33)     
        # Potential Temperature equation
        LD41 = U * DltDx
        LD42 = wxz * (DltDz + DLPTDZ)
        DtDt = -(LD41 + LD42)
-       
-       # Null tendencies at boundaries
-       DwDt[topdex] = np.zeros(len(topdex))
-       DwDt[botdex] = np.zeros(len(botdex))
        DtDt[topdex] = np.zeros(len(topdex))
        
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
