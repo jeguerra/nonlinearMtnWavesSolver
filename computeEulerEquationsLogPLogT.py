@@ -91,6 +91,13 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, Rd
        DlpDz = DDZM.dot(pxz)
        DltDx = DDXM.dot(txz)
        DltDz = DDZM.dot(txz)
+       
+       # Heat and momentum fluxes
+       #uw = uxz * wxz
+       #DuwDz = DDZM.dot(uw)
+       #tw = txz * wxz
+       #DtwDz = DDZM.dot(tw)
+       
        # Horizontal momentum equation
        LD11 = U * DuDx
        LD12 = wxz * (DuDz + DUDZ)
@@ -100,9 +107,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, Rd
        LD21 = U * DwDx
        LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
-       DwDt = -(LD21 + LD22 + LD23)
-       DwDt[topdex] = np.zeros(len(topdex))
-       DwDt[botdex] = np.zeros(len(botdex))             
+       DwDt = -(LD21 + LD22 + LD23)             
        # Pressure (mass) equation
        LD31 = U * DlpDx
        LD32 = wxz * (DlpDz + DLPDZ)
@@ -112,6 +117,9 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, Rd
        LD41 = U * DltDx
        LD42 = wxz * (DltDz + DLPTDZ)
        DtDt = -(LD41 + LD42)
+       
+       DwDt[topdex] = np.zeros(len(topdex))
+       DwDt[botdex] = np.zeros(len(botdex))
        DtDt[topdex] = np.zeros(len(topdex))
        
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
@@ -164,14 +172,14 @@ def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tde
        DtDt = RESCFX[tdex] * DDXM2.dot(txz) + RESCFZ[udex] * DDZM2.dot(txz)
        
        # Null tendencies at vertical boundaries
-       DuDt[topdex] = np.zeros(len(topdex))
-       DuDt[botdex] = np.zeros(len(botdex))
+       #DuDt[topdex] = np.zeros(len(topdex))
+       #DuDt[botdex] = np.zeros(len(botdex))
        DwDt[topdex] = np.zeros(len(topdex))
        DwDt[botdex] = np.zeros(len(botdex))
-       DpDt[topdex] = np.zeros(len(topdex))
-       DpDt[botdex] = np.zeros(len(botdex))
+       #DpDt[topdex] = np.zeros(len(topdex))
+       #DpDt[botdex] = np.zeros(len(botdex))
        DtDt[topdex] = np.zeros(len(topdex))
-       DtDt[botdex] = np.zeros(len(botdex))
+       #DtDt[botdex] = np.zeros(len(botdex))
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))

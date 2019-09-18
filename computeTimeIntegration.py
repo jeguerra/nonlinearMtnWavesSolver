@@ -49,8 +49,10 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
        def computeRHSUpdate():
               rhs = bN - AN.dot(sol)
               if DynSGS:
-                     uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-                     rhs += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+                     SOLT[sysDex,0] = sol
+                     uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     sgs = tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+                     rhs += sgs[sysDex]
                      
               return rhs
        
@@ -58,9 +60,11 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
        # Compute stages 1 - 5
        for ii in range(7):
               sol += c1 * DT * RHS
+              
               if ii == 1:
                      SOLT[sysDex,1] = sol
-                     RHS = computeRHSUpdate()
+              
+              RHS = computeRHSUpdate()
               
        # Compute stage 6 with linear combination
        sol = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * sol)
@@ -93,6 +97,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
               sol += c1 * DT * RHS
               if ii == 1:
                      SOLT[:,1] = sol
+                     RES = (sol - SOLT[:,0]) / (c1 * DT) - RHS
               
               RHS = computeRHSUpdate()
               
@@ -123,4 +128,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
        computeRHSUpdate()
        '''
        
-       return sol, RHS
+       return sol, RHS, RES

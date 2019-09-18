@@ -52,8 +52,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
+       TransientSolve = True
+       NonLinSolve = False
        ResDiff = True
        
        # Set restarting
@@ -74,8 +74,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 81
+       NX = 135
+       NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -106,10 +106,10 @@ if __name__ == '__main__':
        #%% Transient solve parameters
        DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 0.04
+       HR = 10.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 100 # Stride for diagnostic output
-       RTI = 10 # Stride for residual visc update
+       RTI = 1 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
@@ -275,10 +275,10 @@ if __name__ == '__main__':
               
               if isRestart:
                      rdb = shelve.open('restartDB', flag='r')
-                     SOLT[udex] = rdb['uxz']
-                     SOLT[wdex] = rdb['wxz']
-                     SOLT[pdex] = rdb['pxz']
-                     SOLT[tdex] = rdb['txz']
+                     SOLT[udex,0] = rdb['uxz']
+                     SOLT[wdex,0] = rdb['wxz']
+                     SOLT[pdex,0] = rdb['pxz']
+                     SOLT[tdex,0] = rdb['txz']
                      RHS = rdb['RHS']
                      NX_in = rdb['NX']
                      NZ_in = rdb['NZ']
@@ -380,17 +380,19 @@ if __name__ == '__main__':
                      RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
                      
               # Initialize residual coefficients
-              RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
+              RES = RHS
+              RESCF = computeResidualViscCoeffs(SOLT[:,0], RES, DX, DZ, udex, OPS)
               error = [np.linalg.norm(RHS)]
+       
               # Start the time loop
               for tt in range(len(TI)):
                      # Get the DynSGS Coefficients
                      if ResDiff and tt % RTI == 0:
                             # Compute the local DynSGS coefficients
-                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
+                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RES, DX, DZ, udex, OPS)
                             
                      # Compute the SSPRK93 stages at this time step
-                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     sol, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
@@ -399,8 +401,8 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     #if DT * tt >= 360:
-                     #       break
+                     if DT * tt >= 600:
+                            break
               
        endt = time.time()
        print('Solve the system: DONE!')
