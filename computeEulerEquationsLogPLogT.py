@@ -68,7 +68,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        return DOPS
 
 # Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        gam = PHYS[6]
@@ -83,14 +83,16 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, Rd
        DLPTDZ = REFG[2]
        
        # Compute derivative of perturbations
-       DuDx = DDXM.dot(uxz)
-       DuDz = DDZM.dot(uxz)
-       DwDx = DDXM.dot(wxz)
-       DwDz = DDZM.dot(wxz)
-       DlpDx = DDXM.dot(pxz)
-       DlpDz = DDZM.dot(pxz)
-       DltDx = DDXM.dot(txz)
-       DltDz = DDZM.dot(txz)
+       DDx = DDXM.dot(fields)
+       DDz = DDZM.dot(fields)
+       DuDx = DDx[:,0]
+       DwDx = DDx[:,1]
+       DlpDx = DDx[:,2]
+       DltDx = DDx[:,3]
+       DuDz = DDz[:,0]
+       DwDz = DDz[:,1]
+       DlpDz = DDz[:,2]
+       DltDz = DDz[:,3]
        
        # Heat and momentum fluxes
        #uw = uxz * wxz
@@ -107,20 +109,20 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, Rd
        LD21 = U * DwDx
        LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
-       DwDt = -(LD21 + LD22 + LD23)             
+       DwDt = -(LD21 + LD22 + LD23)
        # Pressure (mass) equation
        LD31 = U * DlpDx
        LD32 = wxz * (DlpDz + DLPDZ)
        LD33 = gam * (DuDx + DwDz)
-       DpDt = -(LD31 + LD32 + LD33)     
+       DpDt = -(LD31 + LD32 + LD33) 
        # Potential Temperature equation
        LD41 = U * DltDx
        LD42 = wxz * (DltDz + DLPTDZ)
        DtDt = -(LD41 + LD42)
        
-       DwDt[topdex] = np.zeros(len(topdex))
-       DwDt[botdex] = np.zeros(len(botdex))
-       DtDt[topdex] = np.zeros(len(topdex))
+       DwDt[topdex] *= 0.0
+       DwDt[botdex] *= 0.0
+       DtDt[topdex] *= 0.0
        
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
@@ -138,16 +140,16 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
        DtDt = - ROPS[3].dot(txz)
        
        # Null tendencies at vertical boundaries
-       DwDt[topdex] = np.zeros(len(topdex))
-       DwDt[botdex] = np.zeros(len(botdex))
-       DtDt[topdex] = np.zeros(len(topdex))
+       DwDt[topdex] *= 0.0
+       DwDt[botdex] *= 0.0
+       DtDt[topdex] *= 0.0
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
        return DqDt
 
-def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
+def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
        #DDXM = REFS[13]
@@ -159,27 +161,39 @@ def computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tde
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
-       # Compute the tendencies
+       # Compute derivative of perturbations
+       DDx = DDXM2.dot(fields)
+       DDz = DDZM2.dot(fields)
+       DuDx = DDx[:,0]
+       DwDx = DDx[:,1]
+       DlpDx = DDx[:,2]
+       DltDx = DDx[:,3]
+       DuDz = DDz[:,0]
+       DwDz = DDz[:,1]
+       DlpDz = DDz[:,2]
+       DltDz = DDz[:,3]
+       
+       # Compute the tendencies (divergence of diffusive flux... discontinuous)
        #DuDt = DDXM.dot(RESCFX[udex] * DDXM.dot(uxz)) + DDZM.dot(RESCFZ[udex] * DDZM.dot(uxz))
        #DwDt = DDXM.dot(RESCFX[wdex] * DDXM.dot(wxz)) + DDZM.dot(RESCFZ[wdex] * DDZM.dot(wxz))
        #DpDt = DDXM.dot(RESCFX[pdex] * DDXM.dot(pxz)) + DDZM.dot(RESCFZ[pdex] * DDZM.dot(pxz))
        #DtDt = DDXM.dot(RESCFX[tdex] * DDXM.dot(txz)) + DDZM.dot(RESCFZ[tdex] * DDZM.dot(txz))
        
        # Compute tendencies (2nd derivative term only)
-       DuDt = RESCFX[udex] * DDXM2.dot(uxz) + RESCFZ[udex] * DDZM2.dot(uxz)
-       DwDt = RESCFX[wdex] * DDXM2.dot(wxz) + RESCFZ[udex] * DDZM2.dot(wxz)
-       DpDt = RESCFX[pdex] * DDXM2.dot(pxz) + RESCFZ[udex] * DDZM2.dot(pxz)
-       DtDt = RESCFX[tdex] * DDXM2.dot(txz) + RESCFZ[udex] * DDZM2.dot(txz)
+       DuDt = RESCFX[udex] * DuDx + RESCFZ[udex] * DuDz
+       DwDt = RESCFX[wdex] * DwDx + RESCFZ[wdex] * DwDz
+       DpDt = RESCFX[pdex] * DlpDx + RESCFZ[pdex] * DlpDz
+       DtDt = RESCFX[tdex] * DltDx + RESCFZ[tdex] * DltDz
        
        # Null tendencies at vertical boundaries
-       #DuDt[topdex] = np.zeros(len(topdex))
-       #DuDt[botdex] = np.zeros(len(botdex))
-       DwDt[topdex] = np.zeros(len(topdex))
-       DwDt[botdex] = np.zeros(len(botdex))
-       #DpDt[topdex] = np.zeros(len(topdex))
-       #DpDt[botdex] = np.zeros(len(botdex))
-       DtDt[topdex] = np.zeros(len(topdex))
-       #DtDt[botdex] = np.zeros(len(botdex))
+       #DuDt[topdex] *= 0.0
+       #DuDt[botdex] *= 0.0
+       DwDt[topdex] *= 0.0
+       DwDt[botdex] *= 0.0
+       #DpDt[topdex] *= 0.0
+       #DpDt[botdex] *= 0.0
+       DtDt[topdex] *= 0.0
+       #DtDt[botdex] *= 0.0
        
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))

@@ -12,7 +12,7 @@ def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, OPS):
        
        ARES = np.abs(RES)
        DSOL = np.abs(SOL)
-       
+              
        QRESX = np.zeros(SOL.shape)
        QRESZ = np.zeros(SOL.shape)
        
@@ -27,9 +27,10 @@ def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, OPS):
                      QRESZ[qdex] = (DZ**2 / QM) * ARES[qdex]
        
        # Fix SGS to upwind value where needed
+       #'''
        updex = np.argwhere(QRESX >= 0.5 * DX)
-       QRESX[updex] = 0.5 * DX * np.ones((len(updex),1))
+       QRESX[updex] = 0.5 * DX
        updex = np.argwhere(QRESZ >= 0.5 * DZ)
-       QRESZ[updex] = 0.5 * DZ * np.ones((len(updex),1))
-       
+       QRESZ[updex] = 0.5 * DZ
+       #'''
        return (QRESX, QRESZ)

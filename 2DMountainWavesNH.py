@@ -52,13 +52,13 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        ResDiff = True
        
        # Set restarting
        toRestart = True
-       isRestart = True
+       isRestart = False
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -106,7 +106,7 @@ if __name__ == '__main__':
        #%% Transient solve parameters
        DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 10.0
+       HR = 5.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 100 # Stride for diagnostic output
        RTI = 1 # Stride for residual visc update
@@ -115,8 +115,8 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS)
        
        # Compute DX and DZ grid length scales
-       DX = np.min(np.diff(REFS[0]))
-       DZ = np.min(np.diff(REFS[1]))
+       DX = np.mean(np.diff(REFS[0]))
+       DZ = np.mean(np.diff(REFS[1]))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -141,6 +141,10 @@ if __name__ == '__main__':
        REFS.append(ZTL)
        REFS.append(DZT)
        REFS.append(sigma)
+       
+       # Compute the local grid lengths
+       DXL = np.abs(np.diff(np.concatenate((XL[:,1], XL, XL[:,NX-2]), axis=1), axis=1))
+       DZTL = np.abs(np.diff(np.concatenate((ZTL[1,:], ZTL, ZTL[NZ-2,:]), axis=0), axis=0))
        
        #%% Read in sensible or potential temperature soundings (corner points)
        T_in = [300.0, 228.5, 228.5, 244.5]
@@ -375,9 +379,9 @@ if __name__ == '__main__':
                      # Initialize the boundary condition
                      SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
                      # Initialize fields
-                     uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      # Initialize the RHS and forcing for each field
-                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
                      
               # Initialize residual coefficients
               RES = RHS
@@ -401,7 +405,7 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 600:
+                     if DT * tt >= 720:
                             break
               
        endt = time.time()

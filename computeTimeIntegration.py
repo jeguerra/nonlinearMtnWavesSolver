@@ -6,6 +6,7 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
+import scipy.sparse as sps
 import computeEulerEquationsLogPLogT as tendency
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
@@ -33,12 +34,18 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        # Apply boundary condition
        wxz[botdex] = DZT[0,:] * U[botdex]
-       wxz[topdex] = np.zeros(len(topdex))
+       wxz[topdex] *= 0.0 
        
        # Potential temperature perturbation vanishes along top boundary       
-       txz[topdex] = np.zeros(len(topdex))
+       txz[topdex] *= 0.0
        
-       return uxz, wxz, pxz, txz, U, RdT
+       fields = np.empty((len(uxz), 4))
+       fields[:,0] = uxz 
+       fields[:,1] = wxz
+       fields[:,2] = pxz
+       fields[:,3] = txz
+       
+       return fields, uxz, wxz, pxz, txz, U, RdT
 
 def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
        # Set the coefficients
@@ -50,8 +57,8 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
               rhs = bN - AN.dot(sol)
               if DynSGS:
                      SOLT[sysDex,0] = sol
-                     uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
-                     sgs = tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     sgs = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
                      rhs += sgs[sysDex]
                      
               return rhs
@@ -83,11 +90,11 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
        sol = SOLT[:,0]
        
        def computeRHSUpdate():
-              uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
+              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               if DynSGS:
-                     rhs += tendency.computeDynSGSTendency(RESCF, REFS, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+                     rhs += tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
                      
               return rhs
        #'''
@@ -97,7 +104,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
               sol += c1 * DT * RHS
               if ii == 1:
                      SOLT[:,1] = sol
-                     RES = (sol - SOLT[:,0]) / (c1 * DT) - RHS
+                     RES = RHS
+                     #RES = (sol - SOLT[:,0]) / (c1 * DT) - RHS
               
               RHS = computeRHSUpdate()
               
