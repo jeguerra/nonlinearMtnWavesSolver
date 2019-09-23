@@ -16,3 +16,9 @@ ResidualMtSolve.m
 octave-workspace
 
 *.pyc
+
+*.bak
+
+*.dat
+
+*.dir
