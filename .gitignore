@@ -22,3 +22,5 @@ octave-workspace
 *.dat
 
 *.dir
+
+*.db

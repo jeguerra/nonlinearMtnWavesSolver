@@ -115,12 +115,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
        for ii in range(7):
-              sol += c1 * DT * (RHS + rhsSGS)
+              sol += c1 * DT * RHS
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
-              
-              if ii == 0:
-                     rhsSGS = computeDynSGSUpdate(fields, uxz, wxz, pxz, txz)
               
               if ii == 1:
                      SOLT[:,1] = sol
@@ -130,9 +127,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        
        # Compute stages 7 - 9
        for ii in range(2):
-              sol += c1 * DT * (RHS + rhsSGS)
+              sol += c1 * DT * RHS
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
+              RHS += computeDynSGSUpdate(fields, uxz, wxz, pxz, txz)
        #'''
        
        #%% THE KETCHENSON SSP(10,4) METHOD
