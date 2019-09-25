@@ -40,7 +40,6 @@ from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 from computeRayleighEquations import computeRayleighEquations
-from computeResidualViscCoeffs import computeResidualViscCoeffs
 from computeTimeIntegration import computePrepareFields
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
@@ -274,7 +273,6 @@ if __name__ == '__main__':
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 2))
               INIT = np.zeros((numVar * OPS,))
-              RESI = np.zeros((numVar * OPS,))
               
               # Initialize the Background fields
               INIT[udex] = np.reshape(UZ, (OPS,), order='F')
@@ -311,20 +309,11 @@ if __name__ == '__main__':
                      RHS = bN
                      
               error = [np.linalg.norm(RHS)]
-              # Initialize residual coefficients
-              RESI[sysDex] = RHS
-              RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
               
               # Start the time loop
               for tt in range(len(TI)):
-                     # Get the DynSGS Coefficients
-                     if ResDiff and tt % RTI == 0:
-                            RESI[sysDex] = RHS
-                            # Compute the local DynSGS coefficients
-                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RESI, DX, DZ, udex, OPS)
-                     
                      # Compute the SSPRK93 stages
-                     sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
@@ -343,7 +332,6 @@ if __name__ == '__main__':
               # Initialize transient storage
               SOLT = np.zeros((numVar * OPS, 2))
               INIT = np.zeros((numVar * OPS,))
-              RESI = np.zeros((numVar * OPS,))
               
               # Initialize the solution fields
               INIT[udex] = np.reshape(UZ, (OPS,), order='F')
@@ -389,19 +377,12 @@ if __name__ == '__main__':
                      # Initialize the RHS and forcing for each field
                      RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
                      
-              # Initialize residual coefficients
-              RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
               error = [np.linalg.norm(RHS)]
        
               # Start the time loop
               for tt in range(len(TI)):
-                     # Get the DynSGS Coefficients
-                     if ResDiff and tt % RTI == 0:
-                            # Compute the local DynSGS coefficients
-                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
-                            
                      # Compute the SSPRK93 stages at this time step
-                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps

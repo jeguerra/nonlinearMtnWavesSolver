@@ -8,6 +8,7 @@ Created on Tue Aug 13 10:09:52 2019
 import numpy as np
 import scipy.sparse as sps
 import computeEulerEquationsLogPLogT as tendency
+from computeResidualViscCoeffs import computeResidualViscCoeffs
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
        # Get some physical quantities
@@ -47,26 +48,26 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, uxz, wxz, pxz, txz, U, RdT
 
-def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
+def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[sysDex,0]
        
        rhsSGS = 0.0
-       if DynSGS:
-              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+       def computeDynSGSUpdate():
+              if DynSGS:
+                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     RESCF = computeResidualViscCoeffs(sol, RHS, DX, DZ, udex, wdex, pdex, tdex)
+                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+              else:
+                     rhsSGS = 0.0
+                     
+              return rhsSGS
        
        def computeRHSUpdate():
               rhs = bN - AN.dot(sol)
-              '''
-              if DynSGS:
-                     SOLT[sysDex,0] = sol
-                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
-                     sgs = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-                     rhs += sgs[sysDex]
-              '''       
+                 
               return rhs
        
        #%% THE KETCHENSON SSP(9,3) METHOD
@@ -89,36 +90,40 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
               
        return sol, RHS
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[:,0]
        
        rhsSGS = 0.0
-       if DynSGS:
-              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+       def computeDynSGSUpdate(fields, uxz, wxz, pxz, txz):
+              if DynSGS:
+                     RESCF = computeResidualViscCoeffs(sol, RHS, DX, DZ, udex, wdex, pdex, tdex)
+                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+              else:
+                     rhsSGS = 0.0
+                     
+              return rhsSGS
        
-       def computeRHSUpdate():
-              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+       def computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT):
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              '''
-              if DynSGS:
-                     rhs += rhsSGS
-                     #rhs += tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-              '''       
+       
               return rhs
        #'''
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
        for ii in range(7):
               sol += c1 * DT * (RHS + rhsSGS)
+              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
+              
+              if ii == 0:
+                     rhsSGS = computeDynSGSUpdate(fields, uxz, wxz, pxz, txz)
+              
               if ii == 1:
                      SOLT[:,1] = sol
-              
-              RHS = computeRHSUpdate()
               
        # Compute stage 6 with linear combination
        sol = c2 * (3.0 * SOLT[:,1] + 2.0 * sol)
@@ -126,7 +131,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
        # Compute stages 7 - 9
        for ii in range(2):
               sol += c1 * DT * (RHS + rhsSGS)
-              RHS = computeRHSUpdate()
+              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
        #'''
        
        #%% THE KETCHENSON SSP(10,4) METHOD
