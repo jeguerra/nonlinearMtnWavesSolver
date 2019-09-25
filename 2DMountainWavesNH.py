@@ -114,10 +114,6 @@ if __name__ == '__main__':
        #%% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
        
-       # Compute DX and DZ grid length scales
-       DX = np.mean(np.diff(REFS[0]))
-       DZ = np.mean(np.diff(REFS[1]))
-       
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
@@ -142,9 +138,17 @@ if __name__ == '__main__':
        REFS.append(DZT)
        REFS.append(sigma)
        
+       # Compute DX and DZ grid length scales
+       DX = np.mean(np.abs(np.diff(REFS[0])))
+       DZ = np.mean(np.abs(np.diff(REFS[1])))
+       
        # Compute the local grid lengths
-       DXL = np.abs(np.diff(np.concatenate((XL[:,1], XL, XL[:,NX-2]), axis=1), axis=1))
-       DZTL = np.abs(np.diff(np.concatenate((ZTL[1,:], ZTL, ZTL[NZ-2,:]), axis=0), axis=0))
+       #XLE = np.hstack((XL, np.expand_dims(XL[:,NX-1], axis=1)))
+       #ZTLE = np.vstack((ZTL, np.expand_dims(ZTL[NZ-2,:], axis=0)))
+       #DX2 = np.power(np.diff(XLE, axis=1), 2.0)
+       #DZ2 = np.power(np.diff(ZTLE, axis=0), 2.0)
+       #DXM = np.reshape(DX2, (OPS,), order='F')
+       #DZM = np.reshape(DZ2, (OPS,), order='F')
        
        #%% Read in sensible or potential temperature soundings (corner points)
        T_in = [300.0, 228.5, 228.5, 244.5]
@@ -263,6 +267,7 @@ if __name__ == '__main__':
        if StaticSolve:
               sol = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
        elif TransientSolve:
+              restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
               bN = bN[sysDex]
               
@@ -278,7 +283,7 @@ if __name__ == '__main__':
               INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
               if isRestart:
-                     rdb = shelve.open('restartDB', flag='r')
+                     rdb = shelve.open(restart_file, flag='r')
                      SOLT[udex,0] = rdb['uxz']
                      SOLT[wdex,0] = rdb['wxz']
                      SOLT[pdex,0] = rdb['pxz']
@@ -332,6 +337,7 @@ if __name__ == '__main__':
                      #       break
               
        elif NonLinSolve:
+              restart_file = 'restartDB_NL'
               sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
               # Initialize transient storage
@@ -352,7 +358,7 @@ if __name__ == '__main__':
               REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
               
               if isRestart:
-                     rdb = shelve.open('restartDB')
+                     rdb = shelve.open(restart_file)
                      SOLT[udex,0] = rdb['uxz']
                      SOLT[wdex,0] = rdb['wxz']
                      SOLT[pdex,0] = rdb['pxz']
@@ -384,8 +390,7 @@ if __name__ == '__main__':
                      RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
                      
               # Initialize residual coefficients
-              RES = RHS
-              RESCF = computeResidualViscCoeffs(SOLT[:,0], RES, DX, DZ, udex, OPS)
+              RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
               error = [np.linalg.norm(RHS)]
        
               # Start the time loop
@@ -393,10 +398,10 @@ if __name__ == '__main__':
                      # Get the DynSGS Coefficients
                      if ResDiff and tt % RTI == 0:
                             # Compute the local DynSGS coefficients
-                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RES, DX, DZ, udex, OPS)
+                            RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, OPS)
                             
                      # Compute the SSPRK93 stages at this time step
-                     sol, RHS, RES = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
@@ -405,8 +410,8 @@ if __name__ == '__main__':
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                             
-                     if DT * tt >= 720:
-                            break
+                     #if DT * tt >= 1800:
+                     #       break
               
        endt = time.time()
        print('Solve the system: DONE!')
@@ -419,7 +424,7 @@ if __name__ == '__main__':
        
        #% Make a database for restart
        if toRestart:
-              rdb = shelve.open('restartDB', flag='n')
+              rdb = shelve.open(restart_file, flag='n')
               rdb['uxz'] = SOL[udex]
               rdb['wxz'] = SOL[wdex]
               rdb['pxz'] = SOL[pdex]

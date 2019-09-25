@@ -13,8 +13,8 @@ def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, OPS):
        ARES = np.abs(RES)
        DSOL = np.abs(SOL)
               
-       QRESX = np.zeros(SOL.shape)
-       QRESZ = np.zeros(SOL.shape)
+       QRESX = 0.0 * SOL
+       QRESZ = 0.0 * SOL
        
        for vv in range(4):
               qdex = udex + vv * OPS

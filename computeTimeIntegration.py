@@ -53,20 +53,26 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
        c2 = 1.0 / 5.0
        sol = SOLT[sysDex,0]
        
+       rhsSGS = 0.0
+       if DynSGS:
+              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+       
        def computeRHSUpdate():
               rhs = bN - AN.dot(sol)
+              '''
               if DynSGS:
                      SOLT[sysDex,0] = sol
                      fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      sgs = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
                      rhs += sgs[sysDex]
-                     
+              '''       
               return rhs
        
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
        for ii in range(7):
-              sol += c1 * DT * RHS
+              sol += c1 * DT * (RHS + rhsSGS)
               
               if ii == 1:
                      SOLT[sysDex,1] = sol
@@ -78,7 +84,7 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DT, RHS, SOLT, INIT, RESCF, sys
        
        # Compute stages 7 - 9
        for ii in range(2):
-              sol += c1 * DT * RHS
+              sol += c1 * DT * (RHS + rhsSGS)
               RHS = computeRHSUpdate()
               
        return sol, RHS
@@ -89,23 +95,28 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
        c2 = 1.0 / 5.0
        sol = SOLT[:,0]
        
+       rhsSGS = 0.0
+       if DynSGS:
+              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+       
        def computeRHSUpdate():
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+              '''
               if DynSGS:
-                     rhs += tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
-                     
+                     rhs += rhsSGS
+                     #rhs += tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+              '''       
               return rhs
        #'''
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
        for ii in range(7):
-              sol += c1 * DT * RHS
+              sol += c1 * DT * (RHS + rhsSGS)
               if ii == 1:
                      SOLT[:,1] = sol
-                     RES = RHS
-                     #RES = (sol - SOLT[:,0]) / (c1 * DT) - RHS
               
               RHS = computeRHSUpdate()
               
@@ -114,7 +125,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
        
        # Compute stages 7 - 9
        for ii in range(2):
-              sol += c1 * DT * RHS
+              sol += c1 * DT * (RHS + rhsSGS)
               RHS = computeRHSUpdate()
        #'''
        
@@ -136,4 +147,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DT, RHS, SOLT, INIT, RESCF, udex,
        computeRHSUpdate()
        '''
        
-       return sol, RHS, RES
+       return sol, RHS#, RES

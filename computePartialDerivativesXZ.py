@@ -38,8 +38,6 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        #%% Make the operators sparse
        DDXM = sps.csc_matrix(DDX_OP)
        DDZM = sps.csc_matrix(DDZ_OP)
-       #DDXM = DDX_OP
-       #DDZM = DDZ_OP
        
        # Apply terrain following adjustments (Terrain metric)
        SIGMA = sps.diags(np.reshape(sigma, (OPS,), order='F'), format='csc')       
