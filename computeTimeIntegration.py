@@ -54,7 +54,7 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, RE
        c2 = 1.0 / 5.0
        sol = SOLT[sysDex,0]
        
-       rhsSGS = 0.0
+       SGS = 0.0
        def computeDynSGSUpdate():
               if DynSGS:
                      fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
@@ -73,20 +73,21 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, RE
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
        for ii in range(7):
-              sol += c1 * DT * (RHS + rhsSGS)
+              sol += c1 * DT * (RHS + SGS)
+              RHS = computeRHSUpdate()
+              SGS = computeDynSGSUpdate()
               
               if ii == 1:
                      SOLT[sysDex,1] = sol
-              
-              RHS = computeRHSUpdate()
-              
+                     
        # Compute stage 6 with linear combination
        sol = c2 * (3.0 * SOLT[sysDex,1] + 2.0 * sol)
        
        # Compute stages 7 - 9
        for ii in range(2):
-              sol += c1 * DT * (RHS + rhsSGS)
+              sol += c1 * DT * (RHS + SGS)
               RHS = computeRHSUpdate()
+              SGS = computeDynSGSUpdate()
               
        return sol, RHS
 
