@@ -76,7 +76,7 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
                             
        return RL, SBR
 
-def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral):
+def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, topdex, botdex):
        # Get DIMS data
        NX = DIMS[3] + 1
        NZ = DIMS[4]
@@ -91,8 +91,12 @@ def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLatera
        mu_P = mu[2]
        mu_T = mu[3]
        
-       # Compute the blocks
+       # Compute the diagonal for Rayleigh field
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
+       # Apply the boundary conditions
+       tempDiagonal[topdex] *= 0.0
+       tempDiagonal[botdex] *= 0.0
+       # Compute the matrix operator
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        
        # Store the diagonal blocks corresponding to Rayleigh damping terms

@@ -149,6 +149,14 @@ if __name__ == '__main__':
        #DXM = np.reshape(DX2, (OPS,), order='F')
        #DZM = np.reshape(DZ2, (OPS,), order='F')
        
+       #%% Compute the BC index vector
+       ubdex, utdex, wbdex, sysDexST, sysDexTR = computeAdjust4CBC(DIMS, numVar, varDex)
+       
+       if StaticSolve:
+              sysDex = sysDexST
+       elif TransientSolve or NonLinSolve:
+              sysDex = sysDexTR
+       
        #%% Read in sensible or potential temperature soundings (corner points)
        T_in = [300.0, 228.5, 228.5, 244.5]
        Z_in = [0.0, 1.1E4, 2.0E4, 3.6E4]
@@ -213,15 +221,7 @@ if __name__ == '__main__':
        REFS.append(DDXM.dot(DDXM))
        REFS.append(DDZM.dot(DDZM))
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
-       ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral)
-       
-       #%% Compute the BC index vector
-       ubdex, utdex, wbdex, sysDexST, sysDexTR = computeAdjust4CBC(DIMS, numVar, varDex)
-       
-       if StaticSolve:
-              sysDex = sysDexST
-       elif TransientSolve or NonLinSolve:
-              sysDex = sysDexTR
+       ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
        
        #%% Initialize the global solution vector
        SOL = np.zeros((NX * NZ,1))
@@ -307,23 +307,6 @@ if __name__ == '__main__':
                      TI = np.array(np.arange(DT, ET, DT))
                      # Initialize the RHS
                      RHS = bN
-                     
-              error = [np.linalg.norm(RHS)]
-              
-              # Start the time loop
-              for tt in range(len(TI)):
-                     # Compute the SSPRK93 stages
-                     sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
-                     SOLT[sysDex,0] = sol
-                     
-                     # Print out diagnostics every OTI steps
-                     if tt % OTI == 0:
-                            err = np.linalg.norm(RHS)
-                            error.append(err)
-                            print('Time: ', tt * DT, ' RHS 2-norm: ', err)
-                            
-                     #if DT * tt >= 1800.0:
-                     #       break
               
        elif NonLinSolve:
               restart_file = 'restartDB_NL'
@@ -376,13 +359,17 @@ if __name__ == '__main__':
                      fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      # Initialize the RHS and forcing for each field
                      RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
-                     
+                                          
+       #%% Start the time loop
+       if TransientSolve or NonLinSolve:
               error = [np.linalg.norm(RHS)]
-       
-              # Start the time loop
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
-                     sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     if TransientSolve:
+                            sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     elif NonLinSolve:
+                            sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     
                      SOLT[sysDex,0] = sol
                      
                      # Print out diagnostics every OTI steps
@@ -404,7 +391,7 @@ if __name__ == '__main__':
        SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]))
        
        #% Make a database for restart
-       if toRestart:
+       if toRestart and not StaticSolve:
               rdb = shelve.open(restart_file, flag='n')
               rdb['uxz'] = SOL[udex]
               rdb['wxz'] = SOL[wdex]

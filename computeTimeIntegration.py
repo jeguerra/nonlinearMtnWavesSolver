@@ -6,7 +6,6 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
-import scipy.sparse as sps
 import computeEulerEquationsLogPLogT as tendency
 from computeResidualViscCoeffs import computeResidualViscCoeffs
 
@@ -53,7 +52,6 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, RE
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[sysDex,0]
-       
        SGS = 0.0
        def computeDynSGSUpdate():
               if DynSGS:
@@ -152,4 +150,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        computeRHSUpdate()
        '''
        
-       return sol, RHS#, RES
+       return sol, RHS
