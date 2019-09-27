@@ -44,9 +44,7 @@ from computeTimeIntegration import computePrepareFields
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 
-# Truncated spectral derivative matrices
-#import computeHermiteFunctionDerivativeMatrix_Truncated as hfd
-#import computeChebyshevDerivativeMatrix_Truncated as chd
+#from matplotlib.animation import ImageMagickWriter
 
 if __name__ == '__main__':
        # Set the solution type
@@ -108,6 +106,7 @@ if __name__ == '__main__':
        HR = 5.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 100 # Stride for diagnostic output
+       ITI = 1000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
@@ -264,7 +263,11 @@ if __name__ == '__main__':
        #%% Solve the system - Static or Transient Solution
        start = time.time()
        if StaticSolve:
-              sol = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
+              # Initialize solution storage
+              SOLT = np.zeros((numVar * OPS,))
+              SOLT[sysDex] = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
+              # Set the boundary condition                      
+              SOLT[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex]))
        elif TransientSolve:
               restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
@@ -363,6 +366,10 @@ if __name__ == '__main__':
        #%% Start the time loop
        if TransientSolve or NonLinSolve:
               error = [np.linalg.norm(RHS)]
+              #metadata = dict(title='Nonlinear Solve - Ln-Theta, 100 m', artist='Spectral Methond', comment='DynSGS')
+              #writer = ImageMagickWriter(fps=20, metadata=metadata)
+              fig = plt.figure()
+              #with writer.saving(fig, "nonlinear_dynsgs.gif", 100):
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
                      if TransientSolve:
@@ -377,26 +384,32 @@ if __name__ == '__main__':
                             err = np.linalg.norm(RHS)
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
+                     if tt % ITI == 0:
+                            # Make animation for check
+                            txz = np.reshape(SOLT[tdex,0], (NZ, NX+1), order='F')
+                            ccheck = plt.contourf(XL, ZTL, txz, 101, cmap=cm.seismic)
+                            cbar = fig.colorbar(ccheck)
+                            plt.show()
                             
                      #if DT * tt >= 1800:
                      #       break
+              
+              # Set the boundary condition                      
+              SOLT[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex]))
               
        endt = time.time()
        print('Solve the system: DONE!')
        print('Elapsed time: ', endt - start)
        
        #%% Recover the solution (or check the residual)
-       SOL = np.zeros(numVar * OPS)
-       SOL[sysDex] = sol;
-       SOL[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOL[ubdex]))
        
        #% Make a database for restart
        if toRestart and not StaticSolve:
               rdb = shelve.open(restart_file, flag='n')
-              rdb['uxz'] = SOL[udex]
-              rdb['wxz'] = SOL[wdex]
-              rdb['pxz'] = SOL[pdex]
-              rdb['txz'] = SOL[tdex]
+              rdb['uxz'] = SOLT[udex]
+              rdb['wxz'] = SOLT[wdex]
+              rdb['pxz'] = SOLT[pdex]
+              rdb['txz'] = SOLT[tdex]
               rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ
@@ -404,14 +417,10 @@ if __name__ == '__main__':
               rdb.close()
        
        #% Get the fields in physical space
-       udex = np.array(range(OPS))
-       wdex = np.add(udex, iW * OPS)
-       pdex = np.add(udex, iP * OPS)
-       tdex = np.add(udex, iT * OPS)
-       uxz = np.reshape(SOL[udex], (NZ, NX+1), order='F');
-       wxz = np.reshape(SOL[wdex], (NZ, NX+1), order='F');
-       pxz = np.reshape(SOL[pdex], (NZ, NX+1), order='F');
-       txz = np.reshape(SOL[tdex], (NZ, NX+1), order='F');
+       uxz = np.reshape(SOLT[udex], (NZ, NX+1), order='F')
+       wxz = np.reshape(SOLT[wdex], (NZ, NX+1), order='F')
+       pxz = np.reshape(SOLT[pdex], (NZ, NX+1), order='F')
+       txz = np.reshape(SOLT[tdex], (NZ, NX+1), order='F')
        print('Recover solution on native grid: DONE!')
        
        #% Interpolate columns to a finer grid for plotting

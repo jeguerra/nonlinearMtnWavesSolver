@@ -36,10 +36,10 @@ def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, wdex, pdex, tdex):
                      QRESZ[qdex] = (DZ**2 / QM) * ARES[qdex]
        
        # Fix SGS to upwind value where needed
-       #'''
+       '''
        updex = np.argwhere(QRESX >= 0.5 * DX)
        QRESX[updex] = 0.5 * DX
        updex = np.argwhere(QRESZ >= 0.5 * DZ)
        QRESZ[updex] = 0.5 * DZ
-       #'''
+       '''
        return (QRESX, QRESZ)
