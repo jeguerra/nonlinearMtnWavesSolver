@@ -8,7 +8,7 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 
-def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, wdex, pdex, tdex, topdex, botdex):
+def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, wdex, pdex, tdex):
        
        ARES = np.abs(RES)
        DSOL = np.abs(SOL)
@@ -34,9 +34,6 @@ def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, wdex, pdex, tdex, topdex, 
                      # Compute the anisotropic coefficients
                      QRESX[qdex] = (DX**2 / QM) * ARES[qdex]
                      QRESZ[qdex] = (DZ**2 / QM) * ARES[qdex]
-                     # Null coefficients at vertical boundaries
-                     (QRESX[qdex])[topdex] *= 0.0
-                     (QRESZ[qdex])[botdex] *= 0.0
        
        # Fix SGS to upwind value where needed
        #'''

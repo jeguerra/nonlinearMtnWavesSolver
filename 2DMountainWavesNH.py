@@ -54,7 +54,7 @@ if __name__ == '__main__':
        ResDiff = True
        
        # Set restarting
-       toRestart = True
+       toRestart = False
        isRestart = False
        
        # Set physical constants (dry air)
@@ -71,8 +71,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 155
-       NZ = 95
+       NX = 129
+       NZ = 81
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -101,7 +101,7 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.05 # Linear transient
+       DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
@@ -213,7 +213,7 @@ if __name__ == '__main__':
        SOL = np.zeros((NX * NZ,1))
        
        #%% Rayleigh opearator
-       RAYOP = sps.block_diag((ROPS[0], ROPS[1],  ROPS[2], ROPS[3]), format='lil')
+       RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
        
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
@@ -361,9 +361,9 @@ if __name__ == '__main__':
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
                      if TransientSolve:
-                            sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, vbcDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, vbcDex, ResDiff)
+                            sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      
                      SOLT[sysDex,0] = sol
                      
@@ -372,6 +372,7 @@ if __name__ == '__main__':
                             err = np.linalg.norm(RHS)
                             error.append(err)
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
+                     
                      if tt % ITI == 0:
                             # Make animation for check
                             txz = np.reshape(SOLT[tdex,0], (NZ, NX+1), order='F')

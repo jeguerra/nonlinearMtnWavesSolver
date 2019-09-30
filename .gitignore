@@ -24,3 +24,5 @@ octave-workspace
 *.dir
 
 *.db
+
+*.Result

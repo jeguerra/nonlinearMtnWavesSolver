@@ -123,7 +123,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        
        return DqDt
 
-def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, vbcDex):
+def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the static vertical gradients
        ROPS = REFG[3]
@@ -135,7 +135,6 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, vb
        DtDt = - ROPS[3].dot(txz)
        
        # Null tendencies at essential vertical boundaries
-       '''
        DuDt[topdex] *= 0.0
        DuDt[botdex] *= 0.0
        DwDt[topdex] *= 0.0
@@ -144,16 +143,13 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, vb
        DpDt[botdex] *= 0.0
        DtDt[topdex] *= 0.0
        DtDt[botdex] *= 0.0
-       '''
+       
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       # Null tendencies along vertical boundaries
-       DqDt[vbcDex] *= 0.0
-       
        return DqDt
 
-def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, vbcDex):
+def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
        #DDXM = REFS[13]
@@ -192,8 +188,7 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        DpDt = RESCFX[pdex] * DDx[:,2] + RESCFZ[pdex] * DDz[:,2]
        DtDt = RESCFX[tdex] * DDx[:,3] + RESCFZ[tdex] * DDz[:,3]
        #'''
-       # Null tendencies at vertical boundaries
-       '''
+       # Null tendencies along vertical boundaries
        DuDt[topdex] *= 0.0
        DuDt[botdex] *= 0.0
        DwDt[topdex] *= 0.0
@@ -202,12 +197,9 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        DpDt[botdex] *= 0.0
        DtDt[topdex] *= 0.0
        DtDt[botdex] *= 0.0
-       '''
+
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
-       
-       # Null tendencies along vertical boundaries
-       DqDt[vbcDex] *= 0.0
        
        return DqDt
        
