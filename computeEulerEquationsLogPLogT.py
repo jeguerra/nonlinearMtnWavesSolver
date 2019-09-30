@@ -123,7 +123,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        
        return DqDt
 
-def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
+def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, vbcDex):
        
        # Get the static vertical gradients
        ROPS = REFG[3]
@@ -148,9 +148,12 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
+       # Null tendencies along vertical boundaries
+       DqDt[vbcDex] *= 0.0
+       
        return DqDt
 
-def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
+def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, vbcDex):
        
        # Get the derivative operators
        #DDXM = REFS[13]
@@ -202,6 +205,9 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        '''
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       
+       # Null tendencies along vertical boundaries
+       DqDt[vbcDex] *= 0.0
        
        return DqDt
        

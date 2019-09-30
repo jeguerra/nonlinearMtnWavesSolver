@@ -141,12 +141,7 @@ if __name__ == '__main__':
        DZ = np.mean(np.abs(np.diff(REFS[1])))
        
        #%% Compute the BC index vector
-       ubdex, utdex, wbdex, sysDexST, sysDexTR = computeAdjust4CBC(DIMS, numVar, varDex)
-       
-       if StaticSolve:
-              sysDex = sysDexST
-       elif TransientSolve or NonLinSolve:
-              sysDex = sysDexTR
+       ubdex, utdex, wbdex, sysDex, vbcDex = computeAdjust4CBC(DIMS, numVar, varDex)
        
        #%% Read in sensible or potential temperature soundings (corner points)
        T_in = [300.0, 228.5, 228.5, 244.5]
@@ -366,9 +361,9 @@ if __name__ == '__main__':
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
                      if TransientSolve:
-                            sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, vbcDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, vbcDex, ResDiff)
                      
                      SOLT[sysDex,0] = sol
                      

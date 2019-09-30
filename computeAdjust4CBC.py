@@ -17,7 +17,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # Get prognostic ordering
        #iU = varDex[0]
        iW = varDex[1]
-       #iP = varDex[2]
+       iP = varDex[2]
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
@@ -25,23 +25,23 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        utdex = np.array(range(NZ-1, OPS, NZ))
        wbdex = np.add(ubdex, iW * OPS)
        wtdex = np.add(utdex, iW * OPS)
-       #pbdex = np.add(ubdex, iP * OPS)
-       #ptdex = np.add(utdex, iP * OPS)
-       #tbdex = np.add(ubdex, iT * OPS)
+       pbdex = np.add(ubdex, iP * OPS)
+       ptdex = np.add(utdex, iP * OPS)
+       tbdex = np.add(ubdex, iT * OPS)
        ttdex = np.add(utdex, iT * OPS)
        
        # BC: w' = dh/dx (U + u') so that w' is at top and bottom boundaries
-       rowsOutST = set(np.concatenate((wbdex, wtdex, ttdex)))
-       rowsOutTR = set(np.concatenate((wbdex, wtdex, ttdex)))
-       #rowsOutTR = set(wbdex)
+       rowsOutBC = set(np.concatenate((wbdex, wtdex, ttdex)))
+       # DOF along the vertical boundaries
+       rowsInterior = set(np.concatenate((ubdex, utdex, wbdex, wtdex, pbdex, ptdex, tbdex, ttdex)))
+       # All DOF
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
        # Compute set difference from all rows to rows to be taken out LINEAR
-       sysDexST = rowsAll.difference(rowsOutST)
-       sysDexST = sorted(sysDexST)
+       sysDex = rowsAll.difference(rowsOutBC)
+       sysDex = sorted(sysDex)
        
-       # Compute set difference from all rows to rows to be taken out NONLINEAR
-       sysDexTR = rowsAll.difference(rowsOutTR)
-       sysDexTR = sorted(sysDexTR)
+       # Get index array for DOF along vertical boundaries
+       vbcDex = sorted(rowsInterior)
        
-       return ubdex, utdex, wbdex, sysDexST, sysDexTR
+       return ubdex, utdex, wbdex, sysDex, vbcDex
