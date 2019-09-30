@@ -85,22 +85,23 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        # Compute derivative of perturbations
        DDx = DDXM.dot(fields)
        DDz = DDZM.dot(fields)
+       
        DuDx = DDx[:,0]
-       DwDx = DDx[:,1]
+       #DwDx = DDx[:,1]
        DlpDx = DDx[:,2]
-       DltDx = DDx[:,3]
-       DuDz = DDz[:,0]
+       #DltDx = DDx[:,3]
+       #DuDz = DDz[:,0]
        DwDz = DDz[:,1]
        DlpDz = DDz[:,2]
-       DltDz = DDz[:,3]
+       #DltDz = DDz[:,3]
        
        # Horizontal momentum equation
        LD11 = U * DuDx
-       LD12 = wxz * (DuDz + DUDZ)
+       LD12 = wxz * (DDz[:,0] + DUDZ)
        LD13 = RdT * DlpDx
        DuDt = -(LD11 + LD12 + LD13)
        # Vertical momentum equation
-       LD21 = U * DwDx
+       LD21 = U * DDx[:,0]
        LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        DwDt = -(LD21 + LD22 + LD23)
@@ -110,8 +111,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        LD33 = gam * (DuDx + DwDz)
        DpDt = -(LD31 + LD32 + LD33) 
        # Potential Temperature equation
-       LD41 = U * DltDx
-       LD42 = wxz * (DltDz + DLPTDZ)
+       LD41 = U * DDx[:,3]
+       LD42 = wxz * (DDz[:,3] + DLPTDZ)
        DtDt = -(LD41 + LD42)
        
        DwDt[topdex] *= 0.0
@@ -134,7 +135,7 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
        DtDt = - ROPS[3].dot(txz)
        
        # Null tendencies at essential vertical boundaries
-       #'''
+       '''
        DuDt[topdex] *= 0.0
        DuDt[botdex] *= 0.0
        DwDt[topdex] *= 0.0
@@ -143,7 +144,7 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
        DpDt[botdex] *= 0.0
        DtDt[topdex] *= 0.0
        DtDt[botdex] *= 0.0
-       #'''
+       '''
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
@@ -164,6 +165,7 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        # Compute derivative of perturbations
        DDx = DDXM2.dot(fields)
        DDz = DDZM2.dot(fields)
+       '''
        DuDx = DDx[:,0]
        DwDx = DDx[:,1]
        DlpDx = DDx[:,2]
@@ -172,7 +174,7 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        DwDz = DDz[:,1]
        DlpDz = DDz[:,2]
        DltDz = DDz[:,3]
-       
+       '''
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        '''
        DuDt = DDXM.dot(RESCFX[udex] * DuDx) + DDZM.dot(RESCFZ[udex] * DuDz)
@@ -182,13 +184,13 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        '''
        # Compute tendencies (2nd derivative term only)
        #'''
-       DuDt = RESCFX[udex] * DuDx + RESCFZ[udex] * DuDz
-       DwDt = RESCFX[wdex] * DwDx + RESCFZ[wdex] * DwDz
-       DpDt = RESCFX[pdex] * DlpDx + RESCFZ[pdex] * DlpDz
-       DtDt = RESCFX[tdex] * DltDx + RESCFZ[tdex] * DltDz
+       DuDt = RESCFX[udex] * DDx[:,0] + RESCFZ[udex] * DDz[:,0]
+       DwDt = RESCFX[wdex] * DDx[:,1] + RESCFZ[wdex] * DDz[:,1]
+       DpDt = RESCFX[pdex] * DDx[:,2] + RESCFZ[pdex] * DDz[:,2]
+       DtDt = RESCFX[tdex] * DDx[:,3] + RESCFZ[tdex] * DDz[:,3]
        #'''
        # Null tendencies at vertical boundaries
-       #'''
+       '''
        DuDt[topdex] *= 0.0
        DuDt[botdex] *= 0.0
        DwDt[topdex] *= 0.0
@@ -197,7 +199,7 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        DpDt[botdex] *= 0.0
        DtDt[topdex] *= 0.0
        DtDt[botdex] *= 0.0
-       #'''
+       '''
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
