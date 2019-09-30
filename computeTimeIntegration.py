@@ -47,21 +47,22 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, uxz, wxz, pxz, txz, U, RdT
 
-def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, RESCF, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
+def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[sysDex,0]
-       SGS = 0.0
+       rhs = RHS[sysDex]
+       sgs = 0.0
        def computeDynSGSUpdate():
               if DynSGS:
-                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-                     RESCF = computeResidualViscCoeffs(sol, RHS, DX, DZ, udex, wdex, pdex, tdex, botdex, topdex)
+                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
               else:
                      rhsSGS = 0.0
                      
-              return rhsSGS
+              return rhsSGS[sysDex]
        
        def computeRHSUpdate():
               rhs = bN - AN.dot(sol)
@@ -71,9 +72,9 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, RE
        #%% THE KETCHENSON SSP(9,3) METHOD
        # Compute stages 1 - 5
        for ii in range(7):
-              sol += c1 * DT * (RHS + SGS)
-              RHS = computeRHSUpdate()
-              SGS = computeDynSGSUpdate()
+              sol += c1 * DT * (rhs + sgs)
+              rhs = computeRHSUpdate()
+              sgs = computeDynSGSUpdate()
               
               if ii == 1:
                      SOLT[sysDex,1] = sol
@@ -83,11 +84,11 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, RE
        
        # Compute stages 7 - 9
        for ii in range(2):
-              sol += c1 * DT * (RHS + SGS)
-              RHS = computeRHSUpdate()
-              SGS = computeDynSGSUpdate()
+              sol += c1 * DT * (rhs + sgs)
+              rhs = computeRHSUpdate()
+              sgs = computeDynSGSUpdate()
               
-       return sol, RHS
+       return sol, rhs
 
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
        # Set the coefficients

@@ -49,12 +49,12 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = False
-       NonLinSolve = True
+       TransientSolve = True
+       NonLinSolve = False
        ResDiff = True
        
        # Set restarting
-       toRestart = False
+       toRestart = True
        isRestart = False
        
        # Set physical constants (dry air)
@@ -71,8 +71,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129
-       NZ = 81
+       NX = 135
+       NZ = 91
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -101,7 +101,7 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.1 # Linear transient
+       DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
@@ -239,7 +239,8 @@ if __name__ == '__main__':
        
               # Set up the global solve
               A = LDG + RAYOP
-              AN = A[np.ix_(sysDex,sysDex)]
+              AN = A[sysDex,:]
+              AN = AN[:,sysDex]
               del(A)
               AN = AN.tocsc()
               bN = -(LDG[:,wbdex]).dot(WBC)
@@ -296,7 +297,8 @@ if __name__ == '__main__':
                      # Initialize time array
                      TI = np.array(np.arange(DT, ET, DT))
                      # Initialize the RHS
-                     RHS = bN
+                     RHS = np.zeros((numVar * OPS,))
+                     RHS[sysDex] = bN
               
        elif NonLinSolve:
               restart_file = 'restartDB_NL'
@@ -361,11 +363,12 @@ if __name__ == '__main__':
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
                      if TransientSolve:
-                            sol, RHS = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, rhs = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, RHS = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      
                      SOLT[sysDex,0] = sol
+                     RHS[sysDex] = rhs
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
