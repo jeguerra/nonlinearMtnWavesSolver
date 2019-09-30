@@ -93,9 +93,9 @@ def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLatera
        
        # Compute the diagonal for Rayleigh field
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
-       # Apply the boundary conditions
-       #tempDiagonal[topdex] *= 0.0
-       #tempDiagonal[botdex] *= 0.0
+       # Null damping along top and bottom boundaries
+       tempDiagonal[topdex] *= 0.0
+       tempDiagonal[botdex] *= 0.0
        # Compute the matrix operator
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        

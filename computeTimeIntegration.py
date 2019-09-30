@@ -149,5 +149,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        sol = SOLT[:,1] + 0.6 * sol + 0.1 * DT * RHS
        computeRHSUpdate()
        '''
-       RHS = (RHS + SGS)
        return sol, RHS

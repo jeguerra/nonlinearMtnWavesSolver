@@ -71,8 +71,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135
-       NZ = 85
+       NX = 145
+       NZ = 91
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -101,9 +101,9 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.1 # Linear transient
+       DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 5.0
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 100 # Stride for diagnostic output
        ITI = 1000 # Stride for image output
@@ -139,14 +139,6 @@ if __name__ == '__main__':
        # Compute DX and DZ grid length scales
        DX = np.mean(np.abs(np.diff(REFS[0])))
        DZ = np.mean(np.abs(np.diff(REFS[1])))
-       
-       # Compute the local grid lengths
-       #XLE = np.hstack((XL, np.expand_dims(XL[:,NX-1], axis=1)))
-       #ZTLE = np.vstack((ZTL, np.expand_dims(ZTL[NZ-2,:], axis=0)))
-       #DX2 = np.power(np.diff(XLE, axis=1), 2.0)
-       #DZ2 = np.power(np.diff(ZTLE, axis=0), 2.0)
-       #DXM = np.reshape(DX2, (OPS,), order='F')
-       #DZM = np.reshape(DZ2, (OPS,), order='F')
        
        #%% Compute the BC index vector
        ubdex, utdex, wbdex, sysDexST, sysDexTR = computeAdjust4CBC(DIMS, numVar, varDex)
@@ -226,7 +218,7 @@ if __name__ == '__main__':
        SOL = np.zeros((NX * NZ,1))
        
        #%% Rayleigh opearator
-       RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
+       RAYOP = sps.block_diag((ROPS[0], ROPS[1],  ROPS[2], ROPS[3]), format='lil')
        
        #%% Compute the global LHS operator
        if StaticSolve or TransientSolve:
@@ -264,10 +256,10 @@ if __name__ == '__main__':
        start = time.time()
        if StaticSolve:
               # Initialize solution storage
-              SOLT = np.zeros((numVar * OPS,))
-              SOLT[sysDex] = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
+              SOLT = np.zeros((numVar * OPS, 2))
+              SOLT[sysDex,0] = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
               # Set the boundary condition                      
-              SOLT[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex]))
+              SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
        elif TransientSolve:
               restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
@@ -369,6 +361,7 @@ if __name__ == '__main__':
               #metadata = dict(title='Nonlinear Solve - Ln-Theta, 100 m', artist='Spectral Methond', comment='DynSGS')
               #writer = ImageMagickWriter(fps=20, metadata=metadata)
               fig = plt.figure()
+              plt.show()
               #with writer.saving(fig, "nonlinear_dynsgs.gif", 100):
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
@@ -391,11 +384,12 @@ if __name__ == '__main__':
                             cbar = fig.colorbar(ccheck)
                             plt.show()
                             
-                     #if DT * tt >= 1800:
+                     #if DT * tt >= 3600:
+                     #       ET = DT * tt
                      #       break
               
               # Set the boundary condition                      
-              SOLT[wbdex] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex]))
+              SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
               
        endt = time.time()
        print('Solve the system: DONE!')
@@ -406,10 +400,10 @@ if __name__ == '__main__':
        #% Make a database for restart
        if toRestart and not StaticSolve:
               rdb = shelve.open(restart_file, flag='n')
-              rdb['uxz'] = SOLT[udex]
-              rdb['wxz'] = SOLT[wdex]
-              rdb['pxz'] = SOLT[pdex]
-              rdb['txz'] = SOLT[tdex]
+              rdb['uxz'] = SOLT[udex,0]
+              rdb['wxz'] = SOLT[wdex,0]
+              rdb['pxz'] = SOLT[pdex,0]
+              rdb['txz'] = SOLT[tdex,0]
               rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ
@@ -417,10 +411,10 @@ if __name__ == '__main__':
               rdb.close()
        
        #% Get the fields in physical space
-       uxz = np.reshape(SOLT[udex], (NZ, NX+1), order='F')
-       wxz = np.reshape(SOLT[wdex], (NZ, NX+1), order='F')
-       pxz = np.reshape(SOLT[pdex], (NZ, NX+1), order='F')
-       txz = np.reshape(SOLT[tdex], (NZ, NX+1), order='F')
+       uxz = np.reshape(SOLT[udex,0], (NZ, NX+1), order='F')
+       wxz = np.reshape(SOLT[wdex,0], (NZ, NX+1), order='F')
+       pxz = np.reshape(SOLT[pdex,0], (NZ, NX+1), order='F')
+       txz = np.reshape(SOLT[tdex,0], (NZ, NX+1), order='F')
        print('Recover solution on native grid: DONE!')
        
        #% Interpolate columns to a finer grid for plotting
