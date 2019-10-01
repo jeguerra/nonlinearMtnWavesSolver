@@ -101,7 +101,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        LD13 = RdT * DlpDx
        DuDt = -(LD11 + LD12 + LD13)
        # Vertical momentum equation
-       LD21 = U * DDx[:,0]
+       LD21 = U * DDx[:,1]
        LD22 = wxz * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        DwDt = -(LD21 + LD22 + LD23)

@@ -49,8 +49,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = False
-       TransientSolve = True
-       NonLinSolve = False
+       TransientSolve = False
+       NonLinSolve = True
        ResDiff = True
        
        # Set restarting
@@ -71,8 +71,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135
-       NZ = 91
+       NX = 155
+       NZ = 95
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -256,6 +256,9 @@ if __name__ == '__main__':
               SOLT[sysDex,0] = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
               # Set the boundary condition                      
               SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
+              
+              # Use the linear solution as the initial guess to the nonlinear solution
+              
        elif TransientSolve:
               restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
