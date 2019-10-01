@@ -43,18 +43,19 @@ from computeRayleighEquations import computeRayleighEquations
 from computeTimeIntegration import computePrepareFields
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
+from computeIterativeSolveNL import computeIterativeSolveNL
 
 #from matplotlib.animation import ImageMagickWriter
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = False
+       StaticSolve = True
        TransientSolve = False
-       NonLinSolve = True
-       ResDiff = True
+       NonLinSolve = False
+       ResDiff = False
        
        # Set restarting
-       toRestart = True
+       toRestart = False
        isRestart = False
        
        # Set physical constants (dry air)
@@ -71,8 +72,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 155
-       NZ = 95
+       NX = 135
+       NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -249,30 +250,47 @@ if __name__ == '__main__':
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
+       
+       # Initialize transient storage
+       SOLT = np.zeros((numVar * OPS, 2))
+       INIT = np.zeros((numVar * OPS,))
+       
+       # Initialize the Background fields
+       INIT[udex] = np.reshape(UZ, (OPS,), order='F')
+       INIT[wdex] = np.zeros((OPS,))
+       INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
+       INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
+       
+       # Get the static vertical gradients and store
+       DUDZ = np.reshape(REFS[10], (OPS,), order='F')
+       DLPDZ = np.reshape(REFS[11], (OPS,), order='F')
+       DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
+       REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
+       
        start = time.time()
        if StaticSolve:
-              # Initialize solution storage
-              SOLT = np.zeros((numVar * OPS, 2))
               SOLT[sysDex,0] = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
               # Set the boundary condition                      
               SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
               
-              # Use the linear solution as the initial guess to the nonlinear solution
+              # Get the static vertical gradients and store
+              DUDZ = np.reshape(REFS[10], (OPS,), order='F')
+              DLPDZ = np.reshape(REFS[11], (OPS,), order='F')
+              DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
+              REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
               
+              #%% Use the linear solution as the initial guess to the nonlinear solution
+              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+              SOLT[:,1] = sol
+              
+              # Compare the linear and nonlinear solutions
+              DSOL = SOLT[:,1] - SOLT[:,0]
+              print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
+              #%%
        elif TransientSolve:
               restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
               bN = bN[sysDex]
-              
-              # Initialize transient storage
-              SOLT = np.zeros((numVar * OPS, 2))
-              INIT = np.zeros((numVar * OPS,))
-              
-              # Initialize the Background fields
-              INIT[udex] = np.reshape(UZ, (OPS,), order='F')
-              INIT[wdex] = np.zeros((OPS,))
-              INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
-              INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
               
               if isRestart:
                      rdb = shelve.open(restart_file, flag='r')
@@ -307,21 +325,6 @@ if __name__ == '__main__':
               restart_file = 'restartDB_NL'
               sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
-              # Initialize transient storage
-              SOLT = np.zeros((numVar * OPS, 2))
-              INIT = np.zeros((numVar * OPS,))
-              
-              # Initialize the solution fields
-              INIT[udex] = np.reshape(UZ, (OPS,), order='F')
-              INIT[wdex] = np.zeros((OPS,))
-              INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
-              INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-              
-              # Get the static vertical gradients and store
-              DUDZ = np.reshape(REFS[10], (OPS,), order='F')
-              DLPDZ = np.reshape(REFS[11], (OPS,), order='F')
-              DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
-              REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
               
               if isRestart:
                      rdb = shelve.open(restart_file)
