@@ -44,13 +44,14 @@ from computeTimeIntegration import computePrepareFields
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 from computeIterativeSolveNL import computeIterativeSolveNL
+from computeInterpolatedFields import computeInterpolatedFields
 
 #from matplotlib.animation import ImageMagickWriter
 
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = True
-       TransientSolve = False
+       LinearSolve = False
        NonLinSolve = False
        ResDiff = False
        
@@ -217,7 +218,7 @@ if __name__ == '__main__':
        RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
        
        #%% Compute the global LHS operator
-       if StaticSolve or TransientSolve:
+       if StaticSolve or LinearSolve:
               # Format is 'lil' to allow for column adjustments to the operator
               LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
                               [None, DOPS[3], DOPS[4], DOPS[5]], \
@@ -269,6 +270,7 @@ if __name__ == '__main__':
        
        start = time.time()
        if StaticSolve:
+              print('Starting Linear to Nonlinear Static Solver...')
               SOLT[sysDex,0] = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
               # Set the boundary condition                      
               SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
@@ -287,7 +289,7 @@ if __name__ == '__main__':
               DSOL = SOLT[:,1] - SOLT[:,0]
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
               #%%
-       elif TransientSolve:
+       elif LinearSolve:
               restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
               bN = bN[sysDex]
@@ -359,7 +361,7 @@ if __name__ == '__main__':
                      RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
                                           
        #%% Start the time loop
-       if TransientSolve or NonLinSolve:
+       if LinearSolve or NonLinSolve:
               error = [np.linalg.norm(RHS)]
               #metadata = dict(title='Nonlinear Solve - Ln-Theta, 100 m', artist='Spectral Methond', comment='DynSGS')
               #writer = ImageMagickWriter(fps=20, metadata=metadata)
@@ -368,7 +370,7 @@ if __name__ == '__main__':
               #with writer.saving(fig, "nonlinear_dynsgs.gif", 100):
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
-                     if TransientSolve:
+                     if LinearSolve:
                             sol, rhs = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
                             sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
@@ -400,8 +402,6 @@ if __name__ == '__main__':
        print('Solve the system: DONE!')
        print('Elapsed time: ', endt - start)
        
-       #%% Recover the solution (or check the residual)
-       
        #% Make a database for restart
        if toRestart and not StaticSolve:
               rdb = shelve.open(restart_file, flag='n')
@@ -415,28 +415,17 @@ if __name__ == '__main__':
               rdb['ET'] = ET
               rdb.close()
        
-       #% Get the fields in physical space
-       uxz = np.reshape(SOLT[udex,0], (NZ, NX+1), order='F')
-       wxz = np.reshape(SOLT[wdex,0], (NZ, NX+1), order='F')
-       pxz = np.reshape(SOLT[pdex,0], (NZ, NX+1), order='F')
-       txz = np.reshape(SOLT[tdex,0], (NZ, NX+1), order='F')
-       print('Recover solution on native grid: DONE!')
-       
-       #% Interpolate columns to a finer grid for plotting
-       NZI = 200
-       uxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, uxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       wxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, wxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       pxzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, pxz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       txzint = computeColumnInterp(DIMS, None, None, NZI, ZTL, txz, CH_TRANS, 'TerrainFollowingCheb2Lin')
-       print('Interpolate columns to finer grid: DONE!')
-       
-       #% Interpolate rows to a finer grid for plotting
+       #%% Recover the solution (or check the residual)
        NXI = 2500
-       uxzint = computeHorizontalInterp(DIMS, NXI, uxzint, HF_TRANS)
-       wxzint = computeHorizontalInterp(DIMS, NXI, wxzint, HF_TRANS)
-       pxzint = computeHorizontalInterp(DIMS, NXI, pxzint, HF_TRANS)
-       txzint = computeHorizontalInterp(DIMS, NXI, txzint, HF_TRANS)
-       print('Interpolate columns to finer grid: DONE!')
+       NZI = 200
+       if StaticSolve:
+              nativeLN, interpLN = computeInterpolatedFields(DIMS, ZTL, SOLT[:,0], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+              nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, SOLT[:,1], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+              nativeDF, interpDF = computeInterpolatedFields(DIMS, ZTL, DSOL, NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+       else:
+              native, interp = computeInterpolatedFields(DIMS, ZTL, SOLT[:,0], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+              uxz = native[0]; wxz = native[1]; pxz = native[2]; txz = native[3]
+              uxzint = interp[0]; wxzint = interp[1]; pxzint = interp[2]; txzint = interp[3]
        
        #% Make the new grid XLI, ZTLI
        import HerfunChebNodesWeights as hcnw
@@ -461,6 +450,38 @@ if __name__ == '__main__':
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
        
+       #%% Make some plots for static or transient solutions
+       
+       if StaticSolve:
+              fig = plt.figure(figsize=(12.0, 6.0))
+              # 1 X 3 subplot of W for linear, nonlinear, and difference
+              plt.subplot(2,2,1)
+              ccheck = plt.contourf(XLI, ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              cbar = fig.colorbar(ccheck)
+              plt.xlim(-30000.0, 50000.0)
+              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+              plt.title('Linear - W (m/s)')
+              plt.subplot(2,2,3)
+              ccheck = plt.contourf(1.0E-3 * XLI, ZTLI, interpNL[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              cbar = fig.colorbar(ccheck)
+              plt.xlim(-30.0, 50.0)
+              plt.title('Nonlinear - W (m/s)')
+              plt.subplot(1,2,2)
+              ccheck = plt.contourf(1.0E-3 * XLI, ZTLI, interpDF[1], 201, cmap=cm.flag)#, vmin=0.0, vmax=20.0)
+              cbar = fig.colorbar(ccheck)
+              plt.xlim(-30.0, 50.0)
+              plt.title('Difference - W (m/s)')
+              plt.tight_layout()
+              
+       elif LinearSolve or NonLinSolve:
+              fig = plt.figure()
+              # 2 X 2 subplot with all fields at the final time
+              for pp in range(4):
+                     plt.subplot(2,2,pp+1)
+                     ccheck = plt.contourf(XLI, ZTLI, interp[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+                     cbar = fig.colorbar(ccheck)
+       
+       '''
        #% #Spot check the solution on both grids
        fig = plt.figure()
        ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
@@ -478,3 +499,4 @@ if __name__ == '__main__':
        fig = plt.figure()
        plt.plot(XLI[0,:], wxzint[0:2,:].T, XL[0,:], wxz[0:2,:].T)
        plt.xlim(-15000.0, 15000.0)
+       '''
