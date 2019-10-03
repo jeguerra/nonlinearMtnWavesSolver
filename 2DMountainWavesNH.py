@@ -73,8 +73,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135
-       NZ = 85
+       NX = 136
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -90,7 +90,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 100.0
+       h0 = 1000.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -103,12 +103,12 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.05 # Linear transient
+       DT = 0.005 # Linear transient
        #DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
-       OTI = 100 # Stride for diagnostic output
-       ITI = 1000 # Stride for image output
+       OTI = 200 # Stride for diagnostic output
+       ITI = 2000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
        #%% Define the computational and physical grids+
@@ -139,8 +139,8 @@ if __name__ == '__main__':
        REFS.append(sigma)
        
        # Compute DX and DZ grid length scales
-       DX = np.mean(np.abs(np.diff(REFS[0])))
-       DZ = np.mean(np.abs(np.diff(REFS[1])))
+       DX = np.amax(np.abs(np.diff(REFS[0])))
+       DZ = np.amax(np.abs(np.diff(REFS[1])))
        
        #%% Compute the BC index vector
        ubdex, utdex, wbdex, sysDex, vbcDex = computeAdjust4CBC(DIMS, numVar, varDex)
@@ -271,7 +271,15 @@ if __name__ == '__main__':
        start = time.time()
        if StaticSolve:
               print('Starting Linear to Nonlinear Static Solver...')
-              SOLT[sysDex,0] = spl.spsolve(AN, bN[sysDex], use_umfpack=False)
+              # Make the normal equations
+              #AN = (AN.T).dot(AN)
+              #bN = (AN.T).dot(bN[sysDex])
+              # Solve the system
+              #from sksparse.cholmod import cholesky
+              #factor = cholesky(AN, ordering_method='colamd'); del(AN)
+              #SOLT[sysDex,0] = factor(bN); del(bN)
+              bN = bN[sysDex]
+              SOLT[sysDex,0] = spl.spsolve(AN, bN, use_umfpack=False)
               # Set the boundary condition                      
               SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
               
@@ -387,8 +395,9 @@ if __name__ == '__main__':
                      if tt % ITI == 0:
                             # Make animation for check
                             txz = np.reshape(SOLT[tdex,0], (NZ, NX+1), order='F')
-                            ccheck = plt.contourf(XL, ZTL, txz, 101, cmap=cm.seismic)
-                            cbar = fig.colorbar(ccheck)
+                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, txz, 101, cmap=cm.jet)
+                            plt.xlim(-30, 30)
+                            plt.ylim(0, 25)
                             plt.show()
                             
                      #if DT * tt >= 3600:
