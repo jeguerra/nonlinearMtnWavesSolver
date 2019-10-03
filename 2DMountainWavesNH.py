@@ -28,7 +28,6 @@ import matplotlib.pyplot as plt
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
-from computeHorizontalInterp import computeHorizontalInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
 from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
 from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
@@ -45,6 +44,8 @@ from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 from computeIterativeSolveNL import computeIterativeSolveNL
 from computeInterpolatedFields import computeInterpolatedFields
+
+import faulthandler; faulthandler.enable()
 
 #from matplotlib.animation import ImageMagickWriter
 
@@ -73,8 +74,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135
-       NZ = 85
+       NX = 168
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -105,7 +106,7 @@ if __name__ == '__main__':
        #%% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 1.0
+       HR = 5.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 100 # Stride for diagnostic output
        ITI = 1000 # Stride for image output
