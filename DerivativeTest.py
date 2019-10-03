@@ -10,8 +10,8 @@ import numpy as np
 import math as mt
 import matplotlib.pyplot as plt
 from computeGrid import computeGrid
-import computeHermiteFunctionDerivativeMatrix_Truncated as hfd
-import computeChebyshevDerivativeMatrix_Truncated as chd
+import computeHermiteFunctionDerivativeMatrix as hfd
+import computeChebyshevDerivativeMatrix as chd
 import computeTopographyOnGrid as top
 
 #%%

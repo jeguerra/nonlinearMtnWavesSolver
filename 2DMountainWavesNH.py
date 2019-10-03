@@ -74,8 +74,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 168
-       NZ = 96
+       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -91,7 +91,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 1000.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -212,9 +212,6 @@ if __name__ == '__main__':
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
        
-       #%% Initialize the global solution vector
-       SOL = np.zeros((NX * NZ,1))
-       
        #%% Rayleigh opearator
        RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
        
@@ -247,6 +244,7 @@ if __name__ == '__main__':
               del(A)
               AN = AN.tocsc()
               bN = -(LDG[:,wbdex]).dot(WBC)
+              #bN = np.expand_dims(bN, axis=1)
               del(LDG)
               del(WBC)
               print('Set up global solution operators: DONE!')
@@ -279,6 +277,7 @@ if __name__ == '__main__':
               #from sksparse.cholmod import cholesky
               #factor = cholesky(AN, ordering_method='colamd'); del(AN)
               #SOLT[sysDex,0] = factor(bN); del(bN)
+              #bN = sps.csc_matrix(bN[sysDex])
               bN = bN[sysDex]
               SOLT[sysDex,0] = spl.spsolve(AN, bN, use_umfpack=False)
               # Set the boundary condition                      
@@ -466,9 +465,9 @@ if __name__ == '__main__':
               fig = plt.figure(figsize=(12.0, 6.0))
               # 1 X 3 subplot of W for linear, nonlinear, and difference
               plt.subplot(2,2,1)
-              ccheck = plt.contourf(XLI, ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              ccheck = plt.contourf(1.0E-3 * XLI, ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
-              plt.xlim(-30000.0, 50000.0)
+              plt.xlim(-30.0, 50.0)
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.title('Linear - W (m/s)')
               plt.subplot(2,2,3)
@@ -479,7 +478,7 @@ if __name__ == '__main__':
               plt.subplot(1,2,2)
               ccheck = plt.contourf(1.0E-3 * XLI, ZTLI, interpDF[1], 201, cmap=cm.flag)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
-              plt.xlim(-30.0, 50.0)
+              #plt.xlim(-30.0, 50.0)
               plt.title('Difference - W (m/s)')
               plt.tight_layout()
               
@@ -490,23 +489,24 @@ if __name__ == '__main__':
                      plt.subplot(2,2,pp+1)
                      ccheck = plt.contourf(XLI, ZTLI, interp[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
                      cbar = fig.colorbar(ccheck)
-       
+
+
+       #%% #Spot check the solution on both grids
        '''
-       #% #Spot check the solution on both grids
        fig = plt.figure()
-       ccheck = plt.contourf(XL, ZTL, wxz, 101, cmap=cm.seismic)
+       ccheck = plt.contourf(XL, ZTL, nativeLN[1], 101, cmap=cm.seismic)
        cbar = fig.colorbar(ccheck)
        #plt.xlim(-25000.0, 25000.0)
        #plt.ylim(0.0, 5000.0)
        #
        fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, wxzint, 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+       ccheck = plt.contourf(XLI, ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        cbar = fig.colorbar(ccheck)
        #plt.xlim(-20000.0, 20000.0)
        #plt.ylim(0.0, 1000.0)
        #plt.yscale('symlog')
        #
        fig = plt.figure()
-       plt.plot(XLI[0,:], wxzint[0:2,:].T, XL[0,:], wxz[0:2,:].T)
+       plt.plot(XLI[0,:], (interpLN[1])[0:2,:].T, XL[0,:], (nativeLN[1])[0:2,:].T)
        plt.xlim(-15000.0, 15000.0)
        '''
