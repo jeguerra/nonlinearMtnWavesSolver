@@ -60,6 +60,6 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               return rhs
        
        # Solve for nonlinear equilibrium
-       sol = root(computeRHSUpdate, linSol, method='df-sane')
+       sol = root(computeRHSUpdate, linSol, method='df-sane', options={'ftol':1.0E-16})
        
        return sol.x
