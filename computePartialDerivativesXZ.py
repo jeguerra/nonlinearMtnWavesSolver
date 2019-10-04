@@ -33,14 +33,14 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        for rr in range(NZ):
               ddex = np.array(range(0,OPS,NZ)) + rr
               # Advanced slicing used to get submatrix
-              DDX_OP[np.ix_(ddex,ddex)] = DDX_1D
+              DDX_OP[np.ix_(ddex,ddex)] = sigma[cc] * DDX_1D
               
        #%% Make the operators sparse
        DDXM = sps.csc_matrix(DDX_OP)
        DDZM = sps.csc_matrix(DDZ_OP)
        
        # Apply terrain following adjustments (Terrain metric)
-       SIGMA = sps.diags(np.reshape(sigma, (OPS,), order='F'), format='csc')       
-       DDZM = SIGMA.dot(DDZM)
+       #SIGMA = sps.diags(np.reshape(sigma, (OPS,), order='F'), format='csc')       
+       #DDZM = SIGMA.dot(DDZM)
        
        return DDXM, DDZM

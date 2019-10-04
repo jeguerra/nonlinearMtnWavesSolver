@@ -33,6 +33,7 @@ from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivat
 from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
+from computeStretchedDomain2D import computeStretchedDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
@@ -74,8 +75,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 82
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -104,9 +105,9 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.005 # Linear transient
+       DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 5.0
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output
@@ -132,16 +133,17 @@ if __name__ == '__main__':
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Make the 2D physical domains from reference grids and topography
-       XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
+       #XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
+       XL, ZTL, sigma = computeStretchedDomain2D(DIMS, REFS, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
-       REFS.append(DZT)
+       REFS.append(dHdX)
        REFS.append(sigma)
        
        # Compute DX and DZ grid length scales
-       DX = np.amax(np.abs(np.diff(REFS[0])))
-       DZ = np.amax(np.abs(np.diff(REFS[1])))
+       DX = np.mean(np.abs(np.diff(REFS[0])))
+       DZ = np.mean(np.abs(np.diff(REFS[1])))
        
        #%% Compute the BC index vector
        ubdex, utdex, wbdex, sysDex, vbcDex = computeAdjust4CBC(DIMS, numVar, varDex)
@@ -228,23 +230,22 @@ if __name__ == '__main__':
               print('Compute global sparse linear Euler operator: DONE!')
        
               # Apply the coupled multipoint constraint for terrain
-              DHDXM = sps.spdiags(DZT[0,:], 0, NX+1, NX+1)
+              DHDXM = sps.spdiags(dHdX, 0, NX+1, NX+1)
               # Compute LHS column adjustment to LDG
               LDG[:,ubdex] += (LDG[:,wbdex]).dot(DHDXM)
               # Compute RHS adjustment to forcing
-              WBC = DZT[0,:] * UZ[0,:]
+              WBC = dHdX * UZ[0,:]
               # Get some memory back
               del(DHDXM)
               print('Apply coupled BC adjustments: DONE!')
        
               # Set up the global solve
-              A = LDG + RAYOP
+              A = LDG.tocsr() + RAYOP.tocsr()
               AN = A[sysDex,:]
-              AN = AN[:,sysDex]
+              AN = (AN.tocsc())[:,sysDex]
               del(A)
               AN = AN.tocsc()
               bN = -(LDG[:,wbdex]).dot(WBC)
-              #bN = np.expand_dims(bN, axis=1)
               del(LDG)
               del(WBC)
               print('Set up global solution operators: DONE!')
@@ -277,11 +278,12 @@ if __name__ == '__main__':
               #from sksparse.cholmod import cholesky
               #factor = cholesky(AN, ordering_method='colamd'); del(AN)
               #SOLT[sysDex,0] = factor(bN); del(bN)
-              #bN = sps.csc_matrix(bN[sysDex])
               bN = bN[sysDex]
-              SOLT[sysDex,0] = spl.spsolve(AN, bN, use_umfpack=False)
+              SOLT[sysDex,0] = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
+              #factor = spl.splu(AN, permc_spec='COLAMD', options=dict(Equil=True, IterRefine='DOUBLE'))
+              #SOLT[sysDex,0] = factor.solve(bN)
               # Set the boundary condition                      
-              SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
+              SOLT[wbdex,0] = np.multiply(dHdX, np.add(UZ[0,:], SOLT[ubdex,0]))
               
               # Get the static vertical gradients and store
               DUDZ = np.reshape(REFS[10], (OPS,), order='F')
@@ -362,7 +364,7 @@ if __name__ == '__main__':
                      # Initialize time array
                      TI = np.array(np.arange(DT, ET, DT))
                      # Initialize the boundary condition
-                     SOLT[wbdex,0] = DZT[0,:] * UZ[0,:]
+                     SOLT[wbdex,0] = dHdX * UZ[0,:]
                      # Initialize fields
                      fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      # Initialize the RHS and forcing for each field
@@ -405,7 +407,7 @@ if __name__ == '__main__':
                      #       break
               
               # Set the boundary condition                      
-              SOLT[wbdex,0] = np.multiply(DZT[0,:], np.add(UZ[0,:], SOLT[ubdex,0]))
+              SOLT[wbdex,0] = np.multiply(dHdX, np.add(UZ[0,:], SOLT[ubdex,0]))
               
        endt = time.time()
        print('Solve the system: DONE!')
@@ -447,7 +449,7 @@ if __name__ == '__main__':
        
        # Interpolate the terrain profile
        hcf = HF_TRANS.dot(ZTL[0,:])
-       dhcf = HF_TRANS.dot(DZT[0,:])
+       dhcf = HF_TRANS.dot(dHdX)
        IHF_TRANS = hcnw.hefuncm(NX, xnew, True)
        hnew = (IHF_TRANS).dot(hcf)
        dhnewdx = (IHF_TRANS).dot(dhcf)
@@ -481,6 +483,7 @@ if __name__ == '__main__':
               #plt.xlim(-30.0, 50.0)
               plt.title('Difference - W (m/s)')
               plt.tight_layout()
+              plt.show()
               
        elif LinearSolve or NonLinSolve:
               fig = plt.figure()
@@ -489,6 +492,7 @@ if __name__ == '__main__':
                      plt.subplot(2,2,pp+1)
                      ccheck = plt.contourf(XLI, ZTLI, interp[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
                      cbar = fig.colorbar(ccheck)
+              plt.show()
 
 
        #%% #Spot check the solution on both grids

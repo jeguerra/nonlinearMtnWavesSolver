@@ -16,7 +16,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        kap = PHYS[4]
        
        # Get the boundary terrain
-       DZT = REFS[6]
+       dHdX = REFS[6]
        
        # Get the solution components
        uxz = SOLT[udex]
@@ -33,7 +33,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        # Apply boundary condition
-       wxz[botdex] = DZT[0,:] * U[botdex]
+       wxz[botdex] = dHdX * U[botdex]
        wxz[topdex] *= 0.0 
        
        # Potential temperature perturbation vanishes along top boundary       
@@ -59,10 +59,11 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sy
                      fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+                     rhs = rhsSGS[sysDex] 
               else:
-                     rhsSGS = 0.0
+                     rhs = 0.0
                      
-              return rhsSGS[sysDex]
+              return rhs
        
        def computeRHSUpdate():
               rhs = bN - AN.dot(sol)

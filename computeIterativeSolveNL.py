@@ -18,7 +18,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        kap = PHYS[4]
        
        # Get the boundary terrain
-       DZT = REFS[6]
+       dHdX = REFS[6]
        
        # Get the solution components
        uxz = SOLT[udex]
@@ -35,7 +35,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        # Apply boundary condition
-       wxz[botdex] = DZT[0,:] * U[botdex]
+       wxz[botdex] = dHdX * U[botdex]
        wxz[topdex] *= 0.0 
        
        # Potential temperature perturbation vanishes along top boundary       
