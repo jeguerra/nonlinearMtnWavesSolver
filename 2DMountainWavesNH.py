@@ -75,8 +75,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 82
+       NX = 191 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0

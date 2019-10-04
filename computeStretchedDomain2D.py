@@ -29,7 +29,7 @@ def computeStretchedDomain2D(DIMS, REFS, hx, dhdx):
        for cc in range(NX):
               thisZH = ZH - hx[cc]
               sigma.append(ZH / thisZH)
-              ZTL[:,cc] *= thisZH / ZH
+              ZTL[:,cc] = ZL[:,cc] * thisZH / ZH
               ZTL[:,cc] += hx[cc]
        
        return XL, ZTL, sigma
