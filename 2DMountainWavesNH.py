@@ -75,8 +75,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 191 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -271,17 +271,13 @@ if __name__ == '__main__':
        start = time.time()
        if StaticSolve:
               print('Starting Linear to Nonlinear Static Solver...')
-              # Make the normal equations
-              #AN = (AN.T).dot(AN)
-              #bN = (AN.T).dot(bN[sysDex])
-              # Solve the system
-              #from sksparse.cholmod import cholesky
-              #factor = cholesky(AN, ordering_method='colamd'); del(AN)
-              #SOLT[sysDex,0] = factor(bN); del(bN)
               bN = bN[sysDex]
-              SOLT[sysDex,0] = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
-              #factor = spl.splu(AN, permc_spec='COLAMD', options=dict(Equil=True, IterRefine='DOUBLE'))
-              #SOLT[sysDex,0] = factor.solve(bN)
+              #SOLT[sysDex,0] = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
+              opts = dict(Equil=True, IterRefine='DOUBLE')
+              factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
+              del(AN)
+              SOLT[sysDex,0] = factor.solve(bN)
+              del(factor)
               # Set the boundary condition                      
               SOLT[wbdex,0] = np.multiply(dHdX, np.add(UZ[0,:], SOLT[ubdex,0]))
               
@@ -467,20 +463,22 @@ if __name__ == '__main__':
               fig = plt.figure(figsize=(12.0, 6.0))
               # 1 X 3 subplot of W for linear, nonlinear, and difference
               plt.subplot(2,2,1)
-              ccheck = plt.contourf(1.0E-3 * XLI, ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.title('Linear - W (m/s)')
               plt.subplot(2,2,3)
-              ccheck = plt.contourf(1.0E-3 * XLI, ZTLI, interpNL[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpNL[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
               plt.title('Nonlinear - W (m/s)')
               plt.subplot(1,2,2)
-              ccheck = plt.contourf(1.0E-3 * XLI, ZTLI, interpDF[1], 201, cmap=cm.flag)#, vmin=0.0, vmax=20.0)
+              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic, vmin=-0.0008, vmax=+0.0008)
               cbar = fig.colorbar(ccheck)
-              #plt.xlim(-30.0, 50.0)
+              plt.contour(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 51, colors='black', linewidths=1.25, vmin=-0.0008, vmax=+0.0008)
+              plt.xlim(-15.0, 25.0)
+              plt.ylim(0.0, 30.0)
               plt.title('Difference - W (m/s)')
               plt.tight_layout()
               plt.show()
