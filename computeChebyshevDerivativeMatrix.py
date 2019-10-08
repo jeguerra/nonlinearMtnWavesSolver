@@ -57,5 +57,6 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Domain scale factor included here
        temp = (CTD).dot(SDIFF)
        DDM = - (2.0 / ZH) * temp.dot(STR_C);
+       #DDM = - 2.0 * temp.dot(STR_C);
        
        return DDM, STR_C

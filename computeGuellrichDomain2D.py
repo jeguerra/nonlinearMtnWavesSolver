@@ -36,15 +36,14 @@ def computeGuellrichDomain2D(DIMS, REFS, hx, dhdx):
        cosvard = np.power(np.cos(ang), p-1)
        fxi1 = mul(expdec, cosvar)
        fxi2 = AR * mul(xi, (1.0 - xi));
-       fxi = np.add(fxi1, fxi2)
+       dzdh = np.add(fxi1, fxi2)
        
        dfdxi1 = -p/q * mul(expdec, cosvar)
        dfdxi2 = -(0.5 * p) * mt.pi * mul(mul(expdec, np.sin(ang)), cosvard)
        dfdxi3 = -AR * (1.0 - 2.0 * xi);
-       dfdxi = np.add(np.add(dfdxi1, dfdxi2), dfdxi3)
+       d_dzdh_dxi = np.add(np.add(dfdxi1, dfdxi2), dfdxi3)
        
-       dzdh = fxi;
-       dxidz = ZH + mul(HTZL, np.add(dfdxi, -fxi))
+       dxidz = ZH + mul(HTZL, d_dzdh_dxi)
        sigma = ZH * np.power(dxidz, -1.0)
        
        # Make the global array of terrain height and slope features

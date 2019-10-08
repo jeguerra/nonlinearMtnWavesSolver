@@ -75,8 +75,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -133,8 +133,8 @@ if __name__ == '__main__':
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Make the 2D physical domains from reference grids and topography
-       #XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
-       XL, ZTL, sigma = computeStretchedDomain2D(DIMS, REFS, HofX, dHdX)
+       XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
+       #XL, ZTL, sigma = computeStretchedDomain2D(DIMS, REFS, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -211,6 +211,7 @@ if __name__ == '__main__':
        REFS.append(DDZM)
        REFS.append(DDXM.dot(DDXM))
        REFS.append(DDZM.dot(DDZM))
+       REFS.append(DZT)
        DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
        
@@ -235,19 +236,19 @@ if __name__ == '__main__':
               LDG[:,ubdex] += (LDG[:,wbdex]).dot(DHDXM)
               # Compute RHS adjustment to forcing
               WBC = dHdX * UZ[0,:]
+              bN = -(LDG[:,wbdex]).dot(WBC)
               # Get some memory back
+              del(WBC)
               del(DHDXM)
               print('Apply coupled BC adjustments: DONE!')
        
               # Set up the global solve
               A = LDG.tocsr() + RAYOP.tocsr()
+              del(LDG)
+              del(RAYOP)
               AN = A[sysDex,:]
               AN = (AN.tocsc())[:,sysDex]
-              del(A)
               AN = AN.tocsc()
-              bN = -(LDG[:,wbdex]).dot(WBC)
-              del(LDG)
-              del(WBC)
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -474,9 +475,9 @@ if __name__ == '__main__':
               plt.xlim(-30.0, 50.0)
               plt.title('Nonlinear - W (m/s)')
               plt.subplot(1,2,2)
-              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic, vmin=-0.0008, vmax=+0.0008)
+              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)
               cbar = fig.colorbar(ccheck)
-              plt.contour(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 51, colors='black', linewidths=1.25, vmin=-0.0008, vmax=+0.0008)
+              #plt.contour(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 51, colors='black', linewidths=1.25)
               plt.xlim(-15.0, 25.0)
               plt.ylim(0.0, 30.0)
               plt.title('Difference - W (m/s)')

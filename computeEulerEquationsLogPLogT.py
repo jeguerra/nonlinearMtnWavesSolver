@@ -76,6 +76,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        # Get the derivative operators
        DDXM = REFS[13]
        DDZM = REFS[14]
+       DZT = REFS[17]
+       NX = DZT.shape[0]
+       NZ = DZT.shape[1]
+       DZDX = np.reshape(DZT, (NX*NZ,), order='F')
        
        # Get the static vertical gradients
        DUDZ = REFG[0]
@@ -85,34 +89,37 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        # Compute derivative of perturbations
        DDx = DDXM.dot(fields)
        DDz = DDZM.dot(fields)
-       
        DuDx = DDx[:,0]
-       #DwDx = DDx[:,1]
+       DwDx = DDx[:,1]
        DlpDx = DDx[:,2]
-       #DltDx = DDx[:,3]
-       #DuDz = DDz[:,0]
+       DltDx = DDx[:,3]
+       DuDz = DDz[:,0]
        DwDz = DDz[:,1]
        DlpDz = DDz[:,2]
-       #DltDz = DDz[:,3]
+       DltDz = DDz[:,3]
+       
+       WXZ = wxz - U * DZDX
+       DUDX = DuDx - DZDX * (DuDz + DUDZ)
+       DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
        
        # Horizontal momentum equation
        LD11 = U * DuDx
-       LD12 = wxz * (DDz[:,0] + DUDZ)
-       LD13 = RdT * DlpDx
+       LD12 = WXZ * (DuDz + DUDZ)
+       LD13 = RdT * DLPDX - gc * DZDX
        DuDt = -(LD11 + LD12 + LD13)
        # Vertical momentum equation
-       LD21 = U * DDx[:,1]
-       LD22 = wxz * DwDz
+       LD21 = U * DwDx
+       LD22 = WXZ * DwDz
        LD23 = RdT * (DlpDz + DLPDZ) + gc
        DwDt = -(LD21 + LD22 + LD23)
        # Pressure (mass) equation
        LD31 = U * DlpDx
-       LD32 = wxz * (DlpDz + DLPDZ)
-       LD33 = gam * (DuDx + DwDz)
+       LD32 = WXZ * (DlpDz + DLPDZ)
+       LD33 = gam * (DUDX + DwDz)
        DpDt = -(LD31 + LD32 + LD33) 
        # Potential Temperature equation
-       LD41 = U * DDx[:,3]
-       LD42 = wxz * (DDz[:,3] + DLPTDZ)
+       LD41 = U * DltDx
+       LD42 = WXZ * (DltDz + DLPTDZ)
        DtDt = -(LD41 + LD42)
        
        DwDt[topdex] *= 0.0
