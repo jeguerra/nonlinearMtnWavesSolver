@@ -3,6 +3,8 @@
 """
 Created on Fri Jul 19 10:23:58 2019
 
+Grid stretching that preserves the layout of Chebyshev nodes on columns.
+
 @author: TempestGuerra
 """
 
@@ -14,12 +16,13 @@ def computeStretchedDomain2D(DIMS, REFS, hx, dhdx):
        NX = DIMS[3] + 1
        NZ = DIMS[4]
        
-       # input REFS = [x, z, HFM, whf, CPM, wcp]
+       # Get REFS data
        x = REFS[0]
        z = REFS[1]
+       DDX_1D = REFS[2]
        
        # Compute the flat XZ mesh
-       HTZL, dummy = np.meshgrid(hx,z);
+       DZT, dummy = np.meshgrid(dhdx,z);
        XL, ZL = np.meshgrid(x,z);
        
        # Make the global array of terrain height and slope features
@@ -32,4 +35,8 @@ def computeStretchedDomain2D(DIMS, REFS, hx, dhdx):
               ZTL[:,cc] = ZL[:,cc] * thisZH / ZH
               ZTL[:,cc] += hx[cc]
        
-       return XL, ZTL, sigma
+       # Compute the terrain derivatives       
+       for rr in range(1,NZ):
+              DZT[rr,:] = DDX_1D.dot(ZTL[rr,:] - z[rr])
+       
+       return XL, ZTL, DZT, sigma
