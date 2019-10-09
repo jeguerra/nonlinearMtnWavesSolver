@@ -52,10 +52,10 @@ import faulthandler; faulthandler.enable()
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
-       ResDiff = True
+       NonLinSolve = False
+       ResDiff = False
        
        # Set restarting
        toRestart = True
