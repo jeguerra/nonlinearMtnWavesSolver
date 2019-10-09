@@ -9,7 +9,7 @@ import numpy as np
 import scipy.sparse as sps
 
 #%% The linear equation operator
-def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
+def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Get physical constants
        gc = PHYS[0]
        gam = PHYS[6]
@@ -22,11 +22,11 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        # Get REFS data
        UZ = REFS[8]
        PORZ = REFS[9]
-       DUDZ = REFS[10]
-       DLPDZ = REFS[11]
-       DLPTDZ = REFS[12]
-       DDXM = REFS[13]
-       DDZM = REFS[14]
+       DUDZ = REFG[3]
+       DLPDZ = REFG[4]
+       DLPTDZ = REFG[5]
+       DDXM = REFS[10]
+       DDZM = REFS[11]
               
        #%% Compute the various blocks needed
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
@@ -67,24 +67,59 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS):
        
        return DOPS
 
-# Function evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
+# Function evaluation of the non linear equations (static components)
+def computeEulerStaticEquationsLogPLogT_NL(PHYS, REFS, REFG, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        gam = PHYS[6]
        
        # Get the derivative operators
-       DDXM = REFS[13]
-       DDZM = REFS[14]
-       DZT = REFS[17]
-       NX = DZT.shape[0]
-       NZ = DZT.shape[1]
-       DZDX = np.reshape(DZT, (NX*NZ,), order='F')
+       DZDX = REFS[15]
        
-       # Get the static vertical gradients
-       DUDZ = REFG[0]
-       DLPDZ = REFG[1]
-       DLPTDZ = REFG[2]
+       # Get the static horizontal and vertical derivatives
+       DUDX = REFG[0]
+       DUDZ = REFG[3]
+       DLPDZ = REFG[4]
+       DLPTDZ = REFG[5]
+       
+       # Compute terrain following terms
+       PuPx = DUDX - (DZDX * DUDZ)
+       PGFZ = (RdT * DLPDZ) + gc
+       
+       # Horizontal momentum equation
+       DuDt = DZDX * PGFZ
+       # Vertical momentum equation
+       DwDt = -PGFZ
+       # Pressure (mass) equation
+       DpDt = -gam * PuPx
+       # Potential Temperature equation
+       DtDt = 0.0 * DLPTDZ
+       
+       DwDt[topdex] *= 0.0
+       DwDt[botdex] *= 0.0
+       DtDt[topdex] *= 0.0
+       
+       DqDt_static = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       
+       return DqDt_static
+
+# Function evaluation of the non linear equations (dynamic components)
+def computeEulerEquationsLogPLogT_NL(DqDt_static, PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
+       # Get physical constants
+       gam = PHYS[6]
+       
+       # Get the derivative operators
+       DDXM = REFS[10]
+       DDZM = REFS[11]
+       DZDX = REFS[15]
+       
+       # Get the static horizontal and vertical derivatives
+       DUDX = REFG[0]
+       DLPDX = REFG[1]
+       DLPTDX = REFG[2]
+       DUDZ = REFG[3]
+       DLPDZ = REFG[4]
+       DLPTDZ = REFG[5]
        
        # Compute derivative of perturbations
        DDx = DDXM.dot(fields)
@@ -98,27 +133,28 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        DlpDz = DDz[:,2]
        DltDz = DDz[:,3]
        
+       # Compute terrain following terms
        WXZ = wxz - U * DZDX
-       DUDX = DuDx - DZDX * (DuDz + DUDZ)
-       DLPDX = DlpDx - DZDX * (DlpDz + DLPDZ)
+       PuPx = DuDx - (DZDX * DuDz)
+       PGFZ = RdT * DlpDz
        
        # Horizontal momentum equation
-       LD11 = U * DuDx
+       LD11 = U * (DuDx + DUDX)
        LD12 = WXZ * (DuDz + DUDZ)
-       LD13 = RdT * DLPDX - gc * DZDX
+       LD13 = RdT * DlpDx - DZDX * PGFZ
        DuDt = -(LD11 + LD12 + LD13)
        # Vertical momentum equation
        LD21 = U * DwDx
        LD22 = WXZ * DwDz
-       LD23 = RdT * (DlpDz + DLPDZ) + gc
+       LD23 = PGFZ
        DwDt = -(LD21 + LD22 + LD23)
        # Pressure (mass) equation
-       LD31 = U * DlpDx
+       LD31 = U * (DlpDx + DLPDX)
        LD32 = WXZ * (DlpDz + DLPDZ)
-       LD33 = gam * (DUDX + DwDz)
+       LD33 = gam * (PuPx + DwDz)
        DpDt = -(LD31 + LD32 + LD33) 
        # Potential Temperature equation
-       LD41 = U * DltDx
+       LD41 = U * (DltDx + DLPTDX)
        LD42 = WXZ * (DltDz + DLPTDZ)
        DtDt = -(LD41 + LD42)
        
@@ -126,14 +162,14 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        DwDt[botdex] *= 0.0
        DtDt[topdex] *= 0.0
        
-       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       DqDt = DqDt_static + np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
        return DqDt
 
 def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the static vertical gradients
-       ROPS = REFG[3]
+       ROPS = REFG[6]
        
        # Compute the tendencies
        DuDt = - ROPS[0].dot(uxz)
@@ -159,10 +195,10 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
 def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
-       #DDXM = REFS[13]
-       #DDZM = REFS[14]
-       DDXM2 = REFS[15]
-       DDZM2 = REFS[16]
+       #DDXM = REFS[10]
+       #DDZM = REFS[11]
+       DDXM2 = REFS[12]
+       DDZM2 = REFS[13]
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]

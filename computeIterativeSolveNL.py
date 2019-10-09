@@ -49,17 +49,20 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, uxz, wxz, pxz, txz, U, RdT
 
-def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
+def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, RHS_static, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
        linSol = SOLT
        
        def computeRHSUpdate(sol):
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(RHS_static, PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
        
               return rhs
        
        # Solve for nonlinear equilibrium
-       sol = root(computeRHSUpdate, linSol, method='df-sane', options={'ftol':1.0E-16})
+       sol = root(computeRHSUpdate, linSol, method='df-sane', \
+                  options={'fatol':1.0E-16, 'ftol':1.0E-8, 'maxfev':1000000, 'M':100, 'line_search':'cheng'})
+       print('NL solver exit on: ', sol.message)
+       print('Number of NL solver iterations: ', sol.nit)
        
        return sol.x

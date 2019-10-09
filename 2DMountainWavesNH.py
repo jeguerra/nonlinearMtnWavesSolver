@@ -38,6 +38,7 @@ from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
+from computeEulerEquationsLogPLogT import computeEulerStaticEquationsLogPLogT_NL
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 from computeRayleighEquations import computeRayleighEquations
 from computeTimeIntegration import computePrepareFields
@@ -75,8 +76,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -134,7 +135,7 @@ if __name__ == '__main__':
        
        # Make the 2D physical domains from reference grids and topography
        XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
-       #XL, ZTL, sigma = computeStretchedDomain2D(DIMS, REFS, HofX, dHdX)
+       #XL, ZTL, DZT, sigma = computeStretchedDomain2D(DIMS, REFS, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -191,13 +192,30 @@ if __name__ == '__main__':
        LPT = np.expand_dims(LPT, axis=1)
        LOGT = np.tile(LPT, NX+1)
        LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
+       # Compute horizontal derivatives of background fields
+       DUDX = np.zeros((NZ,NX+1))
+       DLPDX = np.zeros((NZ,NX+1))
+       DLTDX = np.zeros((NZ,NX+1))
+       for rr in range(NZ):
+              # Compute X derivative without constant offsets
+              DUDX[rr,:] = DDX_1D.dot(UZ[rr,:] - UZ[rr,0])
+              DLPDX[rr,:] = DDX_1D.dot(LOGP[rr,:] - LOGP[rr,0])
+              DLTDX[rr,:] = DDX_1D.dot(LOGT[rr,:] - LOGT[rr,0])
+              
+       # Get the static vertical gradients and store
+       DUDX = np.reshape(DUDX, (OPS,), order='F')
+       DLPDX = np.reshape(DLPDX, (OPS,), order='F')
+       DLPTDX = np.reshape(DLTDX, (OPS,), order='F')
+       DUDZ = np.reshape(DUDZ, (OPS,), order='F')
+       DLPDZ = np.reshape(DLPDZ, (OPS,), order='F')
+       DLPTDZ = np.reshape(DLPTDZ, (OPS,), order='F')
+       
+       # Make a collection for background field derivatives
+       REFG = [DUDX, DLPDX, DLPTDX, DUDZ, DLPDZ, DLPTDZ]
        
        # Update the REFS collection
        REFS.append(UZ)
        REFS.append(PORZ)
-       REFS.append(DUDZ)
-       REFS.append(DLPDZ)
-       REFS.append(DLPTDZ)
        
        # Get some memory back here
        del(PORZ)
@@ -206,20 +224,23 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Get the 2D linear operators...
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)              
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)              
        REFS.append(DDXM)
        REFS.append(DDZM)
        REFS.append(DDXM.dot(DDXM))
        REFS.append(DDZM.dot(DDZM))
        REFS.append(DZT)
-       DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS)
-       ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
+       REFS.append(np.reshape(DZT, (OPS,), order='F'))
        
        #%% Rayleigh opearator
+       ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
        RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
+       REFG.append(ROPS)
        
        #%% Compute the global LHS operator
        if StaticSolve or LinearSolve:
+              # Compute the equation blocks
+              DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               # Format is 'lil' to allow for column adjustments to the operator
               LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
                               [None, DOPS[3], DOPS[4], DOPS[5]], \
@@ -263,11 +284,8 @@ if __name__ == '__main__':
        INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
        INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
        
-       # Get the static vertical gradients and store
-       DUDZ = np.reshape(REFS[10], (OPS,), order='F')
-       DLPDZ = np.reshape(REFS[11], (OPS,), order='F')
-       DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
-       REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
+       # Initialize fields
+       fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        
        start = time.time()
        if StaticSolve:
@@ -280,16 +298,12 @@ if __name__ == '__main__':
               SOLT[sysDex,0] = factor.solve(bN)
               del(factor)
               # Set the boundary condition                      
-              SOLT[wbdex,0] = np.multiply(dHdX, np.add(UZ[0,:], SOLT[ubdex,0]))
+              SOLT[wbdex,0] = dHdX * (UZ[0,:] + SOLT[ubdex,0])
               
-              # Get the static vertical gradients and store
-              DUDZ = np.reshape(REFS[10], (OPS,), order='F')
-              DLPDZ = np.reshape(REFS[11], (OPS,), order='F')
-              DLPTDZ = np.reshape(REFS[12], (OPS,), order='F')
-              REFG = [DUDZ, DLPDZ, DLPTDZ, ROPS]
-              
+              # Initialize the RHS and forcing for each field
+              RHS_static = computeEulerStaticEquationsLogPLogT_NL(PHYS, REFS, REFG, RdT, ubdex, utdex)
               #%% Use the linear solution as the initial guess to the nonlinear solution
-              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, RHS_static, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
               SOLT[:,1] = sol
               
               # Compare the linear and nonlinear solutions
@@ -365,7 +379,8 @@ if __name__ == '__main__':
                      # Initialize fields
                      fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      # Initialize the RHS and forcing for each field
-                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                     RHS_static = computeEulerStaticEquationsLogPLogT_NL(PHYS, REFS, REFG, RdT, ubdex, utdex)
+                     RHS = computeEulerEquationsLogPLogT_NL(RHS_static, PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
                                           
        #%% Start the time loop
        if LinearSolve or NonLinSolve:
@@ -378,9 +393,9 @@ if __name__ == '__main__':
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
-                            sol, rhs = computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, RHS_static, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      
                      SOLT[sysDex,0] = sol
                      RHS[sysDex] = rhs
@@ -394,9 +409,9 @@ if __name__ == '__main__':
                      if tt % ITI == 0:
                             # Make animation for check
                             txz = np.reshape(SOLT[tdex,0], (NZ, NX+1), order='F')
-                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, txz, 101, cmap=cm.jet)
-                            plt.xlim(-30, 30)
-                            plt.ylim(0, 25)
+                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, txz, 101, cmap=cm.seismic)
+                            #plt.xlim(-30, 30)
+                            #plt.ylim(0, 25)
                             plt.show()
                             
                      #if DT * tt >= 3600:

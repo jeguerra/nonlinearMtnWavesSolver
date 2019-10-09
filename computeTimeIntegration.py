@@ -47,7 +47,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, uxz, wxz, pxz, txz, U, RdT
 
-def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
+def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -91,7 +91,7 @@ def computeTimeIntegrationLN(PHYS, REFS, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sy
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, RHS_static, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -106,8 +106,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
                      
               return rhsSGS
        
-       def computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT):
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
+       def computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT, RHS_static):
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(RHS_static, PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
        
               return rhs
@@ -117,7 +117,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        for ii in range(7):
               sol += c1 * DT * (RHS + SGS)
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
+              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT, RHS_static)
               SGS = computeDynSGSUpdate(fields, uxz, wxz, pxz, txz)
               
               if ii == 1:
@@ -130,7 +130,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        for ii in range(2):
               sol += c1 * DT * (RHS + SGS)
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
+              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT, RHS_static)
               SGS = computeDynSGSUpdate(fields, uxz, wxz, pxz, txz)
        #'''
        

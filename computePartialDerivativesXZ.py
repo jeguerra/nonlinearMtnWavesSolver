@@ -28,10 +28,10 @@ def computePartialDerivativesXZ(DIMS, REFS):
               ddex = np.array(range(NZ)) + cc * NZ
               # Advanced slicing used to get submatrix
               # TF adjustment for Guellrich coordinate
-              #SIGMA = sps.diags(sigma[:,cc])
-              #DDZ_OP[np.ix_(ddex,ddex)] = SIGMA.dot(DDZ_1D)
+              SIGMA = sps.diags(sigma[:,cc])
+              DDZ_OP[np.ix_(ddex,ddex)] = SIGMA.dot(DDZ_1D)
               # TF adjustment for vanilla stretching
-              DDZ_OP[np.ix_(ddex,ddex)] = sigma[cc] * DDZ_1D
+              #DDZ_OP[np.ix_(ddex,ddex)] = sigma[cc] * DDZ_1D
        
        
        # Horizontal Derivative
