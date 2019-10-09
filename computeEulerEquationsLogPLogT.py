@@ -67,45 +67,10 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        
        return DOPS
 
-# Function evaluation of the non linear equations (static components)
-def computeEulerStaticEquationsLogPLogT_NL(PHYS, REFS, REFG, RdT, botdex, topdex):
+# Function evaluation of the non linear equations (dynamic components)
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
-       gam = PHYS[6]
-       
-       # Get the derivative operators
-       DZDX = REFS[15]
-       
-       # Get the static horizontal and vertical derivatives
-       DUDX = REFG[0]
-       DUDZ = REFG[3]
-       DLPDZ = REFG[4]
-       DLPTDZ = REFG[5]
-       
-       # Compute terrain following terms
-       PuPx = DUDX - (DZDX * DUDZ)
-       PGFZ = (RdT * DLPDZ) + gc
-       
-       # Horizontal momentum equation
-       DuDt = DZDX * PGFZ
-       # Vertical momentum equation
-       DwDt = -PGFZ
-       # Pressure (mass) equation
-       DpDt = -gam * PuPx
-       # Potential Temperature equation
-       DtDt = 0.0 * DLPTDZ
-       
-       DwDt[topdex] *= 0.0
-       DwDt[botdex] *= 0.0
-       DtDt[topdex] *= 0.0
-       
-       DqDt_static = np.concatenate((DuDt, DwDt, DpDt, DtDt))
-       
-       return DqDt_static
-
-# Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(DqDt_static, PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
-       # Get physical constants
        gam = PHYS[6]
        
        # Get the derivative operators
@@ -134,13 +99,15 @@ def computeEulerEquationsLogPLogT_NL(DqDt_static, PHYS, REFS, REFG, fields, uxz,
        DltDz = DDz[:,3]
        
        # Compute terrain following terms
+       PuPz = (DuDz + DUDZ)
+       PlpPz = (DlpDz + DLPDZ)
        WXZ = wxz - U * DZDX
-       PuPx = DuDx - (DZDX * DuDz)
-       PGFZ = RdT * DlpDz
+       PuPx = DuDx + DUDX - DZDX * PuPz
+       PGFZ = RdT * PlpPz + gc
        
        # Horizontal momentum equation
        LD11 = U * (DuDx + DUDX)
-       LD12 = WXZ * (DuDz + DUDZ)
+       LD12 = WXZ * PuPz
        LD13 = RdT * DlpDx - DZDX * PGFZ
        DuDt = -(LD11 + LD12 + LD13)
        # Vertical momentum equation
@@ -150,9 +117,9 @@ def computeEulerEquationsLogPLogT_NL(DqDt_static, PHYS, REFS, REFG, fields, uxz,
        DwDt = -(LD21 + LD22 + LD23)
        # Pressure (mass) equation
        LD31 = U * (DlpDx + DLPDX)
-       LD32 = WXZ * (DlpDz + DLPDZ)
+       LD32 = WXZ * PlpPz
        LD33 = gam * (PuPx + DwDz)
-       DpDt = -(LD31 + LD32 + LD33) 
+       DpDt = -(LD31 + LD32 + LD33)
        # Potential Temperature equation
        LD41 = U * (DltDx + DLPTDX)
        LD42 = WXZ * (DltDz + DLPTDZ)
@@ -162,7 +129,7 @@ def computeEulerEquationsLogPLogT_NL(DqDt_static, PHYS, REFS, REFG, fields, uxz,
        DwDt[botdex] *= 0.0
        DtDt[topdex] *= 0.0
        
-       DqDt = DqDt_static + np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
        return DqDt
 

@@ -38,7 +38,6 @@ from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
-from computeEulerEquationsLogPLogT import computeEulerStaticEquationsLogPLogT_NL
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 from computeRayleighEquations import computeRayleighEquations
 from computeTimeIntegration import computePrepareFields
@@ -53,13 +52,13 @@ import faulthandler; faulthandler.enable()
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
-       ResDiff = False
+       NonLinSolve = True
+       ResDiff = True
        
        # Set restarting
-       toRestart = False
+       toRestart = True
        isRestart = False
        
        # Set physical constants (dry air)
@@ -76,8 +75,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -300,10 +299,8 @@ if __name__ == '__main__':
               # Set the boundary condition                      
               SOLT[wbdex,0] = dHdX * (UZ[0,:] + SOLT[ubdex,0])
               
-              # Initialize the RHS and forcing for each field
-              RHS_static = computeEulerStaticEquationsLogPLogT_NL(PHYS, REFS, REFG, RdT, ubdex, utdex)
               #%% Use the linear solution as the initial guess to the nonlinear solution
-              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, RHS_static, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
               SOLT[:,1] = sol
               
               # Compare the linear and nonlinear solutions
@@ -379,8 +376,7 @@ if __name__ == '__main__':
                      # Initialize fields
                      fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      # Initialize the RHS and forcing for each field
-                     RHS_static = computeEulerStaticEquationsLogPLogT_NL(PHYS, REFS, REFG, RdT, ubdex, utdex)
-                     RHS = computeEulerEquationsLogPLogT_NL(RHS_static, PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
                                           
        #%% Start the time loop
        if LinearSolve or NonLinSolve:
@@ -395,7 +391,7 @@ if __name__ == '__main__':
                      if LinearSolve:
                             sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, RHS_static, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      
                      SOLT[sysDex,0] = sol
                      RHS[sysDex] = rhs
