@@ -99,31 +99,35 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        DltDz = DDz[:,3]
        
        # Compute terrain following terms
-       PuPz = (DuDz + DUDZ)
-       PlpPz = (DlpDz + DLPDZ)
        WXZ = wxz - U * DZDX
-       PuPx = DuDx + DUDX - DZDX * PuPz
+       DDX_U = DuDx + DUDX
+       DDX_LP = DlpDx + DLPDX
+       DDX_LT = DltDx + DLPTDX
+       PuPz = DuDz + DUDZ
+       PlpPz = DlpDz + DLPDZ
+       PltPz = DltDz + DLPTDZ
+       PuPx = DDX_U - DZDX * PuPz
        PGFZ = RdT * PlpPz + gc
        
        # Horizontal momentum equation
-       LD11 = U * (DuDx + DUDX)
-       LD12 = WXZ * PuPz
-       LD13 = RdT * DlpDx - DZDX * PGFZ
-       DuDt = -(LD11 + LD12 + LD13)
+       DuDt = -(U * DDX_U) - (WXZ * PuPz) - (RdT * DlpDx - DZDX * PGFZ)
+       #LD12 = WXZ * PuPz
+       #LD13 = RdT * DlpDx - DZDX * PGFZ
+       #DuDt = -(LD11 + LD12 + LD13)
        # Vertical momentum equation
-       LD21 = U * DwDx
-       LD22 = WXZ * DwDz
-       LD23 = PGFZ
-       DwDt = -(LD21 + LD22 + LD23)
+       DwDt = -(U * DwDx) - (WXZ * DwDz) - PGFZ
+       #LD22 = WXZ * DwDz
+       #LD23 = PGFZ
+       #DwDt = -(LD21 + LD22 + LD23)
        # Pressure (mass) equation
-       LD31 = U * (DlpDx + DLPDX)
-       LD32 = WXZ * PlpPz
-       LD33 = gam * (PuPx + DwDz)
-       DpDt = -(LD31 + LD32 + LD33)
+       DpDt = -(U * DDX_LP) - (WXZ * PlpPz) - gam * (PuPx + DwDz)
+       #LD32 = WXZ * PlpPz
+       #LD33 = gam * (PuPx + DwDz)
+       #DpDt = -(LD31 + LD32 + LD33)
        # Potential Temperature equation
-       LD41 = U * (DltDx + DLPTDX)
-       LD42 = WXZ * (DltDz + DLPTDZ)
-       DtDt = -(LD41 + LD42)
+       DtDt = -(U * DDX_LT) - (WXZ * PltPz)
+       #LD42 = WXZ * PltPz
+       #DtDt = -(LD41 + LD42)
        
        DwDt[topdex] *= 0.0
        DwDt[botdex] *= 0.0
