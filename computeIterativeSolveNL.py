@@ -61,9 +61,10 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               return -1.0 * rhs
        
        # Solve for nonlinear equilibrium
-       #sol = root(computeRHSUpdate, linSol, method='krylov')
-       sol = root(computeRHSUpdate, linSol, method='df-sane', \
-                  options={'maxfev':200000, 'M':100, 'line_search':'cruz'})
+       sol = root(computeRHSUpdate, linSol, method='krylov', \
+                  options={'disp':True,'jac_options':{'inner_maxiter':2000,'method':'lgmres','outer_k':10}})
+       #sol = root(computeRHSUpdate, linSol, method='df-sane', \
+       #           options={'maxfev':200000, 'M':100, 'line_search':'cruz'})
        print('NL solver exit on: ', sol.message)
        print('Number of NL solver iterations: ', sol.nit)
        
