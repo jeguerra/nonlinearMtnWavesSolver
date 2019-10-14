@@ -52,16 +52,18 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
 def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
        linSol = SOLT
        
-       def computeRHSUpdate(sol, RHS_static):
+       def computeRHSUpdate(sol):
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
        
-              return rhs
+              # Multiply by -1 here. The RHS was computed for transient solution
+              return -1.0 * rhs
        
        # Solve for nonlinear equilibrium
+       #sol = root(computeRHSUpdate, linSol, method='krylov')
        sol = root(computeRHSUpdate, linSol, method='df-sane', \
-                  options={'fatol':1.0E-16, 'ftol':1.0E-8, 'maxfev':100000, 'M':100, 'line_search':'cruz'})
+                  options={'maxfev':200000, 'M':100, 'line_search':'cruz'})
        print('NL solver exit on: ', sol.message)
        print('Number of NL solver iterations: ', sol.nit)
        
