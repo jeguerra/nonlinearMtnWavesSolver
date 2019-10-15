@@ -27,6 +27,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DLPTDZ = REFG[5]
        DDXM = REFS[10]
        DDZM = REFS[11]
+       DZDX = REFS[15]
               
        #%% Compute the various blocks needed
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
@@ -39,15 +40,19 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DLPTDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(PORZ, (OPS,), order='F')
        PORZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
+       tempDiagonal = np.reshape(DZDX, (OPS,), order='F')
+       DZDXM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        unit = sps.identity(OPS)
        
        #%% Compute the terms in the equations
-       U0DDX = UM.dot(DDXM)
+       PPX = DDXM - DZDXM.dot(DDZM)
+       U0DDX = UM.dot(PPX)
        
        # Horizontal momentum
        LD11 = U0DDX
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXM)
+       LD13 = PORZM.dot(PPX) - gc * (1.0 / gam - 1.0) * DZDXM
+       LD14 = gc * DZDXM
        
        # Vertical momentum
        LD22 = U0DDX
@@ -55,7 +60,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        LD24 = -gc * unit
        
        # Log-P equation
-       LD31 = gam * DDXM
+       LD31 = gam * PPX
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0DDX
        
@@ -63,7 +68,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        LD42 = DLPTDZM
        LD44 = U0DDX
        
-       DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
+       DOPS = [LD11, LD12, LD13, LD14, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
        
        return DOPS
 
@@ -79,9 +84,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        DZDX = REFS[15]
        
        # Get the static horizontal and vertical derivatives
-       DUDX = REFG[0]
-       DLPDX = REFG[1]
-       DLPTDX = REFG[2]
        DUDZ = REFG[3]
        DLPDZ = REFG[4]
        DLPTDZ = REFG[5]
@@ -100,34 +102,29 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        
        # Compute terrain following terms
        WXZ = wxz - U * DZDX
-       DDX_U = DuDx + DUDX
-       DDX_LP = DlpDx + DLPDX
-       DDX_LT = DltDx + DLPTDX
-       PuPz = DuDz + DUDZ
        PlpPz = DlpDz + DLPDZ
-       PltPz = DltDz + DLPTDZ
-       PuPx = DDX_U - DZDX * PuPz
        PGFZ = RdT * PlpPz + gc
        
        # Horizontal momentum equation
-       DuDt = -(U * DDX_U) - (WXZ * PuPz) - (RdT * DlpDx - DZDX * PGFZ)
-       #LD12 = WXZ * PuPz
-       #LD13 = RdT * DlpDx - DZDX * PGFZ
-       #DuDt = -(LD11 + LD12 + LD13)
+       LD11 = U * DuDx
+       LD12 = WXZ * DuDz + wxz * DUDZ
+       LD13 = RdT * DlpDx - DZDX * PGFZ
+       DuDt = -(LD11 + LD12 + LD13)
        # Vertical momentum equation
-       DwDt = -(U * DwDx) - (WXZ * DwDz) - PGFZ
-       #LD22 = WXZ * DwDz
-       #LD23 = PGFZ
-       #DwDt = -(LD21 + LD22 + LD23)
+       LD21 = U * DwDx
+       LD22 = WXZ * DwDz
+       LD23 = PGFZ
+       DwDt = -(LD21 + LD22 + LD23)
        # Pressure (mass) equation
-       DpDt = -(U * DDX_LP) - (WXZ * PlpPz) - gam * (PuPx + DwDz)
-       #LD32 = WXZ * PlpPz
-       #LD33 = gam * (PuPx + DwDz)
-       #DpDt = -(LD31 + LD32 + LD33)
+       LD31 = U * DlpDx
+       LD32 = WXZ * DlpDz + wxz * DLPDZ
+       LD33 = gam * (DuDx + (1.0 - DZDX) * DwDz)
+       #LD33 = gam * (DuDx - DZDX * DwDz + DwDz)
+       DpDt = -(LD31 + LD32 + LD33)
        # Potential Temperature equation
-       DtDt = -(U * DDX_LT) - (WXZ * PltPz)
-       #LD42 = WXZ * PltPz
-       #DtDt = -(LD41 + LD42)
+       LD41 = U * DltDx
+       LD42 = WXZ * DltDz + wxz * DLPTDZ
+       DtDt = -(LD41 + LD42)
        
        DwDt[topdex] *= 0.0
        DwDt[botdex] *= 0.0
