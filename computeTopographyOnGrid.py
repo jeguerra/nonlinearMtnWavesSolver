@@ -7,7 +7,6 @@ Created on Fri Jul 19 14:43:05 2019
 """
 import sys
 import numpy as np
-from numpy import multiply as mul
 import math as mt
 
 def computeTopographyOnGrid(REFS, profile, opt):
@@ -32,8 +31,9 @@ def computeTopographyOnGrid(REFS, profile, opt):
               lC = opt[2]
               # Compute the height field
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(x, 2.0))
-              ht2 = np.power(np.cos(mt.pi / lC * x), 2.0);
-              htfft = mul(ht1, ht2)
+              ht2 = np.power(np.cos(mt.pi / lC * x), 2.0)
+              ht3 = np.reciprocal((1.0 / aC)**2.0 * np.power(x, 2.0) + 1.0)
+              htfft = ht1 * ht2 * ht3
               # Compute the slope field perfectly
               '''
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))

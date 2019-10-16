@@ -422,7 +422,7 @@ if __name__ == '__main__':
        print('Elapsed time: ', endt - start)
        
        #% Make a database for restart
-       if toRestart and not StaticSolve:
+       if toRestart:
               rdb = shelve.open(restart_file, flag='n')
               rdb['uxz'] = SOLT[udex,0]
               rdb['wxz'] = SOLT[wdex,0]
