@@ -288,6 +288,7 @@ if __name__ == '__main__':
        
        start = time.time()
        if StaticSolve:
+              restart_file = 'restartDB_NL'
               print('Starting Linear to Nonlinear Static Solver...')
               bN = bN[sysDex]
               #SOLT[sysDex,0] = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
