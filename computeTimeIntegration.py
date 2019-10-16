@@ -15,9 +15,6 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        Rd = PHYS[3]
        kap = PHYS[4]
        
-       # Get the boundary terrain
-       dHdX = REFS[6]
-       
        # Get the solution components
        uxz = SOLT[udex]
        wxz = SOLT[wdex]
@@ -31,13 +28,6 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
-       
-       # Apply boundary condition
-       wxz[botdex] = dHdX * U[botdex]
-       wxz[topdex] *= 0.0 
-       
-       # Potential temperature perturbation vanishes along top boundary       
-       txz[topdex] *= 0.0
        
        fields = np.empty((len(uxz), 4))
        fields[:,0] = uxz 

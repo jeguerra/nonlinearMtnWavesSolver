@@ -58,7 +58,7 @@ if __name__ == '__main__':
        ResDiff = False
        
        # Set restarting
-       toRestart = False
+       toRestart = True
        isRestart = False
        
        # Set physical constants (dry air)
@@ -105,9 +105,9 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #%% Transient solve parameters
-       DT = 0.05 # Linear transient
+       DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 5.0
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output

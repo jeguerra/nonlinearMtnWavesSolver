@@ -18,7 +18,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        kap = PHYS[4]
        
        # Get the boundary terrain
-       dHdX = REFS[6]
+       #dHdX = REFS[6]
        
        # Get the solution components
        uxz = SOLT[udex]
@@ -33,13 +33,6 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        # Compute the sensible temperature scaling to PGF
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
-       
-       # Apply boundary condition
-       wxz[botdex] = dHdX * U[botdex]
-       wxz[topdex] *= 0.0 
-       
-       # Potential temperature perturbation vanishes along top boundary       
-       txz[topdex] *= 0.0
        
        fields = np.empty((len(uxz), 4))
        fields[:,0] = uxz 
@@ -62,7 +55,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        
        # Solve for nonlinear equilibrium
        sol = root(computeRHSUpdate, linSol, method='krylov', \
-                  options={'disp':True,'jac_options':{'iter':10, 'inner_maxiter':100,'method':'lgmres','outer_k':50}})
+                  options={'disp':True, 'maxiter':100, 'jac_options':{'inner_maxiter':100,'method':'lgmres','outer_k':50}})
        #sol = root(computeRHSUpdate, linSol, method='df-sane', \
        #           options={'disp':True, 'maxfev':10000, 'M':100, 'line_search':'cruz'})
        print('NL solver exit on: ', sol.message)
