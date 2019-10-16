@@ -27,7 +27,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DLPTDZ = REFG[5]
        DDXM = REFS[10]
        DDZM = REFS[11]
-       DZDX = REFS[15]
               
        #%% Compute the various blocks needed
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
@@ -40,8 +39,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DLPTDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        tempDiagonal = np.reshape(PORZ, (OPS,), order='F')
        PORZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(DZDX, (OPS,), order='F')
-       DZDXM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        unit = sps.identity(OPS)
        
        #%% Compute the terms in the equations
