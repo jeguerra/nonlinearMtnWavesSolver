@@ -269,6 +269,16 @@ if __name__ == '__main__':
               AN = A[sysDex,:]
               AN = (AN.tocsc())[:,sysDex]
               AN = AN.tocsc()
+              bN = bN[sysDex]
+              
+              # Compute permutation array
+              rcmDex = sps.csgraph.reverse_cuthill_mckee(AN)
+              # Apply the permuation to the system
+              AN.indices = rcmDex.take(AN.indices)
+              bN = bN[rcmDex]
+              # Compute the inverse permuation
+              invDex = np.argsort(rcmDex)
+              
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -290,13 +300,13 @@ if __name__ == '__main__':
        if StaticSolve:
               restart_file = 'restartDB_NL'
               print('Starting Linear to Nonlinear Static Solver...')
-              bN = bN[sysDex]
-              #SOLT[sysDex,0] = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
-              opts = dict(Equil=True, IterRefine='DOUBLE')
-              factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
-              del(AN)
-              SOLT[sysDex,0] = factor.solve(bN)
-              del(factor)
+              sol = spl.spsolve(AN, bN, use_umfpack=False)
+              SOLT[sysDex,0] = sol[invDex]
+              #opts = dict(Equil=True, IterRefine='DOUBLE')
+              #factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
+              #del(AN)
+              #SOLT[sysDex,0] = factor.solve(bN)
+              #del(factor)
               # Set the boundary condition                      
               SOLT[wbdex,0] = dHdX * (UZ[0,:] + SOLT[ubdex,0])
               
@@ -317,7 +327,6 @@ if __name__ == '__main__':
        elif LinearSolve:
               restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
-              bN = bN[sysDex]
               
               if isRestart:
                      rdb = shelve.open(restart_file, flag='r')
