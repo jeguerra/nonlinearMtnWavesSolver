@@ -75,8 +75,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 86
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -251,15 +251,15 @@ if __name__ == '__main__':
               print('Compute global sparse linear Euler operator: DONE!')
        
               # Apply the coupled multipoint constraint for terrain
-              DHDXM = sps.spdiags(dHdX, 0, NX+1, NX+1)
+              #DHDXM = sps.spdiags(dHdX, 0, NX+1, NX+1)
               # Compute LHS column adjustment to LDG
-              LDG[:,ubdex] += (LDG[:,wbdex]).dot(DHDXM)
+              #LDG[:,ubdex] += (LDG[:,wbdex]).dot(DHDXM)
               # Compute RHS adjustment to forcing
               WBC = dHdX * UZ[0,:]
               bN = -(LDG[:,wbdex]).dot(WBC)
               # Get some memory back
               del(WBC)
-              del(DHDXM)
+              #del(DHDXM)
               print('Apply coupled BC adjustments: DONE!')
        
               # Set up the global solve
@@ -307,6 +307,12 @@ if __name__ == '__main__':
               # Compare the linear and nonlinear solutions
               DSOL = SOLT[:,1] - SOLT[:,0]
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
+              
+              # Compute and print out the residual
+              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              # Initialize the RHS and forcing for each field
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+              print('Residual 2-norm: ', np.linalg.norm(RHS))
               #%%
        elif LinearSolve:
               restart_file = 'restartDB_LN'
