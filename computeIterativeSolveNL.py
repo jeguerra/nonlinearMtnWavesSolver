@@ -9,7 +9,6 @@ Created on Tue Oct  1 17:05:20 2019
 import numpy as np
 from scipy.optimize import root
 import computeEulerEquationsLogPLogT as tendency
-#from computeResidualViscCoeffs import computeResidualViscCoeffs
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
        # Get some physical quantities
@@ -57,7 +56,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        sol = root(computeRHSUpdate, linSol, method='krylov', \
                   options={'disp':True, 'maxiter':50, 'jac_options':{'inner_maxiter':100,'method':'lgmres','outer_k':100}})
        
-       for pp in range(10):
+       for pp in range(5):
               sol = root(computeRHSUpdate, sol.x, method='df-sane', \
                          options={'disp':True, 'maxfev':1000, 'M':100, 'line_search':'cheng'})
               

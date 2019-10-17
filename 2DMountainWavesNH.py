@@ -33,18 +33,20 @@ from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivat
 from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
-from computeStretchedDomain2D import computeStretchedDomain2D
+#from computeStretchedDomain2D import computeStretchedDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
+from computeRayleighEquations import computeRayleighEquations
+from computeInterpolatedFields import computeInterpolatedFields
+
+# Numerical stuff
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
-from computeRayleighEquations import computeRayleighEquations
 from computeTimeIntegration import computePrepareFields
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 from computeIterativeSolveNL import computeIterativeSolveNL
-from computeInterpolatedFields import computeInterpolatedFields
 
 import faulthandler; faulthandler.enable()
 
@@ -75,8 +77,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 86
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -104,16 +106,16 @@ if __name__ == '__main__':
        applyLateral = True
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
-       #%% Transient solve parameters
-       DT = 0.1 # Linear transient
+       #% Transient solve parameters
+       DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 1.0
+       HR = 2.5
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
-       #%% Define the computational and physical grids+
+       #% Define the computational and physical grids+
        REFS = computeGrid(DIMS)
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
@@ -145,10 +147,10 @@ if __name__ == '__main__':
        DX = np.mean(np.abs(np.diff(REFS[0])))
        DZ = np.mean(np.abs(np.diff(REFS[1])))
        
-       #%% Compute the BC index vector
+       #% Compute the BC index vector
        ubdex, utdex, wbdex, sysDex, vbcDex = computeAdjust4CBC(DIMS, numVar, varDex)
        
-       #%% Read in sensible or potential temperature soundings (corner points)
+       #% Read in sensible or potential temperature soundings (corner points)
        T_in = [300.0, 228.5, 228.5, 244.5]
        Z_in = [0.0, 1.1E4, 2.0E4, 3.6E4]
        SENSIBLE = 1
@@ -168,7 +170,7 @@ if __name__ == '__main__':
 
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
        
-       #%% Compute the background gradients in physical 2D space
+       #% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(dUdz, axis=1)
        DUDZ = np.tile(dUdz, NX+1)
        DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
@@ -222,7 +224,7 @@ if __name__ == '__main__':
        del(DLPDZ)
        del(DLPTDZ)
        
-       #%% Get the 2D linear operators...
+       #% Get the 2D linear operators...
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)              
        REFS.append(DDXM)
        REFS.append(DDZM)
@@ -231,12 +233,12 @@ if __name__ == '__main__':
        REFS.append(DZT)
        REFS.append(np.reshape(DZT, (OPS,), order='F'))
        
-       #%% Rayleigh opearator
+       #% Rayleigh opearator
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
        RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
        REFG.append(ROPS)
        
-       #%% Compute the global LHS operator
+       #% Compute the global LHS operator
        if StaticSolve or LinearSolve:
               # Compute the equation blocks
               DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
@@ -270,15 +272,19 @@ if __name__ == '__main__':
               AN = (AN.tocsc())[:,sysDex]
               AN = AN.tocsc()
               bN = bN[sysDex]
-              
+              plt.spy(AN)
+              plt.show()
               # Compute permutation array
               rcmDex = sps.csgraph.reverse_cuthill_mckee(AN)
               # Apply the permuation to the system
-              AN.indices = rcmDex.take(AN.indices)
+              AN = AN.tolil()
+              AN = AN[np.ix_(rcmDex, rcmDex)]
+              AN = AN.tocsc()
               bN = bN[rcmDex]
               # Compute the inverse permuation
               invDex = np.argsort(rcmDex)
-              
+              plt.spy(AN)
+              plt.show()
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -300,7 +306,7 @@ if __name__ == '__main__':
        if StaticSolve:
               restart_file = 'restartDB_NL'
               print('Starting Linear to Nonlinear Static Solver...')
-              sol = spl.spsolve(AN, bN, use_umfpack=False)
+              sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
               SOLT[sysDex,0] = sol[invDex]
               #opts = dict(Equil=True, IterRefine='DOUBLE')
               #factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
