@@ -77,8 +77,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 86
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -148,7 +148,8 @@ if __name__ == '__main__':
        DZ = np.mean(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, sysDex, vbcDex = computeAdjust4CBC(DIMS, numVar, varDex)
+       ubdex, utdex, wbdex, sysDex, vbcDex, wbcDex, tbcDex = \
+              computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
        T_in = [300.0, 228.5, 228.5, 244.5]
@@ -235,36 +236,50 @@ if __name__ == '__main__':
        
        #% Rayleigh opearator
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
-       RAYOP = sps.block_diag((ROPS[0], ROPS[1], ROPS[2], ROPS[3]), format='lil')
-       REFG.append(ROPS)
        
        #% Compute the global LHS operator
        if StaticSolve or LinearSolve:
               # Compute the equation blocks
               DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
-              # Format is 'lil' to allow for column adjustments to the operator
-              LDG = sps.bmat([[DOPS[0], DOPS[1], DOPS[2], None], \
-                              [None, DOPS[3], DOPS[4], DOPS[5]], \
-                              [DOPS[6], DOPS[7], DOPS[8], None], \
-                              [None, DOPS[9], None, DOPS[10]]], format='lil')
+              # Apply the BC indexing block-wise
+              A = DOPS[0]
+              B = (DOPS[1].tocsc())[:,wbcDex]
+              C = DOPS[2]
+              D = (DOPS[3].tolil())[np.ix_(wbcDex,wbcDex)] 
+              E = (DOPS[4].tocsr())[wbcDex,:]
+              F = (DOPS[5].tocsr())[np.ix_(wbcDex,tbcDex)]
+              G = DOPS[6]
+              H = (DOPS[7].tocsc())[:,wbcDex]
+              J = DOPS[8]
+              K = (DOPS[9].tocsr())[np.ix_(tbcDex,wbcDex)]
+              M = (DOPS[3].tolil())[np.ix_(tbcDex,tbcDex)];
+              # Compute the global operator
+              AN = sps.bmat([[A, B, C, None], \
+                              [None, D, E, F], \
+                              [G, H, J, None], \
+                              [None, K, None, M]], format='csc')
+       
+              RAYOP = sps.block_diag((ROPS[0], \
+                                      (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)], 
+                                      ROPS[2], 
+                                      (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]), format='csc')
+              REFG.append(ROPS)
+              AN += RAYOP
               
-              # Get some memory back
-              del(DOPS)
+              # Compute the forcing
+              WBC = dHdX * UZ[0,:]
+              WEQ = sps.bmat([[((DOPS[1].tocsc())[:,ubdex])], \
+                              [((DOPS[3].tocsc())[:,ubdex])], \
+                              [((DOPS[7].tocsc())[:,ubdex])], \
+                              [((DOPS[9].tocsc())[:,ubdex])]])
+              bN = -WEQ.dot(WBC)
+              bN = bN[sysDex]
+              del(WBC)
+       
               print('Compute global sparse linear Euler operator: DONE!')
        
-              # Apply the coupled multipoint constraint for terrain
-              #DHDXM = sps.spdiags(dHdX, 0, NX+1, NX+1)
-              # Compute LHS column adjustment to LDG
-              #LDG[:,ubdex] += (LDG[:,wbdex]).dot(DHDXM)
-              # Compute RHS adjustment to forcing
-              WBC = dHdX * UZ[0,:]
-              bN = -(LDG[:,wbdex]).dot(WBC)
-              # Get some memory back
-              del(WBC)
-              #del(DHDXM)
-              print('Apply coupled BC adjustments: DONE!')
-       
               # Set up the global solve
+              '''
               A = LDG.tocsr() + RAYOP.tocsr()
               del(LDG)
               del(RAYOP)
@@ -272,19 +287,23 @@ if __name__ == '__main__':
               AN = (AN.tocsc())[:,sysDex]
               AN = AN.tocsc()
               bN = bN[sysDex]
-              plt.spy(AN)
-              plt.show()
+              #plt.spy(AN)
+              #plt.show()
               # Compute permutation array
               rcmDex = sps.csgraph.reverse_cuthill_mckee(AN)
               # Apply the permuation to the system
-              AN = AN.tolil()
-              AN = AN[np.ix_(rcmDex, rcmDex)]
-              AN = AN.tocsc()
+              AN = AN.tocsr()
+              AN = AN[rcmDex,:]
+              AN = (AN.tocsc())[:,rcmDex]
               bN = bN[rcmDex]
               # Compute the inverse permuation
               invDex = np.argsort(rcmDex)
-              plt.spy(AN)
-              plt.show()
+              # Compute the normal equations (should improve sparsity)
+              #AN = ((AN.T).tocsr()).dot(AN)
+              #bN = ((AN.T).tocsr()).dot(bN)
+              #plt.spy(AN)
+              #plt.show()
+              '''
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -306,13 +325,13 @@ if __name__ == '__main__':
        if StaticSolve:
               restart_file = 'restartDB_NL'
               print('Starting Linear to Nonlinear Static Solver...')
-              sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
-              SOLT[sysDex,0] = sol[invDex]
-              #opts = dict(Equil=True, IterRefine='DOUBLE')
-              #factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
-              #del(AN)
-              #SOLT[sysDex,0] = factor.solve(bN)
-              #del(factor)
+              #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
+              opts = dict(Equil=True, IterRefine='DOUBLE')
+              factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
+              del(AN)
+              sol = factor.solve(bN)
+              del(factor)
+              SOLT[sysDex,0] = sol#[invDex]
               # Set the boundary condition                      
               SOLT[wbdex,0] = dHdX * (UZ[0,:] + SOLT[ubdex,0])
               
