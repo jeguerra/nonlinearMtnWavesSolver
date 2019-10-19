@@ -60,7 +60,7 @@ if __name__ == '__main__':
        ResDiff = False
        
        # Set restarting
-       toRestart = True
+       toRestart = False
        isRestart = False
        
        # Set physical constants (dry air)
@@ -77,8 +77,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -109,7 +109,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 2.5
+       HR = 3.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output
@@ -236,11 +236,13 @@ if __name__ == '__main__':
        
        #% Rayleigh opearator
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
+       REFG.append(ROPS)
        
        #% Compute the global LHS operator
        if StaticSolve or LinearSolve:
               # Compute the equation blocks
               DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              print('Compute global sparse linear Euler operator: DONE!')
               # Apply the BC indexing block-wise
               A = DOPS[0]
               B = (DOPS[1].tocsc())[:,wbcDex]
@@ -252,19 +254,23 @@ if __name__ == '__main__':
               H = (DOPS[7].tocsc())[:,wbcDex]
               J = DOPS[8]
               K = (DOPS[9].tocsr())[np.ix_(tbcDex,wbcDex)]
-              M = (DOPS[3].tolil())[np.ix_(tbcDex,tbcDex)];
-              # Compute the global operator
-              AN = sps.bmat([[A, B, C, None], \
-                              [None, D, E, F], \
-                              [G, H, J, None], \
-                              [None, K, None, M]], format='csc')
-       
-              RAYOP = sps.block_diag((ROPS[0], \
-                                      (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)], 
-                                      ROPS[2], 
-                                      (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]), format='csc')
-              REFG.append(ROPS)
-              AN += RAYOP
+              M = (DOPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
+              R1 = ROPS[0]
+              R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
+              R3 = ROPS[2]
+              R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
+              # Compute the global linear operator
+              '''
+              AN = sps.bmat([[A + R1, B, C, None], \
+                              [None, D + R2, E, F], \
+                              [G, H, J + R3, None], \
+                              [None, K, None, M + R4]], format='csc')
+              '''
+              # Compute the partitions for Schur Complement solution
+              AS = sps.bmat([[A + R1, B], [None, D + R2]], format='csc')
+              BS = sps.bmat([[C, None], [E, F]], format='csc')
+              CS = sps.bmat([[G, H], [None, K]], format='csc')
+              DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
               
               # Compute the forcing
               WBC = dHdX * UZ[0,:]
@@ -272,38 +278,15 @@ if __name__ == '__main__':
                               [((DOPS[3].tocsc())[:,ubdex])], \
                               [((DOPS[7].tocsc())[:,ubdex])], \
                               [((DOPS[9].tocsc())[:,ubdex])]])
-              bN = -WEQ.dot(WBC)
-              bN = bN[sysDex]
-              del(WBC)
+              bN = -WEQ.dot(WBC); del(WBC)
+              # Compute the global linear force vector
+              #bN = bN[sysDex]
+              # Compute the partitions for Schur Complement solution
+              fw = bN[wdex]
+              f1 = np.concatenate((bN[udex], fw[wbcDex]))
+              ft = bN[tdex]
+              f2 = np.concatenate((bN[pdex], ft[tbcDex]))
        
-              print('Compute global sparse linear Euler operator: DONE!')
-       
-              # Set up the global solve
-              '''
-              A = LDG.tocsr() + RAYOP.tocsr()
-              del(LDG)
-              del(RAYOP)
-              AN = A[sysDex,:]
-              AN = (AN.tocsc())[:,sysDex]
-              AN = AN.tocsc()
-              bN = bN[sysDex]
-              #plt.spy(AN)
-              #plt.show()
-              # Compute permutation array
-              rcmDex = sps.csgraph.reverse_cuthill_mckee(AN)
-              # Apply the permuation to the system
-              AN = AN.tocsr()
-              AN = AN[rcmDex,:]
-              AN = (AN.tocsc())[:,rcmDex]
-              bN = bN[rcmDex]
-              # Compute the inverse permuation
-              invDex = np.argsort(rcmDex)
-              # Compute the normal equations (should improve sparsity)
-              #AN = ((AN.T).tocsr()).dot(AN)
-              #bN = ((AN.T).tocsr()).dot(bN)
-              #plt.spy(AN)
-              #plt.show()
-              '''
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -325,6 +308,7 @@ if __name__ == '__main__':
        if StaticSolve:
               restart_file = 'restartDB_NL'
               print('Starting Linear to Nonlinear Static Solver...')
+              '''
               #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
               opts = dict(Equil=True, IterRefine='DOUBLE')
               factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
@@ -332,8 +316,27 @@ if __name__ == '__main__':
               sol = factor.solve(bN)
               del(factor)
               SOLT[sysDex,0] = sol#[invDex]
+              '''
+              # Factor DS and compute the Schur Complement of DS
+              opts = dict(Equil=True, IterRefine='DOUBLE')
+              factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
+              print('Factor D matrix... DONE!')
+              # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
+              alpha = factorDS.solve(CS.toarray())
+              f2_hat = factorDS.solve(f2)
+              DS_SC = sps.csc_matrix(AS - BS.dot(alpha))
+              f1_hat = f1 - BS.dot(f2_hat)
+              print('Compute Schur Complement of D... DONE!')
+              sol1 = spl.spsolve(DS_SC, f1_hat, permc_spec='MMD_ATA', use_umfpack=False)
+              print('Solve for u and w... DONE!')
+              f2 = f2 - alpha.dot(CS)
+              sol2 = factorDS.solve(f2)
+              print('Solve for ln(p) and ln(theta)... DONE!')
+              sol = np.concatenate(sol1, sol2)
+              SOLT[sysDex,0] = sol
               # Set the boundary condition                      
               SOLT[wbdex,0] = dHdX * (UZ[0,:] + SOLT[ubdex,0])
+              print('Recover full solution vector... DONE!')
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
