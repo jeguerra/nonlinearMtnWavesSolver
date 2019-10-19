@@ -22,6 +22,7 @@ import numpy as np
 import math as mt
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
+import scipy.linalg as dsl
 from matplotlib import cm
 import matplotlib.pyplot as plt
 # Import from the local library of routines
@@ -324,15 +325,16 @@ if __name__ == '__main__':
               # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
               alpha = factorDS.solve(CS.toarray())
               f2_hat = factorDS.solve(f2)
-              DS_SC = sps.csc_matrix(AS - BS.dot(alpha))
+              DS_SC = AS.toarray() - BS.dot(alpha)
               f1_hat = f1 - BS.dot(f2_hat)
               print('Compute Schur Complement of D... DONE!')
-              sol1 = spl.spsolve(DS_SC, f1_hat, permc_spec='MMD_ATA', use_umfpack=False)
+              # Use dense linear algebra at this point
+              sol1 = dsl.solve(DS_SC, f1_hat)
               print('Solve for u and w... DONE!')
-              f2 = f2 - alpha.dot(CS)
+              f2 = f2 - CS.dot(sol1)
               sol2 = factorDS.solve(f2)
               print('Solve for ln(p) and ln(theta)... DONE!')
-              sol = np.concatenate(sol1, sol2)
+              sol = np.concatenate((sol1, sol2))
               SOLT[sysDex,0] = sol
               # Set the boundary condition                      
               SOLT[wbdex,0] = dHdX * (UZ[0,:] + SOLT[ubdex,0])
