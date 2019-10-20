@@ -61,7 +61,7 @@ if __name__ == '__main__':
        ResDiff = False
        
        # Set restarting
-       toRestart = False
+       toRestart = True
        isRestart = False
        
        # Set physical constants (dry air)
@@ -78,8 +78,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       NX = 191 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 100
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -287,7 +287,8 @@ if __name__ == '__main__':
               f1 = np.concatenate((bN[udex], fw[wbcDex]))
               ft = bN[tdex]
               f2 = np.concatenate((bN[pdex], ft[tbcDex]))
-       
+              del(fw)
+              del(ft)
               print('Set up global solution operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -321,15 +322,18 @@ if __name__ == '__main__':
               # Factor DS and compute the Schur Complement of DS
               opts = dict(Equil=True, IterRefine='DOUBLE')
               factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
+              del(DS)
               print('Factor D matrix... DONE!')
               # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
               alpha = factorDS.solve(CS.toarray())
               f2_hat = factorDS.solve(f2)
               DS_SC = AS.toarray() - BS.dot(alpha)
               f1_hat = f1 - BS.dot(f2_hat)
+              del(BS)
               print('Compute Schur Complement of D... DONE!')
               # Use dense linear algebra at this point
               sol1 = dsl.solve(DS_SC, f1_hat)
+              del(DS_SC)
               print('Solve for u and w... DONE!')
               f2 = f2 - CS.dot(sol1)
               sol2 = factorDS.solve(f2)
