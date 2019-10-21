@@ -55,14 +55,14 @@ import faulthandler; faulthandler.enable()
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
-       ResDiff = False
+       NonLinSolve = True
+       ResDiff = True
        
        # Set restarting
        toRestart = True
-       isRestart = False
+       isRestart = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -78,8 +78,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 183 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -110,7 +110,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 3.0
+       HR = 3.5
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output
@@ -262,22 +262,6 @@ if __name__ == '__main__':
               R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
               R3 = ROPS[2]
               R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
-              # Compute the global linear operator
-              '''
-              AN = sps.bmat([[A + R1, B, C, None], \
-                              [None, D + R2, E, F], \
-                              [G, H, J + R3, None], \
-                              [None, K, None, M + R4]], format='csc')
-              '''
-              # Compute the partitions for Schur Complement solution
-              AS = sps.bmat([[A + R1, B], [None, D + R2]], format='csc')
-              BS = sps.bmat([[C, None], [E, F]], format='csc')
-              CS = sps.bmat([[G, H], [None, K]], format='csc')
-              DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
-              del(A); del(B); del(C)
-              del(D); del(E); del(F)
-              del(G); del(H); del(J)
-              del(K); del(M)
               
               # Compute the forcing
               WBC = dHdX * UZ[0,:]
@@ -286,16 +270,37 @@ if __name__ == '__main__':
                               [((DOPS[7])[:,ubdex])], \
                               [((DOPS[9].tolil())[:,ubdex])]])
               bN = -WEQ.dot(WBC); del(WBC)
-              # Compute the global linear force vector
-              #bN = bN[sysDex]
-              # Compute the partitions for Schur Complement solution
-              fw = bN[wdex]
-              f1 = np.concatenate((bN[udex], fw[wbcDex]))
-              ft = bN[tdex]
-              f2 = np.concatenate((bN[pdex], ft[tbcDex]))
-              del(fw)
-              del(ft)
-              print('Set up global solution operators: DONE!')
+              
+              if StaticSolve and not LinearSolve:
+                     # Compute the partitions for Schur Complement solution
+                     AS = sps.bmat([[A + R1, B], [None, D + R2]], format='csc')
+                     BS = sps.bmat([[C, None], [E, F]], format='csc')
+                     CS = sps.bmat([[G, H], [None, K]], format='csc')
+                     DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
+                     del(A); del(B); del(C)
+                     del(D); del(E); del(F)
+                     del(G); del(H); del(J)
+                     del(K); del(M)
+                     
+                     # Compute the partitions for Schur Complement solution
+                     fw = bN[wdex]
+                     f1 = np.concatenate((bN[udex], fw[wbcDex]))
+                     ft = bN[tdex]
+                     f2 = np.concatenate((bN[pdex], ft[tbcDex]))
+                     del(fw)
+                     del(ft)
+                     
+              if LinearSolve and not StaticSolve:
+                     # Compute the global linear operator
+                     AN = sps.bmat([[A + R1, B, C, None], \
+                              [None, D + R2, E, F], \
+                              [G, H, J + R3, None], \
+                              [None, K, None, M + R4]], format='csc')
+              
+                     # Compute the global linear force vector
+                     bN = bN[sysDex]
+              
+              print('Set up global linear operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
        
@@ -477,11 +482,22 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                      
                      if tt % ITI == 0:
-                            # Make animation for check
-                            txz = np.reshape(SOLT[tdex,0], (NZ, NX+1), order='F')
-                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, txz, 101, cmap=cm.seismic)
+                            # Check the tendencies
                             #plt.xlim(-30, 30)
                             #plt.ylim(0, 25)
+                            for pp in range(4):
+                                   plt.subplot(2,2,pp+1)
+                                   if pp == 0:
+                                          qdex = udex
+                                   elif pp == 1:
+                                          qdex = wdex
+                                   elif pp == 2:
+                                          qdex = pdex
+                                   else:
+                                          qdex = tdex
+                                   dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
+                                   cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
                             
                      #if DT * tt >= 3600:
