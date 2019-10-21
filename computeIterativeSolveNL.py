@@ -54,7 +54,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        
        # Solve for nonlinear equilibrium
        sol = root(computeRHSUpdate, linSol, method='krylov', \
-                  options={'disp':True, 'maxiter':1000, 'jac_options':{'inner_maxiter':100,'method':'lgmres','outer_k':100}})
+                  options={'disp':True, 'maxiter':100, 'jac_options':{'inner_maxiter':100,'method':'lgmres','outer_k':10}})
        '''
        for pp in range(10):
               sol = root(computeRHSUpdate, sol.x, method='df-sane', \

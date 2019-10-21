@@ -234,6 +234,8 @@ if __name__ == '__main__':
        REFS.append(DDZM.dot(DDZM))
        REFS.append(DZT)
        REFS.append(np.reshape(DZT, (OPS,), order='F'))
+       del(DDXM)
+       del(DDZM)
        
        #% Rayleigh opearator
        ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
@@ -246,16 +248,16 @@ if __name__ == '__main__':
               print('Compute global sparse linear Euler operator: DONE!')
               # Apply the BC indexing block-wise
               A = DOPS[0]
-              B = (DOPS[1].tocsc())[:,wbcDex]
+              B = (DOPS[1].tolil())[:,wbcDex]
               C = DOPS[2]
-              D = (DOPS[3].tolil())[np.ix_(wbcDex,wbcDex)] 
-              E = (DOPS[4].tocsr())[wbcDex,:]
-              F = (DOPS[5].tocsr())[np.ix_(wbcDex,tbcDex)]
+              D = (DOPS[3])[np.ix_(wbcDex,wbcDex)] 
+              E = (DOPS[4])[wbcDex,:]
+              F = (DOPS[5].tolil())[np.ix_(wbcDex,tbcDex)]
               G = DOPS[6]
-              H = (DOPS[7].tocsc())[:,wbcDex]
+              H = (DOPS[7])[:,wbcDex]
               J = DOPS[8]
-              K = (DOPS[9].tocsr())[np.ix_(tbcDex,wbcDex)]
-              M = (DOPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
+              K = (DOPS[9].tolil())[np.ix_(tbcDex,wbcDex)]
+              M = (DOPS[3])[np.ix_(tbcDex,tbcDex)]
               R1 = ROPS[0]
               R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
               R3 = ROPS[2]
@@ -272,13 +274,17 @@ if __name__ == '__main__':
               BS = sps.bmat([[C, None], [E, F]], format='csc')
               CS = sps.bmat([[G, H], [None, K]], format='csc')
               DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
+              del(A); del(B); del(C)
+              del(D); del(E); del(F)
+              del(G); del(H); del(J)
+              del(K); del(M)
               
               # Compute the forcing
               WBC = dHdX * UZ[0,:]
-              WEQ = sps.bmat([[((DOPS[1].tocsc())[:,ubdex])], \
-                              [((DOPS[3].tocsc())[:,ubdex])], \
-                              [((DOPS[7].tocsc())[:,ubdex])], \
-                              [((DOPS[9].tocsc())[:,ubdex])]])
+              WEQ = sps.bmat([[((DOPS[1].tolil())[:,ubdex])], \
+                              [((DOPS[3])[:,ubdex])], \
+                              [((DOPS[7])[:,ubdex])], \
+                              [((DOPS[9].tolil())[:,ubdex])]])
               bN = -WEQ.dot(WBC); del(WBC)
               # Compute the global linear force vector
               #bN = bN[sysDex]
@@ -439,6 +445,7 @@ if __name__ == '__main__':
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
+                            # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
                             sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
                             sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)

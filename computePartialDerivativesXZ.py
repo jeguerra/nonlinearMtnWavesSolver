@@ -42,7 +42,7 @@ def computePartialDerivativesXZ(DIMS, REFS):
               DDX_OP[np.ix_(ddex,ddex)] = DDX_1D
               
        #%% Make the operators sparse
-       DDXM = sps.csc_matrix(DDX_OP)
-       DDZM = sps.csc_matrix(DDZ_OP)
+       DDXM = sps.csr_matrix(DDX_OP)
+       DDZM = sps.csr_matrix(DDZ_OP)
        
        return DDXM, DDZM
