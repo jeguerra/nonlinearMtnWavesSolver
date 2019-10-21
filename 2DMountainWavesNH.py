@@ -78,8 +78,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 191 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 100
+       NX = 183 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -316,39 +316,56 @@ if __name__ == '__main__':
        if StaticSolve:
               restart_file = 'restartDB_NL'
               print('Starting Linear to Nonlinear Static Solver...')
-              '''
-              #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
-              opts = dict(Equil=True, IterRefine='DOUBLE')
-              factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
-              del(AN)
-              sol = factor.solve(bN)
-              del(factor)
-              SOLT[sysDex,0] = sol#[invDex]
-              '''
-              # Factor DS and compute the Schur Complement of DS
-              opts = dict(Equil=True, IterRefine='DOUBLE')
-              factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
-              del(DS)
-              print('Factor D matrix... DONE!')
-              # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
-              alpha = factorDS.solve(CS.toarray())
-              f2_hat = factorDS.solve(f2)
-              DS_SC = AS.toarray() - BS.dot(alpha)
-              f1_hat = f1 - BS.dot(f2_hat)
-              del(BS)
-              print('Compute Schur Complement of D... DONE!')
-              # Use dense linear algebra at this point
-              sol1 = dsl.solve(DS_SC, f1_hat)
-              del(DS_SC)
-              print('Solve for u and w... DONE!')
-              f2 = f2 - CS.dot(sol1)
-              sol2 = factorDS.solve(f2)
-              print('Solve for ln(p) and ln(theta)... DONE!')
-              sol = np.concatenate((sol1, sol2))
-              SOLT[sysDex,0] = sol
-              # Set the boundary condition                      
-              SOLT[wbdex,0] = dHdX * (UZ[0,:] + SOLT[ubdex,0])
-              print('Recover full solution vector... DONE!')
+              
+              if isRestart:
+                     rdb = shelve.open(restart_file, flag='r')
+                     SOLT[udex,0] = rdb['uxz']
+                     SOLT[wdex,0] = rdb['wxz']
+                     SOLT[pdex,0] = rdb['pxz']
+                     SOLT[tdex,0] = rdb['txz']
+                     RHS = rdb['RHS']
+                     NX_in = rdb['NX']
+                     NZ_in = rdb['NZ']
+                     IT = rdb['ET']
+                     rdb.close()
+                     
+                     if NX_in != NX or NZ_in != NZ:
+                            print('ERROR: RESTART DATA IS INVALID')
+                            sys.exit(2)
+              else:
+                     '''
+                     #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
+                     opts = dict(Equil=True, IterRefine='DOUBLE')
+                     factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
+                     del(AN)
+                     sol = factor.solve(bN)
+                     del(factor)
+                     SOLT[sysDex,0] = sol#[invDex]
+                     '''
+                     # Factor DS and compute the Schur Complement of DS
+                     opts = dict(Equil=True, IterRefine='DOUBLE')
+                     factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
+                     del(DS)
+                     print('Factor D matrix... DONE!')
+                     # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
+                     alpha = factorDS.solve(CS.toarray())
+                     f2_hat = factorDS.solve(f2)
+                     DS_SC = AS.toarray() - BS.dot(alpha)
+                     f1_hat = f1 - BS.dot(f2_hat)
+                     del(BS)
+                     print('Compute Schur Complement of D... DONE!')
+                     # Use dense linear algebra at this point
+                     sol1 = dsl.solve(DS_SC, f1_hat)
+                     del(DS_SC)
+                     print('Solve for u and w... DONE!')
+                     f2 = f2 - CS.dot(sol1)
+                     sol2 = factorDS.solve(f2)
+                     print('Solve for ln(p) and ln(theta)... DONE!')
+                     sol = np.concatenate((sol1, sol2))
+                     SOLT[sysDex,0] = sol
+                     # Set the boundary condition   
+                     SOLT[wbdex,0] = dHdX * UZ[0,:]
+                     print('Recover full linear solution vector... DONE!')
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
