@@ -62,7 +62,7 @@ if __name__ == '__main__':
        
        # Set restarting
        toRestart = True
-       isRestart = True
+       isRestart = False
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -78,8 +78,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -110,7 +110,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 1.5
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output

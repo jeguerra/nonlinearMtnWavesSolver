@@ -51,7 +51,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        
               # Multiply by -1 here. The RHS was computed for transient solution
               return -1.0 * rhs
-       
+       '''
        # Approximate the Jacobian numerically...
        SOLT[:,0] = root(computeRHSUpdate, linSol, method='krylov', jac=False, \
                   options={'disp':False, 'maxiter':10, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
@@ -71,11 +71,11 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               for jj in range(M):
                      if abs(DSOL[jj]) > 0.0:
                             JAC[ii,jj] = DF[ii] / DSOL[jj]
-       
+       '''
        # Solve for nonlinear equilibrium
-       sol = root(computeRHSUpdate, SOLT[:,0], method='hybr', jac=False, tol=1.0E-6)
-       #sol = root(computeRHSUpdate, SOLT[:,0], method='krylov', jac=False, \
-       #           options={'disp':True, 'maxiter':100, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
+       #sol = root(computeRHSUpdate, SOLT[:,0], method='hybr', jac=False, tol=1.0E-6)
+       sol = root(computeRHSUpdate, SOLT[:,0], method='krylov', \
+                  options={'disp':True, 'maxiter':1000, 'jac_options':{'inner_maxiter':50,'method':'lgmres','outer_k':10}})
        '''
        for pp in range(10):
               sol = root(computeRHSUpdate, sol.x, method='df-sane', \
