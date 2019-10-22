@@ -55,10 +55,10 @@ import faulthandler; faulthandler.enable()
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
-       ResDiff = True
+       NonLinSolve = False
+       ResDiff = False
        
        # Set restarting
        toRestart = True
@@ -78,8 +78,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -108,9 +108,9 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #% Transient solve parameters
-       DT = 0.05 # Linear transient
+       DT = 0.1 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 3.5
+       HR = 1.5
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output
@@ -355,7 +355,7 @@ if __name__ == '__main__':
                      # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
                      alpha = factorDS.solve(CS.toarray())
                      f2_hat = factorDS.solve(f2)
-                     DS_SC = AS.toarray() - BS.dot(alpha)
+                     DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(BS)
                      print('Compute Schur Complement of D... DONE!')
@@ -373,7 +373,7 @@ if __name__ == '__main__':
                      print('Recover full linear solution vector... DONE!')
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
-              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
               SOLT[:,1] = sol
               
               # Compare the linear and nonlinear solutions
