@@ -46,7 +46,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
 
 def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex, DynSGS):
        linSol = SOLT[:,0]
-       qdex = tuple(udex, wdex, pdex, tdex)
+       qdex = (udex, wdex, pdex, tdex)
        
        def computeRHSUpdate(sol):
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
@@ -63,11 +63,12 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        #           options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
        F0 = computeRHSUpdate(sol0)
        sol1 = root(computeRHSUpdate, sol0, method='krylov', \
-                  options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
+                  options={'disp':True, 'maxiter':50, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
        F1 = computeRHSUpdate(sol1.x)
        # Compute the differences
        DF = F1 - F0
        DSOL = sol1.x - sol0
+       IDSOL = np.reciprocal(DSOL)
        del(F0); del(sol0)
        del(F1); del(sol1)
        #plt.plot(DSOL)
@@ -78,31 +79,54 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        #DF = DF[sysDex]
        #DSOL = DSOL[sysDex]
        # Compute the Jacobian matrix by columns
-       M = len(DF)
-       JAC = sps.lil_matrix((M,M))
+       jac_diag = np.zeros((len(DF,)))
+       nzDex = np.where(DSOL > 0.0)
+       M = len(nzDex)
+       jac_diag[nzDex] = DF[nzDex] * IDSOL[nzDex]
+       plt.plot(jac_diag)
+       plt.show()
+       dFdu_max = np.amax(jac_diag[udex])
+       dFdw_max = np.amax(jac_diag[wdex])
+       dFdp_max = np.amax(jac_diag[pdex])
+       dFdt_max = np.amax(jac_diag[tdex])
+       print(dFdu_max, dFdw_max, dFdp_max, dFdt_max)
+       JAC = sps.dia_matrix((jac_diag, 0), shape=(M,M))
        # Exclude places where there is little change in the solution
        dtol_fact = 1.0E-2 # 1% of maximum absolute value change in EACH variable
-       IDSOL = np.reciprocal(DSOL)
-       
+       '''
+       M = 5000
        for ii in range(M):
               #print(M, len(nzDex))
               jac_row = DF[ii] * IDSOL
-              # Compute maximum change for each variable in this row and apply drop tolerance
-              # Exclude places where there is little change in the solution
-              nzDex = []
               for vv in range(4):
-                     drop_tol = dtol_fact * np.amax(np.abs(jac_row[qdex[vv]]))
-                     rnzDex = np.where(np.abs(jac_row[qdex[vv]]) > drop_tol)
-                     qnzDex = (qdex[vv])[rnzDex]
-                     nzDex.append(qnzDex)
+                     this_qdex = qdex[vv]
+                     jacq_row = jac_row[this_qdex]
+                     # Compute maximum change for each variable in this row and apply drop tolerance
+                     local_max = np.amax(np.abs(jacq_row))
+                     print(local_max)
+                     drop_tol = dtol_fact * local_max
+                     #print(local_max)
+                     # Include locations with "significant" change only
+                     rnzDex = np.where(np.abs(jacq_row) > drop_tol)
+                     #print(rnzDex)
+                     qnzDex = np.array(this_qdex[rnzDex])
+                     if vv == 0:
+                            nzDex = qnzDex
+                     else:
+                            nzDex = np.concatenate((nzDex, qnzDex))
+                     
               
+              #plt.plot(jac_row)
+              #plt.show()
               # Normalize the row
               NZS = len(nzDex)
+              #print(DF[ii], NZS)
               # Set the nonzero elements of this row
               if NZS > 0:
                      JAC[ii,nzDex] = (1.0 / NZS) * jac_row[nzDex]
-                     
+       '''              
        JAC = JAC.tocsc()
+       
        plt.spy(JAC)
        plt.show()
        
