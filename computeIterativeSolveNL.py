@@ -63,14 +63,14 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        #           options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
        F0 = computeRHSUpdate(sol0)
        sol1 = root(computeRHSUpdate, sol0, method='krylov', \
-                  options={'disp':True, 'maxiter':50, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
+                  options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
        F1 = computeRHSUpdate(sol1.x)
        # Compute the differences
        DF = F1 - F0
        DSOL = sol1.x - sol0
        IDSOL = np.reciprocal(DSOL)
-       del(F0); del(sol0)
-       del(F1); del(sol1)
+       #del(F0); del(sol0)
+       #del(F1); del(sol1)
        #plt.plot(DSOL)
        #plt.show()
        #plt.plot(DF)
@@ -78,22 +78,25 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        # Apply the BC indeces
        #DF = DF[sysDex]
        #DSOL = DSOL[sysDex]
-       # Compute the Jacobian matrix by columns
-       jac_diag = np.zeros((len(DF,)))
+       # Compute a diagonal approximation to the Jacobian matrix
+       # Index only places where change is happening
        nzDex = np.where(DSOL > 0.0)
+       nzDex = nzDex[0]
        M = len(nzDex)
-       jac_diag[nzDex] = DF[nzDex] * IDSOL[nzDex]
-       plt.plot(jac_diag)
-       plt.show()
-       dFdu_max = np.amax(jac_diag[udex])
-       dFdw_max = np.amax(jac_diag[wdex])
-       dFdp_max = np.amax(jac_diag[pdex])
-       dFdt_max = np.amax(jac_diag[tdex])
-       print(dFdu_max, dFdw_max, dFdp_max, dFdt_max)
+       jac_diag = np.zeros((M,))
+       jac_diag = DF[nzDex] * IDSOL[nzDex]
+       #plt.plot(jac_diag)
+       #plt.show()
+       #dFdu_max = np.amax(jac_diag[udex])
+       #dFdw_max = np.amax(jac_diag[wdex])
+       #dFdp_max = np.amax(jac_diag[pdex])
+       #dFdt_max = np.amax(jac_diag[tdex])
+       #print(dFdu_max, dFdw_max, dFdp_max, dFdt_max)
        JAC = sps.dia_matrix((jac_diag, 0), shape=(M,M))
-       # Exclude places where there is little change in the solution
-       dtol_fact = 1.0E-2 # 1% of maximum absolute value change in EACH variable
        '''
+       dtol_fact = 1.0E-2 # 1% of maximum absolute value change in EACH variable
+       M = len(DSOL)
+       JAC = sps.lil_matrix((M,M))
        M = 5000
        for ii in range(M):
               #print(M, len(nzDex))
@@ -103,13 +106,13 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
                      jacq_row = jac_row[this_qdex]
                      # Compute maximum change for each variable in this row and apply drop tolerance
                      local_max = np.amax(np.abs(jacq_row))
-                     print(local_max)
+                     #print(local_max)
                      drop_tol = dtol_fact * local_max
                      #print(local_max)
                      # Include locations with "significant" change only
                      rnzDex = np.where(np.abs(jacq_row) > drop_tol)
                      #print(rnzDex)
-                     qnzDex = np.array(this_qdex[rnzDex])
+                     qnzDex = np.array(this_qdex[rnzDex[0]])
                      if vv == 0:
                             nzDex = qnzDex
                      else:
@@ -123,13 +126,11 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               #print(DF[ii], NZS)
               # Set the nonzero elements of this row
               if NZS > 0:
-                     JAC[ii,nzDex] = (1.0 / NZS) * jac_row[nzDex]
-       '''              
+                     JAC[ii,nzDex] = (1.0 / NZS) * jac_row[nzDex]  
+       '''
        JAC = JAC.tocsc()
-       
-       plt.spy(JAC)
-       plt.show()
-       
+       #plt.spy(JAC)
+       #plt.show()
        end = time.time()
        print('Compute numerical approximation of local Jacobian... DONE!')
        print('Time to compute local Jacobian matrix: ', end - start)
@@ -143,11 +144,16 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        print('Compute numerical approximation of local Jacobian... DONE!')
        print('Time to compute local Jacobian factorization: ', end - start)
        
+       solNewton = sol1.x
+       for nn in range(3):
+              dsol = -factor.solve(F1[nzDex])
+              solNewton[nzDex] += dsol
+       
        #'''
        # Solve for nonlinear equilibrium
        #sol = root(computeRHSUpdate, SOLT[:,0], method='hybr', jac=False, tol=1.0E-6)
-       sol = root(computeRHSUpdate, SOLT[:,0], method='krylov', \
-                  options={'disp':True, 'maxiter':1000, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
+       sol = root(computeRHSUpdate, solNewton, method='krylov', \
+                  options={'disp':True, 'maxiter':10, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
        '''
        for pp in range(10):
               sol = root(computeRHSUpdate, sol.x, method='df-sane', \
