@@ -371,9 +371,14 @@ if __name__ == '__main__':
                      # Set the boundary condition   
                      SOLT[wbdex,0] = dHdX * UZ[0,:]
                      print('Recover full linear solution vector... DONE!')
+                     
+              # Get memory back
+              del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
+              del(alpha)
+              del(factorDS)
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
-              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex, ResDiff)
               SOLT[:,1] = sol
               
               # Compare the linear and nonlinear solutions

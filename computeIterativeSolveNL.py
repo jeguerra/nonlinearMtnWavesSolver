@@ -5,9 +5,11 @@ Created on Tue Oct  1 17:05:20 2019
 
 @author: jorge.guerra
 """
-
+import time
 import numpy as np
+import scipy.sparse as sps
 from scipy.optimize import root
+import scipy.sparse.linalg as spl
 import computeEulerEquationsLogPLogT as tendency
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
@@ -41,7 +43,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, uxz, wxz, pxz, txz, U, RdT
 
-def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
+def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex, DynSGS):
        linSol = SOLT[:,0]
        
        def computeRHSUpdate(sol):
@@ -51,35 +53,57 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        
               # Multiply by -1 here. The RHS was computed for transient solution
               return -1.0 * rhs
-       '''
+       #'''
        # Approximate the Jacobian numerically...
-       SOLT[:,0] = root(computeRHSUpdate, linSol, method='krylov', jac=False, \
-                  options={'disp':False, 'maxiter':10, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
-       F0 = computeRHSUpdate(SOLT[:,0])
-       SOLT[:,1] = root(computeRHSUpdate, SOLT[:,0], method='krylov', jac=False, \
-                  options={'disp':False, 'maxiter':10, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
-       F1 = computeRHSUpdate(SOLT[:,1])
+       start = time.time()
+       sol0 = root(computeRHSUpdate, linSol, method='krylov', \
+                  options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
+       F0 = computeRHSUpdate(sol0.x)
+       sol1 = root(computeRHSUpdate, sol0.x, method='krylov', \
+                  options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
+       F1 = computeRHSUpdate(sol1.x)
        # Compute the differences
        DF = F1 - F0
-       DSOL = SOLT[:,1] - SOLT[:,0]
-       del(F0)
-       del(F1)
-       # Compute the Jacobian matrix
-       M = len(DF)
-       JAC = np.empty((M,M))
+       DSOL = sol1.x - sol0.x
+       del(F0); del(sol0)
+       del(F1); del(sol1)
+       # Apply the BC indeces
+       DF = DF[sysDex]
+       DSOL = DSOL[sysDex]
+       # Compute the Jacobian matrix by columns
+       M = len(sysDex)
+       drop_tol = 1.0E-3
+       JAC = sps.lil_matrix((M,M))
        for ii in range(M):
-              for jj in range(M):
-                     if abs(DSOL[jj]) > 0.0:
-                            JAC[ii,jj] = DF[ii] / DSOL[jj]
-       '''
+              jac_row = DF[ii] * np.reciprocal(DSOL)
+              mc = np.amax(np.abs(jac_row))
+              jac_row[np.abs(jac_row) < drop_tol * mc] = 0.0
+              JAC[ii,:] = jac_row #np.expand_dims(jac_row, axis=1)
+                     
+       JAC = JAC.tocsc()
+       
+       end = time.time()
+       print('Compute numerical approximation of local Jacobian... DONE!')
+       print('Time to compute local Jacobian matrix: ', start-end)
+       start = time.time()
+       #'''
+       opts = dict(Equil=True, IterRefine='DOUBLE')
+       factor = spl.splu(JAC, permc_spec='MMD_ATA', options=opts)
+       end = time.time()
+       #'''    
+       end = time.time()          
+       print('Compute numerical approximation of local Jacobian... DONE!')
+       print('Time to compute local Jacobian factorization: ', start-end)
+       
+       #'''
        # Solve for nonlinear equilibrium
        #sol = root(computeRHSUpdate, SOLT[:,0], method='hybr', jac=False, tol=1.0E-6)
        sol = root(computeRHSUpdate, SOLT[:,0], method='krylov', \
-                  options={'disp':True, 'maxiter':1000, 'jac_options':{'inner_maxiter':50,'method':'lgmres','outer_k':10}})
+                  options={'disp':True, 'maxiter':1000, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
        '''
        for pp in range(10):
               sol = root(computeRHSUpdate, sol.x, method='df-sane', \
-                         options={'disp':True, 'maxfev':100, 'M':10, 'line_search':'cruz'})
+                         options={'disp':True, 'maxfev':50, 'M':10, 'line_search':'cruz'})
               
               sol = root(computeRHSUpdate, sol.x, method='krylov', \
                          options={'disp':True, 'maxiter':20, 'jac_options':{'inner_maxiter':50,'method':'lgmres','outer_k':10}})
