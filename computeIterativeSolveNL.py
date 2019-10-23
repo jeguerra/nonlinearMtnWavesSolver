@@ -46,6 +46,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
 
 def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex, DynSGS):
        linSol = SOLT[:,0]
+       qdex = tuple(udex, wdex, pdex, tdex)
        
        def computeRHSUpdate(sol):
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
@@ -81,32 +82,25 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        JAC = sps.lil_matrix((M,M))
        # Exclude places where there is little change in the solution
        dtol_fact = 1.0E-2 # 1% of maximum absolute value change in EACH variable
-       drop_tol = dtol_fact * np.amax(np.abs(DSOL[udex])) # small horizontal wind change
-       nzDex = np.where(np.abs(DSOL[udex]) > drop_tol)
-       unzDex = udex[nzDex]
-       drop_tol = dtol_fact * np.amax(np.abs(DSOL[wdex])) # small vertical wind change
-       nzDex = np.where(np.abs(DSOL[wdex]) > drop_tol)
-       wnzDex = wdex[nzDex]
-       drop_tol = dtol_fact * np.amax(np.abs(DSOL[pdex])) # small log pressure change
-       nzDex = np.where(np.abs(DSOL[pdex]) > drop_tol)
-       pnzDex = pdex[nzDex]
-       drop_tol = dtol_fact * np.amax(np.abs(DSOL[tdex])) # small log potential temp. change
-       nzDex = np.where(np.abs(DSOL[tdex]) > drop_tol)
-       tnzDex = tdex[nzDex]
-       
-       nzDex = np.concatenate((unzDex, wnzDex, pnzDex, tnzDex))
-       IDSOL = np.reciprocal(DSOL[nzDex])
-       NZS = len(nzDex)
-       print(M, NZS)
+       IDSOL = np.reciprocal(DSOL)
        
        for ii in range(M):
               #print(M, len(nzDex))
-              jac_row = (DF[ii] / NZS) * IDSOL
-              # Compute maximum change for this row and apply drop tolerance
-              #mc = np.amax(np.abs(jac_row))
-              #jac_row[np.abs(jac_row) < drop_tol * mc] = 0.0
+              jac_row = DF[ii] * IDSOL
+              # Compute maximum change for each variable in this row and apply drop tolerance
+              # Exclude places where there is little change in the solution
+              nzDex = []
+              for vv in range(4):
+                     drop_tol = dtol_fact * np.amax(np.abs(jac_row[qdex[vv]]))
+                     rnzDex = np.where(np.abs(jac_row[qdex[vv]]) > drop_tol)
+                     qnzDex = (qdex[vv])[rnzDex]
+                     nzDex.append(qnzDex)
+              
+              # Normalize the row
+              NZS = len(nzDex)
               # Set the nonzero elements of this row
-              JAC[ii,nzDex] = jac_row #np.expand_dims(jac_row, axis=1)
+              if NZS > 0:
+                     JAC[ii,nzDex] = (1.0 / NZS) * jac_row[nzDex]
                      
        JAC = JAC.tocsc()
        plt.spy(JAC)
