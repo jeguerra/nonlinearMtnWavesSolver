@@ -7,10 +7,11 @@ Created on Tue Oct  1 17:05:20 2019
 """
 import time
 import numpy as np
-import scipy.sparse as sps
-import matplotlib.pyplot as plt
-from scipy.optimize import root
-import scipy.sparse.linalg as spl
+#import scipy.linalg as dsl
+#import scipy.sparse as sps
+#import matplotlib.pyplot as plt
+import scipy.optimize as opt
+#import scipy.sparse.linalg as spl
 import computeEulerEquationsLogPLogT as tendency
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
@@ -44,9 +45,8 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, uxz, wxz, pxz, txz, U, RdT
 
-def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex, DynSGS):
+def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex, INV_LDU):
        linSol = SOLT[:,0]
-       qdex = (udex, wdex, pdex, tdex)
        
        def computeRHSUpdate(sol):
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
@@ -58,102 +58,52 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        #'''
        # Approximate the Jacobian numerically...
        start = time.time()
-       sol0 = linSol
-       #sol0 = root(computeRHSUpdate, linSol, method='krylov', \
-       #           options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
-       F0 = computeRHSUpdate(sol0)
-       sol1 = root(computeRHSUpdate, sol0, method='krylov', \
+       F_lin = computeRHSUpdate(linSol)
+       # Perturb the solution by iterative method
+       sol0 = opt.root(computeRHSUpdate, linSol, method='krylov', \
                   options={'disp':True, 'maxiter':5, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
-       F1 = computeRHSUpdate(sol1.x)
+       F0 = computeRHSUpdate(sol0.x)
        # Compute the differences
-       DF = F1 - F0
-       DSOL = sol1.x - sol0
-       IDSOL = np.reciprocal(DSOL)
+       DF = F0 - F_lin
+       DSOL = sol0.x - linSol
+       DF = DF[sysDex]
+       DSOL = DSOL[sysDex]
        #del(F0); del(sol0)
        #del(F1); del(sol1)
-       #plt.plot(DSOL)
-       #plt.show()
-       #plt.plot(DF)
-       #plt.show()
-       # Apply the BC indeces
-       #DF = DF[sysDex]
-       #DSOL = DSOL[sysDex]
-       # Compute a diagonal approximation to the Jacobian matrix
        # Index only places where change is happening
        nzDex = np.where(DSOL > 0.0)
        nzDex = nzDex[0]
-       M = len(nzDex)
-       jac_diag = np.zeros((M,))
-       jac_diag = DF[nzDex] * IDSOL[nzDex]
-       #plt.plot(jac_diag)
-       #plt.show()
-       #dFdu_max = np.amax(jac_diag[udex])
-       #dFdw_max = np.amax(jac_diag[wdex])
-       #dFdp_max = np.amax(jac_diag[pdex])
-       #dFdt_max = np.amax(jac_diag[tdex])
-       #print(dFdu_max, dFdw_max, dFdp_max, dFdt_max)
-       JAC = sps.dia_matrix((jac_diag, 0), shape=(M,M))
-       '''
-       dtol_fact = 1.0E-2 # 1% of maximum absolute value change in EACH variable
-       M = len(DSOL)
-       JAC = sps.lil_matrix((M,M))
-       M = 5000
-       for ii in range(M):
-              #print(M, len(nzDex))
-              jac_row = DF[ii] * IDSOL
-              for vv in range(4):
-                     this_qdex = qdex[vv]
-                     jacq_row = jac_row[this_qdex]
-                     # Compute maximum change for each variable in this row and apply drop tolerance
-                     local_max = np.amax(np.abs(jacq_row))
-                     #print(local_max)
-                     drop_tol = dtol_fact * local_max
-                     #print(local_max)
-                     # Include locations with "significant" change only
-                     rnzDex = np.where(np.abs(jacq_row) > drop_tol)
-                     #print(rnzDex)
-                     qnzDex = np.array(this_qdex[rnzDex[0]])
-                     if vv == 0:
-                            nzDex = qnzDex
-                     else:
-                            nzDex = np.concatenate((nzDex, qnzDex))
-                     
-              
-              #plt.plot(jac_row)
-              #plt.show()
-              # Normalize the row
-              NZS = len(nzDex)
-              #print(DF[ii], NZS)
-              # Set the nonzero elements of this row
-              if NZS > 0:
-                     JAC[ii,nzDex] = (1.0 / NZS) * jac_row[nzDex]  
-       '''
-       JAC = JAC.tocsc()
-       #plt.spy(JAC)
-       #plt.show()
-       end = time.time()
-       print('Compute numerical approximation of local Jacobian... DONE!')
-       print('Time to compute local Jacobian matrix: ', end - start)
-       start = time.time()
-       #'''
-       opts = dict(Equil=True, IterRefine='DOUBLE')
-       factor = spl.splu(JAC, permc_spec='MMD_ATA', options=opts)
-       end = time.time()
-       #'''    
-       end = time.time()          
-       print('Compute numerical approximation of local Jacobian... DONE!')
-       print('Time to compute local Jacobian factorization: ', end - start)
+       # Get inverse Jacobian at these DOF only
+       IJAC_L = (INV_LDU[0].toarray())[np.ix_(nzDex, nzDex)]
+       IJAC_D = (INV_LDU[1].toarray())[np.ix_(nzDex, nzDex)]
+       IJAC_U = (INV_LDU[2].toarray())[np.ix_(nzDex, nzDex)]
+       IJAC = IJAC_D.dot(IJAC_U)
+       IJAC = IJAC_L.dot(IJAC)
        
-       solNewton = sol1.x
-       for nn in range(3):
-              dsol = -factor.solve(F1[nzDex])
+       # Compute update  to inverse Jacobian (Sherman-Morrison)
+       num = DSOL[nzDex] - IJAC.dot(DF[nzDex])
+       dsol = np.expand_dims(DSOL[nzDex], axis=0)
+       chg = dsol.dot(IJAC)
+       df = np.expand_dims(DSOL[nzDex], axis=1)
+       scale = chg.dot(df)
+       DJ = (1.0 / scale[0,0]) * np.outer(num, chg.flatten())
+       
+       # Compute update to inverse Jacobian
+       IJAC += DJ
+       
+       solNewton = sol0.x
+       for nn in range(5):
+              dsol = -IJAC.dot(F0[nzDex])
               solNewton[nzDex] += dsol
+              F0 = computeRHSUpdate(solNewton)
+              print(np.linalg.norm(F0))
        
        #'''
        # Solve for nonlinear equilibrium
-       #sol = root(computeRHSUpdate, SOLT[:,0], method='hybr', jac=False, tol=1.0E-6)
-       sol = root(computeRHSUpdate, solNewton, method='krylov', \
-                  options={'disp':True, 'maxiter':10, 'jac_options':{'inner_maxiter':20,'method':'lgmres','outer_k':10}})
+       #sol = root(computeRHSUpdate, sol1.x, method='broyden1', jac=False, options={'disp':True})
+       sol = opt.root(computeRHSUpdate, linSol, method='krylov', \
+                  options={'disp':True, 'maxiter':5000, 'jac_options':{'inner_maxiter':50,'method':'lgmres','outer_k':10}})
+       
        '''
        for pp in range(10):
               sol = root(computeRHSUpdate, sol.x, method='df-sane', \

@@ -277,6 +277,9 @@ if __name__ == '__main__':
                      BS = sps.bmat([[C, None], [E, F]], format='csc')
                      CS = sps.bmat([[G, H], [None, K]], format='csc')
                      DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
+                     # Get sizes
+                     AS_size = AS.shape()
+                     DS_size = DS.shape()
                      del(A); del(B); del(C)
                      del(D); del(E); del(F)
                      del(G); del(H); del(J)
@@ -350,11 +353,14 @@ if __name__ == '__main__':
                      # Factor DS and compute the Schur Complement of DS
                      opts = dict(Equil=True, IterRefine='DOUBLE')
                      factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
-                     del(DS)
+                     # Compute inverse of D
+                     IDEN_D = np.identity(DS_size[0])
+                     IDS = factorDS.solve(IDEN_D)
+                     del(factoDS)
                      print('Factor D matrix... DONE!')
                      # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
-                     alpha = factorDS.solve(CS.toarray())
-                     f2_hat = factorDS.solve(f2)
+                     alpha = IDS.dot(CS.toarray())
+                     f2_hat = IDS.dot(f2)
                      DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(BS)
@@ -364,7 +370,7 @@ if __name__ == '__main__':
                      del(DS_SC)
                      print('Solve for u and w... DONE!')
                      f2 = f2 - CS.dot(sol1)
-                     sol2 = factorDS.solve(f2)
+                     sol2 = IDS.dot(f2)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      sol = np.concatenate((sol1, sol2))
                      SOLT[sysDex,0] = sol
@@ -372,13 +378,20 @@ if __name__ == '__main__':
                      SOLT[wbdex,0] = dHdX * UZ[0,:]
                      print('Recover full linear solution vector... DONE!')
                      
+                     # Compute and store the LDU decompositions for the inverse
+                     IDEN_A = sps.identity(AS_size[0])
+                     INV_LDU = [sps.bmat([[IDEN_A, None], [-alpha, IDEN_D]], format='lil'), \
+                                sps.bmat([[DS_SC, None], [None, IDS]], format='lil'), \
+                                sps.bmat([[IDEN_A, -BS.dot(IDS)], [None, IDEN_D]], format='lil')]
+                     
               # Get memory back
               del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
-              del(alpha)
-              del(factorDS)
+              del(AS); del(BS); del(CS); del(DS)
+              del(IDS); del(DS_SC); del(alpha)
+              #del(factorDS)
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
-              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex, ResDiff)
+              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex, INV_LDU)
               SOLT[:,1] = sol
               
               # Compare the linear and nonlinear solutions
