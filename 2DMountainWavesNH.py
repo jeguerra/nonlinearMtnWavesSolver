@@ -353,10 +353,11 @@ if __name__ == '__main__':
                      # Factor DS and compute the Schur Complement of DS
                      opts = dict(Equil=True, IterRefine='DOUBLE')
                      factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
+                     del(DS)
                      alpha = factorDS.solve(CS.toarray())
                      DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
-                     factorDS_SC = dsl.lu_factor(DS_SC)
-                     del(AS); del(BS); del(DS)
+                     del(AS)
+                     factorDS_SC = dsl.lu_factor(DS_SC.toarray())
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
                      # Solve the linear system and make one nonlinear iteration
@@ -375,7 +376,7 @@ if __name__ == '__main__':
                             sol = np.concatenate((sol1, sol2))
                             SOLT[sysDex,0] = sol
                             # Set the boundary condition   
-                            SOLT[wbdex,0] = dHdX * UZ[0,:]
+                            SOLT[wbdex,0] = dHdX * U[0,:]
                             print('Recover full linear solution vector... DONE!')
                             
                             if nn == 0:
@@ -392,6 +393,9 @@ if __name__ == '__main__':
                                    del(ft)
                             
                      # Get memory back
+                     del(BS); del(CS)
+                     del(factorDS)
+                     del(factorDS_SC)
                      del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
