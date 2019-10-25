@@ -358,11 +358,11 @@ if __name__ == '__main__':
                      DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
                      del(AS)
                      factorDS_SC = dsl.lu_factor(DS_SC)
+                     del(DS_SC)
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
                      #%% Solve the linear system and make a few nonlinear iterations
-                     fN = bN
-                     for nn in range(5):
+                     for nn in range(20):
                             # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
                             f2_hat = factorDS.solve(f2)
                             f1_hat = -BS.dot(f2_hat)
@@ -373,7 +373,7 @@ if __name__ == '__main__':
                             sol2 = factorDS.solve(f2)
                             print('Solve for ln(p) and ln(theta)... DONE!')
                             sol = np.concatenate((sol1, sol2))
-                            SOLT[sysDex,0] += sol
+                            SOLT[sysDex,0] += 0.25 * sol
                             # Set the boundary condition   
                             SOLT[wbdex,0] = dHdX * U[ubdex]
                             print('Recover full linear solution vector... DONE!')
@@ -381,20 +381,20 @@ if __name__ == '__main__':
                             # Update the forcing vector
                             fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                             RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
-                            fN += RHS
+                            print('Residual 2-norm: ', np.linalg.norm(RHS))
                             # Update the partitions
-                            fw = fN[wdex]
-                            f1 = np.concatenate((fN[udex], fw[wbcDex]))
-                            ft = fN[tdex]
-                            f2 = np.concatenate((fN[pdex], ft[tbcDex]))
+                            fw = RHS[wdex]
+                            f1 = np.concatenate((RHS[udex], fw[wbcDex]))
+                            ft = RHS[tdex]
+                            f2 = np.concatenate((RHS[pdex], ft[tbcDex]))
                             del(fw)
                             del(ft)
                             
                      #%% Get memory back
-                     del(BS); del(CS)
-                     del(factorDS)
-                     del(factorDS_SC)
-                     del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
+                     #del(BS); del(CS)
+                     #del(factorDS)
+                     #del(factorDS_SC)
+                     #del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
