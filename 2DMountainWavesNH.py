@@ -78,8 +78,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 86
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -357,11 +357,12 @@ if __name__ == '__main__':
                      alpha = factorDS.solve(CS.toarray())
                      DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
                      del(AS)
-                     factorDS_SC = dsl.lu_factor(DS_SC.toarray())
+                     factorDS_SC = dsl.lu_factor(DS_SC)
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
-                     # Solve the linear system and make one nonlinear iteration
-                     for nn in range(2):
+                     #%% Solve the linear system and make a few nonlinear iterations
+                     fN = bN
+                     for nn in range(5):
                             # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
                             f2_hat = factorDS.solve(f2)
                             f1_hat = -BS.dot(f2_hat)
@@ -371,28 +372,26 @@ if __name__ == '__main__':
                             print('Solve for u and w... DONE!')
                             f2 = f2 - CS.dot(sol1)
                             sol2 = factorDS.solve(f2)
-                            del(CS);
                             print('Solve for ln(p) and ln(theta)... DONE!')
                             sol = np.concatenate((sol1, sol2))
-                            SOLT[sysDex,0] = sol
+                            SOLT[sysDex,0] += sol
                             # Set the boundary condition   
-                            SOLT[wbdex,0] = dHdX * U[0,:]
+                            SOLT[wbdex,0] = dHdX * U[ubdex]
                             print('Recover full linear solution vector... DONE!')
                             
-                            if nn == 0:
-                                   # Update the forcing vector
-                                   fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                                   RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
-                                   fN = bN - RHS
-                                   # Update the partitions
-                                   fw = fN[wdex]
-                                   f1 = np.concatenate((fN[udex], fw[wbcDex]))
-                                   ft = fN[tdex]
-                                   f2 = np.concatenate((fN[pdex], ft[tbcDex]))
-                                   del(fw)
-                                   del(ft)
+                            # Update the forcing vector
+                            fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                            RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                            fN += RHS
+                            # Update the partitions
+                            fw = fN[wdex]
+                            f1 = np.concatenate((fN[udex], fw[wbcDex]))
+                            ft = fN[tdex]
+                            f2 = np.concatenate((fN[pdex], ft[tbcDex]))
+                            del(fw)
+                            del(ft)
                             
-                     # Get memory back
+                     #%% Get memory back
                      del(BS); del(CS)
                      del(factorDS)
                      del(factorDS_SC)
