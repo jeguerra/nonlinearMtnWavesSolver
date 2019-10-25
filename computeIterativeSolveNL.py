@@ -95,14 +95,17 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        
        '''
        # Solve for nonlinear equilibrium
-       #sol = root(computeRHSUpdate, sol1.x, method='broyden1', jac=False, options={'disp':True})
-       #from scipy.optimize.nonlin import BroydenFirst, Anderson
-       #from scipy.optimize.nonlin import InverseJacobian
-       #jac = BroydenFirst(reduction_method='svd')
-       #jac = Anderson(M = 10)
+       '''
+       sol = opt.newton_krylov(computeRHSUpdate, linSol, \
+                               iter=100, \
+                               maxiter=1000, \
+                               method='gmres', \
+                               inner_maxiter=100, \
+                               verbose=True)
+       '''
        sol = opt.root(computeRHSUpdate, linSol, method='krylov', \
-                  options={'line_search':'armijo', 'disp':True, 'maxiter':1000, \
-                           'jac_options':{'inner_M':None, 'inner_maxiter':50,'method':'gmres','outer_k':50}})
+                  options={'line_search':'armijo', 'disp':True, 'maxiter':100, \
+                           'jac_options':{'inner_M':None, 'inner_maxiter':200,'method':'lgmres','outer_k':10}})
        
        '''
        for pp in range(10):

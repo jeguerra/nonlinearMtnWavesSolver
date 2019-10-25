@@ -366,7 +366,6 @@ if __name__ == '__main__':
                             # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
                             f2_hat = factorDS.solve(f2)
                             f1_hat = -BS.dot(f2_hat)
-                            print('Compute Schur Complement of D... DONE!')
                             # Use dense linear algebra at this point
                             sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
                             print('Solve for u and w... DONE!')
