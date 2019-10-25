@@ -78,8 +78,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 131 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 86
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -278,8 +278,8 @@ if __name__ == '__main__':
                      CS = sps.bmat([[G, H], [None, K]], format='csc')
                      DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
                      # Get sizes
-                     AS_size = AS.shape()
-                     DS_size = DS.shape()
+                     AS_size = AS.shape
+                     DS_size = DS.shape
                      del(A); del(B); del(C)
                      del(D); del(E); del(F)
                      del(G); del(H); del(J)
@@ -353,56 +353,59 @@ if __name__ == '__main__':
                      # Factor DS and compute the Schur Complement of DS
                      opts = dict(Equil=True, IterRefine='DOUBLE')
                      factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
-                     # Compute inverse of D
-                     IDEN_D = np.identity(DS_size[0])
-                     IDS = factorDS.solve(IDEN_D)
-                     del(factoDS)
-                     print('Factor D matrix... DONE!')
-                     # Compute alpha = DS^-1 * CS and f2_hat = DS^-1 * f2
-                     alpha = IDS.dot(CS.toarray())
-                     f2_hat = IDS.dot(f2)
+                     alpha = factorDS.solve(CS.toarray())
                      DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
-                     f1_hat = f1 - BS.dot(f2_hat)
-                     del(BS)
-                     print('Compute Schur Complement of D... DONE!')
-                     # Use dense linear algebra at this point
-                     sol1 = dsl.solve(DS_SC, f1_hat)
-                     del(DS_SC)
-                     print('Solve for u and w... DONE!')
-                     f2 = f2 - CS.dot(sol1)
-                     sol2 = IDS.dot(f2)
-                     print('Solve for ln(p) and ln(theta)... DONE!')
-                     sol = np.concatenate((sol1, sol2))
-                     SOLT[sysDex,0] = sol
-                     # Set the boundary condition   
-                     SOLT[wbdex,0] = dHdX * UZ[0,:]
-                     print('Recover full linear solution vector... DONE!')
+                     factorDS_SC = dsl.lu_factor(DS_SC)
+                     del(AS); del(BS); del(DS)
+                     print('Factor D and Schur Complement of D matrix... DONE!')
                      
-                     # Compute and store the LDU decompositions for the inverse
-                     IDEN_A = sps.identity(AS_size[0])
-                     INV_LDU = [sps.bmat([[IDEN_A, None], [-alpha, IDEN_D]], format='lil'), \
-                                sps.bmat([[DS_SC, None], [None, IDS]], format='lil'), \
-                                sps.bmat([[IDEN_A, -BS.dot(IDS)], [None, IDEN_D]], format='lil')]
-                     
-              # Get memory back
-              del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
-              del(AS); del(BS); del(CS); del(DS)
-              del(IDS); del(DS_SC); del(alpha)
-              #del(factorDS)
+                     # Solve the linear system and make one nonlinear iteration
+                     for nn in range(2):
+                            # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
+                            f2_hat = factorDS.solve(f2)
+                            f1_hat = -BS.dot(f2_hat)
+                            print('Compute Schur Complement of D... DONE!')
+                            # Use dense linear algebra at this point
+                            sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
+                            print('Solve for u and w... DONE!')
+                            f2 = f2 - CS.dot(sol1)
+                            sol2 = factorDS.solve(f2)
+                            del(CS);
+                            print('Solve for ln(p) and ln(theta)... DONE!')
+                            sol = np.concatenate((sol1, sol2))
+                            SOLT[sysDex,0] = sol
+                            # Set the boundary condition   
+                            SOLT[wbdex,0] = dHdX * UZ[0,:]
+                            print('Recover full linear solution vector... DONE!')
+                            
+                            if nn == 0:
+                                   # Update the forcing vector
+                                   fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                                   RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                                   fN = bN - RHS
+                                   # Update the partitions
+                                   fw = fN[wdex]
+                                   f1 = np.concatenate((fN[udex], fw[wbcDex]))
+                                   ft = fN[tdex]
+                                   f2 = np.concatenate((fN[pdex], ft[tbcDex]))
+                                   del(fw)
+                                   del(ft)
+                            
+                     # Get memory back
+                     del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
-              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex, INV_LDU)
+              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
               SOLT[:,1] = sol
               
               # Compare the linear and nonlinear solutions
               DSOL = SOLT[:,1] - SOLT[:,0]
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
               
-              # Compute and print out the residual
-              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               # Initialize the RHS and forcing for each field
+              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
-              print('Residual 2-norm: ', np.linalg.norm(RHS))
+              print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
               #%%
        elif LinearSolve:
               restart_file = 'restartDB_LN'

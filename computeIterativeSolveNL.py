@@ -20,9 +20,6 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        Rd = PHYS[3]
        kap = PHYS[4]
        
-       # Get the boundary terrain
-       #dHdX = REFS[6]
-       
        # Get the solution components
        uxz = SOLT[udex]
        wxz = SOLT[wdex]
@@ -45,17 +42,19 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, uxz, wxz, pxz, txz, U, RdT
 
-def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex, INV_LDU):
+def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex):
        linSol = SOLT[:,0]
+       #nlnSol = linSol
        
        def computeRHSUpdate(sol):
+              #nlnSol[sysDex] = sol
               fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
        
               # Multiply by -1 here. The RHS was computed for transient solution
               return -1.0 * rhs
-       #'''
+       '''
        # Approximate the Jacobian numerically...
        start = time.time()
        F_lin = computeRHSUpdate(linSol)
@@ -74,11 +73,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        nzDex = np.where(DSOL > 0.0)
        nzDex = nzDex[0]
        # Get inverse Jacobian at these DOF only
-       IJAC_L = (INV_LDU[0].toarray())[np.ix_(nzDex, nzDex)]
-       IJAC_D = (INV_LDU[1].toarray())[np.ix_(nzDex, nzDex)]
-       IJAC_U = (INV_LDU[2].toarray())[np.ix_(nzDex, nzDex)]
-       IJAC = IJAC_D.dot(IJAC_U)
-       IJAC = IJAC_L.dot(IJAC)
+       IJAC = INV_LDU[np.ix_(nzDex, nzDex)]
        
        # Compute update  to inverse Jacobian (Sherman-Morrison)
        num = DSOL[nzDex] - IJAC.dot(DF[nzDex])
@@ -98,11 +93,16 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               F0 = computeRHSUpdate(solNewton)
               print(np.linalg.norm(F0))
        
-       #'''
+       '''
        # Solve for nonlinear equilibrium
        #sol = root(computeRHSUpdate, sol1.x, method='broyden1', jac=False, options={'disp':True})
+       #from scipy.optimize.nonlin import BroydenFirst, Anderson
+       #from scipy.optimize.nonlin import InverseJacobian
+       #jac = BroydenFirst(reduction_method='svd')
+       #jac = Anderson(M = 10)
        sol = opt.root(computeRHSUpdate, linSol, method='krylov', \
-                  options={'disp':True, 'maxiter':5000, 'jac_options':{'inner_maxiter':50,'method':'lgmres','outer_k':10}})
+                  options={'line_search':'armijo', 'disp':True, 'maxiter':1000, \
+                           'jac_options':{'inner_M':None, 'inner_maxiter':50,'method':'gmres','outer_k':50}})
        
        '''
        for pp in range(10):

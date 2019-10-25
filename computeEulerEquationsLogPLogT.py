@@ -101,10 +101,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        PlpPz = DlpDz + DLPDZ
        PGFZ = RdT * PlpPz + gc
        
-       # Apply boundary condition
+       # Apply boundary condition exactly
        wxz[botdex] = U[botdex] * dHdX
-       WXZ[botdex] *= 0.0
+       wxz[topdex] *= 0.0
        txz[topdex] *= 0.0
+       WXZ[botdex] *= 0.0
        
        # Horizontal momentum equation
        LD11 = U * DuDx
