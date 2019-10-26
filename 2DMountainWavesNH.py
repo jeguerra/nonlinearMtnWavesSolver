@@ -362,7 +362,7 @@ if __name__ == '__main__':
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
                      #%% Solve the linear system and make a few nonlinear iterations
-                     for nn in range(20):
+                     for nn in range(10):
                             # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
                             f2_hat = factorDS.solve(f2)
                             f1_hat = -BS.dot(f2_hat)
@@ -373,7 +373,10 @@ if __name__ == '__main__':
                             sol2 = factorDS.solve(f2)
                             print('Solve for ln(p) and ln(theta)... DONE!')
                             sol = np.concatenate((sol1, sol2))
-                            SOLT[sysDex,0] += 0.25 * sol
+                            if nn == 0:
+                                   SOLT[sysDex,0] = sol
+                            else:
+                                   SOLT[sysDex,0] += 0.25 * sol
                             # Set the boundary condition   
                             SOLT[wbdex,0] = dHdX * U[ubdex]
                             print('Recover full linear solution vector... DONE!')
