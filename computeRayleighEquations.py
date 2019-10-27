@@ -15,7 +15,7 @@ import scipy.sparse as sps
 #from matplotlib import cm
 #import matplotlib.pyplot as plt
 
-def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
+def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
        # Get DIMS data
        L1 = DIMS[0]
@@ -29,7 +29,7 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
        Z = REFS[5]
        
        # Set the layer bounds
-       dLayerZ = ZH - depth
+       dLayerZ = height
        dLayerR = L2 - width
        dLayerL = L1 + width
        
@@ -57,7 +57,7 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
-                                   dNormZ = (ZH - ZRL) / depth[jj]
+                                   dNormZ = (ZH - ZRL) / (ZH - height[jj])
                             else:
                                    dNormZ = 1.0
                             # Evaluate the strength of the field
