@@ -56,8 +56,8 @@ def computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral):
                             RFX = 0.0
                      if applyTop:
                             # In the top layer?
-                            if ZRL >= dLayerZ:
-                                   dNormZ = (ZH - ZRL) / depth
+                            if ZRL >= dLayerZ[jj]:
+                                   dNormZ = (ZH - ZRL) / depth[jj]
                             else:
                                    dNormZ = 1.0
                             # Evaluate the strength of the field

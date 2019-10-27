@@ -10,23 +10,7 @@ import numpy as np
 import math as mt
 #import matplotlib.pyplot as plt
 
-def computeGuellrichDomain2D(DIMS, REFS, hx, dhdx):
-       # Get data from DIMS and REFS
-       ZH = DIMS[2]
-       NX = DIMS[3] + 1
-       NZ = DIMS[4]
-       
-       # input REFS = [x, z, HFM, whf, CPM, wcp]
-       x = REFS[0]
-       z = REFS[1]
-       
-       # Compute the flat XZ mesh
-       HTZL, dummy = np.meshgrid(hx,z)
-       XL, ZL = np.meshgrid(x,z)
-       
-       # High Order Improved Guellrich coordinate 3 parameter function
-       xi = 1.0 / ZH * ZL
-       ang = 0.5 * mt.pi * xi
+def computeTerrainDecayFunctions(xi, ang):
        AR = 1.0E-3
        p = 20
        q = 5
@@ -43,6 +27,27 @@ def computeGuellrichDomain2D(DIMS, REFS, hx, dhdx):
        dfdxi3 = -AR * (1.0 - 2.0 * xi);
        d_dzdh_dxi = (dfdxi1 * dfdxi2) + dfdxi3
        
+       return dzdh, d_dzdh_dxi
+
+def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx):
+       # Get data from DIMS and REFS
+       ZH = DIMS[2]
+       NX = DIMS[3] + 1
+       NZ = DIMS[4]
+       
+       # input REFS = [x, z, HFM, whf, CPM, wcp]
+       x = REFS[0]
+       z = REFS[1]
+       
+       # Compute the flat XZ mesh (computational domain)
+       HTZL, dummy = np.meshgrid(hx,z)
+       XL, ZL = np.meshgrid(x,z)
+       
+       # High Order Improved Guellrich coordinate 3 parameter function
+       xi = 1.0 / ZH * ZL
+       ang = 0.5 * mt.pi * xi
+       dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang)
+       
        dxidz = ZH + (HTZL * d_dzdh_dxi)
        sigma = ZH * np.reciprocal(dxidz)
        
@@ -56,4 +61,11 @@ def computeGuellrichDomain2D(DIMS, REFS, hx, dhdx):
               
        #plt.plot(z, dzdh[:,0])
        
-       return XL, ZTL, DZT, sigma
+       # Compute the coordinate surface at edge of Rayleigh layer
+       xi = 1.0 / ZH * zRay
+       ang = 0.5 * mt.pi * zRay
+       dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang)
+       
+       ZRL = (dzdh * hx) + zRay
+       
+       return XL, ZTL, DZT, sigma, ZRL

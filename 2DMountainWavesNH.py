@@ -108,7 +108,7 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #% Transient solve parameters
-       DT = 0.1 # Linear transient
+       DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
@@ -136,7 +136,8 @@ if __name__ == '__main__':
        HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
        
        # Make the 2D physical domains from reference grids and topography
-       XL, ZTL, DZT, sigma = computeGuellrichDomain2D(DIMS, REFS, HofX, dHdX)
+       zRay = ZH - depth
+       XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        #XL, ZTL, DZT, sigma = computeStretchedDomain2D(DIMS, REFS, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
@@ -238,7 +239,7 @@ if __name__ == '__main__':
        del(DDZM)
        
        #% Rayleigh opearator
-       ROPS = computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, ubdex, utdex)
+       ROPS = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
        REFG.append(ROPS)
        
        #% Compute the global LHS operator
@@ -578,7 +579,7 @@ if __name__ == '__main__':
        # Compute the new Guellrich domain
        NDIMS = [L1, L2, ZH, NXI-1, NZI]
        NREFS = [xnew, znew]
-       XLI, ZTLI, DZTI, sigmaI = computeGuellrichDomain2D(NDIMS, NREFS, hnew, dhnewdx)
+       XLI, ZTLI, DZTI, sigmaI, ZRLI = computeGuellrichDomain2D(NDIMS, NREFS, zRay, hnew, dhnewdx)
        
        #%% Make some plots for static or transient solutions
        
