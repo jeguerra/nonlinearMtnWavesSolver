@@ -103,9 +103,10 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
                                inner_maxiter=100, \
                                verbose=True)
        '''
+       
        sol = opt.root(computeRHSUpdate, linSol, method='krylov', \
-                  options={'line_search':'armijo', 'disp':True, 'maxiter':1000, \
-                           'jac_options':{'inner_M':None, 'inner_maxiter':100,'method':'gmres','outer_k':5}})
+                  options={'line_search':'armijo', 'disp':True, 'maxiter':100, \
+                           'jac_options':{'inner_M':None, 'inner_maxiter':200,'method':'gmres','outer_k':5}})
        
        '''
        for pp in range(10):
