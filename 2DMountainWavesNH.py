@@ -101,8 +101,8 @@ if __name__ == '__main__':
        HOPT = [h0, aC, lC]
        
        # Set the Rayleigh options
-       depth = 10000.0
-       width = 20000.0
+       depth = 12000.0
+       width = 24000.0
        applyTop = True
        applyLateral = True
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
@@ -228,22 +228,25 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #% Get the 2D linear operators...
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)              
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)  
+       DZDX = np.reshape(DZT, (OPS,), order='F')
+       PPXM = DDXM - DZDX * DDZM
        REFS.append(DDXM)
        REFS.append(DDZM)
-       REFS.append(DDXM.dot(DDXM))
+       REFS.append(PPXM.dot(PPXM))
        REFS.append(DDZM.dot(DDZM))
        REFS.append(DZT)
-       REFS.append(np.reshape(DZT, (OPS,), order='F'))
+       REFS.append(DZDX)
        del(DDXM)
        del(DDZM)
+       del(DZDX)
        
        #% Rayleigh opearator
        ROPS = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
        REFG.append(ROPS)
        
        #% Compute the global LHS operator
-       if StaticSolve or LinearSolve:
+       if (StaticSolve or LinearSolve) and not isRestart:
               # Compute the equation blocks
               DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               print('Compute global sparse linear Euler operator: DONE!')
@@ -448,10 +451,10 @@ if __name__ == '__main__':
               
               if isRestart:
                      rdb = shelve.open(restart_file)
-                     SOLT[udex,0] = rdb['uxz']
-                     SOLT[wdex,0] = rdb['wxz']
-                     SOLT[pdex,0] = rdb['pxz']
-                     SOLT[tdex,0] = rdb['txz']
+                     SOLT[udex,1] = rdb['uxz']
+                     SOLT[wdex,1] = rdb['wxz']
+                     SOLT[pdex,1] = rdb['pxz']
+                     SOLT[tdex,1] = rdb['txz']
                      RHS = rdb['RHS']
                      NX_in = rdb['NX']
                      NZ_in = rdb['NZ']
@@ -483,8 +486,6 @@ if __name__ == '__main__':
               error = [np.linalg.norm(RHS)]
               #metadata = dict(title='Nonlinear Solve - Ln-Theta, 100 m', artist='Spectral Methond', comment='DynSGS')
               #writer = ImageMagickWriter(fps=20, metadata=metadata)
-              fig = plt.figure()
-              plt.show()
               #with writer.saving(fig, "nonlinear_dynsgs.gif", 100):
               for tt in range(len(TI)):
                      # Compute the SSPRK93 stages at this time step
@@ -504,6 +505,7 @@ if __name__ == '__main__':
                             print('Time: ', tt * DT, ' Residual 2-norm: ', err)
                      
                      if tt % ITI == 0:
+                            fig = plt.figure(figsize=(10.0, 6.0))
                             # Check the tendencies
                             #plt.xlim(-30, 30)
                             #plt.ylim(0, 25)
@@ -536,10 +538,10 @@ if __name__ == '__main__':
        #% Make a database for restart
        if toRestart:
               rdb = shelve.open(restart_file, flag='n')
-              rdb['uxz'] = SOLT[udex,0]
-              rdb['wxz'] = SOLT[wdex,0]
-              rdb['pxz'] = SOLT[pdex,0]
-              rdb['txz'] = SOLT[tdex,0]
+              rdb['uxz'] = SOLT[udex,1]
+              rdb['wxz'] = SOLT[wdex,1]
+              rdb['pxz'] = SOLT[pdex,1]
+              rdb['txz'] = SOLT[tdex,1]
               rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ

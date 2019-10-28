@@ -43,8 +43,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        return fields, uxz, wxz, pxz, txz, U, RdT
 
 def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex):
-       linSol = SOLT[:,0]
-       #nlnSol = linSol
+       lastSol = SOLT[:,0]
        
        def computeRHSUpdate(sol):
               #nlnSol[sysDex] = sol
@@ -104,9 +103,9 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
                                verbose=True)
        '''
        
-       sol = opt.root(computeRHSUpdate, linSol, method='krylov', \
+       sol = opt.root(computeRHSUpdate, lastSol, method='krylov', \
                   options={'line_search':'armijo', 'disp':True, 'maxiter':10, \
-                           'jac_options':{'inner_M':None, 'inner_maxiter':200,'method':'gmres','outer_k':10}})
+                           'jac_options':{'inner_M':None, 'inner_maxiter':400,'method':'gmres','outer_k':10}})
        
        '''
        for pp in range(10):
