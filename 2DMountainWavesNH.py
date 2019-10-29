@@ -55,14 +55,14 @@ import faulthandler; faulthandler.enable()
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
-       ResDiff = False
+       NonLinSolve = True
+       ResDiff = True
        
        # Set restarting
        toRestart = True
-       isRestart = False
+       isRestart = True
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -110,7 +110,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 1.0
+       HR = 3.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output
@@ -229,11 +229,12 @@ if __name__ == '__main__':
        
        #% Get the 2D linear operators...
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)  
-       DZDX = np.reshape(DZT, (OPS,), order='F')
+       DZDX = sps.spdiags(np.reshape(DZT, (OPS,), order='F'), 0, OPS, OPS)
        PPXM = DDXM - DZDX * DDZM
        REFS.append(DDXM)
        REFS.append(DDZM)
-       REFS.append(PPXM.dot(PPXM))
+       #REFS.append(PPXM.dot(PPXM))
+       REFS.append(DDXM.dot(DDXM))
        REFS.append(DDZM.dot(DDZM))
        REFS.append(DZT)
        REFS.append(DZDX)
@@ -451,10 +452,10 @@ if __name__ == '__main__':
               
               if isRestart:
                      rdb = shelve.open(restart_file)
-                     SOLT[udex,1] = rdb['uxz']
-                     SOLT[wdex,1] = rdb['wxz']
-                     SOLT[pdex,1] = rdb['pxz']
-                     SOLT[tdex,1] = rdb['txz']
+                     SOLT[udex,0] = rdb['uxz']
+                     SOLT[wdex,0] = rdb['wxz']
+                     SOLT[pdex,0] = rdb['pxz']
+                     SOLT[tdex,0] = rdb['txz']
                      RHS = rdb['RHS']
                      NX_in = rdb['NX']
                      NZ_in = rdb['NZ']
