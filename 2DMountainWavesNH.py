@@ -55,10 +55,10 @@ import faulthandler; faulthandler.enable()
 
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
-       ResDiff = False
+       NonLinSolve = True
+       ResDiff = True
        
        # Set restarting
        toRestart = True
@@ -110,7 +110,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 4.0
+       HR = 5.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 2000 # Stride for image output
@@ -507,8 +507,8 @@ if __name__ == '__main__':
                             err2 = np.linalg.norm(RHS[wdex])
                             err3 = np.linalg.norm(RHS[pdex])
                             err4 = np.linalg.norm(RHS[tdex])
-                            print('Time: %2f, Residuals: % 10.3E, % 10.3E, % 10.3E, % 10.3E, % 10.3E', \
-                                  (tt * DT, err1, err2, err3, err4, err))
+                            print('Time: %d, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
+                                  % (tt * DT, err1, err2, err3, err4, err))
                      
                      if tt % ITI == 0:
                             fig = plt.figure(figsize=(10.0, 6.0))
