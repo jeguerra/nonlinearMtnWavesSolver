@@ -51,8 +51,31 @@ from computeIterativeSolveNL import computeIterativeSolveNL
 
 import faulthandler; faulthandler.enable()
 
-#from matplotlib.animation import ImageMagickWriter
-
+def getFromRestart(name, sdex, NX, NZ, ET, udex, wdex, vpdex, tdex):
+       rdb = shelve.open(restart_file, flag='r')
+       
+       NX_in = rdb['NX']
+       NZ_in = rdb['NZ']
+       if NX_in != NX or NZ_in != NZ:
+              print('ERROR: RESTART DATA IS INVALID')
+              sys.exit(2)
+       
+       SOLT[udex,sdex] = rdb['uxz']
+       SOLT[wdex,sdex] = rdb['wxz']
+       SOLT[pdex,sdex] = rdb['pxz']
+       SOLT[tdex,sdex] = rdb['txz']
+       RHS = rdb['RHS']
+       IT = rdb['ET']
+       if ET <= IT:
+              print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
+              sys.exit(2)
+              
+       # Initialize the restart time array
+       TI = np.array(np.arange(IT + DT, ET, DT))
+       rdb.close()
+       
+       return SOLT, RHS, NX_in, NZ_in, TI
+       
 if __name__ == '__main__':
        # Set the solution type
        StaticSolve = True
@@ -251,6 +274,14 @@ if __name__ == '__main__':
               # Compute the equation blocks
               DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               print('Compute global sparse linear Euler operator: DONE!')
+              # Compute the forcing
+              WBC = dHdX * UZ[0,:]
+              WEQ = sps.bmat([[((DOPS[1].tolil())[:,ubdex])], \
+                              [((DOPS[3])[:,ubdex])], \
+                              [((DOPS[7])[:,ubdex])], \
+                              [((DOPS[9].tolil())[:,ubdex])]])
+              bN = -WEQ.dot(WBC); del(WBC)
+              
               # Apply the BC indexing block-wise
               A = DOPS[0]
               B = (DOPS[1].tolil())[:,wbcDex]
@@ -267,14 +298,6 @@ if __name__ == '__main__':
               R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
               R3 = ROPS[2]
               R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
-              
-              # Compute the forcing
-              WBC = dHdX * UZ[0,:]
-              WEQ = sps.bmat([[((DOPS[1].tolil())[:,ubdex])], \
-                              [((DOPS[3])[:,ubdex])], \
-                              [((DOPS[7])[:,ubdex])], \
-                              [((DOPS[9].tolil())[:,ubdex])]])
-              bN = -WEQ.dot(WBC); del(WBC)
               
               if StaticSolve and not LinearSolve:
                      # Compute the partitions for Schur Complement solution
@@ -331,20 +354,7 @@ if __name__ == '__main__':
               print('Starting Linear to Nonlinear Static Solver...')
               
               if isRestart:
-                     rdb = shelve.open(restart_file, flag='r')
-                     SOLT[udex,0] = rdb['uxz']
-                     SOLT[wdex,0] = rdb['wxz']
-                     SOLT[pdex,0] = rdb['pxz']
-                     SOLT[tdex,0] = rdb['txz']
-                     RHS = rdb['RHS']
-                     NX_in = rdb['NX']
-                     NZ_in = rdb['NZ']
-                     IT = rdb['ET']
-                     rdb.close()
-                     
-                     if NX_in != NX or NZ_in != NZ:
-                            print('ERROR: RESTART DATA IS INVALID')
-                            sys.exit(2)
+                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, 1, ET, NX, NZ, udex, wdex, pdex, tdex)
               else:
                      '''
                      #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
@@ -417,27 +427,7 @@ if __name__ == '__main__':
               print('Starting Linear Transient Solver...')
               
               if isRestart:
-                     rdb = shelve.open(restart_file, flag='r')
-                     SOLT[udex,0] = rdb['uxz']
-                     SOLT[wdex,0] = rdb['wxz']
-                     SOLT[pdex,0] = rdb['pxz']
-                     SOLT[tdex,0] = rdb['txz']
-                     RHS = rdb['RHS']
-                     NX_in = rdb['NX']
-                     NZ_in = rdb['NZ']
-                     IT = rdb['ET']
-                     rdb.close()
-                     
-                     if NX_in != NX or NZ_in != NZ:
-                            print('ERROR: RESTART DATA IS INVALID')
-                            sys.exit(2)
-                            
-                     if ET <= IT:
-                            print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
-                            sys.exit(2)
-                            
-                     # Initialize the restart time array
-                     TI = np.array(np.arange(IT + DT, ET, DT))
+                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, 0, ET, NX, NZ, udex, wdex, pdex, tdex)
               else:
                      # Initialize time array
                      TI = np.array(np.arange(DT, ET, DT))
@@ -451,27 +441,7 @@ if __name__ == '__main__':
               print('Starting Nonlinear Transient Solver...')
               
               if isRestart:
-                     rdb = shelve.open(restart_file)
-                     SOLT[udex,0] = rdb['uxz']
-                     SOLT[wdex,0] = rdb['wxz']
-                     SOLT[pdex,0] = rdb['pxz']
-                     SOLT[tdex,0] = rdb['txz']
-                     RHS = rdb['RHS']
-                     NX_in = rdb['NX']
-                     NZ_in = rdb['NZ']
-                     IT = rdb['ET']
-                     rdb.close()
-                     
-                     if NX_in != NX or NZ_in != NZ:
-                            print('ERROR: RESTART DATA IS INVALID')
-                            sys.exit(2)
-                            
-                     if ET <= IT:
-                            print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
-                            sys.exit(2)
-                            
-                     # Initialize the restart time array
-                     TI = np.array(np.arange(IT + DT, ET, DT))
+                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, 0, ET, NX, NZ, udex, wdex, pdex, tdex)
               else:
                      # Initialize time array
                      TI = np.array(np.arange(DT, ET, DT))
