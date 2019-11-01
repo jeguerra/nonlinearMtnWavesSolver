@@ -18,14 +18,14 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        lastSol = SOLT[:,0]
        
        def computeRHSUpdate(sol):
-              fields, wxz, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex)
        
               return rhs
        
        def computeJacVecUpdate(sol, vec):
-              fields, wxz, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               jv = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
               jv += tendency.computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex)
        
@@ -33,7 +33,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               
        
        # Solve for nonlinear equilibrium (default krylov)
-       jac_options = {'method':'gmres','inner_maxiter':5000,'outer_k':5}
+       jac_options = {'method':'gmres','inner_maxiter':1000,'outer_k':5}
        sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
                                   jacobian=opt.nonlin.KrylovJacobian(**jac_options),
                                   iter=5, verbose=True,

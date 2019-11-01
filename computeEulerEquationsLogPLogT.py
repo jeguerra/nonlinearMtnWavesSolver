@@ -114,7 +114,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
        # Get the static horizontal and vertical derivatives
-       DQDZ = REFG[4]
+       DQDZ = REFG[3]
        wDQDZ = wxz.dot(DQDZ)
        
        # Compute derivative of perturbations
