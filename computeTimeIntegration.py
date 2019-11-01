@@ -9,34 +9,6 @@ import numpy as np
 import computeEulerEquationsLogPLogT as tendency
 from computeResidualViscCoeffs import computeResidualViscCoeffs
 
-def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
-       # Get some physical quantities
-       P0 = PHYS[1]
-       Rd = PHYS[3]
-       kap = PHYS[4]
-       
-       # Get the solution components
-       uxz = SOLT[udex]
-       wxz = SOLT[wdex]
-       pxz = SOLT[pdex]
-       txz = SOLT[tdex]
-       
-       # Make the total quatities
-       U = uxz + INIT[udex]
-       LP = pxz + INIT[pdex]
-       LT = txz + INIT[tdex]
-       
-       # Compute the sensible temperature scaling to PGF
-       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
-       
-       fields = np.empty((len(uxz), 4))
-       fields[:,0] = uxz 
-       fields[:,1] = wxz
-       fields[:,2] = pxz
-       fields[:,3] = txz
-       
-       return fields, uxz, wxz, pxz, txz, U, RdT
-
 def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
        # Set the coefficients
        c1 = 1.0 / 6.0
@@ -46,7 +18,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
        sgs = 0.0
        def computeDynSGSUpdate():
               if DynSGS:
-                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     fields, wxz, U, RdT = tendency.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
                      rhs = rhsSGS[sysDex] 
@@ -87,18 +59,18 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        c2 = 1.0 / 5.0
        sol = SOLT[:,0]
        SGS = 0.0
-       def computeDynSGSUpdate(fields, uxz, wxz, pxz, txz):
+       def computeDynSGSUpdate(fields):
               if DynSGS:
                      RESCF = computeResidualViscCoeffs(sol, RHS, DX, DZ, udex, wdex, pdex, tdex)
-                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
               else:
                      rhsSGS = 0.0
                      
               return rhsSGS
        
-       def computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT):
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex)
-              rhs += tendency.computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+       def computeRHSUpdate(fields, U, RdT):
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
+              rhs += tendency.computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex)
        
               return rhs
        #'''
@@ -106,9 +78,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        # Compute stages 1 - 5
        for ii in range(7):
               sol += c1 * DT * (RHS + SGS)
-              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
-              SGS = computeDynSGSUpdate(fields, uxz, wxz, pxz, txz)
+              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS = computeRHSUpdate(fields, U, RdT)
+              SGS = computeDynSGSUpdate(fields)
               
               if ii == 1:
                      SOLT[:,1] = sol
@@ -119,9 +91,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        # Compute stages 7 - 9
        for ii in range(2):
               sol += c1 * DT * (RHS + SGS)
-              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              RHS = computeRHSUpdate(fields, uxz, wxz, pxz, txz, U, RdT)
-              SGS = computeDynSGSUpdate(fields, uxz, wxz, pxz, txz)
+              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              RHS = computeRHSUpdate(fields, U, RdT)
+              SGS = computeDynSGSUpdate(fields)
        #'''
        
        #%% THE KETCHENSON SSP(10,4) METHOD

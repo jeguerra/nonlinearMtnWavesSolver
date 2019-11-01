@@ -44,20 +44,22 @@ from computeInterpolatedFields import computeInterpolatedFields
 # Numerical stuff
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
-from computeTimeIntegration import computePrepareFields
+from computeEulerEquationsLogPLogT import computePrepareFields
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 from computeIterativeSolveNL import computeIterativeSolveNL
 
 import faulthandler; faulthandler.enable()
 
-def getFromRestart(name, sdex, NX, NZ, ET, udex, wdex, vpdex, tdex):
+def getFromRestart(name, sdex, ET, NX, NZ, udex, wdex, vpdex, tdex):
        rdb = shelve.open(restart_file, flag='r')
        
        NX_in = rdb['NX']
        NZ_in = rdb['NZ']
        if NX_in != NX or NZ_in != NZ:
               print('ERROR: RESTART DATA IS INVALID')
+              print(NX, NX_in)
+              print(NZ, NZ_in)
               sys.exit(2)
        
        SOLT[udex,sdex] = rdb['uxz']
@@ -131,12 +133,12 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #% Transient solve parameters
-       DT = 0.05 # Linear transient
+       DT = 0.01 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 5.0
+       HR = 7.0
        ET = HR * 60 * 60 # End time in seconds
-       OTI = 200 # Stride for diagnostic output
-       ITI = 2000 # Stride for image output
+       OTI = 500 # Stride for diagnostic output
+       ITI = 5000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
        #% Define the computational and physical grids+
@@ -233,12 +235,13 @@ if __name__ == '__main__':
        DUDX = np.reshape(DUDX, (OPS,), order='F')
        DLPDX = np.reshape(DLPDX, (OPS,), order='F')
        DLPTDX = np.reshape(DLTDX, (OPS,), order='F')
-       DUDZ = np.reshape(DUDZ, (OPS,), order='F')
-       DLPDZ = np.reshape(DLPDZ, (OPS,), order='F')
-       DLPTDZ = np.reshape(DLPTDZ, (OPS,), order='F')
+       DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
+       DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
+       DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
+       DQDZ = np.hstack((DUDZ, DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
-       REFG = [DUDX, DLPDX, DLPTDX, DUDZ, DLPDZ, DLPTDZ]
+       REFG = [DUDX, DLPDX, DLPTDX, DUDZ, DLPDZ, DLPTDZ, DQDZ]
        
        # Update the REFS collection
        REFS.append(UZ)
@@ -252,15 +255,15 @@ if __name__ == '__main__':
        
        #% Get the 2D linear operators...
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)  
-       DZDX = sps.spdiags(np.reshape(DZT, (OPS,), order='F'), 0, OPS, OPS)
-       PPXM = DDXM - DZDX * DDZM
+       DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr')
+       #PPXM = DDXM - DZDX.dot(DDZM)
        REFS.append(DDXM)
        REFS.append(DDZM)
        #REFS.append(PPXM.dot(PPXM))
        REFS.append(DDXM.dot(DDXM))
        REFS.append(DDZM.dot(DDZM))
        REFS.append(DZT)
-       REFS.append(DZDX)
+       REFS.append(DZDX.diagonal())
        del(DDXM)
        del(DDZM)
        del(DZDX)
@@ -371,7 +374,7 @@ if __name__ == '__main__':
        INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
        
        # Initialize fields
-       fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        
        start = time.time()
        if StaticSolve:
@@ -418,8 +421,8 @@ if __name__ == '__main__':
                      print('Recover full linear solution vector... DONE!')
                      
                      # Update the forcing vector
-                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                     fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
                      print('Residual 2-norm: ', np.linalg.norm(RHS))
                      # Update the partitions
                      fw = RHS[wdex]
@@ -445,8 +448,8 @@ if __name__ == '__main__':
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
               
               # Initialize the RHS and forcing for each field
-              fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+              fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
               print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
               #%%
        elif LinearSolve:
@@ -475,9 +478,9 @@ if __name__ == '__main__':
                      # Initialize the boundary condition
                      SOLT[wbdex,0] = dHdX * UZ[0,:]
                      # Initialize fields
-                     fields, uxz, wxz, pxz, txz, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      # Initialize the RHS and forcing for each field
-                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, ubdex, utdex)
+                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
                                           
        #%% Start the time loop
        if LinearSolve or NonLinSolve:
@@ -621,10 +624,16 @@ if __name__ == '__main__':
                      cbar = fig.colorbar(ccheck)
               plt.show()
 
-       #%%
-       #plt.plot(REFS[0], (UZ[0,:] + nativeNL[0][0,:])*dHdX)
+       #%% Check the boundary conditions
+       plt.figure()
        plt.plot(REFS[0],nativeLN[0][0,:])
        plt.plot(REFS[0],nativeNL[0][0,:])
+       plt.title('Horizontal Velocity - Terrain Boundary')
+       plt.xlim(-15000, 15000)
+       plt.figure()
+       plt.plot(REFS[0],nativeLN[1][0,:])
+       plt.plot(REFS[0],nativeNL[1][0,:])
+       plt.title('Vertical Velocity - Terrain Boundary')
        plt.xlim(-15000, 15000)
        #%% #Spot check the solution on both grids
        '''

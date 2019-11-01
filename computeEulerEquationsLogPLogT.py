@@ -7,6 +7,26 @@ Created on Mon Jul 22 13:11:11 2019
 """
 import numpy as np
 import scipy.sparse as sps
+from numba import jit
+
+def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+       # Get some physical quantities
+       P0 = PHYS[1]
+       Rd = PHYS[3]
+       kap = PHYS[4]
+       
+       TQ = SOLT + INIT
+       # Make the total quatities
+       U = TQ[udex]
+       LP = TQ[pdex]
+       LT = TQ[tdex]
+       
+       # Compute the sensible temperature scaling to PGF
+       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
+       
+       fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       
+       return fields, U, RdT
 
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
@@ -68,7 +88,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, txz, U, RdT, botdex, topdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        gam = PHYS[6]
@@ -79,72 +99,64 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, uxz, wxz, pxz, tx
        DDZM = REFS[11]
        DZDX = REFS[15]
        
-       # Get the static horizontal and vertical derivatives
-       DUDZ = REFG[3]
-       DLPDZ = REFG[4]
-       DLPTDZ = REFG[5]
-       
-       # Compute derivative of perturbations
-       DDx = DDXM.dot(fields)
-       DDz = DDZM.dot(fields)
-       DuDx = DDx[:,0]
-       DwDx = DDx[:,1]
-       DlpDx = DDx[:,2]
-       DltDx = DDx[:,3]
-       DuDz = DDz[:,0]
-       DwDz = DDz[:,1]
-       DlpDz = DDz[:,2]
-       DltDz = DDz[:,3]
-       
        # Compute terrain following terms
-       WXZ = wxz - U * DZDX
-       PlpPz = DlpDz + DLPDZ
-       PGFZ = RdT * PlpPz + gc
-       
+       WXZ = fields[:,1] - U * DZDX
+              
        # Apply boundary condition exactly
-       wxz[botdex] = U[botdex] * dHdX
-       wxz[topdex] *= 0.0
-       txz[topdex] *= 0.0
+       fields[botdex,1] = U[botdex] * dHdX
+       fields[topdex,1] *= 0.0
+       fields[topdex,3] *= 0.0
        WXZ[botdex] *= 0.0
        
-       # Horizontal momentum equation
-       LD11 = U * DuDx
-       LD12 = WXZ * DuDz + wxz * DUDZ
-       LD13 = RdT * (DlpDx - DZDX * DlpDz)
-       DuDt = -(LD11 + LD12 + LD13)
-       # Vertical momentum equation
-       LD21 = U * DwDx
-       LD22 = WXZ * DwDz
-       LD23 = PGFZ
-       DwDt = -(LD21 + LD22 + LD23)
-       # Pressure (mass) equation
-       LD31 = U * DlpDx
-       LD32 = WXZ * DlpDz + wxz * DLPDZ
-       LD33 = gam * (DuDx - DZDX * DuDz + DwDz)
-       DpDt = -(LD31 + LD32 + LD33)
-       # Potential Temperature equation
-       LD41 = U * DltDx
-       LD42 = WXZ * DltDz + wxz * DLPTDZ
-       DtDt = -(LD41 + LD42)
+       # Compute advective (multiplicative) operators
+       U = sps.diags(U, offsets=0, format='csr')
+       wxz = sps.diags(fields[:,1], offsets=0, format='csr')
+       WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
-       DwDt[topdex] *= 0.0
-       DwDt[botdex] *= 0.0
-       DtDt[topdex] *= 0.0
+       # Get the static horizontal and vertical derivatives
+       DQDZ = REFG[6]
+       wDQDZ = wxz.dot(DQDZ)
        
-       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       # Compute derivative of perturbations
+       DqDx = DDXM.dot(fields)
+       DqDz = DDZM.dot(fields)
+       # Compute advection
+       UDqDx = U.dot(DqDx)
+       WDqDz = WXZ.dot(DqDz)
        
-       return DqDt
+       # Compute pressure gradient forces
+       PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
+       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,1]) + gc
+       
+       def DqDt():
+              # Horizontal momentum equation
+              DuDt = -(UDqDx[:,0] + WDqDz[:,0] + wDQDZ[:,0] + PGFX)
+              # Vertical momentum equation
+              DwDt = -(UDqDx[:,1] + WDqDz[:,1] + PGFZ)
+              # Pressure (mass) equation
+              LD33 = gam * (DqDx[:,0] - DZDX * DqDz[:,0] + DqDz[:,1])
+              DpDt = -(UDqDx[:,2] + WDqDz[:,2] + wDQDZ[:,1] + LD33)
+              # Potential Temperature equation
+              DtDt = -(UDqDx[:,3] + WDqDz[:,3] + wDQDZ[:,2])
+              
+              DwDt[topdex] *= 0.0
+              DwDt[botdex] *= 0.0
+              DtDt[topdex] *= 0.0
+       
+              return (DuDt, DwDt, DpDt, DtDt)
+                     
+       return np.concatenate(DqDt())
 
-def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
+def computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the static vertical gradients
-       ROPS = REFG[6]
+       ROPS = REFG[7]
        
        # Compute the tendencies
-       DuDt = - ROPS[0].dot(uxz)
-       DwDt = - ROPS[1].dot(wxz)
-       DpDt = - ROPS[2].dot(pxz)
-       DtDt = - ROPS[3].dot(txz)
+       DuDt = - ROPS[0].dot(fields[:,0])
+       DwDt = - ROPS[1].dot(fields[:,1])
+       DpDt = - ROPS[2].dot(fields[:,2])
+       DtDt = - ROPS[3].dot(fields[:,3])
        
        # Null tendencies at essential vertical boundaries
        DuDt[topdex] *= 0.0
@@ -161,7 +173,7 @@ def computeRayleighTendency(REFG, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, bo
        
        return DqDt
 
-def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex):
+def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
        #DDXM = REFS[10]
@@ -195,20 +207,23 @@ def computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, p
        '''
        # Compute tendencies (2nd derivative term only)
        #'''
-       DuDt = RESCFX[udex] * DDx[:,0] + RESCFZ[udex] * DDz[:,0]
+       #DuDt = RESCFX[udex] * DDx[:,0] + RESCFZ[udex] * DDz[:,0]
+       DuDt = 0.0 * RESCFX[udex]
        DwDt = RESCFX[wdex] * DDx[:,1] + RESCFZ[wdex] * DDz[:,1]
        DpDt = RESCFX[pdex] * DDx[:,2] + RESCFZ[pdex] * DDz[:,2]
+       DpDt = 0.0 * RESCFX[pdex]
        DtDt = RESCFX[tdex] * DDx[:,3] + RESCFZ[tdex] * DDz[:,3]
        #'''
        # Null tendencies along vertical boundaries
        DuDt[topdex] *= 0.0
-       DuDt[botdex] *= 0.0
-       DwDt[topdex] *= 0.0
-       DwDt[botdex] *= 0.0
+       #DwDt[topdex] *= 0.0
        DpDt[topdex] *= 0.0
+       #DtDt[topdex] *= 0.0
+
+       DuDt[botdex] *= 0.0
+       #DwDt[botdex] *= 0.0
        DpDt[botdex] *= 0.0
-       DtDt[topdex] *= 0.0
-       DtDt[botdex] *= 0.0
+       #DtDt[botdex] *= 0.0
 
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
