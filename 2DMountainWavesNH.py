@@ -133,9 +133,9 @@ if __name__ == '__main__':
        mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
        
        #% Transient solve parameters
-       DT = 0.01 # Linear transient
+       DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 7.0
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 500 # Stride for diagnostic output
        ITI = 5000 # Stride for image output
@@ -221,7 +221,9 @@ if __name__ == '__main__':
        LPT = np.expand_dims(LPT, axis=1)
        LOGT = np.tile(LPT, NX+1)
        LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
+       
        # Compute horizontal derivatives of background fields
+       '''
        DUDX = np.zeros((NZ,NX+1))
        DLPDX = np.zeros((NZ,NX+1))
        DLTDX = np.zeros((NZ,NX+1))
@@ -231,17 +233,18 @@ if __name__ == '__main__':
               DLPDX[rr,:] = DDX_1D.dot(LOGP[rr,:] - LOGP[rr,0])
               DLTDX[rr,:] = DDX_1D.dot(LOGT[rr,:] - LOGT[rr,0])
               
-       # Get the static vertical gradients and store
        DUDX = np.reshape(DUDX, (OPS,), order='F')
        DLPDX = np.reshape(DLPDX, (OPS,), order='F')
        DLPTDX = np.reshape(DLTDX, (OPS,), order='F')
+       '''       
+       # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
-       REFG = [DUDX, DLPDX, DLPTDX, DUDZ, DLPDZ, DLPTDZ, DQDZ]
+       REFG = [DUDZ, DLPDZ, DLPTDZ, DQDZ]
        
        # Update the REFS collection
        REFS.append(UZ)

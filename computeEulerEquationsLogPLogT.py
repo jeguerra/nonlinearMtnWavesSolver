@@ -114,7 +114,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
        # Get the static horizontal and vertical derivatives
-       DQDZ = REFG[6]
+       DQDZ = REFG[4]
        wDQDZ = wxz.dot(DQDZ)
        
        # Compute derivative of perturbations
@@ -150,7 +150,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
 def computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the static vertical gradients
-       ROPS = REFG[7]
+       ROPS = REFG[5]
        
        # Compute the tendencies
        DuDt = - ROPS[0].dot(fields[:,0])
