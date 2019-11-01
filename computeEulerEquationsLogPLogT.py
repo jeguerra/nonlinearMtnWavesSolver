@@ -42,9 +42,9 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Get REFS data
        UZ = REFS[8]
        PORZ = REFS[9]
-       DUDZ = REFG[3]
-       DLPDZ = REFG[4]
-       DLPTDZ = REFG[5]
+       DUDZ = REFG[0]
+       DLPDZ = REFG[1]
+       DLPTDZ = REFG[2]
        DDXM = REFS[10]
        DDZM = REFS[11]
               
