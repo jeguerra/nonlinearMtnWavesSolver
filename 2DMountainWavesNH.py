@@ -414,7 +414,7 @@ if __name__ == '__main__':
                      sol = np.concatenate((sol1, sol2))
                      SOLT[sysDex,0] = sol
                      # Set the boundary condition   
-                     SOLT[wbdex,0] = dHdX * U[ubdex]
+                     SOLT[wbdex,0] = dHdX * (U[ubdex] + SOLT[ubdex,0])
                      print('Recover full linear solution vector... DONE!')
                      
                      # Update the forcing vector
@@ -622,9 +622,9 @@ if __name__ == '__main__':
               plt.show()
 
        #%%
-       plt.plot(REFS[0], (UZ[0,:] + nativeNL[0][0,:])*dHdX)
-       #plt.plot(REFS[0],(UZ[0,:])*dHdX)
-       plt.plot(REFS[0],nativeNL[1][0,:])
+       #plt.plot(REFS[0], (UZ[0,:] + nativeNL[0][0,:])*dHdX)
+       plt.plot(REFS[0],nativeLN[0][0,:])
+       plt.plot(REFS[0],nativeNL[0][0,:])
        plt.xlim(-15000, 15000)
        #%% #Spot check the solution on both grids
        '''
