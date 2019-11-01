@@ -61,7 +61,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               
        
        # Solve for nonlinear equilibrium (default krylov)
-       jac_options = {'method':'gmres','inner_maxiter':1000,'outer_k':5}
+       jac_options = {'method':'gmres','inner_maxiter':5000,'outer_k':5}
        sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
                                   jacobian=opt.nonlin.KrylovJacobian(**jac_options),
                                   iter=5, verbose=True,

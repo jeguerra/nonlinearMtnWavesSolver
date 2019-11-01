@@ -280,16 +280,25 @@ if __name__ == '__main__':
                               [((DOPS[3])[:,ubdex])], \
                               [((DOPS[7])[:,ubdex])], \
                               [((DOPS[9].tolil())[:,ubdex])]])
-              bN = -WEQ.dot(WBC); del(WBC)
+              bN = -WEQ.dot(WBC); 
+              del(WEQ)
               
-              # Apply the BC indexing block-wise
-              A = DOPS[0]
+              # Compute coupled BC adjustment per block from w to u eqs.
+              WBC = sps.spdiags(dHdX, 0, len(dHdX), len(dHdX))
+              U_cols11 = ((DOPS[1].tolil())[:,ubdex]).dot(WBC)
+              U_cols21 = ((DOPS[3].tolil())[:,ubdex]).dot(WBC)
+              U_cols31 = ((DOPS[7].tolil())[:,ubdex]).dot(WBC)
+              U_cols41 = ((DOPS[9].tolil())[:,ubdex]).dot(WBC)
+              del(WBC)
+              
+              # Apply the BC adjustments and indexing block-wise
+              A = DOPS[0].tolil()              
               B = (DOPS[1].tolil())[:,wbcDex]
               C = DOPS[2]
               D = (DOPS[3])[np.ix_(wbcDex,wbcDex)] 
               E = (DOPS[4])[wbcDex,:]
               F = (DOPS[5].tolil())[np.ix_(wbcDex,tbcDex)]
-              G = DOPS[6]
+              G = DOPS[6].tolil()
               H = (DOPS[7])[:,wbcDex]
               J = DOPS[8]
               K = (DOPS[9].tolil())[np.ix_(tbcDex,wbcDex)]
@@ -299,11 +308,26 @@ if __name__ == '__main__':
               R3 = ROPS[2]
               R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
               
+              # Adjust columns in existing U blocks
+              A[:,ubdex] += U_cols11
+              G[:,ubdex] += U_cols31
+              # Handle special cases in w and ln-theta equations for coupled BC
+              UW = sps.lil_matrix((DOPS[3].shape[0], DOPS[0].shape[1]))
+              UW[:,ubdex] = U_cols21
+              # Take out rows for w bc
+              UW = UW[wbcDex,:]
+              UT = sps.lil_matrix((DOPS[9].shape[0], DOPS[6].shape[1]))
+              UT[:,ubdex] = U_cols41
+              # Take out rows for theta bc
+              UT = UT[tbcDex,:]
+              
+              del(DOPS)
+              del(U_cols11); del(U_cols21); del(U_cols31); del(U_cols41)
               if StaticSolve and not LinearSolve:
                      # Compute the partitions for Schur Complement solution
-                     AS = sps.bmat([[A + R1, B], [None, D + R2]], format='csc')
+                     AS = sps.bmat([[A + R1, B], [UW, D + R2]], format='csc')
                      BS = sps.bmat([[C, None], [E, F]], format='csc')
-                     CS = sps.bmat([[G, H], [None, K]], format='csc')
+                     CS = sps.bmat([[G, H], [UT, K]], format='csc')
                      DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
                      # Get sizes
                      AS_size = AS.shape
@@ -312,6 +336,7 @@ if __name__ == '__main__':
                      del(D); del(E); del(F)
                      del(G); del(H); del(J)
                      del(K); del(M)
+                     del(UW); del(UT)
                      
                      # Compute the partitions for Schur Complement solution
                      fw = bN[wdex]
@@ -372,6 +397,7 @@ if __name__ == '__main__':
                      alpha = factorDS.solve(CS.toarray())
                      DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
                      del(AS)
+                     del(alpha)
                      factorDS_SC = dsl.lu_factor(DS_SC)
                      del(DS_SC)
                      print('Factor D and Schur Complement of D matrix... DONE!')
@@ -404,6 +430,7 @@ if __name__ == '__main__':
                      del(ft)
                             
                      #%% Get memory back
+                     del(bN)
                      del(BS); del(CS)
                      del(factorDS)
                      del(factorDS_SC)
@@ -594,7 +621,11 @@ if __name__ == '__main__':
                      cbar = fig.colorbar(ccheck)
               plt.show()
 
-
+       #%%
+       plt.plot(REFS[0], (UZ[0,:] + nativeNL[0][0,:])*dHdX)
+       #plt.plot(REFS[0],(UZ[0,:])*dHdX)
+       plt.plot(REFS[0],nativeNL[1][0,:])
+       plt.xlim(-15000, 15000)
        #%% #Spot check the solution on both grids
        '''
        fig = plt.figure()
