@@ -88,6 +88,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
+@jit(nopython=True)
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
@@ -100,7 +101,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DZDX = REFS[15]
        
        # Compute terrain following terms
-       WXZ = fields[:,1] - U * DZDX
+       wxz = fields[:,1]
+       WXZ = wxz - U * DZDX
               
        # Apply boundary condition exactly
        fields[botdex,1] = U[botdex] * dHdX
@@ -110,7 +112,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
-       wxz = sps.diags(fields[:,1], offsets=0, format='csr')
+       wxz = sps.diags(wxz, offsets=0, format='csr')
        WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
        # Get the static horizontal and vertical derivatives
@@ -150,7 +152,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
 def computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the static vertical gradients
-       ROPS = REFG[5]
+       ROPS = REFG[4]
        
        # Compute the tendencies
        DuDt = - ROPS[0].dot(fields[:,0])

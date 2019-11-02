@@ -51,7 +51,7 @@ from computeIterativeSolveNL import computeIterativeSolveNL
 
 import faulthandler; faulthandler.enable()
 
-def getFromRestart(name, sdex, ET, NX, NZ, udex, wdex, vpdex, tdex):
+def getFromRestart(name, ET, NX, NZ):
        rdb = shelve.open(restart_file, flag='r')
        
        NX_in = rdb['NX']
@@ -62,10 +62,7 @@ def getFromRestart(name, sdex, ET, NX, NZ, udex, wdex, vpdex, tdex):
               print(NZ, NZ_in)
               sys.exit(2)
        
-       SOLT[udex,sdex] = rdb['uxz']
-       SOLT[wdex,sdex] = rdb['wxz']
-       SOLT[pdex,sdex] = rdb['pxz']
-       SOLT[tdex,sdex] = rdb['txz']
+       SOLT = rdb['SOLT']
        RHS = rdb['RHS']
        IT = rdb['ET']
        if ET <= IT:
@@ -385,7 +382,7 @@ if __name__ == '__main__':
               print('Starting Linear to Nonlinear Static Solver...')
               
               if isRestart:
-                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, 1, ET, NX, NZ, udex, wdex, pdex, tdex)
+                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
               else:
                      '''
                      #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
@@ -460,7 +457,7 @@ if __name__ == '__main__':
               print('Starting Linear Transient Solver...')
               
               if isRestart:
-                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, 0, ET, NX, NZ, udex, wdex, pdex, tdex)
+                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
               else:
                      # Initialize time array
                      TI = np.array(np.arange(DT, ET, DT))
@@ -474,7 +471,7 @@ if __name__ == '__main__':
               print('Starting Nonlinear Transient Solver...')
               
               if isRestart:
-                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, 0, ET, NX, NZ, udex, wdex, pdex, tdex)
+                     SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
               else:
                      # Initialize time array
                      TI = np.array(np.arange(DT, ET, DT))
@@ -547,10 +544,7 @@ if __name__ == '__main__':
        #% Make a database for restart
        if toRestart:
               rdb = shelve.open(restart_file, flag='n')
-              rdb['uxz'] = SOLT[udex,1]
-              rdb['wxz'] = SOLT[wdex,1]
-              rdb['pxz'] = SOLT[pdex,1]
-              rdb['txz'] = SOLT[tdex,1]
+              rdb['SOLT'] = SOLT
               rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ

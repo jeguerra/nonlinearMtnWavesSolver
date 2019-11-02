@@ -23,9 +23,21 @@ def computeCompactFiniteDiffDerivativeMatrix(DIMS, dom):
               # Get the metric weights
               hp = abs(dom[ii+1] - dom[ii])
               hm = abs(dom[ii] - dom[ii-1])
-              # Write the right equation
+              
+              # Compute the stencil coefficients
               
               # Write the left equation
+              LDM[ii,ii-1] =
+              LDM[ii,ii] =
+              LDM[ii,ii+1] =
+              # Write the right equation
+              RDM[ii,ii-1] =
+              RDM[ii,ii] =
+              RDM[ii,ii+1] =
+              
+       DDM = LDM.solve(RDM)
+       
+       return DDM
 
 def computeHermiteFunctionDerivativeMatrix(DIMS):
        
