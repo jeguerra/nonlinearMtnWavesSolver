@@ -30,8 +30,6 @@ from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
-from computeHermiteFunctionDerivativeMatrix import computeHermiteFunctionDerivativeMatrix
-from computeChebyshevDerivativeMatrix import computeChebyshevDerivativeMatrix
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
 #from computeStretchedDomain2D import computeStretchedDomain2D
@@ -42,6 +40,7 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
+import computeDerivativeMatrix as derv
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
 from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
 from computeEulerEquationsLogPLogT import computePrepareFields
@@ -77,10 +76,10 @@ def getFromRestart(name, ET, NX, NZ):
        
 if __name__ == '__main__':
        # Set the solution type
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
-       ResDiff = False
+       NonLinSolve = True
+       ResDiff = True
        
        # Set restarting
        toRestart = True
@@ -100,8 +99,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 90
+       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 85
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -142,8 +141,11 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS)
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
-       DDX_1D, HF_TRANS = computeHermiteFunctionDerivativeMatrix(DIMS)
-       DDZ_1D, CH_TRANS = computeChebyshevDerivativeMatrix(DIMS)
+       DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       
+       DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix(DIMS, REFS[0])
+       DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix(DIMS, REFS[1])
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -181,10 +183,10 @@ if __name__ == '__main__':
        SENSIBLE = 1
        POTENTIAL = 2
        # Map the sounding to the computational vertical grid [0 H]
-       TofZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS)
+       TofZ, DTDZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS)
        # Compute background fields on the vertical
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TofZ, SENSIBLE)
+              computeThermoMassFields(PHYS, DIMS, REFS, TofZ, DTDZ, SENSIBLE)
               
        # Compute the ratio of pressure to density:
        POR = np.multiply(PZ, np.reciprocal(RHO))

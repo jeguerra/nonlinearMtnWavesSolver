@@ -20,22 +20,62 @@ def computeCompactFiniteDiffDerivativeMatrix(DIMS, dom):
        
        # Loop over each interior point in the irregular grid
        for ii in range(1,N-1):
-              # Get the metric weights
-              hp = abs(dom[ii+1] - dom[ii])
-              hm = abs(dom[ii] - dom[ii-1])
+              # Set compact finite difference on some points
+              # and simple centered difference in between
+              if ii != 0:
+                     # Get the metric weights
+                     hp = dom[ii+1] - dom[ii]
+                     hm = dom[ii] - dom[ii-1]
+                     
+                     # Compute the stencil coefficients
+                     hr = (hm / hp)
+                     d = -0.25
+                     c = d * hr**4
+                     b = -1.0 / 8.0 * (5.0 + hr) 
+                     a = 1.0 / 8.0 * (hr**2 + hr**3) + 0.5 * hr**4
+                     
+                     # Write the right equation
+                     RDM[ii,ii-1] = -b
+                     RDM[ii,ii] = (a + b)
+                     RDM[ii,ii+1] = -a
+                     # Write the left equation
+                     LDM[ii,ii-1] = d * hm
+                     LDM[ii,ii] = -(hp * (a + c) + hm * (d - b))
+                     LDM[ii,ii+1] = c * hp
+              else:
+                     hd = dom[ii+1] - dom[ii-1]
+                     LDM[ii,ii] = 1.0
+                     RDM[ii,ii+1] = 1.0 / hd
+                     RDM[ii,ii-1] = -1.0 / hd
               
-              # Compute the stencil coefficients
-              
-              # Write the left equation
-              LDM[ii,ii-1] =
-              LDM[ii,ii] =
-              LDM[ii,ii+1] =
-              # Write the right equation
-              RDM[ii,ii-1] =
-              RDM[ii,ii] =
-              RDM[ii,ii+1] =
-              
-       DDM = LDM.solve(RDM)
+       # Handle the left and right boundaries
+       LDM[0,0] = 1.0
+       LDM[N-1,N-1] = 1.0
+       
+       # Left end (forward)
+       hp = dom[1] - dom[0]
+       hpp = hp + (dom[2] - dom[1])
+       lc = (hp - (hp**2 / hpp))
+       RDM[0,0] = -(1.0 / lc) * (1.0 - (hp / hpp)**2)
+       RDM[0,1] = (1.0 / lc)
+       RDM[0,2] = -(1.0 / lc) * (hp / hpp)**2
+       
+       # Right end (backward)
+       hm = dom[N-2] - dom[N-1]
+       hmm = hm + (dom[N-3] - dom[N-2])
+       rc = (hm - (hm**2 / hmm))
+       RDM[N-1,N-1] = -(1.0 / rc) * (1.0 - (hm / hmm)**2)
+       RDM[N-1,N-2] = (1.0 / rc)
+       RDM[N-1,N-3] = -(1.0 / rc) * (hm / hmm)**2
+
+       # Get the derivative matrix
+       DDM = np.linalg.solve(LDM, RDM)
+       
+       # Clean up numerical zeros
+       for ii in range(N):
+              for jj in range(N):
+                     if abs(DDM[ii,jj]) <= 1.0E-15:
+                            DDM[ii,jj] = 0.0
        
        return DDM
 

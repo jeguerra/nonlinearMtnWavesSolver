@@ -88,7 +88,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-@jit(nopython=True)
+#@jit(nopython=True)
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
@@ -209,23 +209,23 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        '''
        # Compute tendencies (2nd derivative term only)
        #'''
-       #DuDt = RESCFX[udex] * DDx[:,0] + RESCFZ[udex] * DDz[:,0]
-       DuDt = 0.0 * RESCFX[udex]
+       DuDt = RESCFX[udex] * DDx[:,0] + RESCFZ[udex] * DDz[:,0]
+       #DuDt = 0.0 * RESCFX[udex]
        DwDt = RESCFX[wdex] * DDx[:,1] + RESCFZ[wdex] * DDz[:,1]
        DpDt = RESCFX[pdex] * DDx[:,2] + RESCFZ[pdex] * DDz[:,2]
-       DpDt = 0.0 * RESCFX[pdex]
+       #DpDt = 0.0 * RESCFX[pdex]
        DtDt = RESCFX[tdex] * DDx[:,3] + RESCFZ[tdex] * DDz[:,3]
        #'''
        # Null tendencies along vertical boundaries
        DuDt[topdex] *= 0.0
-       #DwDt[topdex] *= 0.0
+       DwDt[topdex] *= 0.0
        DpDt[topdex] *= 0.0
-       #DtDt[topdex] *= 0.0
+       DtDt[topdex] *= 0.0
 
        DuDt[botdex] *= 0.0
-       #DwDt[botdex] *= 0.0
+       DwDt[botdex] *= 0.0
        DpDt[botdex] *= 0.0
-       #DtDt[botdex] *= 0.0
+       DtDt[botdex] *= 0.0
 
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))

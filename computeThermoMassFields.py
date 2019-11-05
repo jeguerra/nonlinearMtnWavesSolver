@@ -121,7 +121,7 @@ def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
        
        return pBar, ln_pBar
 
-def computeThermoMassFields(PHYS, DIMS, REFS, TZ, TempType):
+def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType):
        # Get DIMS data
        NZ = DIMS[4]
        
@@ -143,7 +143,7 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, TempType):
               dlnPdz = AC * np.reciprocal(TZ)
               # Recover potential temperature background
               LPT = np.log(TZ) + Rd / cp * (mt.log(P0) - LPZ)
-              dlnPTdz = np.matmul(DDZ, np.log(TZ)) - Rd / cp * dlnPdz
+              dlnPTdz = np.reciprocal(TZ) * DTDZ - Rd / cp * dlnPdz
               PT = np.exp(LPT)
               # Recover density
               RHO = 1.0 / Rd * (PZ * np.reciprocal(TZ))
@@ -154,7 +154,7 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, TempType):
               dlnPdz = AC * np.reciprocal(PZ * TZ)
               # Recover potential temperature background
               LPT = np.log(TZ)
-              dlnPTdz = np.matmul(DDZ, LPT)
+              dlnPTdz = np.reciprocal(PT) * DTDZ
               PT = np.exp(PT)
               # Recover density
               RHO = P0**Kp / Rd * np.power(PZ, 1.0 - Kp) * np.reciprocal(TZ)
