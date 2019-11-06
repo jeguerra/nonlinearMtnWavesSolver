@@ -178,44 +178,44 @@ def computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex
 def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
-       #DDXM = REFS[10]
-       #DDZM = REFS[11]
-       DDXM2 = REFS[12]
-       DDZM2 = REFS[13]
+       DDXM = REFS[10]
+       DDZM = REFS[11]
+       #DDXM = REFS[12]
+       #DDZM = REFS[13]
+       DZDX = REFS[15]
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute derivative of perturbations
-       DDx = DDXM2.dot(fields)
-       DDz = DDZM2.dot(fields)
-       '''
-       DuDx = DDx[:,0]
-       DwDx = DDx[:,1]
-       DlpDx = DDx[:,2]
-       DltDx = DDx[:,3]
-       DuDz = DDz[:,0]
-       DwDz = DDz[:,1]
-       DlpDz = DDz[:,2]
-       DltDz = DDz[:,3]
-       '''
+       DDz = DDZM.dot(fields)
+       DDx = DDXM.dot(fields)
+       
+       # Compute diffusive fluxes
+       DuDx = RESCFX[udex] * (DDx[:,0] - DZDX * DDz[:,0])
+       DwDx = RESCFX[wdex] * (DDx[:,1] - DZDX * DDz[:,1])
+       DlpDx = RESCFX[pdex] * (DDx[:,2] - DZDX * DDz[:,2])
+       DltDx = RESCFX[tdex] * (DDx[:,3] - DZDX * DDz[:,3])
+       DuDz = RESCFZ[udex] * DDz[:,0]
+       DwDz = RESCFZ[wdex] * DDz[:,1]
+       DlpDz = RESCFZ[pdex] * DDz[:,2]
+       DltDz = RESCFZ[tdex] * DDz[:,3]
+       
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
-       '''
-       DuDt = DDXM.dot(RESCFX[udex] * DuDx) + DDZM.dot(RESCFZ[udex] * DuDz)
-       DwDt = DDXM.dot(RESCFX[wdex] * DwDx) + DDZM.dot(RESCFZ[wdex] * DwDz)
-       DpDt = DDXM.dot(RESCFX[pdex] * DlpDx) + DDZM.dot(RESCFZ[pdex] * DlpDz)
-       DtDt = DDXM.dot(RESCFX[tdex] * DltDx) + DDZM.dot(RESCFZ[tdex] * DltDz)
-       '''
-       # Compute tendencies (2nd derivative term only)
        #'''
+       DuDt = DDXM.dot(DuDx) - DZDX * DDZM.dot(DuDx) + DDZM.dot(DuDz)
+       DwDt = DDXM.dot(DwDx) - DZDX * DDZM.dot(DwDx) + DDZM.dot(DwDz)
+       DpDt = DDXM.dot(DlpDx) - DZDX * DDZM.dot(DlpDx) + DDZM.dot(DlpDz)
+       DtDt = DDXM.dot(DltDx) - DZDX * DDZM.dot(DltDx) + DDZM.dot(DltDz)
+       #'''
+       # Compute tendencies (2nd derivative term only)
+       '''
        DuDt = RESCFX[udex] * DDx[:,0] + RESCFZ[udex] * DDz[:,0]
-       #DuDt = 0.0 * RESCFX[udex]
        DwDt = RESCFX[wdex] * DDx[:,1] + RESCFZ[wdex] * DDz[:,1]
        DpDt = RESCFX[pdex] * DDx[:,2] + RESCFZ[pdex] * DDz[:,2]
-       #DpDt = 0.0 * RESCFX[pdex]
        DtDt = RESCFX[tdex] * DDx[:,3] + RESCFZ[tdex] * DDz[:,3]
-       #'''
+       '''
        # Null tendencies along vertical boundaries
        DuDt[topdex] *= 0.0
        DwDt[topdex] *= 0.0

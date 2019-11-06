@@ -99,8 +99,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 85
+       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 90
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -133,8 +133,8 @@ if __name__ == '__main__':
        #DT = 0.05 # Nonlinear transient
        HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
-       OTI = 500 # Stride for diagnostic output
-       ITI = 5000 # Stride for image output
+       OTI = 200 # Stride for diagnostic output
+       ITI = 1000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
        #% Define the computational and physical grids+
@@ -144,8 +144,8 @@ if __name__ == '__main__':
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        
-       DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix(DIMS, REFS[0])
-       DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix(DIMS, REFS[1])
+       #DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+       #DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -255,19 +255,30 @@ if __name__ == '__main__':
        del(DLPDZ)
        del(DLPTDZ)
        
-       #% Get the 2D linear operators...
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS)  
+       #%% Get the 2D linear operators in Hermite-Chebyshev space
+       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr')
-       #PPXM = DDXM - DZDX.dot(DDZM)
+       
+       #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
+       #DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       #REFG.append(PPXM_SP)
+       #REFG.append(DDZM_SP)
+       
+       # Update the data storage
        REFS.append(DDXM)
        REFS.append(DDZM)
-       #REFS.append(PPXM.dot(PPXM))
+       # 2nd order derivatives
        REFS.append(DDXM.dot(DDXM))
        REFS.append(DDZM.dot(DDZM))
+       #REFS.append(DDXM_SP)
+       #REFS.append(DDZM_SP)
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
+       
        del(DDXM)
        del(DDZM)
+       del(DDXM_SP)
+       del(DDZM_SP)
        del(DZDX)
        
        #% Rayleigh opearator
@@ -384,6 +395,7 @@ if __name__ == '__main__':
               print('Starting Linear to Nonlinear Static Solver...')
               
               if isRestart:
+                     print('Restarting from previous solution...')
                      SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
               else:
                      '''
@@ -453,12 +465,13 @@ if __name__ == '__main__':
               fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
               print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
-              #%%
+              
        elif LinearSolve:
               restart_file = 'restartDB_LN'
               print('Starting Linear Transient Solver...')
               
               if isRestart:
+                     print('Restarting from previous solution...')
                      SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
               else:
                      # Initialize time array
@@ -473,7 +486,9 @@ if __name__ == '__main__':
               print('Starting Nonlinear Transient Solver...')
               
               if isRestart:
+                     print('Restarting from previous solution...')
                      SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
+                     SOLT[:,0] = SOLT[:,1]
               else:
                      # Initialize time array
                      TI = np.array(np.arange(DT, ET, DT))
@@ -538,6 +553,8 @@ if __name__ == '__main__':
               
               # Set the boundary condition                      
               SOLT[wbdex,0] = np.multiply(dHdX, np.add(UZ[0,:], SOLT[ubdex,0]))
+              # Copy state instance 0 to 1
+              SOLT[:,1] = SOLT[:,0]
               
        endt = time.time()
        print('Solve the system: DONE!')
