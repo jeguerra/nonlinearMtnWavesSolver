@@ -28,8 +28,50 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, U, RdT
 
-#%% The linear equation operator
-def computeJacobianVectorLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
+#%% Evaluate product of Jacobian and a vector
+def computeJacobianVectorLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, DQ):
+    # Get physical constants
+       gc = PHYS[0]
+       gam = PHYS[6]
+       
+       # Get the derivative operators
+       dHdX = REFS[6]
+       DDXM = REFS[10]
+       DDZM = REFS[11]
+       DZDX = REFS[15]
+       
+       # Compute terrain following terms
+       wxz = fields[:,1]
+       WXZ = wxz - U * DZDX
+              
+       # Apply boundary condition exactly
+       fields[botdex,1] = U[botdex] * dHdX
+       fields[topdex,1] *= 0.0
+       fields[topdex,3] *= 0.0
+       WXZ[botdex] *= 0.0
+       
+       # Compute advective (multiplicative) operators
+       U = sps.diags(U, offsets=0, format='csr')
+       wxz = sps.diags(wxz, offsets=0, format='csr')
+       WXZ = sps.diags(WXZ, offsets=0, format='csr')
+       
+       # Get the static horizontal and vertical derivatives
+       DQDZ = REFG[3]
+       wDQDZ = wxz.dot(DQDZ)
+       
+       # Compute derivative of perturbations
+       DqDx = DDXM.dot(fields)
+       DqDz = DDZM.dot(fields)
+       # Compute advection
+       UDqDx = U.dot(DqDx)
+       WDqDz = WXZ.dot(DqDz)
+       transport = UDqDx + WDqDz
+       
+       # Compute pressure gradient forces
+       PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
+       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,1]) + gc
+    
+    return 0.0
 
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
@@ -54,6 +96,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Sparse 4th order compact FD derivative matrices
        #DDXM = REFS[12]
        #DDZM = REFS[13]
+       DZDX = REFS[15]
               
        #%% Compute the various blocks needed
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')
@@ -68,13 +111,16 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        PORZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        unit = sps.identity(OPS)
        
+       DZDXM = sps.spdiags(DZDX, 0, OPS, OPS)
+       
        #%% Compute the terms in the equations
        U0DDX = UM.dot(DDXM)
+       U0PPX = UM.dot(DDXM - DZDXM.dot(DDZM))
        
        # Horizontal momentum
        LD11 = U0DDX
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXM)
+       LD13 = PORZM.dot(DDXM - DZDXM.dot(DDZM))
        
        # Vertical momentum
        LD22 = U0DDX
@@ -84,11 +130,11 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Log-P equation
        LD31 = gam * DDXM
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0DDX
+       LD33 = U0PPX
        
        # Log-Theta equation
        LD42 = DLPTDZM
-       LD44 = U0DDX
+       LD44 = U0PPX
        
        DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
        
@@ -132,6 +178,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute advection
        UDqDx = U.dot(DqDx)
        WDqDz = WXZ.dot(DqDz)
+       transport = UDqDx + WDqDz
        
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
@@ -139,14 +186,14 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        def DqDt():
               # Horizontal momentum equation
-              DuDt = -(UDqDx[:,0] + WDqDz[:,0] + wDQDZ[:,0] + PGFX)
+              DuDt = -(transport[:,0] + wDQDZ[:,0] + PGFX)
               # Vertical momentum equation
-              DwDt = -(UDqDx[:,1] + WDqDz[:,1] + PGFZ)
+              DwDt = -(transport[:,1] + PGFZ)
               # Pressure (mass) equation
               LD33 = gam * (DqDx[:,0] - DZDX * DqDz[:,0] + DqDz[:,1])
-              DpDt = -(UDqDx[:,2] + WDqDz[:,2] + wDQDZ[:,1] + LD33)
+              DpDt = -(transport[:,2] + wDQDZ[:,1] + LD33)
               # Potential Temperature equation
-              DtDt = -(UDqDx[:,3] + WDqDz[:,3] + wDQDZ[:,2])
+              DtDt = -(transport[:,3] + wDQDZ[:,2])
               
               DwDt[topdex] *= 0.0
               DwDt[botdex] *= 0.0
