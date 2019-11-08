@@ -71,7 +71,7 @@ def computeJacobianVectorLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
        PGFZ = RdT * (DqDz[:,2] + DQDZ[:,1]) + gc
     
-    return 0.0
+       return 0.0
 
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
@@ -115,12 +115,13 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        
        #%% Compute the terms in the equations
        U0DDX = UM.dot(DDXM)
-       U0PPX = UM.dot(DDXM - DZDXM.dot(DDZM))
+       PPX = DDXM - DZDXM.dot(DDZM)
+       U0PPX = UM.dot(PPX)
        
        # Horizontal momentum
        LD11 = U0DDX
        LD12 = DUDZM
-       LD13 = PORZM.dot(DDXM - DZDXM.dot(DDZM))
+       LD13 = PORZM.dot(PPX)
        
        # Vertical momentum
        LD22 = U0DDX
