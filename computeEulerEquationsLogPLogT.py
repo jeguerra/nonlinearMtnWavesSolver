@@ -129,7 +129,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        LD24 = -gc * unit
        
        # Log-P equation
-       LD31 = gam * DDXM
+       LD31 = gam * PPX
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0DDX
        
@@ -179,22 +179,23 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute advection
        UDqDx = U.dot(DqDx)
        WDqDz = WXZ.dot(DqDz)
-       transport = UDqDx + WDqDz
+       transport = UDqDx + WDqDz + wDQDZ
        
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
        PGFZ = RdT * (DqDz[:,2] + DQDZ[:,1]) + gc
+
        
        def DqDt():
               # Horizontal momentum equation
-              DuDt = -(transport[:,0] + wDQDZ[:,0] + PGFX)
+              DuDt = -(transport[:,0] + PGFX)
               # Vertical momentum equation
               DwDt = -(transport[:,1] + PGFZ)
               # Pressure (mass) equation
               LD33 = gam * (DqDx[:,0] - DZDX * DqDz[:,0] + DqDz[:,1])
-              DpDt = -(transport[:,2] + wDQDZ[:,1] + LD33)
+              DpDt = -(transport[:,2] + LD33)
               # Potential Temperature equation
-              DtDt = -(transport[:,3] + wDQDZ[:,2])
+              DtDt = -transport[:,3]
               
               DwDt[topdex] *= 0.0
               DwDt[botdex] *= 0.0

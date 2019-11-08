@@ -213,6 +213,9 @@ if __name__ == '__main__':
        dlnPTdz = np.expand_dims(dlnPTdz, axis=1)
        DLPTDZ = np.tile(dlnPTdz, NX+1)
        DLPTDZ = computeColumnInterp(DIMS, REFS[1], dlnPTdz, 0, ZTL, DLPTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       DTDZ = np.expand_dims(DTDZ, axis=1)
+       DTSDZ = np.tile(DTDZ, NX+1)
+       DTSDZ = computeColumnInterp(DIMS, REFS[1], DTDZ, 0, ZTL, DTSDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        # Compute the background (initial) fields
        POR = np.expand_dims(POR, axis=1)
        PORZ = np.tile(POR, NX+1)
@@ -244,9 +247,10 @@ if __name__ == '__main__':
        '''       
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
+       DTSDZ = np.reshape(DTSDZ, (OPS,1), order='F')
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
-       DQDZ = np.hstack((DUDZ, DLPDZ, DLPTDZ))
+       DQDZ = np.hstack((DUDZ, DTSDZ, DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
        REFG = [DUDZ, DLPDZ, DLPTDZ, DQDZ]
@@ -283,8 +287,8 @@ if __name__ == '__main__':
        
        del(DDXM)
        del(DDZM)
-       del(DDXM_SP)
-       del(DDZM_SP)
+       #del(DDXM_SP)
+       #del(DDZM_SP)
        del(DZDX)
        
        #% Rayleigh opearator
