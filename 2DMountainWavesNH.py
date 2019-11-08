@@ -250,10 +250,10 @@ if __name__ == '__main__':
        DTSDZ = np.reshape(DTSDZ, (OPS,1), order='F')
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
-       DQDZ = np.hstack((DUDZ, DTSDZ, DLPDZ, DLPTDZ))
+       DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
-       REFG = [DUDZ, DLPDZ, DLPTDZ, DQDZ]
+       REFG = [DUDZ, DTSDZ, DLPDZ, DLPTDZ, DQDZ]
        
        # Update the REFS collection
        REFS.append(UZ)
@@ -262,6 +262,7 @@ if __name__ == '__main__':
        # Get some memory back here
        del(PORZ)
        del(DUDZ)
+       del(DTSDZ)
        del(DLPDZ)
        del(DLPTDZ)
        

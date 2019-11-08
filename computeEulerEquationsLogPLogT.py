@@ -88,8 +88,8 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        UZ = REFS[8]
        PORZ = REFS[9]
        DUDZ = REFG[0]
-       DLPDZ = REFG[1]
-       DLPTDZ = REFG[2]
+       DLPDZ = REFG[2]
+       DLPTDZ = REFG[3]
        # Full spectral transform derivative matrices
        DDXM = REFS[10]
        DDZM = REFS[11]
@@ -170,7 +170,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
        # Get the static horizontal and vertical derivatives
-       DQDZ = REFG[3]
+       DQDZ = REFG[4]
        wDQDZ = wxz.dot(DQDZ)
        
        # Compute derivative of perturbations
@@ -183,9 +183,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
-       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,1]) + gc
+       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
 
-       
        def DqDt():
               # Horizontal momentum equation
               DuDt = -(transport[:,0] + PGFX)
@@ -195,7 +194,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               LD33 = gam * (DqDx[:,0] - DZDX * DqDz[:,0] + DqDz[:,1])
               DpDt = -(transport[:,2] + LD33)
               # Potential Temperature equation
-              DtDt = -transport[:,3]
+              DtDt = -(transport[:,3])
               
               DwDt[topdex] *= 0.0
               DwDt[botdex] *= 0.0
@@ -208,7 +207,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
 def computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the static vertical gradients
-       ROPS = REFG[4]
+       ROPS = REFG[5]
        
        # Compute the tendencies
        DuDt = - ROPS[0].dot(fields[:,0])
