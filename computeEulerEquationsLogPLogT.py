@@ -29,6 +29,9 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        return fields, U, RdT
 
 #%% The linear equation operator
+def computeJacobianVectorLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
+
+#%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Get physical constants
        gc = PHYS[0]
