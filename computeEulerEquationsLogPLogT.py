@@ -116,7 +116,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        #%% Compute the terms in the equations
        U0DDX = UM.dot(DDXM)
        PPX = DDXM - DZDXM.dot(DDZM)
-       U0PPX = UM.dot(PPX)
+       #U0PPX = UM.dot(PPX)
        
        # Horizontal momentum
        LD11 = U0DDX
@@ -131,11 +131,11 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Log-P equation
        LD31 = gam * DDXM
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0PPX
+       LD33 = U0DDX
        
        # Log-Theta equation
        LD42 = DLPTDZM
-       LD44 = U0PPX
+       LD44 = U0DDX
        
        DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
        
