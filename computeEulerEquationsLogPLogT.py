@@ -45,8 +45,12 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DUDZ = REFG[0]
        DLPDZ = REFG[1]
        DLPTDZ = REFG[2]
+       # Full spectral transform derivative matrices
        DDXM = REFS[10]
        DDZM = REFS[11]
+       # Sparse 4th order compact FD derivative matrices
+       #DDXM = REFS[12]
+       #DDZM = REFS[13]
               
        #%% Compute the various blocks needed
        tempDiagonal = np.reshape(UZ, (OPS,), order='F')

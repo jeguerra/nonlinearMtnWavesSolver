@@ -75,11 +75,17 @@ def getFromRestart(name, ET, NX, NZ):
        return SOLT, RHS, NX_in, NZ_in, TI
        
 if __name__ == '__main__':
-       # Set the solution type
-       StaticSolve = False
+       # Set the solution type (MUTUALLY EXCLUSIVE)
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
-       ResDiff = True
+       NonLinSolve = False
+       
+       # Set residual diffusion switch
+       ResDiff = False
+       
+       # Set direct solution method (MUTUALLY EXCLUSIVE)
+       SolveFull = True
+       SolveSchur = False
        
        # Set restarting
        toRestart = True
@@ -144,8 +150,8 @@ if __name__ == '__main__':
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        
-       #DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       #DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+       DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+       DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -260,18 +266,18 @@ if __name__ == '__main__':
        DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr')
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
-       #DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        #REFG.append(PPXM_SP)
        #REFG.append(DDZM_SP)
        
        # Update the data storage
        REFS.append(DDXM)
        REFS.append(DDZM)
-       # 2nd order derivatives
-       REFS.append(DDXM.dot(DDXM))
-       REFS.append(DDZM.dot(DDZM))
-       #REFS.append(DDXM_SP)
-       #REFS.append(DDZM_SP)
+       # 2nd order derivatives or compact FD sparse 1st derivatives
+       #REFS.append(DDXM.dot(DDXM))
+       #REFS.append(DDZM.dot(DDZM))
+       REFS.append(DDXM_SP)
+       REFS.append(DDZM_SP)
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
        
@@ -339,7 +345,8 @@ if __name__ == '__main__':
               
               del(DOPS)
               del(U_cols11); del(U_cols21); del(U_cols31); del(U_cols41)
-              if StaticSolve and not LinearSolve:
+              
+              if (StaticSolve and SolveSchur) and not LinearSolve:
                      # Compute the partitions for Schur Complement solution
                      AS = sps.bmat([[A + R1, B], [UW, D + R2]], format='csc')
                      BS = sps.bmat([[C, None], [E, F]], format='csc')
@@ -362,7 +369,7 @@ if __name__ == '__main__':
                      del(fw)
                      del(ft)
                      
-              if LinearSolve and not StaticSolve:
+              if LinearSolve or (StaticSolve and SolveFull):
                      # Compute the global linear operator
                      AN = sps.bmat([[A + R1, B, C, None], \
                               [None, D + R2, E, F], \
@@ -398,37 +405,48 @@ if __name__ == '__main__':
                      print('Restarting from previous solution...')
                      SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
               else:
-                     '''
-                     #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
-                     opts = dict(Equil=True, IterRefine='DOUBLE')
-                     factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
-                     del(AN)
-                     sol = factor.solve(bN)
-                     del(factor)
-                     SOLT[sysDex,0] = sol#[invDex]
-                     '''
-                     # Factor DS and compute the Schur Complement of DS
-                     opts = dict(Equil=True, IterRefine='DOUBLE')
-                     factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
-                     del(DS)
-                     alpha = factorDS.solve(CS.toarray())
-                     DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
-                     del(AS)
-                     del(alpha)
-                     factorDS_SC = dsl.lu_factor(DS_SC)
-                     del(DS_SC)
-                     print('Factor D and Schur Complement of D matrix... DONE!')
+                     if SolveFull and not SolveSchur:
+                            print('Solving linear system by full operator SuperLU...')
+                            # Direct solution over the entire operator (better for testing BC's)
+                            #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
+                            opts = dict(Equil=True, IterRefine='DOUBLE')
+                            factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
+                            del(AN)
+                            sol = factor.solve(bN)
+                            del(bN)
+                            del(factor)
+                     if SolveSchur and not SolveFull:
+                            print('Solving linear system by Schur Complement...')
+                            # Factor DS and compute the Schur Complement of DS
+                            opts = dict(Equil=True, IterRefine='DOUBLE')
+                            factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
+                            del(DS)
+                            alpha = factorDS.solve(CS.toarray())
+                            DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
+                            del(AS)
+                            del(alpha)
+                            factorDS_SC = dsl.lu_factor(DS_SC)
+                            del(DS_SC)
+                            print('Factor D and Schur Complement of D matrix... DONE!')
+                            
+                            # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
+                            f2_hat = factorDS.solve(f2)
+                            f1_hat = -BS.dot(f2_hat)
+                            # Use dense linear algebra at this point
+                            sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
+                            print('Solve for u and w... DONE!')
+                            f2 = f2 - CS.dot(sol1)
+                            sol2 = factorDS.solve(f2)
+                            print('Solve for ln(p) and ln(theta)... DONE!')
+                            sol = np.concatenate((sol1, sol2))
+                            
+                            # Get memory back
+                            del(BS); del(CS)
+                            del(factorDS)
+                            del(factorDS_SC)
+                            del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
-                     # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
-                     f2_hat = factorDS.solve(f2)
-                     f1_hat = -BS.dot(f2_hat)
-                     # Use dense linear algebra at this point
-                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
-                     print('Solve for u and w... DONE!')
-                     f2 = f2 - CS.dot(sol1)
-                     sol2 = factorDS.solve(f2)
-                     print('Solve for ln(p) and ln(theta)... DONE!')
-                     sol = np.concatenate((sol1, sol2))
+                     # Set the solution
                      SOLT[sysDex,0] = sol
                      # Set the boundary condition   
                      SOLT[wbdex,0] = dHdX * (U[ubdex] + SOLT[ubdex,0])
@@ -437,7 +455,8 @@ if __name__ == '__main__':
                      # Update the forcing vector
                      fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
-                     print('Residual 2-norm: ', np.linalg.norm(RHS))
+                     print('Residual 2-norm after linear solve: ', np.linalg.norm(RHS))
+                     '''
                      # Update the partitions
                      fw = RHS[wdex]
                      f1 = np.concatenate((RHS[udex], fw[wbcDex]))
@@ -445,13 +464,7 @@ if __name__ == '__main__':
                      f2 = np.concatenate((RHS[pdex], ft[tbcDex]))
                      del(fw)
                      del(ft)
-                            
-                     #%% Get memory back
-                     del(bN)
-                     del(BS); del(CS)
-                     del(factorDS)
-                     del(factorDS_SC)
-                     del(f1); del(f2); del(f1_hat); del(f2_hat); del(sol1); del(sol2)
+                     '''       
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
@@ -641,6 +654,7 @@ if __name__ == '__main__':
               plt.show()
 
        #%% Check the boundary conditions
+       '''
        plt.figure()
        plt.plot(REFS[0],nativeLN[0][0,:])
        plt.plot(REFS[0],nativeNL[0][0,:])
@@ -651,6 +665,7 @@ if __name__ == '__main__':
        plt.plot(REFS[0],nativeNL[1][0,:])
        plt.title('Vertical Velocity - Terrain Boundary')
        plt.xlim(-15000, 15000)
+       '''
        #%% #Spot check the solution on both grids
        '''
        fig = plt.figure()
