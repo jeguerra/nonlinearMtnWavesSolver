@@ -41,9 +41,7 @@ from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
 import computeDerivativeMatrix as derv
-from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT
-from computeEulerEquationsLogPLogT import computeEulerEquationsLogPLogT_NL
-from computeEulerEquationsLogPLogT import computePrepareFields
+import computeEulerEquationsLogPLogT as eqs
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 from computeIterativeSolveNL import computeIterativeSolveNL
@@ -84,8 +82,8 @@ if __name__ == '__main__':
        ResDiff = False
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
-       SolveFull = True
-       SolveSchur = False
+       SolveFull = False
+       SolveSchur = True
        
        # Set restarting
        toRestart = True
@@ -189,13 +187,14 @@ if __name__ == '__main__':
        SENSIBLE = 1
        POTENTIAL = 2
        # Map the sounding to the computational vertical grid [0 H]
-       TofZ, DTDZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS)
+       TofZ, dTdz = computeTemperatureProfileOnGrid(Z_in, T_in, REFS)
        # Compute background fields on the vertical
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TofZ, DTDZ, SENSIBLE)
+              computeThermoMassFields(PHYS, DIMS, REFS, TofZ, dTdz, SENSIBLE)
               
-       # Compute the ratio of pressure to density:
-       POR = np.multiply(PZ, np.reciprocal(RHO))
+       # Compute the ratio of pressure to density or (Rd * T(z))
+       #POR = PZ * np.reciprocal(RHO)
+       POR = Rd * TofZ
        
        # Read in or compute background horizontal wind profile
        MEANJET = 1 # Analytical smooth jet profile
@@ -213,9 +212,9 @@ if __name__ == '__main__':
        dlnPTdz = np.expand_dims(dlnPTdz, axis=1)
        DLPTDZ = np.tile(dlnPTdz, NX+1)
        DLPTDZ = computeColumnInterp(DIMS, REFS[1], dlnPTdz, 0, ZTL, DLPTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       DTDZ = np.expand_dims(DTDZ, axis=1)
-       DTSDZ = np.tile(DTDZ, NX+1)
-       DTSDZ = computeColumnInterp(DIMS, REFS[1], DTDZ, 0, ZTL, DTSDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       dlnTDz = np.expand_dims(dTdz * np.reciprocal(TofZ), axis=1)
+       DLTDZ = np.tile(dlnTDz, NX+1)
+       DLTDZ = computeColumnInterp(DIMS, REFS[1], dlnTDz, 0, ZTL, DLTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        # Compute the background (initial) fields
        POR = np.expand_dims(POR, axis=1)
        PORZ = np.tile(POR, NX+1)
@@ -247,22 +246,22 @@ if __name__ == '__main__':
        '''       
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
-       DTSDZ = np.reshape(DTSDZ, (OPS,1), order='F')
+       DLTDZ = np.reshape(DLTDZ, (OPS,1), order='F')
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
-       REFG = [DUDZ, DTSDZ, DLPDZ, DLPTDZ, DQDZ]
+       REFG = [DUDZ, DLTDZ, DLPDZ, DLPTDZ, DQDZ]
        
        # Update the REFS collection
-       REFS.append(UZ)
-       REFS.append(PORZ)
+       REFS.append(np.reshape(UZ, (OPS,1), order='F'))
+       REFS.append(np.reshape(PORZ, (OPS,1), order='F'))
        
        # Get some memory back here
        del(PORZ)
        del(DUDZ)
-       del(DTSDZ)
+       del(DLTDZ)
        del(DLPDZ)
        del(DLPTDZ)
        
@@ -296,10 +295,57 @@ if __name__ == '__main__':
        ROPS = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
        REFG.append(ROPS)
        
+       # Initialize transient storage
+       SOLT = np.zeros((numVar * OPS, 2))
+       INIT = np.zeros((numVar * OPS,))
+       
+       # Initialize the Background fields
+       INIT[udex] = np.reshape(UZ, (OPS,), order='F')
+       INIT[wdex] = np.zeros((OPS,))
+       INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
+       INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
+       
+       # Initialize fields
+       fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       
        #% Compute the global LHS operator
        if (StaticSolve or LinearSolve) and not isRestart:
               # Compute the equation blocks
-              DOPS = computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              # Test evaluation of full Jacobian... must match linearization
+              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex, SOLT[:,0])
+              '''
+              # TEST NL JACOBIAN EVALUATION
+              DOPS[0] = DOPS_NL[0]
+              DOPS[1] = DOPS_NL[1]
+              DOPS[2] = DOPS_NL[2]
+              DOPS[3] = DOPS_NL[5]
+              DOPS[4] = DOPS_NL[6]
+              DOPS[5] = DOPS_NL[7]
+              DOPS[6] = DOPS_NL[8]
+              DOPS[7] = DOPS_NL[9]
+              DOPS[8] = DOPS_NL[10]
+              DOPS[9] = DOPS_NL[13]
+              DOPS[10] = DOPS_NL[15]
+              '''
+              # TEST FOR EQUIVALENT JACOBIAN BLOCKS
+              '''
+              DLD11 = sps.linalg.norm(DOPS[0] - DOPS_NL[0], np.inf)
+              DLD12 = sps.linalg.norm(DOPS[1] - DOPS_NL[1], np.inf)
+              DLD13 = sps.linalg.norm(DOPS[2] - DOPS_NL[2], np.inf)
+              DLD14 = sps.linalg.norm(-DOPS_NL[3], np.inf)
+              DLD21 = sps.linalg.norm(-DOPS_NL[4], np.inf)
+              DLD22 = sps.linalg.norm(DOPS[3] - DOPS_NL[5], np.inf)
+              DLD23 = sps.linalg.norm(DOPS[4] - DOPS_NL[6], np.inf)
+              DLD24 = sps.linalg.norm(DOPS[5] - DOPS_NL[7], np.inf)
+              DLD31 = sps.linalg.norm(DOPS[6] - DOPS_NL[8], np.inf)
+              DLD32 = sps.linalg.norm(DOPS[7] - DOPS_NL[9], np.inf)
+              DLD33 = sps.linalg.norm(DOPS[8] - DOPS_NL[10], np.inf)
+              DLD41 = sps.linalg.norm(-DOPS_NL[12], np.inf)
+              DLD42 = sps.linalg.norm(DOPS[9] - DOPS_NL[13], np.inf)
+              DLD44 = sps.linalg.norm(DOPS[10] - DOPS_NL[15], np.inf)
+              sys.exit(0)
+              '''
               print('Compute global sparse linear Euler operator: DONE!')
               # Compute the forcing
               WBC = dHdX * UZ[0,:]
@@ -307,7 +353,7 @@ if __name__ == '__main__':
                               [((DOPS[3])[:,ubdex])], \
                               [((DOPS[7])[:,ubdex])], \
                               [((DOPS[9].tolil())[:,ubdex])]])
-              bN = -WEQ.dot(WBC); 
+              bN = -WEQ.dot(WBC);
               del(WEQ)
               
               # Compute coupled BC adjustment per block from w to u eqs.
@@ -329,7 +375,7 @@ if __name__ == '__main__':
               H = (DOPS[7])[:,wbcDex]
               J = DOPS[8]
               K = (DOPS[9].tolil())[np.ix_(tbcDex,wbcDex)]
-              M = (DOPS[3])[np.ix_(tbcDex,tbcDex)]
+              M = (DOPS[10])[np.ix_(tbcDex,tbcDex)]
               R1 = ROPS[0]
               R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
               R3 = ROPS[2]
@@ -348,7 +394,7 @@ if __name__ == '__main__':
               # Take out rows for theta bc
               UT = UT[tbcDex,:]
               
-              del(DOPS)
+              #del(DOPS)
               del(U_cols11); del(U_cols21); del(U_cols31); del(U_cols41)
               
               if (StaticSolve and SolveSchur) and not LinearSolve:
@@ -357,22 +403,12 @@ if __name__ == '__main__':
                      BS = sps.bmat([[C, None], [E, F]], format='csc')
                      CS = sps.bmat([[G, H], [UT, K]], format='csc')
                      DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
-                     # Get sizes
-                     AS_size = AS.shape
-                     DS_size = DS.shape
-                     del(A); del(B); del(C)
-                     del(D); del(E); del(F)
-                     del(G); del(H); del(J)
-                     del(K); del(M)
-                     del(UW); del(UT)
                      
                      # Compute the partitions for Schur Complement solution
                      fw = bN[wdex]
                      f1 = np.concatenate((bN[udex], fw[wbcDex]))
                      ft = bN[tdex]
                      f2 = np.concatenate((bN[pdex], ft[tbcDex]))
-                     del(fw)
-                     del(ft)
                      
               if LinearSolve or (StaticSolve and SolveFull):
                      # Compute the global linear operator
@@ -384,23 +420,15 @@ if __name__ == '__main__':
                      # Compute the global linear force vector
                      bN = bN[sysDex]
               
+              # Get memory back
+              del(A); del(B); del(C)
+              del(D); del(E); del(F)
+              del(G); del(H); del(J)
+              del(K); del(M)
+              del(UW); del(UT)
               print('Set up global linear operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
-       
-       # Initialize transient storage
-       SOLT = np.zeros((numVar * OPS, 2))
-       INIT = np.zeros((numVar * OPS,))
-       
-       # Initialize the Background fields
-       INIT[udex] = np.reshape(UZ, (OPS,), order='F')
-       INIT[wdex] = np.zeros((OPS,))
-       INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
-       INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-       
-       # Initialize fields
-       fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-       
        start = time.time()
        if StaticSolve:
               restart_file = 'restartDB_NL'
@@ -409,6 +437,7 @@ if __name__ == '__main__':
               if isRestart:
                      print('Restarting from previous solution...')
                      SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
+                     SOLT[:,0] = SOLT[:,1]
               else:
                      if SolveFull and not SolveSchur:
                             print('Solving linear system by full operator SuperLU...')
@@ -434,16 +463,40 @@ if __name__ == '__main__':
                             del(DS_SC)
                             print('Factor D and Schur Complement of D matrix... DONE!')
                             
-                            # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
-                            f2_hat = factorDS.solve(f2)
-                            f1_hat = -BS.dot(f2_hat)
-                            # Use dense linear algebra at this point
-                            sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
-                            print('Solve for u and w... DONE!')
-                            f2 = f2 - CS.dot(sol1)
-                            sol2 = factorDS.solve(f2)
-                            print('Solve for ln(p) and ln(theta)... DONE!')
-                            sol = np.concatenate((sol1, sol2))
+                            for nn in range(1):
+                                   # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
+                                   f2_hat = factorDS.solve(f2)
+                                   f1_hat = -BS.dot(f2_hat)
+                                   # Use dense linear algebra at this point
+                                   sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
+                                   print('Solve for u and w... DONE!')
+                                   f2 = f2 - CS.dot(sol1)
+                                   sol2 = factorDS.solve(f2)
+                                   print('Solve for ln(p) and ln(theta)... DONE!')
+                                   sol = np.concatenate((sol1, sol2))
+                                   
+                                   # Set the solution
+                                   if nn == 0:
+                                          SOLT[sysDex,0] = sol
+                                   else:
+                                          SOLT[sysDex,0] += 1.0 * sol
+                                   # Set the boundary condition   
+                                   SOLT[wbdex,0] = dHdX * (U[ubdex] + SOLT[ubdex,0])
+                                   print('Recover full linear solution vector... DONE!')
+                                   
+                                   # Update the forcing vector
+                                   fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                                   RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+                                   print('Residual 2-norm after linear solve: ', np.linalg.norm(RHS))
+                                   
+                                   # Update the partitions
+                                   fw = RHS[wdex]
+                                   f1 = np.concatenate((RHS[udex], fw[wbcDex]))
+                                   ft = RHS[tdex]
+                                   f2 = np.concatenate((RHS[pdex], ft[tbcDex]))
+                                   
+                                   #del(fw)
+                                   #del(ft)
                             
                             # Get memory back
                             del(BS); del(CS)
@@ -451,25 +504,6 @@ if __name__ == '__main__':
                             del(factorDS_SC)
                             del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
-                     # Set the solution
-                     SOLT[sysDex,0] = sol
-                     # Set the boundary condition   
-                     SOLT[wbdex,0] = dHdX * (U[ubdex] + SOLT[ubdex,0])
-                     print('Recover full linear solution vector... DONE!')
-                     
-                     # Update the forcing vector
-                     fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
-                     print('Residual 2-norm after linear solve: ', np.linalg.norm(RHS))
-                     '''
-                     # Update the partitions
-                     fw = RHS[wdex]
-                     f1 = np.concatenate((RHS[udex], fw[wbcDex]))
-                     ft = RHS[tdex]
-                     f2 = np.concatenate((RHS[pdex], ft[tbcDex]))
-                     del(fw)
-                     del(ft)
-                     '''       
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
@@ -480,8 +514,8 @@ if __name__ == '__main__':
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
               
               # Initialize the RHS and forcing for each field
-              fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
               print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
               
        elif LinearSolve:
@@ -513,9 +547,9 @@ if __name__ == '__main__':
                      # Initialize the boundary condition
                      SOLT[wbdex,0] = dHdX * UZ[0,:]
                      # Initialize fields
-                     fields, U, RdT = computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      # Initialize the RHS and forcing for each field
-                     RHS = computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
                                           
        #%% Start the time loop
        if LinearSolve or NonLinSolve:

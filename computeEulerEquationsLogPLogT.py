@@ -9,7 +9,7 @@ import numpy as np
 import scipy.sparse as sps
 from numba import jit
 
-def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
        # Get some physical quantities
        P0 = PHYS[1]
        Rd = PHYS[3]
@@ -25,17 +25,41 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
-       
+
        return fields, U, RdT
 
-#%% Evaluate product of Jacobian and a vector
-def computeJacobianVectorLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, DQ):
-    # Get physical constants
+def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+       # Get some physical quantities
+       P0 = PHYS[1]
+       Rd = PHYS[3]
+       kap = PHYS[4]
+       
+       dHdX = REFS[6]
+       
+       TQ = SOLT + INIT
+       # Make the total quatities
+       U = TQ[udex]
+       LP = TQ[pdex]
+       LT = TQ[tdex]
+       
+       # Compute the sensible temperature scaling to PGF
+       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
+       
+       fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       fields[botdex,1] = U[botdex] * dHdX
+       fields[topdex,1] *= 0.0
+       fields[topdex,3] *= 0.0
+
+       return fields, U, RdT
+
+#%% Evaluate the Jacobian matrix
+def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, DQ):
+       # Get physical constants
        gc = PHYS[0]
+       Rd = PHYS[3]
        gam = PHYS[6]
        
        # Get the derivative operators
-       dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -43,36 +67,89 @@ def computeJacobianVectorLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute terrain following terms
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-              
+       
        # Apply boundary condition exactly
-       fields[botdex,1] = U[botdex] * dHdX
-       fields[topdex,1] *= 0.0
-       fields[topdex,3] *= 0.0
        WXZ[botdex] *= 0.0
+       print(np.linalg.norm(WXZ, np.inf))
        
-       # Compute advective (multiplicative) operators
-       U = sps.diags(U, offsets=0, format='csr')
-       wxz = sps.diags(wxz, offsets=0, format='csr')
-       WXZ = sps.diags(WXZ, offsets=0, format='csr')
-       
-       # Get the static horizontal and vertical derivatives
-       DQDZ = REFG[3]
-       wDQDZ = wxz.dot(DQDZ)
-       
-       # Compute derivative of perturbations
+       # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
-       # Compute advection
-       UDqDx = U.dot(DqDx)
-       WDqDz = WXZ.dot(DqDz)
-       transport = UDqDx + WDqDz
        
-       # Compute pressure gradient forces
-       PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
-       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,1]) + gc
-    
-       return 0.0
+       # Compute (partial) x derivatives of perturbations
+       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
+       PqPx = DqDx - DZDXM.dot(DqDz)
+       
+       # Compute vertical gradient diagonal operators
+       DuDzM = sps.diags(DqDz[:,0], offsets=0, format='csr')
+       DwDzM = sps.diags(DqDz[:,1], offsets=0, format='csr')
+       DlpDzM = sps.diags(DqDz[:,2], offsets=0, format='csr')
+       DltDzM = sps.diags(DqDz[:,3], offsets=0, format='csr')
+       
+       # Compute horizontal gradient diagonal operators
+       PuPxM = sps.diags(PqPx[:,0], offsets=0, format='csr')
+       PwPxM = sps.diags(PqPx[:,1], offsets=0, format='csr')
+       PlpPxM = sps.diags(PqPx[:,2], offsets=0, format='csr')
+       PltPxM = sps.diags(PqPx[:,3], offsets=0, format='csr')
+       
+       # Compute hydrostatic state diagonal operators
+       DLTDZ = REFG[1]
+       DLTDZM = sps.diags(DLTDZ[:,0], offsets=0, format='csr')
+       DQDZ = REFG[4]
+       DUDZM = sps.diags(DQDZ[:,0], offsets=0, format='csr')
+       DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
+       DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
+       
+       # Compute advective (multiplicative) diagonal operators
+       UM = sps.diags(U, offsets=0, format='csr')
+       WXZM = sps.diags(WXZ, offsets=0, format='csr')
+       RdTM = sps.diags(RdT, offsets=0, format='csr')
+       
+       # Compute diagonal blocks related to sensible temperature
+       RdT_bar = REFS[9]
+       T_prime = (1.0 / Rd) * (RdT - RdT_bar[:,0])
+       RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
+       PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
+       DtDz = DDZM.dot(T_prime)
+       PtPxM = sps.diags(PtPx, offsets=0, format='csr')
+       DtDzM = sps.diags(DtDz, offsets=0, format='csr')
+       
+       # Compute partial in X terrain following block
+       PPXM = DDXM - DZDXM.dot(DDZM)
+       
+       # Compute common horizontal transport block
+       UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       
+       unit = sps.identity(len(U))
+       
+       # Compute the blocks of the Jacobian operator
+       LD11 = UPXM + PuPxM
+       LD12 = DuDzM + DUDZM
+       LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
+       LD14 = RdTM.dot(PlpPxM) # vanish initial
+       
+       LD21 = PwPxM # vanish initial
+       LD22 = UPXM + DwDzM
+       LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
+       LD24 = RdTM.dot(DlpDzM) - gc * unit
+       
+       LD31 = gam * PPXM + PlpPxM
+       LD32 = gam * DDZM + DlpDzM + DLPDZM
+       LD33 = UPXM
+       LD34 = None
+       
+       LD41 = PltPxM # vanish initial
+       LD42 = DltDzM + DLPTDZM
+       LD43 = None
+       LD44 = UPXM 
 
+       DOPS = [LD11, LD12, LD13, LD14, \
+               LD21, LD22, LD23, LD24, \
+               LD31, LD32, LD33, LD34, \
+               LD41, LD42, LD43, LD44]
+       
+       return DOPS
+    
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Get physical constants
@@ -88,6 +165,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        UZ = REFS[8]
        PORZ = REFS[9]
        DUDZ = REFG[0]
+       DLTDZ = REFG[1]
        DLPDZ = REFG[2]
        DLPTDZ = REFG[3]
        # Full spectral transform derivative matrices
@@ -99,16 +177,13 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DZDX = REFS[15]
               
        #%% Compute the various blocks needed
-       tempDiagonal = np.reshape(UZ, (OPS,), order='F')
-       UM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(DUDZ, (OPS,), order='F')
-       DUDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(DLPDZ, (OPS,), order='F')
-       DLPDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(DLPTDZ, (OPS,), order='F')
-       DLPTDZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       tempDiagonal = np.reshape(PORZ, (OPS,), order='F')
-       PORZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
+       UM = sps.spdiags(UZ[:,0], 0, OPS, OPS)
+       PORZM = sps.spdiags(PORZ[:,0], 0, OPS, OPS)
+       
+       DUDZM = sps.spdiags(DUDZ[:,0], 0, OPS, OPS)
+       DLTDZM = sps.spdiags(DLTDZ[:,0], 0, OPS, OPS)
+       DLPDZM = sps.spdiags(DLPDZ[:,0], 0, OPS, OPS)
+       DLPTDZM = sps.spdiags(DLPTDZ[:,0], 0, OPS, OPS)
        unit = sps.identity(OPS)
        
        DZDXM = sps.spdiags(DZDX, 0, OPS, OPS)
@@ -125,7 +200,9 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        
        # Vertical momentum
        LD22 = U0DDX
-       LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
+       LD23 = PORZM.dot(DDZM + DLTDZM)
+       # Equivalent form from direct linearization
+       #LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
        
        # Log-P equation
@@ -149,7 +226,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        gam = PHYS[6]
        
        # Get the derivative operators
-       dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -159,9 +235,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        WXZ = wxz - U * DZDX
               
        # Apply boundary condition exactly
-       fields[botdex,1] = U[botdex] * dHdX
-       fields[topdex,1] *= 0.0
-       fields[topdex,3] *= 0.0
        WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators

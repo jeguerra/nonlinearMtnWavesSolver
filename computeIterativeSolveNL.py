@@ -33,18 +33,8 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               
        
        # Solve for nonlinear equilibrium (default krylov)
-       jac_options = {'method':'gmres','inner_maxiter':1000,'outer_k':5}
-       sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
-                                  jacobian=opt.nonlin.KrylovJacobian(**jac_options),
-                                  iter=10, verbose=True,
-                                  maxiter=100,
-                                  line_search='armijo',
-                                  full_output=True,
-                                  raise_exception=False)
-       
-       # Solve for nonlinear equilibrium (modified direct krylov)
        '''
-       jac_options = {'jdv':computeJacVecUpdate, 'method':'gmres','inner_maxiter':4000,'outer_k':10}
+       jac_options = {'method':'gmres','inner_maxiter':5000,'outer_k':5}
        sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
                                   jacobian=opt.nonlin.KrylovJacobian(**jac_options),
                                   iter=5, verbose=True,
@@ -52,7 +42,21 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
                                   line_search='armijo',
                                   full_output=True,
                                   raise_exception=False)
+       
+       # Solve for nonlinear equilibrium (modified direct krylov)
        '''
+       jac_options = {'jdv':computeJacVecUpdate, \
+                      'method':'gmres', \
+                      'inner_maxiter':1000, \
+                      'outer_k':10}
+       sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
+                                  jacobian=KrylovDirectJacobian(**jac_options),
+                                  iter=5, verbose=True,
+                                  maxiter=100,
+                                  line_search='armijo',
+                                  full_output=True,
+                                  raise_exception=False)
+       #'''
        print('NL solver exit on: ', info)
        
        return sol
@@ -134,8 +138,9 @@ class KrylovDirectJacobian(opt.nonlin.Jacobian):
 
     """
 
-    def __init__(self, jdv=None, method='lgmres', inner_maxiter=20,
+    def __init__(self, rdiff=None, jdv=None, method='lgmres', inner_maxiter=20,
                  inner_M=None, outer_k=10, **kw):
+        self.rdiff = rdiff
         self.jac_vec = jdv
         self.preconditioner = inner_M
         self.method = dict(
@@ -175,13 +180,21 @@ class KrylovDirectJacobian(opt.nonlin.Jacobian):
             if not key.startswith('inner_'):
                 raise ValueError("Unknown parameter %s" % key)
             self.method_kw[key[6:]] = value
+            
+    def _update_diff_step(self):
+        mx = abs(self.x0).max()
+        mf = abs(self.f0).max()
+        self.omega = self.rdiff * max(1, mx) / max(1, mf)
 
     def matvec(self, v):
         nv = dsl.norm(v)
         if nv == 0:
             return 0*v
         # Compute the updated Jacobian-vector product
-        r = self.jac_vec(self.x0, v)
+        #r = self.jac_vec(self.x0, v)
+        sc = 0.5*self.omega / nv
+        #r = (self.func(self.x0 + sc*v) - self.f0) / sc
+        r = (self.func(self.x0 + sc*v) - self.func(self.x0 - sc*v)) / sc
         if not np.all(np.isfinite(r)) and np.all(np.isfinite(v)):
             raise ValueError('Function returned non-finite results')
         return r
@@ -196,9 +209,15 @@ class KrylovDirectJacobian(opt.nonlin.Jacobian):
     def update(self, x, f):
         self.x0 = x
         self.f0 = f
+        self._update_diff_step()
 
     def setup(self, x, f, func):
         opt.nonlin.Jacobian.setup(self, x, f, func)
         self.x0 = x
         self.f0 = f
         self.op = spl.aslinearoperator(self)
+        
+        if self.rdiff is None:
+            self.rdiff = np.finfo(x.dtype).eps ** (1./2)
+            
+        self._update_diff_step()
