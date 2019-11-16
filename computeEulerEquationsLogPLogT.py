@@ -25,6 +25,13 @@ def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       
+       # The initial condition is an atmosphere in hydrostatic rest
+       DZDX = REFS[15]
+       # This sets the free slip condition on all coordinate surfaces
+       # in the column. Ensures proper initialization of perturbation
+       # fields. 
+       fields[:,1] = U * DZDX
 
        return fields, U, RdT
 
@@ -67,10 +74,8 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute terrain following terms
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       
        # Apply boundary condition exactly
        WXZ[botdex] *= 0.0
-       print(np.linalg.norm(WXZ, np.inf))
        
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
