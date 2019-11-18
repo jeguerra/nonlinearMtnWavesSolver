@@ -27,11 +27,11 @@ def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
        
        # The initial condition is an atmosphere in hydrostatic rest
-       DZDX = REFS[15]
+       #DZDX = REFS[15]
        # This sets the free slip condition on all coordinate surfaces
        # in the column. Ensures proper initialization of perturbation
        # fields. 
-       fields[:,1] = U * DZDX
+       #fields[:,1] = U * DZDX
 
        return fields, U, RdT
 
@@ -42,6 +42,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        kap = PHYS[4]
        
        dHdX = REFS[6]
+       DZDX = REFS[15]
        
        TQ = SOLT + INIT
        # Make the total quatities
@@ -53,14 +54,19 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       
+       # SET FREE SLIP ON BOTTOM TERRAIN SURFACE
        fields[botdex,1] = U[botdex] * dHdX
        fields[topdex,1] *= 0.0
+       
+       # SET FREE SLIP ON ALL COORDINATE SURFACES
+       #fields[:,1] = U * DZDX
        fields[topdex,3] *= 0.0
 
        return fields, U, RdT
 
 #%% Evaluate the Jacobian matrix
-def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, DQ):
+def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
@@ -154,6 +160,26 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
                LD41, LD42, LD43, LD44]
        
        return DOPS
+
+def computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex):
+       # Get the Rayleight operators
+       ROPS = REFG[5]
+       
+       # Compute the variable sections
+       uvec = vec[udex]
+       wvec = vec[wdex]
+       pvec = vec[pdex]
+       tvec = vec[tdex]
+       
+       # Compute the block products
+       ures = (DOPS[0] + ROPS[0]).dot(uvec) + DOPS[1].dot(wvec) + DOPS[2].dot(pvec) + DOPS[3].dot(tvec)
+       wres = DOPS[4].dot(uvec) + (DOPS[5] + ROPS[1]).dot(wvec) + DOPS[6].dot(pvec) + DOPS[7].dot(tvec)
+       pres = DOPS[8].dot(uvec) + DOPS[9].dot(wvec) + (DOPS[10] + ROPS[2]).dot(pvec)
+       tres = DOPS[12].dot(uvec) + DOPS[13].dot(wvec) + (DOPS[15] + ROPS[3]).dot(tvec)
+       
+       qprod = np.concatenate((ures, wres, pres, tres))
+       
+       return -qprod
     
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
@@ -282,9 +308,9 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
                      
        return np.concatenate(DqDt())
 
-def computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex):
+def computeRayleighTendency(REFG, fields, botdex, topdex):
        
-       # Get the static vertical gradients
+       # Get the Rayleight operators
        ROPS = REFG[5]
        
        # Compute the tendencies

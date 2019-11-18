@@ -20,7 +20,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
               if DynSGS:
                      fields, wxz, U, RdT = tendency.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
-                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, uxz, wxz, pxz, txz, udex, wdex, pdex, tdex, botdex, topdex)
+                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
                      rhs = rhsSGS[sysDex] 
               else:
                      rhs = 0.0
@@ -70,7 +70,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        
        def computeRHSUpdate(fields, U, RdT):
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
-              rhs += tendency.computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex)
+              rhs += tendency.computeRayleighTendency(REFG, fields, botdex, topdex)
        
               return rhs
        #'''

@@ -74,9 +74,9 @@ def getFromRestart(name, ET, NX, NZ):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
+       NonLinSolve = False
        
        # Set residual diffusion switch
        ResDiff = True
@@ -87,7 +87,7 @@ if __name__ == '__main__':
        
        # Set restarting
        toRestart = True
-       isRestart = True
+       isRestart = False
        restart_file = 'restartDB'
        
        # Set physical constants (dry air)
@@ -320,8 +320,7 @@ if __name__ == '__main__':
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
               # Initialize fields
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              #fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               # Initialize the RHS and forcing for each field
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
        
@@ -334,8 +333,7 @@ if __name__ == '__main__':
               
               # Test evaluation of full Jacobian... must match linearization on first iteration
               if StaticSolve:
-                     fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                     DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex, SOLT[:,0])
+                     DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
                      DOPS = [DOPS_NL[0], DOPS_NL[1], DOPS_NL[2], \
                              DOPS_NL[5], DOPS_NL[6], DOPS_NL[7], \
                              DOPS_NL[8], DOPS_NL[9], DOPS_NL[10], \
@@ -376,22 +374,20 @@ if __name__ == '__main__':
                      # No coupled BC implementation on restart
                      UW = None
                      UT = None
+                     
+                     # Compute the current boundary forcing
+                     WBC = dHdX * fields[ubdex,0]
               else:
                      # Set the forcing
                      bN = RHS
                      # No coupled BC implementation on restart
                      UW = None
                      UT = None
-                     '''
-                     # Compute the forcing
-                     WBC = dHdX * UZ[0,:]
-                     WEQ = sps.bmat([[((DOPS[1])[:,ubdex])], \
-                                     [((DOPS[3])[:,ubdex])], \
-                                     [((DOPS[7])[:,ubdex])], \
-                                     [((DOPS[9])[:,ubdex])]])
-                     bN = -WEQ.dot(WBC);
-                     del(WEQ)
                      
+                     # Compute the initial boundary forcing
+                     WBC = dHdX * U[ubdex]
+
+                     '''
                      # Compute coupled BC adjustment per block from w to u eqs.
                      WBC = sps.spdiags(dHdX, 0, len(dHdX), len(dHdX))
                      U_cols11 = ((DOPS[1].tolil())[:,ubdex]).dot(WBC)
@@ -415,7 +411,16 @@ if __name__ == '__main__':
                      del(U_cols11); del(U_cols21); del(U_cols31); del(U_cols41)
                      '''
               
+              # Apply terrain forcing
+              WEQ = sps.bmat([[((DOPS[1])[:,ubdex])], \
+                              [((DOPS[3])[:,ubdex])], \
+                              [((DOPS[7])[:,ubdex])], \
+                              [((DOPS[9])[:,ubdex])]])
+              bN -= WEQ.dot(WBC);
               del(DOPS)
+              del(WEQ)
+              
+              # Set up Schur blocks or full operator...
               if (StaticSolve and SolveSchur) and not LinearSolve:
                      # Compute the partitions for Schur Complement solution
                      AS = sps.bmat([[A + R1, B], [UW, D + R2]], format='csc')
@@ -509,9 +514,6 @@ if __name__ == '__main__':
                             f1 = np.concatenate((RHS[udex], fw[wbcDex]))
                             ft = RHS[tdex]
                             f2 = np.concatenate((RHS[pdex], ft[tbcDex]))
-                            
-                            #del(fw)
-                            #del(ft)
                      
                      # Get memory back
                      del(BS); del(CS)
@@ -532,7 +534,8 @@ if __name__ == '__main__':
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
               print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
-              
+       
+       #%% Transient solutions       
        elif LinearSolve:
               RHS[sysDex] = bN
               print('Starting Linear Transient Solver...')

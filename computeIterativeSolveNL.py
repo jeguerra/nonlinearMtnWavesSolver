@@ -5,14 +5,15 @@ Created on Tue Oct  1 17:05:20 2019
 
 @author: jorge.guerra
 """
-import time
 import numpy as np
 import scipy.linalg as dsl
-#import scipy.sparse as sps
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import scipy.optimize as opt
 import scipy.sparse.linalg as spl
 import computeEulerEquationsLogPLogT as tendency
+
+def pause():
+    input("Press the <ENTER> key to continue...")
 
 def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex):
        lastSol = SOLT[:,0]
@@ -20,17 +21,18 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        def computeRHSUpdate(sol):
               fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
-              rhs += tendency.computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex)
+              rhs += tendency.computeRayleighTendency(REFG, fields, botdex, topdex)
        
               return rhs
        
        def computeJacVecUpdate(sol, vec):
+              # Prepare the Jacobian
               fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              jv = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
-              jv += tendency.computeRayleighTendency(REFG, fields, udex, wdex, pdex, tdex, botdex, topdex)
+              DOPS = tendency.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
+              # Compute the product
+              jv = tendency.computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex)
        
               return jv
-              
        
        # Solve for nonlinear equilibrium (default krylov)
        '''
@@ -47,11 +49,11 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        '''
        jac_options = {'jdv':computeJacVecUpdate, \
                       'method':'gmres', \
-                      'inner_maxiter':10000, \
-                      'outer_k':10}
+                      'inner_maxiter':100, \
+                      'outer_k':1}
        sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
                                   jacobian=KrylovDirectJacobian(**jac_options),
-                                  iter=10, verbose=True,
+                                  iter=2, verbose=True,
                                   maxiter=100,
                                   line_search='armijo',
                                   full_output=True,
@@ -191,10 +193,24 @@ class KrylovDirectJacobian(opt.nonlin.Jacobian):
         if nv == 0:
             return 0*v
         # Compute the updated Jacobian-vector product
-        #r = self.jac_vec(self.x0, v)
+        #r1 = self.jac_vec(self.x0, v)
         sc = 0.5*self.omega / nv
         #r = (self.func(self.x0 + sc*v) - self.f0) / sc
-        r = (self.func(self.x0 + sc*v) - self.func(self.x0 - sc*v)) / sc
+        r2 = (self.func(self.x0 + sc*v) - self.func(self.x0 - sc*v)) / sc
+        '''
+        plt.figure(figsize=(12.0, 8.0))
+        varL = (int) (len(v) / 4)
+        udex = range(0, varL)
+        wdex = range(varL, 2*varL)
+        pdex = range(2*varL, 3*varL)
+        tdex = range(3*varL, len(v))
+        plt.plot(r1[tdex], 'k-'); #plt.xscale('log'); plt.yscale('linear'); #plt.ylim(1.0E-6, 1.0E-1)
+        plt.plot(r2[tdex], 'b:'); #plt.xscale('log'); plt.yscale('linear'); #plt.ylim(1.0E-6, 1.0E-1)
+        plt.show()
+        pause()
+        '''
+        r = r2
+        
         if not np.all(np.isfinite(r)) and np.all(np.isfinite(v)):
             raise ValueError('Function returned non-finite results')
         return r
