@@ -136,7 +136,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 3.0
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 1000 # Stride for image output
@@ -333,12 +333,15 @@ if __name__ == '__main__':
               
               # Test evaluation of full Jacobian... must match linearization on first iteration
               if StaticSolve:
+                     '''
                      DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
                      DOPS = [DOPS_NL[0], DOPS_NL[1], DOPS_NL[2], \
                              DOPS_NL[5], DOPS_NL[6], DOPS_NL[7], \
                              DOPS_NL[8], DOPS_NL[9], DOPS_NL[10], \
                              DOPS_NL[13], DOPS_NL[15]]
                      del(DOPS_NL)
+                     '''
+                     DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
                      
               print('Compute Jacobian operator blocks: DONE!')
               

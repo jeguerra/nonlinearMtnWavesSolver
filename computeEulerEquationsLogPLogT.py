@@ -26,13 +26,6 @@ def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
        
-       # The initial condition is an atmosphere in hydrostatic rest
-       #DZDX = REFS[15]
-       # This sets the free slip condition on all coordinate surfaces
-       # in the column. Ensures proper initialization of perturbation
-       # fields. 
-       #fields[:,1] = U * DZDX
-
        return fields, U, RdT
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
@@ -40,9 +33,6 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        P0 = PHYS[1]
        Rd = PHYS[3]
        kap = PHYS[4]
-       
-       dHdX = REFS[6]
-       DZDX = REFS[15]
        
        TQ = SOLT + INIT
        # Make the total quatities
@@ -54,14 +44,6 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
-       
-       # SET FREE SLIP ON BOTTOM TERRAIN SURFACE
-       fields[botdex,1] = U[botdex] * dHdX
-       fields[topdex,1] *= 0.0
-       
-       # SET FREE SLIP ON ALL COORDINATE SURFACES
-       #fields[:,1] = U * DZDX
-       fields[topdex,3] *= 0.0
 
        return fields, U, RdT
 
@@ -73,14 +55,16 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        gam = PHYS[6]
        
        # Get the derivative operators
+       dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
        
        # Compute terrain following terms
        wxz = fields[:,1]
+       # Apply free slip boundary condition exactly
+       wxz[botdex] = U[botdex] * dHdX
        WXZ = wxz - U * DZDX
-       # Apply boundary condition exactly
        WXZ[botdex] *= 0.0
        
        # Compute (total) derivatives of perturbations
@@ -257,15 +241,16 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        gam = PHYS[6]
        
        # Get the derivative operators
+       dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
        
        # Compute terrain following terms
        wxz = fields[:,1]
+       # Apply free slip boundary condition exactly
+       wxz[botdex] = U[botdex] * dHdX
        WXZ = wxz - U * DZDX
-              
-       # Apply boundary condition exactly
        WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
