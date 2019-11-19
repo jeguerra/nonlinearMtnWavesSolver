@@ -55,7 +55,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        gam = PHYS[6]
        
        # Get the derivative operators
-       dHdX = REFS[6]
+       #dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -63,9 +63,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute terrain following terms
        wxz = fields[:,1]
        # Apply free slip boundary condition exactly
-       wxz[botdex] = U[botdex] * dHdX
+       #wxz[botdex] = U[botdex] * dHdX
        WXZ = wxz - U * DZDX
-       WXZ[botdex] *= 0.0
+       #WXZ[botdex] *= 0.0
        
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
