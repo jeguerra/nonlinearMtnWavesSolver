@@ -121,7 +121,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 100.0
+       h0 = 10.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]

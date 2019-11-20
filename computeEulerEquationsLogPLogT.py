@@ -114,12 +114,11 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
-       UDXM = UM.dot(DDXM)
        
        unit = sps.identity(len(U))
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UDXM + PuPxM
+       LD11 = UPXM + PuPxM
        LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM) # vanish initial
@@ -205,17 +204,17 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DZDXM = sps.spdiags(DZDX, 0, OPS, OPS)
        
        #%% Compute the terms in the equations
-       U0DDX = UM.dot(DDXM)
+       #U0DDX = UM.dot(DDXM)
        PPX = DDXM - DZDXM.dot(DDZM)
-       #U0PPX = UM.dot(PPX)
+       U0PPX = UM.dot(PPX)
        
        # Horizontal momentum
-       LD11 = U0DDX
+       LD11 = U0PPX
        LD12 = DUDZM
        LD13 = PORZM.dot(PPX)
        
        # Vertical momentum
-       LD22 = U0DDX
+       LD22 = U0PPX
        LD23 = PORZM.dot(DDZM + DLTDZM)
        # Equivalent form from direct linearization
        #LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
@@ -224,11 +223,11 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Log-P equation
        LD31 = gam * PPX
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0DDX
+       LD33 = U0PPX
        
        # Log-Theta equation
        LD42 = DLPTDZM
-       LD44 = U0DDX
+       LD44 = U0PPX
        
        DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
        
