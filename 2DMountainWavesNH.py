@@ -79,7 +79,7 @@ if __name__ == '__main__':
        NonLinSolve = False
        
        # Set residual diffusion switch
-       ResDiff = True
+       ResDiff = False
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
@@ -328,15 +328,15 @@ if __name__ == '__main__':
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of full Jacobian... must match linearization on first iteration
-              '''
+              #'''
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
               DOPS = [DOPS_NL[0], DOPS_NL[1], DOPS_NL[2], \
                       DOPS_NL[5], DOPS_NL[6], DOPS_NL[7], \
                       DOPS_NL[8], DOPS_NL[9], DOPS_NL[10], \
                       DOPS_NL[13], DOPS_NL[15]]
               del(DOPS_NL)
-              '''
-              DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              #'''
+              #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
                      
               print('Compute Jacobian operator blocks: DONE!')
               

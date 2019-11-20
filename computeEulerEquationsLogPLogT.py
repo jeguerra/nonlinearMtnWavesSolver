@@ -114,11 +114,12 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       UDXM = UM.dot(DDXM)
        
        unit = sps.identity(len(U))
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UPXM + PuPxM
+       LD11 = UDXM + PuPxM
        LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM) # vanish initial
