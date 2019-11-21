@@ -329,7 +329,6 @@ if __name__ == '__main__':
               
               # Test evaluation of full Jacobian... must match linearization on first iteration
               #'''
-              fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
               '''
               DOPS = [DOPS_NL[0], DOPS_NL[1], DOPS_NL[2], \
@@ -399,7 +398,7 @@ if __name__ == '__main__':
                      AN = sps.bmat([[A + R1, B, C, D], \
                               [E, F + R2, G, H], \
                               [I, J, K + R3, M], \
-                              [N, O, P, Q + R4]], format='csc')
+                              [N, O, P, Q + R4]], format='csr')
               
                      # Compute the global linear force vector
                      bN = bN[sysDex]
