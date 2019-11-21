@@ -329,36 +329,48 @@ if __name__ == '__main__':
               
               # Test evaluation of full Jacobian... must match linearization on first iteration
               #'''
+              fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+              '''
               DOPS = [DOPS_NL[0], DOPS_NL[1], DOPS_NL[2], \
                       DOPS_NL[5], DOPS_NL[6], DOPS_NL[7], \
                       DOPS_NL[8], DOPS_NL[9], DOPS_NL[10], \
                       DOPS_NL[13], DOPS_NL[15]]
               del(DOPS_NL)
-              #'''
+              '''
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
                      
               print('Compute Jacobian operator blocks: DONE!')
               
               # Convert blocks to 'lil' format for indexing
-              for dd in range(len(DOPS)):
-                     DOPS[dd] = DOPS[dd].tolil()
+              DOPS = []
+              for dd in range(len(DOPS_NL)):
+                     if (DOPS_NL[dd]) is not None: 
+                            DOPS.append(DOPS_NL[dd].tolil())
+                     else:
+                            DOPS.append(DOPS_NL[dd])
+              del(DOPS_NL)
               
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
               B = DOPS[1][:,wbcDex]
               C = DOPS[2]
+              D = DOPS[3][:,tbcDex]
               
-              D = DOPS[3][np.ix_(wbcDex,wbcDex)] 
               E = DOPS[4][wbcDex,:]
-              F = DOPS[5][np.ix_(wbcDex,tbcDex)]
+              F = DOPS[5][np.ix_(wbcDex,wbcDex)] 
+              G = DOPS[6][wbcDex,:]
+              H = DOPS[7][np.ix_(wbcDex,tbcDex)]
               
-              G = DOPS[6]
-              H = DOPS[7][:,wbcDex]
-              J = DOPS[8]
+              I = DOPS[8]
+              J = DOPS[9][:,wbcDex]
+              K = DOPS[10]
+              M = DOPS[11]
               
-              K = DOPS[9][np.ix_(tbcDex,wbcDex)]
-              M = DOPS[10][np.ix_(tbcDex,tbcDex)]
+              N = DOPS[12][tbcDex,:]
+              O = DOPS[13][np.ix_(tbcDex,wbcDex)]
+              P = DOPS[14]
+              Q = DOPS[15][np.ix_(tbcDex,tbcDex)]
               
               # The Rayleigh operators are block diagonal
               R1 = ROPS[0]
@@ -371,10 +383,10 @@ if __name__ == '__main__':
               # Set up Schur blocks or full operator...
               if (StaticSolve and SolveSchur) and not LinearSolve:
                      # Compute the partitions for Schur Complement solution
-                     AS = sps.bmat([[A + R1, B], [None, D + R2]], format='csc')
-                     BS = sps.bmat([[C, None], [E, F]], format='csc')
-                     CS = sps.bmat([[G, H], [None, K]], format='csc')
-                     DS = sps.bmat([[J + R3, None], [None, M + R4]], format='csc')
+                     AS = sps.bmat([[A + R1, B], [E, F + R2]], format='csc')
+                     BS = sps.bmat([[C, D], [G, H]], format='csc')
+                     CS = sps.bmat([[I, J], [N, O]], format='csc')
+                     DS = sps.bmat([[K + R3, M], [P, Q + R4]], format='csc')
                      
                      # Compute the partitions for Schur Complement solution
                      fw = bN[wdex]
@@ -384,10 +396,10 @@ if __name__ == '__main__':
                      
               if LinearSolve or (StaticSolve and SolveFull):
                      # Compute the global linear operator
-                     AN = sps.bmat([[A + R1, B, C, None], \
-                              [None, D + R2, E, F], \
-                              [G, H, J + R3, None], \
-                              [None, K, None, M + R4]], format='csc')
+                     AN = sps.bmat([[A + R1, B, C, D], \
+                              [E, F + R2, G, H], \
+                              [I, J, K + R3, M], \
+                              [N, O, P, Q + R4]], format='csc')
               
                      # Compute the global linear force vector
                      bN = bN[sysDex]
@@ -430,37 +442,27 @@ if __name__ == '__main__':
                      del(DS_SC)
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
-                     for nn in range(1):
-                            # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
-                            f2_hat = factorDS.solve(f2)
-                            f1_hat = -BS.dot(f2_hat)
-                            # Use dense linear algebra at this point
-                            sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
-                            print('Solve for u and w... DONE!')
-                            f2 = f2 - CS.dot(sol1)
-                            sol2 = factorDS.solve(f2)
-                            print('Solve for ln(p) and ln(theta)... DONE!')
-                            sol = np.concatenate((sol1, sol2))
-                            
-                            # Set the solution
-                            if nn == 0:
-                                   SOLT[sysDex,0] = sol
-                            else:
-                                   SOLT[sysDex,0] += 1.0 * sol
-                            # Set the boundary condition   
-                            SOLT[wbdex,0] = dHdX * (U[ubdex] + SOLT[ubdex,0])
-                            print('Recover full linear solution vector... DONE!')
-                            
-                            # Update the forcing vector
-                            fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                            RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
-                            print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
-                            
-                            # Update the partitions
-                            fw = RHS[wdex]
-                            f1 = np.concatenate((RHS[udex], fw[wbcDex]))
-                            ft = RHS[tdex]
-                            f2 = np.concatenate((RHS[pdex], ft[tbcDex]))
+                     # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
+                     f2_hat = factorDS.solve(f2)
+                     f1_hat = -BS.dot(f2_hat)
+                     # Use dense linear algebra at this point
+                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
+                     print('Solve for u and w... DONE!')
+                     f2 = f2 - CS.dot(sol1)
+                     sol2 = factorDS.solve(f2)
+                     print('Solve for ln(p) and ln(theta)... DONE!')
+                     sol = np.concatenate((sol1, sol2))
+                     
+                     # Set the solution
+                     SOLT[sysDex,0] += sol
+                     # Set the boundary condition   
+                     SOLT[wbdex,0] = dHdX * (U[ubdex] + SOLT[ubdex,0])
+                     print('Recover full linear solution vector... DONE!')
+                     
+                     # Update the forcing vector
+                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+                     print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
                      
                      # Get memory back
                      del(BS); del(CS)
