@@ -61,12 +61,15 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        DZDX = REFS[15]
        
        # Compute terrain following terms
-       wxz = fields[:,1]
-       # Apply free slip boundary condition exactly
-       #wxz[botdex] = U[botdex] * dHdX
+       wxz = np.array(fields[:,1])
        WXZ = wxz - U * DZDX
-       #WXZ[botdex] *= 0.0
        
+       # WXZ vanishes when w vanishes (initial condition)
+       #'''
+       if np.linalg.norm(wxz) < 1.0E-15:
+              print('Initial Jacobian...')
+              #WXZ *= 0.0
+       #'''
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
@@ -205,13 +208,13 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        
        #%% Compute the terms in the equations
        #U0DDX = UM.dot(DDXM)
-       PPX = DDXM - DZDXM.dot(DDZM)
-       U0PPX = UM.dot(PPX)
+       PPXM = DDXM - DZDXM.dot(DDZM)
+       U0PPX = UM.dot(PPXM)
        
        # Horizontal momentum
        LD11 = U0PPX
        LD12 = DUDZM
-       LD13 = PORZM.dot(PPX)
+       LD13 = PORZM.dot(PPXM)
        
        # Vertical momentum
        LD22 = U0PPX
@@ -221,7 +224,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        LD24 = -gc * unit
        
        # Log-P equation
-       LD31 = gam * PPX
+       LD31 = gam * PPXM
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0PPX
        
@@ -246,7 +249,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DDZM = REFS[11]
        DZDX = REFS[15]
        
-       # Compute terrain following terms
+       # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
        # Apply free slip boundary condition exactly
        wxz[botdex] = U[botdex] * dHdX

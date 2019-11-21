@@ -49,11 +49,11 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        '''
        jac_options = {'jdv':computeJacVecUpdate, \
                       'method':'gmres', \
-                      'inner_maxiter':5000, \
+                      'inner_maxiter':500, \
                       'outer_k':2}
        sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
                                   jacobian=KrylovDirectJacobian(**jac_options),
-                                  iter=10, verbose=True,
+                                  iter=5, verbose=True,
                                   maxiter=100,
                                   line_search='armijo',
                                   full_output=True,

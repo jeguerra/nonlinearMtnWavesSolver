@@ -26,3 +26,5 @@ octave-workspace
 *.db
 
 *.Result
+
+restartDB

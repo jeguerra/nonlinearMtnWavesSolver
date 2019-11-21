@@ -74,8 +74,8 @@ def getFromRestart(name, ET, NX, NZ):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = True
-       LinearSolve = False
+       StaticSolve = False
+       LinearSolve = True
        NonLinSolve = False
        
        # Set residual diffusion switch
@@ -121,7 +121,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 10.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -316,9 +316,9 @@ if __name__ == '__main__':
               TI = np.array(np.arange(DT, ET, DT))
               
        # Initialize fields
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        # Initialize the RHS and forcing for each field
-       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        print('Residual 2-norm INITIAL state: ', np.linalg.norm(RHS))
        
        # Set the forcing
