@@ -68,7 +68,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        #'''
        if np.linalg.norm(wxz) < 1.0E-15:
               print('Initial Jacobian...')
-              #WXZ *= 0.0
+              WXZ *= 0.0
        #'''
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)

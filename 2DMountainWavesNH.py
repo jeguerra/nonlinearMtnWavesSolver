@@ -74,8 +74,8 @@ def getFromRestart(name, ET, NX, NZ):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
-       LinearSolve = True
+       StaticSolve = True
+       LinearSolve = False
        NonLinSolve = False
        
        # Set residual diffusion switch
@@ -121,7 +121,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 100.0
+       h0 = 25.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -428,11 +428,17 @@ if __name__ == '__main__':
               if SolveSchur and not SolveFull:
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
-                     opts = dict(Equil=True, IterRefine='DOUBLE')
-                     factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
+                     #opts = dict(Equil=True, IterRefine='DOUBLE')
+                     #factorDS = spl.splu(DS, permc_spec='COLAMD', options=opts)
+                     #import scikits.umfpack as um
+                     #umfpack = um.UmfpackContext()
+                     #umfpack.numeric(DS)
+                     factorDS = dsl.lu_factor(DS.toarray())
                      print('Factor D... DONE!')
                      del(DS)
-                     alpha = factorDS.solve(CS.toarray())
+                     #alpha = factorDS.solve(CS.toarray())
+                     alpha = dsl.lu_solve(factorDS, CS.toarray())
+                     #alpha = umfpack(um.UMFPACK_A, DS, CS, autoTranspose = True)
                      DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
                      print('Compute Schur Complement of D')
                      del(AS)
@@ -442,13 +448,16 @@ if __name__ == '__main__':
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
                      # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
-                     f2_hat = factorDS.solve(f2)
+                     #f2_hat = factorDS.solve(f2)
+                     f2_hat = dsl.lu_solve(factorDS, f2)
+                     #f2_hat = umfpack(um.UMFPACK_A, DS, f2, autoTranspose = True)
                      f1_hat = -BS.dot(f2_hat)
                      # Use dense linear algebra at this point
                      sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
                      print('Solve for u and w... DONE!')
                      f2 = f2 - CS.dot(sol1)
-                     sol2 = factorDS.solve(f2)
+                     #sol2 = factorDS.solve(f2)
+                     sol2 = dsl.lu_solve(factorDS, f2)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      sol = np.concatenate((sol1, sol2))
                      
