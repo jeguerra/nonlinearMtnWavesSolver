@@ -104,8 +104,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 90
+       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -136,7 +136,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 1.0
+       HR = 3.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 1000 # Stride for image output
@@ -311,17 +311,20 @@ if __name__ == '__main__':
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               SOLT[:,0] = SOLT[:,1]
+              
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        else:
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
               
-       # Initialize fields
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-       
-       # Initialize the RHS and forcing for each field
-       fields[ubdex,1] = dHdX * fields[ubdex,0]
-       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-       RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+              # Initialize fields
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
+              # Initialize the RHS and forcing for each field
+              initialFields = np.array(fields)
+              initialFields[ubdex,1] = dHdX * initialFields[ubdex,0]
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, initialFields, U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, initialFields, ubdex, utdex)
        
        print('Residual 2-norm INITIAL state: ', np.linalg.norm(RHS))
        
@@ -385,11 +388,17 @@ if __name__ == '__main__':
               
               # Set up Schur blocks or full operator...
               if (StaticSolve and SolveSchur) and not LinearSolve:
-                     # Compute the partitions for Schur Complement solution
+                     # Compute the partitions for Schur Complement solution (SPARSE)
                      AS = sps.bmat([[A + R1, B], [E, F + R2]], format='csc')
                      BS = sps.bmat([[C, D], [G, H]], format='csc')
                      CS = sps.bmat([[I, J], [N, O]], format='csc')
                      DS = sps.bmat([[K + R3, M], [P, Q + R4]], format='csc')
+                     
+                     # Compute the partitions for Schur Complement solution (FULL)
+                     AS = AS.toarray()
+                     BS = BS.toarray()
+                     CS = CS.toarray()
+                     DS = DS.toarray()
                      
                      # Compute the partitions for Schur Complement solution
                      fw = bN[wdex]
@@ -437,13 +446,15 @@ if __name__ == '__main__':
                      #import scikits.umfpack as um
                      #umfpack = um.UmfpackContext()
                      #umfpack.numeric(DS)
-                     factorDS = dsl.lu_factor(DS.toarray())
+                     factorDS = dsl.lu_factor(DS)
                      print('Factor D... DONE!')
                      del(DS)
                      #alpha = factorDS.solve(CS.toarray())
-                     alpha = dsl.lu_solve(factorDS, CS.toarray())
+                     alpha = dsl.lu_solve(factorDS, CS)
+                     print('Solve DS^-1 * CS... DONE!')
                      #alpha = umfpack(um.UMFPACK_A, DS, CS, autoTranspose = True)
-                     DS_SC = AS.toarray() - (BS.toarray()).dot(alpha)
+                     DS_SC = -BS.dot(alpha)
+                     DS_SC += AS
                      print('Compute Schur Complement of D')
                      del(AS)
                      del(alpha)
@@ -467,9 +478,6 @@ if __name__ == '__main__':
                      
                      # Update the solution
                      SOLT[sysDex,1] = SOLT[sysDex,0] + sol
-                     
-                     # Update the boundary condition and check residual
-                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      print('Recover full linear solution vector... DONE!')
                      
                      # Check residual
@@ -493,7 +501,7 @@ if __name__ == '__main__':
               # Compare the linear and nonlinear solutions
               DSOL = SOLT[:,1] - SOLT[:,0]
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
-              
+              '''
               # Initialize the RHS and forcing for each field
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)

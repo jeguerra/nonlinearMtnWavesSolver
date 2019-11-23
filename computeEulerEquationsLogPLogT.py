@@ -250,11 +250,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
-       wxz = fields[:,1]
+       wxz = np.array(fields[:,1])
        # Apply free slip boundary condition exactly
-       wxz[botdex] = U[botdex] * dHdX
+       #wxz[botdex] = U[botdex] * dHdX
        WXZ = wxz - U * DZDX
-       WXZ[botdex] *= 0.0
+       #WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
