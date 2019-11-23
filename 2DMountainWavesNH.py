@@ -322,7 +322,7 @@ if __name__ == '__main__':
               
               # Initialize the RHS and forcing for each field
               initialFields = np.array(fields)
-              initialFields[ubdex,1] = dHdX * initialFields[ubdex,0]
+              initialFields[ubdex,1] = dHdX * INIT[udex][ubdex]
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, initialFields, U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, initialFields, ubdex, utdex)
        
@@ -507,7 +507,7 @@ if __name__ == '__main__':
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
-       
+              '''
        #%% Transient solutions       
        elif LinearSolve:
               RHS[sysDex] = bN
