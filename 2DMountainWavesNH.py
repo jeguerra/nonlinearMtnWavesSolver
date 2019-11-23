@@ -48,7 +48,7 @@ from computeIterativeSolveNL import computeIterativeSolveNL
 
 import faulthandler; faulthandler.enable()
 
-def getFromRestart(name, ET, NX, NZ):
+def getFromRestart(name, ET, NX, NZ, StaticSolve):
        rdb = shelve.open(restart_file, flag='r')
        
        NX_in = rdb['NX']
@@ -62,7 +62,7 @@ def getFromRestart(name, ET, NX, NZ):
        SOLT = rdb['SOLT']
        RHS = rdb['RHS']
        IT = rdb['ET']
-       if ET <= IT:
+       if ET <= IT and not StaticSolve:
               print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
               sys.exit(2)
               
@@ -309,7 +309,7 @@ if __name__ == '__main__':
        
        if isRestart:
               print('Restarting from previous solution...')
-              SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ)
+              SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               SOLT[:,0] = SOLT[:,1]
        else:
               # Initialize time array
@@ -319,6 +319,8 @@ if __name__ == '__main__':
        fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        # Initialize the RHS and forcing for each field
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+       RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+       
        print('Residual 2-norm INITIAL state: ', np.linalg.norm(RHS))
        
        # Set the forcing
@@ -461,14 +463,15 @@ if __name__ == '__main__':
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      sol = np.concatenate((sol1, sol2))
                      
-                     # Set the solution
-                     SOLT[sysDex,0] += sol
+                     # Update the solution
+                     SOLT[sysDex,1] = SOLT[sysDex,0] + sol
+                     
                      # Set the boundary condition   
-                     SOLT[wbdex,0] = dHdX * (U[ubdex] + SOLT[ubdex,0])
+                     SOLT[wbdex,1] = dHdX * (INIT[udex][ubdex] + SOLT[udex,1][ubdex])
                      print('Recover full linear solution vector... DONE!')
                      
                      # Update the forcing vector
-                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
                      print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
                      
@@ -480,9 +483,10 @@ if __name__ == '__main__':
                      
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
+              '''
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
               SOLT[:,1] = sol
-              
+              '''
               # Compare the linear and nonlinear solutions
               DSOL = SOLT[:,1] - SOLT[:,0]
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
