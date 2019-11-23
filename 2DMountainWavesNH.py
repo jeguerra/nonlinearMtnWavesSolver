@@ -317,7 +317,9 @@ if __name__ == '__main__':
               
        # Initialize fields
        fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       
        # Initialize the RHS and forcing for each field
+       fields[ubdex,1] = dHdX * fields[ubdex,0]
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
        
@@ -331,7 +333,7 @@ if __name__ == '__main__':
               
               # Test evaluation of full Jacobian... must match linearization on first iteration
               #'''
-              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               '''
               DOPS = [DOPS_NL[0], DOPS_NL[1], DOPS_NL[2], \
                       DOPS_NL[5], DOPS_NL[6], DOPS_NL[7], \
@@ -466,13 +468,14 @@ if __name__ == '__main__':
                      # Update the solution
                      SOLT[sysDex,1] = SOLT[sysDex,0] + sol
                      
-                     # Set the boundary condition   
-                     SOLT[wbdex,1] = dHdX * (INIT[udex][ubdex] + SOLT[udex,1][ubdex])
+                     # Update the boundary condition and check residual
+                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
                      print('Recover full linear solution vector... DONE!')
                      
-                     # Update the forcing vector
+                     # Check residual
                      fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
                      print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
                      
                      # Get memory back
@@ -493,7 +496,8 @@ if __name__ == '__main__':
               
               # Initialize the RHS and forcing for each field
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, ubdex, utdex)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
        
        #%% Transient solutions       
@@ -572,14 +576,12 @@ if __name__ == '__main__':
        #%% Recover the solution (or check the residual)
        NXI = 2500
        NZI = 200
-       if StaticSolve:
-              nativeLN, interpLN = computeInterpolatedFields(DIMS, ZTL, SOLT[:,0], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-              nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, SOLT[:,1], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-              nativeDF, interpDF = computeInterpolatedFields(DIMS, ZTL, DSOL, NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-       else:
-              native, interp = computeInterpolatedFields(DIMS, ZTL, SOLT[:,0], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-              uxz = native[0]; wxz = native[1]; pxz = native[2]; txz = native[3]
-              uxzint = interp[0]; wxzint = interp[1]; pxzint = interp[2]; txzint = interp[3]
+       nativeLN, interpLN = computeInterpolatedFields(DIMS, ZTL, SOLT[:,0], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+       nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, SOLT[:,1], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+       nativeDF, interpDF = computeInterpolatedFields(DIMS, ZTL, DSOL, NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+       
+       uxz = nativeNL[0]; wxz = nativeNL[1]; pxz = nativeNL[2]; txz = nativeNL[3]
+       uxzint = interpNL[0]; wxzint = interpNL[1]; pxzint = interpNL[2]; txzint = interpNL[3]
        
        #% Make the new grid XLI, ZTLI
        import HerfunChebNodesWeights as hcnw
@@ -630,14 +632,31 @@ if __name__ == '__main__':
               plt.tight_layout()
               plt.show()
               
-       elif LinearSolve or NonLinSolve:
-              fig = plt.figure()
-              # 2 X 2 subplot with all fields at the final time
-              for pp in range(4):
-                     plt.subplot(2,2,pp+1)
-                     ccheck = plt.contourf(XLI, ZTLI, interp[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-                     cbar = fig.colorbar(ccheck)
-              plt.show()
+       fig = plt.figure()
+       # 2 X 2 subplot with all fields at the final time
+       for pp in range(4):
+              plt.subplot(2,2,pp+1)
+              ccheck = plt.contourf(XLI, ZTLI, interpNL[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              cbar = fig.colorbar(ccheck)
+              plt.tight_layout()
+       plt.show()
+       
+       fig = plt.figure()
+       for pp in range(4):
+              plt.subplot(2,2,pp+1)
+              if pp == 0:
+                     qdex = udex
+              elif pp == 1:
+                     qdex = wdex
+              elif pp == 2:
+                     qdex = pdex
+              else:
+                     qdex = tdex
+              dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
+              cbar = plt.colorbar(ccheck, format='%.3e')
+              plt.tight_layout()
+       plt.show()
 
        #%% Check the boundary conditions
        '''
