@@ -244,7 +244,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        gam = PHYS[6]
        
        # Get the derivative operators
-       dHdX = REFS[6]
+       #dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -272,6 +272,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        UDqDx = U.dot(DqDx)
        WDqDz = WXZ.dot(DqDz)
        transport = UDqDx + WDqDz + wDQDZ
+       #transport = wDQDZ
        
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])

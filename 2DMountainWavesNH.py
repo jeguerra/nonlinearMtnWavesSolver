@@ -312,19 +312,18 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               SOLT[:,0] = SOLT[:,1]
               
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        else:
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
               
-              # Initialize fields
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              
-              # Initialize the RHS and forcing for each field
-              initialFields = np.array(fields)
-              initialFields[ubdex,1] = dHdX * INIT[udex][ubdex]
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, initialFields, U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, initialFields, ubdex, utdex)
+       # Initialize fields
+       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       
+       # Initialize the RHS and forcing for each field
+       initialFields = np.array(fields)
+       initialFields[ubdex,1] = dHdX * U[ubdex]
+       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, initialFields, U, RdT, ubdex, utdex)
+       RHS += eqs.computeRayleighTendency(REFG, initialFields, ubdex, utdex)
        
        print('Residual 2-norm INITIAL state: ', np.linalg.norm(RHS))
        
@@ -476,22 +475,29 @@ if __name__ == '__main__':
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      sol = np.concatenate((sol1, sol2))
                      
-                     # Update the solution
-                     SOLT[sysDex,1] = SOLT[sysDex,0] + sol
-                     print('Recover full linear solution vector... DONE!')
-                     
-                     # Check residual
-                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-                     print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
-                     
                      # Get memory back
                      del(BS); del(CS)
                      del(factorDS)
                      del(factorDS_SC)
                      del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
+              #%% Update the solution
+              SOLT[sysDex,1] += sol
+              print('Recover full linear solution vector... DONE!')
+              
+              # Check residual
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
+              # Set the boundary
+              WBC = dHdX * U[ubdex]
+              SOLT[wbdex,1] = WBC
+              
+              # Check residual
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+              print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
               
               #%% Use the linear solution as the initial guess to the nonlinear solution
               '''
@@ -499,7 +505,7 @@ if __name__ == '__main__':
               SOLT[:,1] = sol
               '''
               # Compare the linear and nonlinear solutions
-              DSOL = SOLT[:,1] - SOLT[:,0]
+              DSOL = np.array(SOLT[:,1] - SOLT[:,0])
               print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
               '''
               # Initialize the RHS and forcing for each field
@@ -561,11 +567,8 @@ if __name__ == '__main__':
                                    cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
               
-              # Set the boundary condition                      
-              SOLT[wbdex,0] = np.multiply(dHdX, np.add(UZ[0,:], SOLT[ubdex,0]))
-              
               # Copy state instance 0 to 1
-              SOLT[:,1] = SOLT[:,0]
+              SOLT[:,1] = np.array(SOLT[:,0])
               
        endt = time.time()
        print('Solve the system: DONE!')
@@ -584,8 +587,8 @@ if __name__ == '__main__':
        #%% Recover the solution (or check the residual)
        NXI = 2500
        NZI = 200
-       nativeLN, interpLN = computeInterpolatedFields(DIMS, ZTL, SOLT[:,0], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-       nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, SOLT[:,1], NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+       nativeLN, interpLN = computeInterpolatedFields(DIMS, ZTL, np.array(SOLT[:,0]), NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
+       nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, np.array(SOLT[:,1]), NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
        nativeDF, interpDF = computeInterpolatedFields(DIMS, ZTL, DSOL, NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
        
        uxz = nativeNL[0]; wxz = nativeNL[1]; pxz = nativeNL[2]; txz = nativeNL[3]
@@ -640,7 +643,7 @@ if __name__ == '__main__':
               plt.tight_layout()
               plt.show()
               
-       fig = plt.figure()
+       fig = plt.figure(figsize=(12.0, 6.0))
        # 2 X 2 subplot with all fields at the final time
        for pp in range(4):
               plt.subplot(2,2,pp+1)
@@ -649,7 +652,7 @@ if __name__ == '__main__':
               plt.tight_layout()
        plt.show()
        
-       fig = plt.figure()
+       fig = plt.figure(figsize=(12.0, 6.0))
        for pp in range(4):
               plt.subplot(2,2,pp+1)
               if pp == 0:
