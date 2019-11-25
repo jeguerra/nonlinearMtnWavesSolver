@@ -321,8 +321,9 @@ if __name__ == '__main__':
        # Initialize the RHS
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+       bN = RHS
        
-       print('Residual 2-norm INITIAL state: ', np.linalg.norm(RHS))
+       print('Residual 2-norm CURRENT state: ', np.linalg.norm(RHS))
        
        #% Compute the global LHS operator
        if (StaticSolve or LinearSolve):
@@ -344,20 +345,11 @@ if __name__ == '__main__':
               
               # Set up the coupled boundary condition
               DHDX = sps.diags(dHdX, offsets=0, format='csr')
-              
               (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
               (DOPS[4])[:,ubdex] += ((DOPS[5])[:,ubdex]).dot(DHDX)
-              (DOPS[9])[:,ubdex] += ((DOPS[10])[:,ubdex]).dot(DHDX)
+              (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
               (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
-              
-              # Set up the forcing matrix
-              WBCM = sps.bmat([[DOPS[1]], [DOPS[5]], [DOPS[10]], [DOPS[13]]], format='csr')
-              forceBC = (WBCM[:,ubdex]).dot(dHdX * U[ubdex])
-              
-              # Set forcing to the RHS
-              RHS -= forceBC
-              bN = RHS
-              print('Residual 2-norm INITIAL + CURRENT state: ', np.linalg.norm(RHS))
+              del(DHDX)
               
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
@@ -486,17 +478,18 @@ if __name__ == '__main__':
                      
               #%% Update the solution
               SOLT[sysDex,1] += sol
-              print('Recover full linear solution vector... DONE!')
               
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
-              # Set the boundary
-              WBC = dHdX * U[ubdex]
+              # Set the coupled boundary
+              WBC = dHdX * (INIT[ubdex] + SOLT[ubdex,1])
               SOLT[wbdex,1] = WBC
               
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
+              print('Recover full linear solution vector... DONE!')
               
               # Set the output residual
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
