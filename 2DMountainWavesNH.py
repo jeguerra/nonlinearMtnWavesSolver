@@ -121,7 +121,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 25.0
+       h0 = 10.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -136,7 +136,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05 # Linear transient
        #DT = 0.05 # Nonlinear transient
-       HR = 3.0
+       HR = 1.0
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 1000 # Stride for image output
@@ -311,19 +311,20 @@ if __name__ == '__main__':
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               SOLT[:,0] = SOLT[:,1]
-              
        else:
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
+              # Initialize the boundary forcing
+              WBC = dHdX * INIT[ubdex]
+              SOLT[wbdex,0] = WBC
+              SOLT[wbdex,1] = WBC
               
        # Initialize fields
        fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        
-       # Initialize the RHS and forcing for each field
-       initialFields = np.array(fields)
-       initialFields[ubdex,1] = dHdX * U[ubdex]
-       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, initialFields, U, RdT, ubdex, utdex)
-       RHS += eqs.computeRayleighTendency(REFG, initialFields, ubdex, utdex)
+       # Initialize the RHS
+       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+       RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
        
        print('Residual 2-norm INITIAL state: ', np.linalg.norm(RHS))
        
@@ -484,13 +485,6 @@ if __name__ == '__main__':
               #%% Update the solution
               SOLT[sysDex,1] += sol
               print('Recover full linear solution vector... DONE!')
-              
-              # Check residual
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              
-              # Set the boundary
-              WBC = dHdX * U[ubdex]
-              SOLT[wbdex,1] = WBC
               
               # Check residual
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)

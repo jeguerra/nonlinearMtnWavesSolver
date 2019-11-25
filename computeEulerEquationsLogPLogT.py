@@ -65,11 +65,11 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        WXZ = wxz - U * DZDX
        
        # WXZ vanishes when w vanishes (initial condition)
-       #'''
+       '''
        if np.linalg.norm(wxz) < 1.0E-15:
               print('Initial Jacobian...')
               WXZ *= 0.0
-       #'''
+       '''
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
@@ -250,7 +250,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
-       wxz = np.array(fields[:,1])
+       wxz = fields[:,1]
        # Apply free slip boundary condition exactly
        #wxz[botdex] = U[botdex] * dHdX
        WXZ = wxz - U * DZDX
