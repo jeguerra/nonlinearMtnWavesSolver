@@ -249,10 +249,14 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
-       # Apply free slip boundary condition exactly
-       wxz[botdex] = U[botdex] * dHdX
-       WXZ = wxz - U * DZDX
-       WXZ[botdex] *= 0.0
+       if np.linalg.norm(wxz) < 1.0E-15:
+              print('Initial terrain forcing...')
+              wxz[botdex] = U[botdex] * dHdX
+              WXZ = wxz - U * DZDX
+              WXZ[botdex] *= 0.0
+       else:
+              WXZ = wxz - U * DZDX
+              WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
@@ -270,7 +274,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        UDqDx = U.dot(DqDx)
        WDqDz = WXZ.dot(DqDz)
        transport = UDqDx + WDqDz + wDQDZ
-       #transport = wDQDZ
        
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
@@ -307,15 +310,14 @@ def computeRayleighTendency(REFG, fields, botdex, topdex):
        DtDt = - ROPS[3].dot(fields[:,3])
        
        # Null tendencies at essential vertical boundaries
-       DuDt[topdex] *= 0.0
-       DuDt[botdex] *= 0.0
+       #DuDt[topdex] *= 0.0
+       #DuDt[botdex] *= 0.0
        DwDt[topdex] *= 0.0
        DwDt[botdex] *= 0.0
-       DpDt[topdex] *= 0.0
-       DpDt[botdex] *= 0.0
+       #DpDt[topdex] *= 0.0
+       #DpDt[botdex] *= 0.0
        DtDt[topdex] *= 0.0
-       DtDt[botdex] *= 0.0
-       
+       #DtDt[botdex] *= 0.0
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        

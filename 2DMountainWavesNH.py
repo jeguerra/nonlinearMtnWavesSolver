@@ -411,10 +411,10 @@ if __name__ == '__main__':
                      bN = bN[sysDex]
               
               # Get memory back
-              del(A); del(B); del(C)
-              del(D); del(E); del(F)
-              del(G); del(H); del(J)
-              del(K); del(M)
+              del(A); del(B); del(C); del(D)
+              del(E); del(F); del(G); del(H)
+              del(I); del(J); del(K); del(M)
+              del(N); del(O); del(P); del(Q)
               print('Set up global linear operators: DONE!')
        
        #%% Solve the system - Static or Transient Solution
@@ -483,8 +483,9 @@ if __name__ == '__main__':
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
               # Set the coupled boundary
-              WBC = dHdX * (INIT[ubdex] + SOLT[ubdex,1])
+              WBC = dHdX * U[ubdex]
               SOLT[wbdex,1] = WBC
+              del(WBC)
               
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
