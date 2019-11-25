@@ -121,7 +121,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 10.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -314,10 +314,6 @@ if __name__ == '__main__':
        else:
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
-              # Initialize the boundary forcing
-              WBC = dHdX * INIT[ubdex]
-              SOLT[wbdex,0] = WBC
-              SOLT[wbdex,1] = WBC
               
        # Initialize fields
        fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
@@ -328,22 +324,11 @@ if __name__ == '__main__':
        
        print('Residual 2-norm INITIAL state: ', np.linalg.norm(RHS))
        
-       # Set the forcing
-       bN = RHS
-       
        #% Compute the global LHS operator
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of full Jacobian... must match linearization on first iteration
-              #'''
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              '''
-              DOPS = [DOPS_NL[0], DOPS_NL[1], DOPS_NL[2], \
-                      DOPS_NL[5], DOPS_NL[6], DOPS_NL[7], \
-                      DOPS_NL[8], DOPS_NL[9], DOPS_NL[10], \
-                      DOPS_NL[13], DOPS_NL[15]]
-              del(DOPS_NL)
-              '''
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
                      
               print('Compute Jacobian operator blocks: DONE!')
@@ -356,6 +341,23 @@ if __name__ == '__main__':
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
+              
+              # Set up the coupled boundary condition
+              DHDX = sps.diags(dHdX, offsets=0, format='csr')
+              
+              (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
+              (DOPS[4])[:,ubdex] += ((DOPS[5])[:,ubdex]).dot(DHDX)
+              (DOPS[9])[:,ubdex] += ((DOPS[10])[:,ubdex]).dot(DHDX)
+              (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
+              
+              # Set up the forcing matrix
+              WBCM = sps.bmat([[DOPS[1]], [DOPS[5]], [DOPS[10]], [DOPS[13]]], format='csr')
+              forceBC = (WBCM[:,ubdex]).dot(dHdX * U[ubdex])
+              
+              # Set forcing to the RHS
+              RHS -= forceBC
+              bN = RHS
+              print('Residual 2-norm INITIAL + CURRENT state: ', np.linalg.norm(RHS))
               
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
@@ -486,9 +488,17 @@ if __name__ == '__main__':
               SOLT[sysDex,1] += sol
               print('Recover full linear solution vector... DONE!')
               
-              # Check residual
+              # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
+              # Set the boundary
+              WBC = dHdX * U[ubdex]
+              SOLT[wbdex,1] = WBC
+              
+              # Recover fields
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
+              # Set the output residual
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
@@ -520,6 +530,13 @@ if __name__ == '__main__':
        if LinearSolve or NonLinSolve:
               error = [np.linalg.norm(RHS)]
               for tt in range(len(TI)):
+                     
+                     if tt > 0:
+                            # Set the boundary
+                            fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                            WBC = dHdX * U[ubdex]
+                            SOLT[wbdex,0] = WBC
+                     
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
