@@ -229,22 +229,7 @@ if __name__ == '__main__':
        LPT = np.expand_dims(LPT, axis=1)
        LOGT = np.tile(LPT, NX+1)
        LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
-       
-       # Compute horizontal derivatives of background fields
-       '''
-       DUDX = np.zeros((NZ,NX+1))
-       DLPDX = np.zeros((NZ,NX+1))
-       DLTDX = np.zeros((NZ,NX+1))
-       for rr in range(NZ):
-              # Compute X derivative without constant offsets
-              DUDX[rr,:] = DDX_1D.dot(UZ[rr,:] - UZ[rr,0])
-              DLPDX[rr,:] = DDX_1D.dot(LOGP[rr,:] - LOGP[rr,0])
-              DLTDX[rr,:] = DDX_1D.dot(LOGT[rr,:] - LOGT[rr,0])
-              
-       DUDX = np.reshape(DUDX, (OPS,), order='F')
-       DLPDX = np.reshape(DLPDX, (OPS,), order='F')
-       DLPTDX = np.reshape(DLTDX, (OPS,), order='F')
-       '''       
+         
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
        DLTDZ = np.reshape(DLTDZ, (OPS,1), order='F')
@@ -321,6 +306,7 @@ if __name__ == '__main__':
        # Initialize the RHS
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+       
        bN = RHS
        
        print('Residual 2-norm CURRENT state: ', np.linalg.norm(RHS))
@@ -478,7 +464,7 @@ if __name__ == '__main__':
                      
               #%% Update the solution
               SOLT[sysDex,1] += sol
-              
+              '''
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
@@ -486,7 +472,7 @@ if __name__ == '__main__':
               WBC = dHdX * U[ubdex]
               SOLT[wbdex,1] = WBC
               del(WBC)
-              
+              '''
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               

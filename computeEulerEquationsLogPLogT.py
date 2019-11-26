@@ -242,21 +242,18 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        gam = PHYS[6]
        
        # Get the derivative operators
+       DQDZ = REFG[4]
        dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
+       #uxz = fields[:,0]
        wxz = fields[:,1]
-       if np.linalg.norm(wxz) < 1.0E-15:
-              print('Initial terrain forcing...')
-              wxz[botdex] = U[botdex] * dHdX
-              WXZ = wxz - U * DZDX
-              WXZ[botdex] *= 0.0
-       else:
-              WXZ = wxz - U * DZDX
-              WXZ[botdex] *= 0.0
+       #wxz[botdex] = U[botdex] * dHdX
+       WXZ = wxz - U * DZDX
+       #WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
@@ -264,7 +261,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
        # Get the static horizontal and vertical derivatives
-       DQDZ = REFG[4]
        wDQDZ = wxz.dot(DQDZ)
        
        # Compute derivative of perturbations
@@ -290,10 +286,12 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               # Potential Temperature equation
               DtDt = -(transport[:,3])
               
+              # Make boundary adjustments
               DwDt[topdex] *= 0.0
-              DwDt[botdex] *= 0.0
+              #DwDt[botdex] *= 0.0
+              DwDt[botdex] = dHdX * DuDt[botdex]
               DtDt[topdex] *= 0.0
-       
+              
               return (DuDt, DwDt, DpDt, DtDt)
                      
        return np.concatenate(DqDt())
