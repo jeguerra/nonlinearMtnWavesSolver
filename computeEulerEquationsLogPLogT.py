@@ -62,7 +62,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute terrain following terms
        wxz = np.array(fields[:,1])
+       #wxz[botdex] = U[botdex] * dHdX
        WXZ = wxz - U * DZDX
+       #WXZ[botdex] *= 0.0
        
        # WXZ vanishes when w vanishes (initial condition)
        if np.linalg.norm(wxz) < 1.0E-15:
@@ -250,7 +252,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Compute terrain following terms (two way assignment into fields)
        #uxz = fields[:,0]
-       wxz = fields[:,1]
+       wxz = np.array(fields[:,1])
        #wxz[botdex] = U[botdex] * dHdX
        WXZ = wxz - U * DZDX
        #WXZ[botdex] *= 0.0

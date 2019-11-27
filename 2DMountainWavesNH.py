@@ -104,8 +104,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 90
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -281,8 +281,7 @@ if __name__ == '__main__':
        ROPS = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
        REFG.append(ROPS)
        
-       # Initialize transient storage
-       SOLT = np.zeros((numVar * OPS, 2))
+       # Initialize hydrostatic background
        INIT = np.zeros((numVar * OPS,))
        RHS = np.zeros((numVar * OPS,))
        
@@ -295,17 +294,27 @@ if __name__ == '__main__':
        if isRestart:
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
-              SOLT[:,0] = SOLT[:,1]
+              # Copy last solution to current state
+              SOLT[:,0] = np.array(SOLT[:,1])
+              # Update boundary condition
+              WBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
+              SOLT[wbdex,1] = WBC
+              del(WBC)
        else:
+              # Initialize solution storage
+              SOLT = np.zeros((numVar * OPS, 2))
+              # Initialize boundary condition
+              WBC = dHdX * INIT[ubdex]
+              SOLT[wbdex,1] = WBC
+              del(WBC)
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
-              
-       # Initialize fields
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-       
+
        # Initialize the RHS
+       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+       del(U); del(fields)
        
        bN = RHS
        
@@ -314,7 +323,8 @@ if __name__ == '__main__':
        #% Compute the global LHS operator
        if (StaticSolve or LinearSolve):
               
-              # Test evaluation of full Jacobian... must match linearization on first iteration
+              # Test evaluation of FIRST Jacobian with/without boundary condition
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
                      
@@ -328,7 +338,7 @@ if __name__ == '__main__':
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
-              
+              '''
               # Set up the coupled boundary condition
               DHDX = sps.diags(dHdX, offsets=0, format='csr')
               (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
@@ -336,7 +346,7 @@ if __name__ == '__main__':
               (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
               (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
               del(DHDX)
-              
+              '''
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
               B = DOPS[1][:,wbcDex]
@@ -464,15 +474,7 @@ if __name__ == '__main__':
                      
               #%% Update the solution
               SOLT[sysDex,1] += sol
-                    
-              # Recover fields
-              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              
-              # Set the coupled boundary
-              WBC = dHdX * U[ubdex]
-              SOLT[wbdex,1] = WBC
-              del(WBC)
-              #'''
+
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
@@ -511,12 +513,6 @@ if __name__ == '__main__':
               error = [np.linalg.norm(RHS)]
               for tt in range(len(TI)):
                      
-                     if tt > 0:
-                            # Set the boundary
-                            fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                            WBC = dHdX * U[ubdex]
-                            SOLT[wbdex,0] = WBC
-                     
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
@@ -526,6 +522,11 @@ if __name__ == '__main__':
                      
                      SOLT[sysDex,0] = sol
                      RHS[sysDex] = rhs
+                     
+                     # Set the coupled boundary
+                     WBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
+                     SOLT[wbdex,0] = WBC
+                     del(WBC)
                      
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
