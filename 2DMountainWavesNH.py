@@ -464,15 +464,15 @@ if __name__ == '__main__':
                      
               #%% Update the solution
               SOLT[sysDex,1] += sol
-              '''
+                    
               # Recover fields
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
               # Set the coupled boundary
               WBC = dHdX * U[ubdex]
               SOLT[wbdex,1] = WBC
               del(WBC)
-              '''
+              #'''
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               

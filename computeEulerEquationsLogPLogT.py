@@ -243,7 +243,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Get the derivative operators
        DQDZ = REFG[4]
-       dHdX = REFS[6]
+       #dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -288,8 +288,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               
               # Make boundary adjustments
               DwDt[topdex] *= 0.0
-              #DwDt[botdex] *= 0.0
-              DwDt[botdex] = dHdX * DuDt[botdex]
+              DwDt[botdex] *= 0.0
               DtDt[topdex] *= 0.0
               
               return (DuDt, DwDt, DpDt, DtDt)

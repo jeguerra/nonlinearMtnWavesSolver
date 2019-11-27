@@ -31,8 +31,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        ttdex = np.add(utdex, iT * OPS)
        
        # Local block-wide indices
-       #rowsOutW = set(np.concatenate((ubdex, utdex)))
-       rowsOutW = set(utdex)
+       rowsOutW = set(np.concatenate((ubdex, utdex)))
        rowsOutT = set(utdex)
        rowsAll = set(np.array(range(0,OPS)))
        
