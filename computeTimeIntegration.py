@@ -18,7 +18,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
        sgs = 0.0
        def computeDynSGSUpdate():
               if DynSGS:
-                     fields, wxz, U, RdT = tendency.computePrepareFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     fields, wxz, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
                      rhs = rhsSGS[sysDex] 
@@ -78,7 +78,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        # Compute stages 1 - 5
        for ii in range(7):
               sol += c1 * DT * (RHS + SGS)
-              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS = computeRHSUpdate(fields, U, RdT)
               SGS = computeDynSGSUpdate(fields)
               
@@ -91,7 +91,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        # Compute stages 7 - 9
        for ii in range(2):
               sol += c1 * DT * (RHS + SGS)
-              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS = computeRHSUpdate(fields, U, RdT)
               SGS = computeDynSGSUpdate(fields)
               

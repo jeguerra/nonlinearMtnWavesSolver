@@ -9,7 +9,7 @@ import numpy as np
 import scipy.sparse as sps
 from numba import jit
 
-def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+def computeUpdatedFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
        # Get some physical quantities
        P0 = PHYS[1]
        Rd = PHYS[3]
@@ -25,6 +25,8 @@ def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       dHdX = REFS[6]
+       fields[botdex,1] = dHdX * np.array(fields[botdex,0])
        
        return fields, U, RdT
 

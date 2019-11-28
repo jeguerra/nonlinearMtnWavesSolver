@@ -523,11 +523,6 @@ if __name__ == '__main__':
                      SOLT[sysDex,0] = sol
                      RHS[sysDex] = rhs
                      
-                     # Set the coupled boundary
-                     WBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
-                     SOLT[wbdex,0] = WBC
-                     del(WBC)
-                     
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             err = np.linalg.norm(RHS)
