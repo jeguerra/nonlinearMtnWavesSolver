@@ -8,16 +8,39 @@ Created on Fri Jul 19 14:43:05 2019
 import sys
 import numpy as np
 import math as mt
+from scipy import signal
 
-def computeTopographyOnGrid(REFS, profile, opt):
+def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        
        # Get data from REFS
        xh = REFS[0]
        l2 = np.amax(xh)
        l1 = np.amin(xh)
+       numRL = 3 # number of Rayleigh width lengths to place the window function
+       r2 = l2 - numRL * latRayX
+       r1 = l1 + numRL * latRayX
+       
        DX = 50.0 # maximum resolution in meters
        NP = int((l2 - l1) / DX)
+       # Make this number odd... helps windowing
+       if NP % 2 == 0:
+              NP += 1
+              
        x = np.linspace(l1, l2, num=NP, endpoint=False)
+       
+       # Make a window function so that dhdx = 0 inside Rayleigh layers
+       condition1 = (x > r1)
+       condition2 = (x < r2)
+       condition = np.zeros(NP)
+       
+       for ii in range(NP):
+              condition[ii] = condition1[ii] == 1 and condition2[ii] == 1
+              
+       WP = len(np.extract(condition, x))
+       kaiserWin = signal.kaiser(WP+1, beta=10.0)
+       padP = NP - WP
+       padZ = np.zeros(int(padP / 2))
+       kaiserDom = np.concatenate((padZ, kaiserWin, padZ))
        
        # Evaluate the function with different options
        if profile == 1:
@@ -33,7 +56,7 @@ def computeTopographyOnGrid(REFS, profile, opt):
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(x, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * x), 2.0)
               ht3 = np.reciprocal((1.0 / aC)**2.0 * np.power(x, 2.0) + 1.0)
-              htfft = ht1 * ht2 * ht3
+              htfft = kaiserDom * (ht1 * ht2 * ht3)
               # Compute the slope field perfectly
               '''
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))

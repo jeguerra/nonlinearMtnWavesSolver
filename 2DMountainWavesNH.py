@@ -157,12 +157,12 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        #% Read in topography profile or compute from analytical function
-       AGNESI = 1 # "Witch of Agnesi" profil e
+       AGNESI = 1 # "Witch of Agnesi" profile
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT)
+       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT, width)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -296,25 +296,18 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               # Copy last solution to current state
               SOLT[:,0] = np.array(SOLT[:,1])
-              # Update boundary condition
-              WBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
-              SOLT[wbdex,1] = WBC
-              del(WBC)
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
-              # Initialize boundary condition
-              WBC = dHdX * INIT[ubdex]
-              SOLT[wbdex,1] = WBC
-              del(WBC)
+       
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
 
-       # Initialize the RHS
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-       RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-       del(U); del(fields)
+              # Initialize the RHS
+              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+              del(U); del(fields)
        
        bN = RHS
        
@@ -324,7 +317,7 @@ if __name__ == '__main__':
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of FIRST Jacobian with/without boundary condition
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
                      
@@ -472,9 +465,15 @@ if __name__ == '__main__':
                      del(factorDS_SC)
                      del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
-              #%% Update the solution
+              #%% Update the interior solution
               SOLT[sysDex,1] += sol
 
+              # Recover fields
+              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
+              # Update vertical velocity at boundary
+              SOLT[wbdex,1] = np.array(fields[ubdex,1])
+              
               # Recover fields
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               

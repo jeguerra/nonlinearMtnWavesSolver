@@ -25,8 +25,10 @@ def computeUpdatedFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       
+       # Update vertical velocity at the boundary
        dHdX = REFS[6]
-       fields[botdex,1] = dHdX * np.array(fields[botdex,0])
+       fields[botdex,1] = dHdX * np.array(U[botdex])
        
        return fields, U, RdT
 
@@ -63,10 +65,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        DZDX = REFS[15]
        
        # Compute terrain following terms
-       wxz = np.array(fields[:,1])
-       #wxz[botdex] = U[botdex] * dHdX
+       wxz = fields[:,1] #np.array(fields[:,1])
        WXZ = wxz - U * DZDX
-       #WXZ[botdex] *= 0.0
+       WXZ[botdex] *= 0.0
        
        # WXZ vanishes when w vanishes (initial condition)
        if np.linalg.norm(wxz) < 1.0E-15:
@@ -253,11 +254,9 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
-       #uxz = fields[:,0]
-       wxz = np.array(fields[:,1])
-       #wxz[botdex] = U[botdex] * dHdX
+       wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       #WXZ[botdex] *= 0.0
+       WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
