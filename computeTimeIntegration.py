@@ -80,7 +80,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
               sol += c1 * DT * (RHS + SGS)
               fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               RHS = computeRHSUpdate(fields, U, RdT)
-              SGS = computeDynSGSUpdate(fields)
+              #SGS = computeDynSGSUpdate(fields)
               
               if ii == 1:
                      SOLT[:,1] = sol

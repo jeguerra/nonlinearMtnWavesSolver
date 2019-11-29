@@ -188,7 +188,7 @@ if __name__ == '__main__':
        SENSIBLE = 1
        POTENTIAL = 2
        # Map the sounding to the computational vertical grid [0 H]
-       TofZ, dTdz = computeTemperatureProfileOnGrid(Z_in, T_in, REFS)
+       TofZ, dTdz = computeTemperatureProfileOnGrid(Z_in, T_in, REFS, True)
        # Compute background fields on the vertical
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
               computeThermoMassFields(PHYS, DIMS, REFS, TofZ, dTdz, SENSIBLE)
