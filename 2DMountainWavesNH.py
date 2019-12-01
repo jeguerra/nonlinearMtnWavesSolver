@@ -179,7 +179,7 @@ if __name__ == '__main__':
        DZ = np.mean(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, sysDex, vbcDex, wbcDex, tbcDex = \
+       ubdex, utdex, wbdex, pbdex, tbdex, sysDex, wbcDex, tbcDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -308,7 +308,45 @@ if __name__ == '__main__':
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               del(U); del(fields)
-       
+              '''
+              plt.figure()
+              plt.plot(RHS[udex], 'k-')
+              plt.figure()
+              plt.plot(RHS[wdex], 'k-')
+              plt.figure()
+              plt.plot(RHS[pdex], 'k-')
+              plt.figure()
+              plt.plot(RHS[tdex], 'k-')
+              plt.figure()
+              plt.plot(RHS, 'k-')
+              plt.show()
+              '''
+              '''
+              # Fix initial condition to RHS
+              WBC = dHdX * INIT[ubdex]
+              zdiff = ZTL[1,:] - ZTL[0,:]
+              RHS[ubdex] = -WBC * DQDZ[ubdex,0]
+              RHS[wbdex] = -WBC * WBC * np.reciprocal(zdiff)
+              RHS[pbdex] = -WBC * DQDZ[ubdex,2] - gam * dHdX * DQDZ[ubdex,0] + gam * WBC * np.reciprocal(zdiff)
+              RHS[tbdex] = -WBC * DQDZ[ubdex,3]
+              del(WBC)
+              
+              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              RHS1 = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS1 += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+              del(U); del(fields)
+              
+              plt.figure()
+              plt.plot(RHS, 'k-'); plt.plot(RHS1, 'b--')
+              
+              plt.figure()
+              plt.plot(REFS[0], RHS[ubdex], 'k-', REFS[0], RHS1[ubdex], 'b--')
+              plt.figure()
+              plt.plot(REFS[0], RHS[pbdex], 'k-', REFS[0], RHS1[pbdex], 'b--')
+              plt.figure()
+              plt.plot(REFS[0], RHS[tbdex], 'k-', REFS[0], RHS1[tbdex], 'b--')
+              plt.show()
+              '''
        bN = RHS
        
        print('Residual 2-norm CURRENT state: ', np.linalg.norm(RHS))
@@ -320,7 +358,7 @@ if __name__ == '__main__':
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
-              del(U); del(fields)
+              #del(U); del(fields)
                      
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -474,11 +512,11 @@ if __name__ == '__main__':
               
               # Update vertical velocity at boundary
               SOLT[wbdex,1] = np.array(fields[ubdex,1])
-              
-              # Recover fields
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              
+              del(U); del(fields)
               print('Recover full linear solution vector... DONE!')
+              
+              #%% Set the output residual to next iteration
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
               # Set the output residual
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)

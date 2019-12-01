@@ -7,7 +7,7 @@ Created on Mon Jul 22 13:11:11 2019
 """
 import numpy as np
 import scipy.sparse as sps
-from numba import jit
+import matplotlib.pyplot as plt
 
 def computeUpdatedFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
        # Get some physical quantities
@@ -29,6 +29,9 @@ def computeUpdatedFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        # Update vertical velocity at the boundary
        dHdX = REFS[6]
        fields[botdex,1] = dHdX * np.array(U[botdex])
+       # Update vertical velocity on ALL terrain following surfaces
+       #DZDX = REFS[15]
+       #fields[:,1] = DZDX * np.array(U)
        
        return fields, U, RdT
 
@@ -67,7 +70,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute terrain following terms
        wxz = fields[:,1] #np.array(fields[:,1])
        WXZ = wxz - U * DZDX
-       WXZ[botdex] *= 0.0
        
        # WXZ vanishes when w vanishes (initial condition)
        if np.linalg.norm(wxz) < 1.0E-15:
@@ -256,7 +258,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
@@ -273,7 +274,12 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        UDqDx = U.dot(DqDx)
        WDqDz = WXZ.dot(DqDz)
        transport = UDqDx + WDqDz + wDQDZ
-       
+       '''
+       plt.figure()
+       plt.plot(DqDz[botdex,1])
+       plt.figure()
+       plt.plot(wDQDZ[botdex,2])
+       '''
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
        PGFZ = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc

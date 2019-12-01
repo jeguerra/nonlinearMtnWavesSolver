@@ -41,7 +41,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC: w' = dh/dx (U + u') so that w' is at top and bottom boundaries
        rowsOutBC = set(np.concatenate((wbdex, wtdex, ttdex)))
        # DOF along the vertical boundaries
-       rowsInterior = set(np.concatenate((ubdex, utdex, wbdex, wtdex, pbdex, ptdex, tbdex, ttdex)))
+       #rowsInterior = set(np.concatenate((ubdex, utdex, wbdex, wtdex, pbdex, ptdex, tbdex, ttdex)))
        # All DOF
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
@@ -50,6 +50,6 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        sysDex = sorted(sysDex)
        
        # Get index array for DOF along vertical boundaries
-       vbcDex = sorted(rowsInterior)
+       #vbcDex = sorted(rowsInterior)
        
-       return ubdex, utdex, wbdex, sysDex, vbcDex, wbcDex, tbcDex
+       return ubdex, utdex, wbdex, pbdex, tbdex, sysDex, wbcDex, tbcDex
