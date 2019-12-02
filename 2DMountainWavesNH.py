@@ -294,8 +294,6 @@ if __name__ == '__main__':
        if isRestart:
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
-              # Copy last solution to current state
-              SOLT[:,0] = np.array(SOLT[:,1])
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -350,6 +348,7 @@ if __name__ == '__main__':
        bN = RHS
        
        print('Residual 2-norm CURRENT state: ', np.linalg.norm(RHS))
+       del(RHS)
        
        #% Compute the global LHS operator
        if (StaticSolve or LinearSolve):
@@ -358,7 +357,7 @@ if __name__ == '__main__':
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
-              #del(U); del(fields)
+              del(U); del(fields)
                      
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -370,7 +369,7 @@ if __name__ == '__main__':
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
-              #'''
+              '''
               # Set up the coupled boundary condition
               DHDX = sps.diags(dHdX, offsets=0, format='csr')
               (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
@@ -378,7 +377,7 @@ if __name__ == '__main__':
               (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
               (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
               del(DHDX)
-              #'''
+              '''
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
               B = DOPS[1][:,wbcDex]
@@ -427,6 +426,7 @@ if __name__ == '__main__':
                      f1 = np.concatenate((bN[udex], fw[wbcDex]))
                      ft = bN[tdex]
                      f2 = np.concatenate((bN[pdex], ft[tbcDex]))
+                     del(bN)
                      
               if LinearSolve or (StaticSolve and SolveFull):
                      # Compute the global linear operator
@@ -505,39 +505,39 @@ if __name__ == '__main__':
                      del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
               #%% Update the interior solution
-              SOLT[sysDex,1] += sol
+              SOLT[sysDex,0] += sol
 
               # Recover fields
-              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
               # Update vertical velocity at boundary
-              SOLT[wbdex,1] = np.array(fields[ubdex,1])
+              SOLT[wbdex,0] = np.array(fields[ubdex,1])
               del(U); del(fields)
               print('Recover full linear solution vector... DONE!')
               
               #%% Set the output residual to next iteration
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
               # Set the output residual
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               print('Residual 2-norm AFTER linear solve: ', np.linalg.norm(RHS))
-              
-              #%% Use the linear solution as the initial guess to the nonlinear solution
               '''
+              #%% Use the linear solution as the initial guess to the nonlinear solution
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
               SOLT[:,1] = sol
-              '''
-              # Compare the linear and nonlinear solutions
-              DSOL = np.array(SOLT[:,1] - SOLT[:,0])
-              print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
-              '''
+              
               # Initialize the RHS and forcing for each field
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-              print('Residual 2-norm after NL solve: ', np.linalg.norm(RHS))
+              print('Residual 2-norm after iterative NL solve: ', np.linalg.norm(RHS))
               '''
+              # Compare the linear and nonlinear solutions
+              DSOL = np.array(SOLT[:,0] - SOLT[:,1])
+              print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
+              # Copy state instance 0 to 1
+              SOLT[:,1] = np.array(SOLT[:,0])
        #%% Transient solutions       
        elif LinearSolve:
               RHS[sysDex] = bN

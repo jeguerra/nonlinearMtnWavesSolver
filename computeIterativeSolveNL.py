@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import scipy.optimize as opt
 import scipy.sparse.linalg as spl
 import computeEulerEquationsLogPLogT as tendency
+from computeResidualViscCoeffs import computeResidualViscCoeffs
 
 def pause():
     input("Press the <ENTER> key to continue...")
@@ -22,6 +23,9 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, fields, botdex, topdex)
+              
+              RESCF = computeResidualViscCoeffs(sol, rhs, DX, DZ, udex, wdex, pdex, tdex)
+              rhs += tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
        
               return rhs
        
@@ -49,7 +53,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
        '''
        jac_options = {'jdv':computeJacVecUpdate, \
                       'method':'gmres', \
-                      'inner_maxiter':1000, \
+                      'inner_maxiter':2000, \
                       'outer_k':2}
        sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
                                   jacobian=KrylovDirectJacobian(**jac_options),
