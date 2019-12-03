@@ -303,7 +303,7 @@ if __name__ == '__main__':
               TI = np.array(np.arange(DT, ET, DT))
 
               # Initialize the RHS
-              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               '''
@@ -546,6 +546,7 @@ if __name__ == '__main__':
                                           
        #%% Start the time loop
        if LinearSolve or NonLinSolve:
+              intMethodOrder = 3
               error = [np.linalg.norm(RHS)]
               for tt in range(len(TI)):
                      # Print out diagnostics every OTI steps
@@ -582,7 +583,7 @@ if __name__ == '__main__':
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
                             sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff, intMethodOrder)
                      
                      SOLT[sysDex,0] = sol
                      RHS[sysDex] = rhs

@@ -53,7 +53,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -75,46 +75,44 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
               return rhs
        #'''
        #%% THE KETCHENSON SSP(9,3) METHOD
-       # Compute stages 1 - 5
-       for ii in range(7):
-              sol += c1 * DT * (RHS + SGS)
-              fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              RHS = computeRHSUpdate(fields, U, RdT)
-              if ii < 3:
+       if order == 3:
+              # Compute stages 1 - 5
+              for ii in range(7):
+                     sol += c1 * DT * (RHS + SGS)
+                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     RHS = computeRHSUpdate(fields, U, RdT)
+                     
+                     if ii == 1:
+                            SOLT[:,1] = sol
+                     
+              # Compute stage 6 with linear combination
+              sol = c2 * (3.0 * SOLT[:,1] + 2.0 * sol)
+              
+              # Compute stages 7 - 9 (diffusion applied here)
+              for ii in range(2):
+                     sol += c1 * DT * (RHS + SGS)
+                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     RHS = computeRHSUpdate(fields, U, RdT)
                      SGS = computeDynSGSUpdate(fields)
-              else:
-                     SGS = 0.0
-              
-              if ii == 1:
-                     SOLT[:,1] = sol
-              
-       # Compute stage 6 with linear combination
-       sol = c2 * (3.0 * SOLT[:,1] + 2.0 * sol)
-       
-       # Compute stages 7 - 9
-       for ii in range(2):
-              sol += c1 * DT * (RHS + SGS)
-              fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              RHS = computeRHSUpdate(fields, U, RdT)
-              #SGS = computeDynSGSUpdate(fields)
-              
-       #'''
        
        #%% THE KETCHENSON SSP(10,4) METHOD
-       '''
-       SOLT[:,1] = SOLT[:,0]
-       for ii in range(1,6):
-              sol += c1 * DT * RHS
-              RHS = computeRHSUpdate()
-       
-       SOLT[:,1] = 0.04 * SOLT[:,1] + 0.36 * sol
-       sol = 15.0 * SOLT[:,1] - 5.0 * sol
-       
-       for ii in range(6,10):
-              sol += c1 * DT * RHS
-              RHS = computeRHSUpdate()
+       elif order == 4:
+              SOLT[:,1] = SOLT[:,0]
+              for ii in range(1,6):
+                     sol += c1 * DT * (RHS + SGS)
+                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     RHS = computeRHSUpdate(fields, U, RdT)
               
-       sol = SOLT[:,1] + 0.6 * sol + 0.1 * DT * RHS
-       computeRHSUpdate()
-       '''
+              SOLT[:,1] = 0.04 * SOLT[:,1] + 0.36 * sol
+              sol = 15.0 * SOLT[:,1] - 5.0 * sol
+              
+              for ii in range(6,10):
+                     sol += c1 * DT * (RHS + SGS)
+                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     RHS = computeRHSUpdate(fields, U, RdT)
+                     SGS = computeDynSGSUpdate(fields)
+                     
+              sol = SOLT[:,1] + 0.6 * sol + 0.1 * DT * RHS
+              computeRHSUpdate()
+              
        return sol, RHS

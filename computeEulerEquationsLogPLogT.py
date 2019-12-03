@@ -9,6 +9,37 @@ import numpy as np
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
+def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+       # Get some physical quantities
+       P0 = PHYS[1]
+       Rd = PHYS[3]
+       kap = PHYS[4]
+       
+       TQ = SOLT + INIT
+       # Make the total quatities
+       U = TQ[udex]
+       LP = TQ[pdex]
+       LT = TQ[tdex]
+       
+       # Compute the sensible temperature scaling to PGF
+       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
+       
+       fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       
+       # Update vertical velocity at the boundary
+       dHdX = REFS[6]
+       fields[botdex,1] = dHdX * np.array(U[botdex])
+       # Make a smooth vertical decay for the input W
+       ZTL = REFS[5]
+       zeroLev = 4
+       DZ = ZTL[zeroLev,:] - ZTL[0,:]
+       for kk in range(1,zeroLev):
+              normZlev = ZTL[kk,:] * np.reciprocal(DZ)
+              fields[botdex+kk,1] = np.power(normZlev - 1.0, 4.0) * \
+                                    np.array(fields[botdex,1])
+       
+       return fields, U, RdT
+
 def computeUpdatedFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
        # Get some physical quantities
        P0 = PHYS[1]
