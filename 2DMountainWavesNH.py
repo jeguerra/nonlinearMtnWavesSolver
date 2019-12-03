@@ -105,7 +105,7 @@ if __name__ == '__main__':
        L1 = -L2
        ZH = 36000.0
        NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 90
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -294,6 +294,7 @@ if __name__ == '__main__':
        if isRestart:
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -305,7 +306,6 @@ if __name__ == '__main__':
               fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-              del(U); del(fields)
               '''
               plt.figure()
               plt.plot(RHS[udex], 'k-')
@@ -348,13 +348,11 @@ if __name__ == '__main__':
        bN = RHS
        
        print('Residual 2-norm CURRENT state: ', np.linalg.norm(RHS))
-       del(RHS)
        
        #% Compute the global LHS operator
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of FIRST Jacobian with/without boundary condition
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               del(U); del(fields)
@@ -369,7 +367,7 @@ if __name__ == '__main__':
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
-              '''
+              #'''
               # Set up the coupled boundary condition
               DHDX = sps.diags(dHdX, offsets=0, format='csr')
               (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
@@ -377,7 +375,7 @@ if __name__ == '__main__':
               (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
               (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
               del(DHDX)
-              '''
+              #'''
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
               B = DOPS[1][:,wbcDex]
@@ -550,17 +548,6 @@ if __name__ == '__main__':
        if LinearSolve or NonLinSolve:
               error = [np.linalg.norm(RHS)]
               for tt in range(len(TI)):
-                     
-                     # Compute the SSPRK93 stages at this time step
-                     if LinearSolve:
-                            # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
-                     elif NonLinSolve:
-                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
-                     
-                     SOLT[sysDex,0] = sol
-                     RHS[sysDex] = rhs
-                     
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             err = np.linalg.norm(RHS)
@@ -575,8 +562,6 @@ if __name__ == '__main__':
                      if tt % ITI == 0:
                             fig = plt.figure(figsize=(10.0, 6.0))
                             # Check the tendencies
-                            #plt.xlim(-30, 30)
-                            #plt.ylim(0, 25)
                             for pp in range(4):
                                    plt.subplot(2,2,pp+1)
                                    if pp == 0:
@@ -591,6 +576,16 @@ if __name__ == '__main__':
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
                                    cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
+                     
+                     # Compute the SSPRK93 stages at this time step
+                     if LinearSolve:
+                            # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
+                            sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     elif NonLinSolve:
+                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                     
+                     SOLT[sysDex,0] = sol
+                     RHS[sysDex] = rhs
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])
