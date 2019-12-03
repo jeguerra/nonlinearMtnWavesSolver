@@ -6,6 +6,7 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
+import math as mt
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
@@ -32,10 +33,15 @@ def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        # Make a smooth vertical decay for the input W
        ZTL = REFS[5]
        zeroLev = 4
+       p = 4
        DZ = ZTL[zeroLev,:] - ZTL[0,:]
-       for kk in range(1,zeroLev):
+       for kk in range(1,zeroLev+1):
               normZlev = ZTL[kk,:] * np.reciprocal(DZ)
-              fields[botdex+kk,1] = np.power(normZlev - 1.0, 4.0) * \
+              # Polynomial decay
+              #fields[botdex+kk,1] = np.power(normZlev - 1.0, p) * \
+              #                      np.array(fields[botdex,1])
+              # Polynomial cosine decay
+              fields[botdex+kk,1] = np.power(np.cos(0.5 * mt.pi * normZlev), p) * \
                                     np.array(fields[botdex,1])
        
        return fields, U, RdT
