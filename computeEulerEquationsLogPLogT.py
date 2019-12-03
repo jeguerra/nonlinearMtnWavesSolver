@@ -30,19 +30,25 @@ def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        # Update vertical velocity at the boundary
        dHdX = REFS[6]
        fields[botdex,1] = dHdX * np.array(U[botdex])
+       #plt.figure()
+       #plt.plot(fields[botdex,1])
        # Make a smooth vertical decay for the input W
        ZTL = REFS[5]
-       zeroLev = 4
+       zeroLev = 10
        p = 4
        DZ = ZTL[zeroLev,:] - ZTL[0,:]
        for kk in range(1,zeroLev+1):
               normZlev = ZTL[kk,:] * np.reciprocal(DZ)
               # Polynomial decay
-              #fields[botdex+kk,1] = np.power(normZlev - 1.0, p) * \
-              #                      np.array(fields[botdex,1])
-              # Polynomial cosine decay
-              fields[botdex+kk,1] = np.power(np.cos(0.5 * mt.pi * normZlev), p) * \
+              fields[botdex+kk,1] = np.power(normZlev - 1.0, p) * \
                                     np.array(fields[botdex,1])
+              # Polynomial cosine decay
+              #fields[botdex+kk,1] = np.power(np.cos(0.5 * mt.pi * normZlev), p) * \
+              #                      np.array(fields[botdex,1])
+              
+              #plt.plot(fields[botdex+kk,1])
+              
+       #plt.show()
        
        return fields, U, RdT
 
@@ -139,8 +145,10 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
+       IRdT_bar = np.reciprocal(RdT_bar)
        T_prime = (1.0 / Rd) * (RdT - RdT_bar[:,0])
        RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
+       IRdT_barM = sps.diags(IRdT_bar[:,0], offsets=0, format='csr')
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
        PtPxM = sps.diags(PtPx, offsets=0, format='csr')
@@ -166,7 +174,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD24 = RdTM.dot(DlpDzM) - gc * unit
        
        LD31 = gam * PPXM + PlpPxM
-       LD32 = gam * DDZM + DlpDzM + DLPDZM
+       LD32 = gam * DDZM + DlpDzM - gc * IRdT_barM #+ DLPDZM
        LD33 = UPXM
        LD34 = None
        
@@ -305,7 +313,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
-       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
+       PGFZ = RdT * DqDz[:,2]
 
        def DqDt():
               # Horizontal momentum equation
