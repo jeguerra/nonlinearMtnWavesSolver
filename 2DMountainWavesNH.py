@@ -74,9 +74,9 @@ def getFromRestart(name, ET, NX, NZ, StaticSolve):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
+       NonLinSolve = True
        
        # Set residual diffusion switch
        ResDiff = False
@@ -105,7 +105,7 @@ if __name__ == '__main__':
        L1 = -L2
        ZH = 36000.0
        NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NZ = 90
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -207,15 +207,18 @@ if __name__ == '__main__':
        dUdz = np.expand_dims(dUdz, axis=1)
        DUDZ = np.tile(dUdz, NX+1)
        DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       dlnPdz = np.expand_dims(dlnPdz, axis=1)
-       DLPDZ = np.tile(dlnPdz, NX+1)
-       DLPDZ = computeColumnInterp(DIMS, REFS[1], dlnPdz, 0, ZTL, DLPDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       dlnPTdz = np.expand_dims(dlnPTdz, axis=1)
-       DLPTDZ = np.tile(dlnPTdz, NX+1)
-       DLPTDZ = computeColumnInterp(DIMS, REFS[1], dlnPTdz, 0, ZTL, DLPTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       
+       # Compute thermodynamic gradients (based on a given T(z))
+       Tbar = np.expand_dims(TofZ, axis=1)
+       TZ = np.tile(Tbar, NX+1)
+       TZ = computeColumnInterp(DIMS, REFS[1], Tbar, 0, ZTL, TZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        dlnTDz = np.expand_dims(dTdz * np.reciprocal(TofZ), axis=1)
        DLTDZ = np.tile(dlnTDz, NX+1)
        DLTDZ = computeColumnInterp(DIMS, REFS[1], dlnTDz, 0, ZTL, DLTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       
+       DLPDZ = -gc / Rd * np.reciprocal(TZ)
+       DLPTDZ = DLTDZ - Kp * DLPDZ
+       
        # Compute the background (initial) fields
        POR = np.expand_dims(POR, axis=1)
        PORZ = np.tile(POR, NX+1)
@@ -577,6 +580,8 @@ if __name__ == '__main__':
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
                                    cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
+                            
+                     #sys.exit(2)
                      
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:

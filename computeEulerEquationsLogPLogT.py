@@ -145,10 +145,8 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
-       IRdT_bar = np.reciprocal(RdT_bar)
        T_prime = (1.0 / Rd) * (RdT - RdT_bar[:,0])
        RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
-       IRdT_barM = sps.diags(IRdT_bar[:,0], offsets=0, format='csr')
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
        PtPxM = sps.diags(PtPx, offsets=0, format='csr')
@@ -174,7 +172,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD24 = RdTM.dot(DlpDzM) - gc * unit
        
        LD31 = gam * PPXM + PlpPxM
-       LD32 = gam * DDZM + DlpDzM - gc * IRdT_barM #+ DLPDZM
+       LD32 = gam * DDZM + DlpDzM + DLPDZM
        LD33 = UPXM
        LD34 = None
        
