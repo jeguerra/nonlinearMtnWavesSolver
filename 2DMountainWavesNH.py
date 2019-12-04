@@ -285,7 +285,7 @@ if __name__ == '__main__':
        if isRestart:
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -293,62 +293,65 @@ if __name__ == '__main__':
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
 
-              # Initialize the RHS
-              fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-              '''
-              plt.figure()
-              plt.plot(RHS[udex], 'k-')
-              plt.figure()
-              plt.plot(RHS[wdex], 'k-')
-              plt.figure()
-              plt.plot(RHS[pdex], 'k-')
-              plt.figure()
-              plt.plot(RHS[tdex], 'k-')
-              plt.figure()
-              plt.plot(RHS, 'k-')
-              plt.show()
-              '''
-              '''
-              # Fix initial condition to RHS
-              WBC = dHdX * INIT[ubdex]
-              zdiff = ZTL[1,:] - ZTL[0,:]
-              RHS[ubdex] = -WBC * DQDZ[ubdex,0]
-              RHS[wbdex] = -WBC * WBC * np.reciprocal(zdiff)
-              RHS[pbdex] = -WBC * DQDZ[ubdex,2] - gam * dHdX * DQDZ[ubdex,0] + gam * WBC * np.reciprocal(zdiff)
-              RHS[tbdex] = -WBC * DQDZ[ubdex,3]
-              del(WBC)
-              
-              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS1 = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS1 += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-              del(U); del(fields)
-              
-              plt.figure()
-              plt.plot(RHS, 'k-'); plt.plot(RHS1, 'b--')
-              
-              plt.figure()
-              plt.plot(REFS[0], RHS[ubdex], 'k-', REFS[0], RHS1[ubdex], 'b--')
-              plt.figure()
-              plt.plot(REFS[0], RHS[pbdex], 'k-', REFS[0], RHS1[pbdex], 'b--')
-              plt.figure()
-              plt.plot(REFS[0], RHS[tbdex], 'k-', REFS[0], RHS1[tbdex], 'b--')
-              plt.show()
-              '''
-       bN = RHS
+       '''
+       plt.figure()
+       plt.plot(RHS[udex], 'k-')
+       plt.figure()
+       plt.plot(RHS[wdex], 'k-')
+       plt.figure()
+       plt.plot(RHS[pdex], 'k-')
+       plt.figure()
+       plt.plot(RHS[tdex], 'k-')
+       plt.figure()
+       plt.plot(RHS, 'k-')
+       plt.show()
+       '''
+       '''
+       # Fix initial condition to RHS
+       WBC = dHdX * INIT[ubdex]
+       zdiff = ZTL[1,:] - ZTL[0,:]
+       RHS[ubdex] = -WBC * DQDZ[ubdex,0]
+       RHS[wbdex] = -WBC * WBC * np.reciprocal(zdiff)
+       RHS[pbdex] = -WBC * DQDZ[ubdex,2] - gam * dHdX * DQDZ[ubdex,0] + gam * WBC * np.reciprocal(zdiff)
+       RHS[tbdex] = -WBC * DQDZ[ubdex,3]
+       del(WBC)
        
-       print('Residual 2-norm CURRENT state: ', np.linalg.norm(RHS))
+       fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       RHS1 = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+       RHS1 += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+       del(U); del(fields)
        
-       #% Compute the global LHS operator
+       plt.figure()
+       plt.plot(RHS, 'k-'); plt.plot(RHS1, 'b--')
+       
+       plt.figure()
+       plt.plot(REFS[0], RHS[ubdex], 'k-', REFS[0], RHS1[ubdex], 'b--')
+       plt.figure()
+       plt.plot(REFS[0], RHS[pbdex], 'k-', REFS[0], RHS1[pbdex], 'b--')
+       plt.figure()
+       plt.plot(REFS[0], RHS[tbdex], 'k-', REFS[0], RHS1[tbdex], 'b--')
+       plt.show()
+       '''
+       
+       #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of FIRST Jacobian with/without boundary condition
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               del(U); del(fields)
-                     
               print('Compute Jacobian operator blocks: DONE!')
+              
+              # Compute the RHS and set current boundary condition
+              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              SOLT[wbdex,0] = np.array(fields[ubdex,1])
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+              del(U); del(fields)
+              print('Residual 2-norm CURRENT state: ', np.linalg.norm(RHS))
+              
+              bN = np.array(RHS)
               
               # Convert blocks to 'lil' format for indexing
               DOPS = []
@@ -358,7 +361,7 @@ if __name__ == '__main__':
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
-              #'''
+              '''
               # Set up the coupled boundary condition
               DHDX = sps.diags(dHdX, offsets=0, format='csr')
               (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
@@ -366,7 +369,7 @@ if __name__ == '__main__':
               (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
               (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
               del(DHDX)
-              #'''
+              '''
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
               B = DOPS[1][:,wbcDex]
@@ -495,16 +498,17 @@ if __name__ == '__main__':
                      
               #%% Update the interior solution
               SOLT[sysDex,0] += sol
-
+              '''
               # Recover fields
               fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
               # Update vertical velocity at boundary
               SOLT[wbdex,0] = np.array(fields[ubdex,1])
               del(U); del(fields)
+              '''
               print('Recover full linear solution vector... DONE!')
               
-              #%% Set the output residual to next iteration
+              #%% Check the output residual
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
               # Set the output residual
