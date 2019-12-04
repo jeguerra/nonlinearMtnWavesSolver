@@ -11,6 +11,8 @@ def computeTemperatureProfileOnGrid(Z_in, T_in, REFS, isSmooth):
        
        # Get REFS data
        z = REFS[1]
+       ZTL = REFS[5]
+       NC = len(ZTL[0,:])
        
        if isSmooth:
               ZTP = Z_in[1] # tropopause height
@@ -38,29 +40,36 @@ def computeTemperatureProfileOnGrid(Z_in, T_in, REFS, isSmooth):
               
               coeffs = np.linalg.solve(VandermondeM, VRHS)
               
-              # Evaluate the polynomial and derivative (lapse rates)
-              TZ = TS + DTS * z + coeffs[0] * np.power(z,2) \
-                                + coeffs[1] * np.power(z,3) \
-                                + coeffs[2] * np.power(z,4) \
-                                + coeffs[3] * np.power(z,5)
-                                
-              DTDZ = DTS + (2 * coeffs[0] * z) \
-                         + (3 * coeffs[1] * np.power(z,2)) \
-                         + (4 * coeffs[2] * np.power(z,3)) \
-                         + (5 * coeffs[3] * np.power(z,4))
+              # Loop over each column and evaluate interpolant
+              TZ = np.zeros(ZTL.shape)
+              DTDZ = np.zeros(ZTL.shape)
+              for cc in range(NC):
+                     zcol = ZTL[:,cc]
+                     # Evaluate the polynomial and derivative (lapse rates)
+                     TZ[:,cc] = TS + DTS * zcol + coeffs[0] * np.power(zcol,2) \
+                                       + coeffs[1] * np.power(zcol,3) \
+                                       + coeffs[2] * np.power(zcol,4) \
+                                       + coeffs[3] * np.power(zcol,5)
+                                       
+                     DTDZ[:,cc] = DTS + (2 * coeffs[0] * zcol) \
+                                + (3 * coeffs[1] * np.power(zcol,2)) \
+                                + (4 * coeffs[2] * np.power(zcol,3)) \
+                                + (5 * coeffs[3] * np.power(zcol,4))
        else:
-              # Get the 1D linear interpolation for this sounding
-              TZ = np.interp(z, Z_in, T_in)
-              
-              # Get piece-wise derivatives
-              DTDZ = np.zeros(len(z))
-              # Loop over layers
-              for pp in range(len(Z_in) - 1):
-                     # Local lapse rate
-                     LR = (T_in[pp+1] - T_in[pp]) / (Z_in[pp+1] - Z_in[pp])
-                     # Loop over the layer
-                     for kk in range(len(z)):
-                            if (z[kk] >= Z_in[pp]) and (z[kk] <= Z_in[pp+1]):
-                                   DTDZ[kk] = LR
+              # Loop over each column and evaluate interpolant
+              TZ = np.zeros(ZTL.shape)
+              DTDZ = np.zeros(ZTL.shape)
+              for cc in range(NC):
+                     zcol = ZTL[:,cc]
+                     # Get the 1D linear interpolation for this sounding
+                     TZ[:,cc] = np.interp(zcol, Z_in, T_in)
+                     # Get piece-wise derivatives, loop over layers
+                     for pp in range(len(Z_in) - 1):
+                            # Local lapse rate
+                            LR = (T_in[pp+1] - T_in[pp]) / (Z_in[pp+1] - Z_in[pp])
+                            # Loop over the layer
+                            for kk in range(len(zcol)):
+                                   if (z[kk] >= Z_in[pp]) and (z[kk] <= Z_in[pp+1]):
+                                          DTDZ[kk,cc] = LR
        
        return TZ, DTDZ

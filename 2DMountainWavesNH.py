@@ -74,9 +74,9 @@ def getFromRestart(name, ET, NX, NZ, StaticSolve):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
+       NonLinSolve = False
        
        # Set residual diffusion switch
        ResDiff = False
@@ -187,15 +187,12 @@ if __name__ == '__main__':
        Z_in = [0.0, 1.1E4, 2.0E4, 3.6E4]
        SENSIBLE = 1
        POTENTIAL = 2
-       # Map the sounding to the computational vertical grid [0 H]
-       TofZ, dTdz = computeTemperatureProfileOnGrid(Z_in, T_in, REFS, True)
-       # Compute background fields on the vertical
+       # Map the sounding to the computational vertical 2D grid [0 H]
+       TZ, DTDZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS, True)
+       
+       # Compute background fields on the reference column
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TofZ, dTdz, SENSIBLE)
-              
-       # Compute the ratio of pressure to density or (Rd * T(z))
-       #POR = PZ * np.reciprocal(RHO)
-       POR = Rd * TofZ
+              computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE)
        
        # Read in or compute background horizontal wind profile
        MEANJET = 1 # Analytical smooth jet profile
@@ -207,22 +204,13 @@ if __name__ == '__main__':
        dUdz = np.expand_dims(dUdz, axis=1)
        DUDZ = np.tile(dUdz, NX+1)
        DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       
-       # Compute thermodynamic gradients (based on a given T(z))
-       Tbar = np.expand_dims(TofZ, axis=1)
-       TZ = np.tile(Tbar, NX+1)
-       TZ = computeColumnInterp(DIMS, REFS[1], Tbar, 0, ZTL, TZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       dlnTDz = np.expand_dims(dTdz * np.reciprocal(TofZ), axis=1)
-       DLTDZ = np.tile(dlnTDz, NX+1)
-       DLTDZ = computeColumnInterp(DIMS, REFS[1], dlnTDz, 0, ZTL, DLTDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       
+       # Compute thermodynamic gradients (no interpolation!)
+       PORZ = Rd * TZ
        DLPDZ = -gc / Rd * np.reciprocal(TZ)
+       DLTDZ = np.reciprocal(TZ) * DTDZ
        DLPTDZ = DLTDZ - Kp * DLPDZ
        
        # Compute the background (initial) fields
-       POR = np.expand_dims(POR, axis=1)
-       PORZ = np.tile(POR, NX+1)
-       PORZ = computeColumnInterp(DIMS, REFS[1], POR, 0, ZTL, PORZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        U = np.expand_dims(U, axis=1)
        UZ = np.tile(U, NX+1)
        UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, '1DtoTerrainFollowingCheb')
@@ -478,7 +466,7 @@ if __name__ == '__main__':
                      #alpha = umfpack(um.UMFPACK_A, DS, CS, autoTranspose = True)
                      DS_SC = -BS.dot(alpha)
                      DS_SC += AS
-                     print('Compute Schur Complement of D')
+                     print('Compute Schur Complement of D... DONE!')
                      del(AS)
                      del(alpha)
                      factorDS_SC = dsl.lu_factor(DS_SC)
