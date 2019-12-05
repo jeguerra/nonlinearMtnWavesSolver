@@ -115,8 +115,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 90
+       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -331,14 +331,17 @@ if __name__ == '__main__':
               (DOPS[4])[:,ubdex] += ((DOPS[5])[:,ubdex]).dot(DHDX)
               (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
               (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
+              del(DHDX)
               
-              WBC = U[ubdex] * dHdX
-              RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-              RHS[wdex] -= ((DOPS[5])[:,ubdex]).dot(WBC)
-              RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-              RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+              if not isRestart:
+                     WBC = U[ubdex] * dHdX
+                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
+                     RHS[wdex] -= ((DOPS[5])[:,ubdex]).dot(WBC)
+                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
+                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+                     del(WBC)
+                     
               bN = np.array(RHS)
-              del(DHDX); del(WBC)
               del(U); del(fields)
               #'''
               
@@ -471,12 +474,12 @@ if __name__ == '__main__':
               #%% Update the interior solution
               SOLT[sysDex,0] += sol
               
-              # Recover fields
-              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              
               # Update vertical velocity at boundary
-              SOLT[wbdex,0] = np.array(fields[ubdex,1])
-              del(U); del(fields)
+              if isRestart:
+                     SOLT[wbdex,0] += dHdX * (SOLT[ubdex,0])
+              else:
+                     SOLT[wbdex,0] += dHdX * (SOLT[ubdex,0] + INIT[ubdex])
+              #del(U); del(fields)
               
               print('Recover full linear solution vector... DONE!')
               
