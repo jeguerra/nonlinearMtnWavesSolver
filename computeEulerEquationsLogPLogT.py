@@ -281,6 +281,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
+       Rd = PHYS[3]
        gam = PHYS[6]
        
        # Get the derivative operators
@@ -310,8 +311,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        transport = UDqDx + WDqDz + wDQDZ
        
        # Compute pressure gradient forces
+       RdT_bar = REFS[9]
+       RdT_prime = (RdT - RdT_bar[:,0])
+       T_ratio = RdT_prime * np.reciprocal(RdT_bar[:,0])
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
-       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
+       PGFZ = RdT * (DqDz[:,2]) - gc * T_ratio
 
        def DqDt():
               # Horizontal momentum equation

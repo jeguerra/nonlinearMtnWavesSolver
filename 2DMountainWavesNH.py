@@ -328,18 +328,19 @@ if __name__ == '__main__':
               # Set up the coupled boundary condition in Jacobian and RHS
               DHDX = sps.diags(dHdX, offsets=0, format='csr')
               (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
-              (DOPS[4])[:,ubdex] += ((DOPS[5])[:,ubdex]).dot(DHDX)
+              (DOPS[4])[:,ubdex] += ((DOPS[5] + ROPS[1])[:,ubdex]).dot(DHDX)
               (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
               (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
               del(DHDX)
+              #'''
               
-              if not isRestart:
-                     WBC = U[ubdex] * dHdX
-                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-                     RHS[wdex] -= ((DOPS[5])[:,ubdex]).dot(WBC)
-                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-                     del(WBC)
+              # Initial forcing
+              WBC = U[ubdex] * dHdX
+              RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
+              RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
+              RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
+              RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+              del(WBC)
                      
               bN = np.array(RHS)
               del(U); del(fields)
@@ -475,11 +476,7 @@ if __name__ == '__main__':
               SOLT[sysDex,0] += sol
               
               # Update vertical velocity at boundary
-              if isRestart:
-                     SOLT[wbdex,0] += dHdX * (SOLT[ubdex,0])
-              else:
-                     SOLT[wbdex,0] += dHdX * (SOLT[ubdex,0] + INIT[ubdex])
-              #del(U); del(fields)
+              SOLT[wbdex,0] = dHdX * (SOLT[ubdex,0] + INIT[ubdex])
               
               print('Recover full linear solution vector... DONE!')
               
