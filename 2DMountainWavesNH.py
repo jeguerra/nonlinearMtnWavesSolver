@@ -335,12 +335,13 @@ if __name__ == '__main__':
               #'''
               
               # Initial forcing
-              WBC = U[ubdex] * dHdX
-              RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-              RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
-              RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-              RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-              del(WBC)
+              if not isRestart:
+                     WBC = U[ubdex] * dHdX
+                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
+                     RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
+                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
+                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+                     del(WBC)
                      
               bN = np.array(RHS)
               del(U); del(fields)

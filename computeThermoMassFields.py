@@ -39,7 +39,7 @@ def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex, isGivenValue, DP):
        return DOP
 
 def computePfromSensibleT(DDZ, TZ, AC, P0, N):
-       # Solves fro lnP_bar so set the constant of integration
+       # Solves for lnP_bar so set the constant of integration
        lnP0 = mt.log(P0)
        
        # Initialize background pressure
@@ -48,7 +48,7 @@ def computePfromSensibleT(DDZ, TZ, AC, P0, N):
        # Compute the Neumann boundary value at the top z = H
        tempBarI = np.reciprocal(TZ)
        
-       #%% Impose BC p^K = 0 @ z = 0 and d(p^K)dz = B @ z = H matched to p^K = 0 at Inf
+       #%% Impose BC lnp = 0 @ z = 0 and d(lnp)dz = B @ z = H matched to lnp = -Inf at Inf
        # Specify the derivative at the model top
        dpdZ_H = AC * tempBarI[N-1]
        # Compute adjustment to the derivative matrix operator
