@@ -311,7 +311,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Compute pressure gradient forces
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
-       PGFZ = RdT * DqDz[:,2]
+       PGFZ = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
 
        def DqDt():
               # Horizontal momentum equation
