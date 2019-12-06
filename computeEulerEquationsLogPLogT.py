@@ -109,6 +109,24 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute terrain following terms
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
+       
+       # Compute boundary term adjustments
+       UBC = np.array(0.0 * U)
+       WBC = np.array(0.0 * wxz)
+       UBC[botdex] = np.array(U[botdex])
+       WBC[botdex] = np.array(wxz[botdex])
+       UBCM = sps.diags(UBC, offsets=0, format='csr')
+       WBCM = sps.diags(WBC, offsets=0, format='csr')
+       
+       WXZ[botdex] *= 0.0
+       
+       DZDX_MT = np.array(DZDX)
+       DZDX_MT[botdex] *= 0.0
+       DZDXM_MT = sps.diags(DZDX_MT, offsets=0, format='csr')
+       
+       DZDX_BC = 0.0 * np.array(DZDX)
+       DZDX_BC[botdex] = np.array(DZDX[botdex])
+       DZDXM_BC = sps.diags(DZDX_BC, offsets=0, format='csr')
 
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
@@ -116,7 +134,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute (partial) x derivatives of perturbations
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
-       PqPx = DqDx - DZDXM.dot(DqDz)
+       PqPx = DqDx - DZDXM_MT.dot(DqDz)
        
        # Compute vertical gradient diagonal operators
        DuDzM = sps.diags(DqDz[:,0], offsets=0, format='csr')
@@ -155,6 +173,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute partial in X terrain following block
        PPXM = DDXM - DZDXM.dot(DDZM)
+       PPXM_MT = DDXM - DZDXM_MT.dot(DDZM)
        
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
@@ -162,25 +181,31 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UPXM + PuPxM
+       LD11 = UPXM + PuPxM + DZDXM_BC.dot(DUDZM)
        LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
-       LD14 = RdTM.dot(PlpPxM) # vanish initial
+       LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = PwPxM # vanish initial
+       LD21 = PwPxM + UBCM.dot(DDXM.dot(DZDXM_BC)) + WBCM.dot(PPXM + DZDXM.dot(DDZM))
        LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
-       LD31 = gam * PPXM + PlpPxM
+       LD31 = gam * PPXM_MT + PlpPxM + DZDXM_BC.dot(DLPDZM)
        LD32 = gam * DDZM + DlpDzM + DLPDZM
        LD33 = UPXM
        LD34 = None
        
-       LD41 = PltPxM # vanish initial
+       LD41 = PltPxM + DZDXM_BC.dot(DLPTDZM)
        LD42 = DltDzM + DLPTDZM
        LD43 = None
        LD44 = UPXM 
+       
+       # Null out Jacobian on dW at z = h(x)
+       LD12[np.ix_(botdex,botdex)] *= 0.0
+       LD22[np.ix_(botdex,botdex)] *= 0.0
+       LD32[np.ix_(botdex,botdex)] *= 0.0
+       LD42[np.ix_(botdex,botdex)] *= 0.0
 
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
@@ -282,7 +307,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
-       Rd = PHYS[3]
        gam = PHYS[6]
        
        # Get the derivative operators
@@ -294,6 +318,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
+       WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
