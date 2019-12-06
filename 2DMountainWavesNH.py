@@ -48,14 +48,15 @@ from computeIterativeSolveNL import computeIterativeSolveNL
 
 import faulthandler; faulthandler.enable()
 
-def displayResiduals(message, RHS, time, udex, wded, pdex, tdex):
+def displayResiduals(message, RHS, thisTime, udex, wded, pdex, tdex):
        err = np.linalg.norm(RHS)
        err1 = np.linalg.norm(RHS[udex])
        err2 = np.linalg.norm(RHS[wdex])
        err3 = np.linalg.norm(RHS[pdex])
        err4 = np.linalg.norm(RHS[tdex])
+       print(message)
        print('Time: %d, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
-             % (time, err1, err2, err3, err4, err))
+             % (thisTime, err1, err2, err3, err4, err))
        
        return err
 
@@ -523,8 +524,8 @@ if __name__ == '__main__':
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             message = ''
-                            time = DT * tt
-                            err = displayResiduals(message, RHS, time, udex, wdex, pdex, tdex)
+                            thisTime = DT * tt
+                            err = displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
                      if tt % ITI == 0:
@@ -559,7 +560,8 @@ if __name__ == '__main__':
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])
-              
+              DSOL = SOLT[:,1] - SOLT[:,0]
+       #%%       
        endt = time.time()
        print('Solve the system: DONE!')
        print('Elapsed time: ', endt - start)

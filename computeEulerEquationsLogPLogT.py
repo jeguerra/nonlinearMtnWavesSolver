@@ -146,6 +146,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
        T_prime = (1.0 / Rd) * (RdT - RdT_bar[:,0])
+       T_ratio = T_prime * np.reciprocal((1.0 / Rd) * RdT_bar[:,0])
        RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
@@ -158,7 +159,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
        
-       unit = sps.identity(len(U))
+       bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + PuPxM
@@ -169,7 +170,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD21 = PwPxM # vanish initial
        LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
-       LD24 = RdTM.dot(DlpDzM) - gc * unit
+       LD24 = RdTM.dot(DlpDzM) - gc * bf
        
        LD31 = gam * PPXM + PlpPxM
        LD32 = gam * DDZM + DlpDzM + DLPDZM
