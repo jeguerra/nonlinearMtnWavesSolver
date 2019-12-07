@@ -303,8 +303,8 @@ if __name__ == '__main__':
               SOLT = np.zeros((numVar * OPS, 2))
               
               # Initialize boundary condition
-              print('**Initial boundary forcing by direct substitution**')
-              SOLT[wbdex,0] = dHdX * INIT[ubdex]
+              #print('**Initial boundary forcing by direct substitution**')
+              #SOLT[wbdex,0] = dHdX * INIT[ubdex]
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
@@ -341,7 +341,7 @@ if __name__ == '__main__':
               '''
               
               # Initial forcing (using Jacobian)
-              '''
+              #'''
               if not isRestart:
                      print('**Initial boundary forcing by Jacobian product**')
                      WBC = U[ubdex] * dHdX
@@ -350,7 +350,7 @@ if __name__ == '__main__':
                      RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
                      RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
                      del(WBC)
-              '''       
+              #'''       
               bN = np.array(RHS)
               del(U); del(fields)
               #'''

@@ -202,10 +202,10 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD44 = UPXM 
        
        # Null out Jacobian on dW at z = h(x)
-       LD12[np.ix_(botdex,botdex)] *= 0.0
-       LD22[np.ix_(botdex,botdex)] *= 0.0
-       LD32[np.ix_(botdex,botdex)] *= 0.0
-       LD42[np.ix_(botdex,botdex)] *= 0.0
+       #LD12[np.ix_(botdex,botdex)] *= 0.0
+       #LD22[np.ix_(botdex,botdex)] *= 0.0
+       #LD32[np.ix_(botdex,botdex)] *= 0.0
+       #LD42[np.ix_(botdex,botdex)] *= 0.0
 
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
