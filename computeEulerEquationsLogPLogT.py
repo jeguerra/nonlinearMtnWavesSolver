@@ -117,9 +117,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        WBC[botdex] = np.array(wxz[botdex])
        UBCM = sps.diags(UBC, offsets=0, format='csr')
        WBCM = sps.diags(WBC, offsets=0, format='csr')
-       
-       #WXZ[botdex] *= 0.0
-       
+              
        DZDX_MT = np.array(DZDX)
        DZDX_MT[botdex] *= 0.0
        DZDXM_MT = sps.diags(DZDX_MT, offsets=0, format='csr')
@@ -201,12 +199,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD43 = None
        LD44 = UPXM 
        
-       # Null out Jacobian on dW at z = h(x)
-       #LD12[np.ix_(botdex,botdex)] *= 0.0
-       #LD22[np.ix_(botdex,botdex)] *= 0.0
-       #LD32[np.ix_(botdex,botdex)] *= 0.0
-       #LD42[np.ix_(botdex,botdex)] *= 0.0
-
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
                LD31, LD32, LD33, LD34, \
@@ -314,6 +306,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
+       dHdX = REFS[6]
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
@@ -349,7 +342,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               # Vertical momentum equation
               DwDt = -(transport[:,1] + PGFZ)
               # Pressure (mass) equation
-              LD33 = gam * (DqDx[:,0] - DZDX * DqDz[:,0] + DqDz[:,1])
+              PuPx = np.array(DqDx[:,0] - DZDX * DqDz[:,0])
+              PwPz = DqDz[:,1]
+              #PwPz[botdex] = dHdX * (DQDZ[botdex,0] + DqDz[botdex,0])
+              LD33 = gam * (PuPx + PwPz)
               DpDt = -(transport[:,2] + LD33)
               # Potential Temperature equation
               DtDt = -(transport[:,3])

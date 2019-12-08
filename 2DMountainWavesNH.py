@@ -314,6 +314,7 @@ if __name__ == '__main__':
               
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+       bN = np.array(RHS)
        del(U); del(fields)
               
        #% Compute the global LHS operator and RHS
@@ -333,29 +334,6 @@ if __name__ == '__main__':
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
-              '''
-              print('**Coupling dq in Jacobian**')
-              # Set up the coupled boundary condition in Jacobian and RHS
-              DHDX = sps.diags(dHdX, offsets=0, format='csr')
-              (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
-              (DOPS[4])[:,ubdex] += ((DOPS[5] + ROPS[1])[:,ubdex]).dot(DHDX)
-              (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
-              (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
-              del(DHDX)
-              '''
-              
-              # Initial forcing (using Jacobian)
-              '''
-              if not isRestart:
-                     print('**Initial boundary forcing by Jacobian product**')
-                     WBC = U[ubdex] * dHdX
-                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-                     RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
-                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-                     del(WBC)
-              '''       
-              bN = np.array(RHS)
               del(U); del(fields)
               #'''
               
