@@ -118,7 +118,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        UBCM = sps.diags(UBC, offsets=0, format='csr')
        WBCM = sps.diags(WBC, offsets=0, format='csr')
        
-       WXZ[botdex] *= 0.0
+       #WXZ[botdex] *= 0.0
        
        DZDX_MT = np.array(DZDX)
        DZDX_MT[botdex] *= 0.0

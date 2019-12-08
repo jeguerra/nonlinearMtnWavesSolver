@@ -297,26 +297,30 @@ if __name__ == '__main__':
        if isRestart:
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
               
               # Initialize boundary condition
+              print('**Initial boundary forcing by function evaluation**')
+              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               #print('**Initial boundary forcing by direct substitution**')
               #SOLT[wbdex,0] = dHdX * INIT[ubdex]
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
               
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+       del(U); del(fields)
               
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of FIRST Jacobian with/without boundary condition
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               print('Compute Jacobian operator blocks: DONE!')
@@ -341,7 +345,7 @@ if __name__ == '__main__':
               '''
               
               # Initial forcing (using Jacobian)
-              #'''
+              '''
               if not isRestart:
                      print('**Initial boundary forcing by Jacobian product**')
                      WBC = U[ubdex] * dHdX
@@ -350,7 +354,7 @@ if __name__ == '__main__':
                      RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
                      RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
                      del(WBC)
-              #'''       
+              '''       
               bN = np.array(RHS)
               del(U); del(fields)
               #'''
