@@ -184,7 +184,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = PwPxM + UBCM.dot(DDXM.dot(DZDXM_BC)) + WBCM.dot(PPXM + DZDXM.dot(DDZM))
+       LD21 = PwPxM + UBCM.dot(DDXM.dot(DZDXM_BC)) + WBCM.dot(PPXM_MT)
        LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
