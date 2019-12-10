@@ -102,9 +102,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        gam = PHYS[6]
        
        # Get the derivative operators
-       DDXBC = REFS[2]
-       DDZBC = REFS[3]
-       dHdX = REFS[6]
+       #DDXBC = REFS[2]
+       #DDZBC = REFS[3]
+       #dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -112,7 +112,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute terrain following terms
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       WXZ[botdex] *= 0.0
 
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
@@ -166,32 +165,52 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UPXM + PuPxM
-       LD12 = DuDzM + DUDZM
+       LD11 = (UPXM + PuPxM).tolil()
+       LD12 = (DuDzM + DUDZM).tolil()
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = PwPxM
-       LD22 = UPXM + DwDzM
+       LD21 = PwPxM.tolil()
+       LD22 = (UPXM + DwDzM).tolil()
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
-       LD31 = gam * PPXM + PlpPxM
+       LD31 = (gam * PPXM + PlpPxM).tolil()
        LD32 = gam * DDZM + DlpDzM + DLPDZM
        LD33 = UPXM
        LD34 = None
        
-       LD41 = PltPxM
+       LD41 = PltPxM.tolil()
        LD42 = DltDzM + DLPTDZM
        LD43 = None
        LD44 = UPXM
-       
+       '''
        # Compute coupled boundary adjustments
        UBC = sps.diags(U[botdex], offsets=0, format='csr')
        DuDxBC = sps.diags(DqDx[botdex,0], offsets=0, format='csr')
        ZDUDZBC = sps.diags(dHdX * DQDZ[botdex,0], offsets=0, format='csr')
        LD11[np.ix_(botdex,botdex)] = UBC.dot(DDXBC) + DuDxBC + ZDUDZBC
+       LD12[np.ix_(botdex,botdex)] *= 0.0
        
+       WBC = sps.diags(fields[botdex,1], offsets=0, format='csr')
+       ZDUDXBC = sps.diags(dHdX * DDXBC.dot(U[botdex]), offsets=0, format='csr')
+       METBC = sps.diags(2.0 * U[botdex] * DDXBC.dot(dHdX), offsets=0, format='csr')
+       LD21[np.ix_(botdex,botdex)] = WBC.dot(DDXBC) + ZDUDXBC + METBC
+       LD22[np.ix_(botdex,botdex)] *= 0.0
+       
+       DlpDxBC = sps.diags(DqDx[botdex,2], offsets=0, format='csr')
+       ZDLPDZBC = sps.diags(dHdX * DQDZ[botdex,2], offsets=0, format='csr')
+       CONTBC = gam * DDXBC
+       LD31[np.ix_(botdex,botdex)] = DlpDxBC + ZDLPDZBC + CONTBC
+       LD32[np.ix_(botdex,botdex)] *= 0.0
+       LD33[np.ix_(botdex,botdex)] = UBC.dot(DDXBC)
+       
+       DlptDxBC = sps.diags(DqDx[botdex,3], offsets=0, format='csr')
+       ZDLPTDZBC = sps.diags(dHdX * DQDZ[botdex,3], offsets=0, format='csr')
+       LD41[np.ix_(botdex,botdex)] = DlptDxBC + ZDLPTDZBC
+       LD42[np.ix_(botdex,botdex)] *= 0.0
+       LD44[np.ix_(botdex,botdex)] = UBC.dot(DDXBC)
+       '''
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
                LD31, LD32, LD33, LD34, \
@@ -304,7 +323,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       WXZ[botdex] *= 0.0
+       print('Boundary constraint: ', np.linalg.norm(WXZ[botdex]))
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
@@ -328,6 +347,9 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        T_ratio = RdT_prime * np.reciprocal(RdT_bar[:,0])
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
        PGFZ = RdT * (DqDz[:,2]) - gc * T_ratio
+       
+       print('W transport: ', np.linalg.norm(transport[:,1]))
+       print('W force: ', np.linalg.norm(PGFZ))
 
        def DqDt():
               # Horizontal momentum equation

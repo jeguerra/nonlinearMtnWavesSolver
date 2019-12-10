@@ -116,8 +116,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 90
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -297,31 +297,30 @@ if __name__ == '__main__':
        if isRestart:
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
               
               # Initialize boundary condition
-              print('**Initial boundary forcing by function evaluation**')
-              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              #print('**Initial boundary forcing by function evaluation**')
+              #fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               #print('**Initial boundary forcing by direct substitution**')
               #SOLT[wbdex,0] = dHdX * INIT[ubdex]
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
-              
+            
+       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)       
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-       bN = np.array(RHS)
-       del(U); del(fields)
               
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of FIRST Jacobian with/without boundary condition
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               print('Compute Jacobian operator blocks: DONE!')
@@ -333,6 +332,26 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd].tolil())
                      else:
                             DOPS.append(DOPS_NL[dd])
+              '''              
+              print('**Coupling dq in Jacobian**')
+              # Set up the coupled boundary condition in Jacobian and RHS
+              DHDX = sps.diags(dHdX, offsets=0, format='csr')
+              (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
+              (DOPS[4])[:,ubdex] += ((DOPS[5] + ROPS[1])[:,ubdex]).dot(DHDX)
+              (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
+              (DOPS[12])[:,ubdex] += ((DOPS[13])[:,ubdex]).dot(DHDX)
+              del(DHDX)
+              '''
+              if not isRestart:
+                     print('**Initial boundary forcing by Jacobian product**')
+                     WBC = U[ubdex] * dHdX
+                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
+                     RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
+                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
+                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+                     del(WBC)         
+              
+              bN = np.array(RHS)
               del(DOPS_NL)
               del(U); del(fields)
               #'''
