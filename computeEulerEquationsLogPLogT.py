@@ -109,6 +109,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute terrain following terms
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
+       WXZ[botdex] *= 0.0
 
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
