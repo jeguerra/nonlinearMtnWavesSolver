@@ -102,6 +102,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        gam = PHYS[6]
        
        # Get the derivative operators
+       DDXBC = REFS[2]
+       DDZBC = REFS[3]
+       dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -184,6 +187,10 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD44 = UPXM
        
        # Compute coupled boundary adjustments
+       UBC = sps.diags(U[botdex], offsets=0, format='csr')
+       DuDxBC = sps.diags(DqDx[botdex,0], offsets=0, format='csr')
+       ZDUDZBC = sps.diags(dHdX * DQDZ[botdex,0], offsets=0, format='csr')
+       LD11[np.ix_(botdex,botdex)] = UBC.dot(DDXBC) + DuDxBC + ZDUDZBC
        
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
