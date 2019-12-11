@@ -298,22 +298,28 @@ if __name__ == '__main__':
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
+              # Update vertical velocity at boundary
+              WBC = dHdX * SOLT[ubdex,0]
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
+              
+              # Initialize vertical velocity at boundary
+              WBC = dHdX * INIT[ubdex]
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
-            
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)       
-       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-       RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               
+       SOLT[wbdex,0] += WBC
+       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+       RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+       
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of FIRST Jacobian with/without boundary condition
-              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               print('Compute Jacobian operator blocks: DONE!')
@@ -337,23 +343,28 @@ if __name__ == '__main__':
                      (DOPS[12])[:,ubdex] += ((DOPS[13])[:,ubdex]).dot(DHDX)
                      del(DHDX)
               '''
-              #'''
+              
+              '''
               if isRestart:
+                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
                      print('**Initial boundary forcing by Jacobian product**')
                      WBC = (SOLT[ubdex,0] - SOLT[ubdex,1]) * dHdX
                      RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
                      RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
                      RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
                      RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-
               elif not isRestart:
+                     fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)       
+                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
                      print('**Initial boundary forcing by Jacobian product**')
                      WBC = U[ubdex] * dHdX
                      RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
                      RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
                      RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
                      RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-              #'''
+              '''
                      
               bN = np.array(RHS)
               del(U); del(fields)
@@ -443,18 +454,11 @@ if __name__ == '__main__':
               if SolveSchur and not SolveFull:
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
-                     #opts = dict(Equil=True, IterRefine='DOUBLE')
-                     #factorDS = spl.splu(DS, permc_spec='COLAMD', options=opts)
-                     #import scikits.umfpack as um
-                     #umfpack = um.UmfpackContext()
-                     #umfpack.numeric(DS)
                      factorDS = dsl.lu_factor(DS)
                      print('Factor D... DONE!')
                      del(DS)
-                     #alpha = factorDS.solve(CS.toarray())
                      alpha = dsl.lu_solve(factorDS, CS)
                      print('Solve DS^-1 * CS... DONE!')
-                     #alpha = umfpack(um.UMFPACK_A, DS, CS, autoTranspose = True)
                      DS_SC = -BS.dot(alpha)
                      DS_SC += AS
                      print('Compute Schur Complement of D... DONE!')
@@ -465,15 +469,12 @@ if __name__ == '__main__':
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
                      # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
-                     #f2_hat = factorDS.solve(f2)
                      f2_hat = dsl.lu_solve(factorDS, f2)
-                     #f2_hat = umfpack(um.UMFPACK_A, DS, f2, autoTranspose = True)
                      f1_hat = -BS.dot(f2_hat)
                      # Use dense linear algebra at this point
                      sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
                      print('Solve for u and w... DONE!')
                      f2 = f2 - CS.dot(sol1)
-                     #sol2 = factorDS.solve(f2)
                      sol2 = dsl.lu_solve(factorDS, f2)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      sol = np.concatenate((sol1, sol2))
@@ -486,10 +487,6 @@ if __name__ == '__main__':
                      
               #%% Update the interior solution
               SOLT[sysDex,0] += sol
-              
-              # Update vertical velocity at boundary
-              SOLT[wbdex,0] += WBC
-              del(WBC)
               
               print('Recover full linear solution vector... DONE!')
               
