@@ -149,8 +149,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
        T_bar = (1.0 / Rd) * RdT_bar[:,0]
-       #T_prime = (1.0 / Rd) * (RdT - RdT_bar[:,0])
-       #T_ratio = T_prime * np.reciprocal((1.0 / Rd) * RdT_bar[:,0])
        T_ratio = np.exp(fields[:,2] + fields[:,3]) - 1.0
        T_prime = T_ratio * T_bar
        RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
@@ -200,14 +198,14 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        METBC = sps.diags(2.0 * U[botdex] * DDXBC.dot(dHdX), offsets=0, format='csr')
        LD21[np.ix_(botdex,botdex)] = WBC.dot(DDXBC) + ZDUDXBC + METBC
        LD22[np.ix_(botdex,botdex)] *= 0.0
-       
+       #
        DlpDxBC = sps.diags(DqDx[botdex,2], offsets=0, format='csr')
        ZDLPDZBC = sps.diags(dHdX * DQDZ[botdex,2], offsets=0, format='csr')
        CONTBC = gam * DDXBC
        LD31[np.ix_(botdex,botdex)] = DlpDxBC + ZDLPDZBC + CONTBC
        LD32[np.ix_(botdex,botdex)] *= 0.0
        LD33[np.ix_(botdex,botdex)] = UBC.dot(DDXBC)
-       
+       #
        DlptDxBC = sps.diags(DqDx[botdex,3], offsets=0, format='csr')
        ZDLPTDZBC = sps.diags(dHdX * DQDZ[botdex,3], offsets=0, format='csr')
        LD41[np.ix_(botdex,botdex)] = DlptDxBC + ZDLPTDZBC
@@ -326,7 +324,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       #print('Boundary constraint: ', np.linalg.norm(WXZ[botdex]))
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
@@ -345,20 +342,17 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        transport = UDqDx + WDqDz + wDQDZ
        
        # Compute pressure gradient forces
-       #RdT_bar = REFS[9]
-       #RdT_prime = (RdT - RdT_bar[:,0])
-       #T_ratio = RdT_prime * np.reciprocal(RdT_bar[:,0])
        T_ratio = np.exp(fields[:,2] + fields[:,3]) - 1.0
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
        PGFZ1 = RdT * (DqDz[:,2])
        PGFZ2 = -gc * T_ratio
        PGFZ = PGFZ1 + PGFZ2
-       
+       '''
        print('U transport: ', np.linalg.norm(transport[:,0]))
        print('U force: ', np.linalg.norm(PGFX))
        print('W transport: ', np.linalg.norm(transport[:,1]))
        print('W force: ', np.linalg.norm(PGFZ1), np.linalg.norm(PGFZ2), np.linalg.norm(PGFZ))
-
+       '''
        def DqDt():
               # Horizontal momentum equation
               DuDt = -(transport[:,0] + PGFX)
@@ -431,13 +425,6 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        DpDt = DDXM.dot(DlpDx) - DZDX * DDZM.dot(DlpDx) + DDZM.dot(DlpDz)
        DtDt = DDXM.dot(DltDx) - DZDX * DDZM.dot(DltDx) + DDZM.dot(DltDz)
        #'''
-       # Compute tendencies (2nd derivative term only)
-       '''
-       DuDt = RESCFX[udex] * DDx[:,0] + RESCFZ[udex] * DDz[:,0]
-       DwDt = RESCFX[wdex] * DDx[:,1] + RESCFZ[wdex] * DDz[:,1]
-       DpDt = RESCFX[pdex] * DDx[:,2] + RESCFZ[pdex] * DDz[:,2]
-       DtDt = RESCFX[tdex] * DDx[:,3] + RESCFZ[tdex] * DDz[:,3]
-       '''
        # Null tendencies along vertical boundaries
        DuDt[topdex] *= 0.0
        DwDt[topdex] *= 0.0

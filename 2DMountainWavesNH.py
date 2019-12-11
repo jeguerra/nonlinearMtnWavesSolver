@@ -99,7 +99,7 @@ if __name__ == '__main__':
        
        # Set restarting
        toRestart = True
-       isRestart = True
+       isRestart = False
        restart_file = 'restartDB'
        
        # Set physical constants (dry air)
@@ -309,7 +309,9 @@ if __name__ == '__main__':
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
-              
+       
+       SOLT[wbdex,0] += WBC
+       SOLT[wbdex,1] = WBC
        fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
@@ -331,12 +333,6 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
-              print('**Boundary forcing by Jacobian product on dW**')
-              RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-              RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
-              RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-              RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-                     
               bN = np.array(RHS)
               del(U); del(fields)
               
@@ -458,11 +454,9 @@ if __name__ == '__main__':
                      
               #%% Update the interior and boundary solution
               SOLT[sysDex,0] += sol
-              SOLT[wbdex,0] += WBC
               
               # Store solution change to instance 1
               SOLT[sysDex,1] = sol
-              SOLT[wbdex,1] = WBC
               
               print('Recover full linear solution vector... DONE!')
               
@@ -566,8 +560,8 @@ if __name__ == '__main__':
        nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, np.array(SOLT[:,1]), NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
        nativeDF, interpDF = computeInterpolatedFields(DIMS, ZTL, DSOL, NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
        
-       uxz = nativeNL[0]; wxz = nativeNL[1]; pxz = nativeNL[2]; txz = nativeNL[3]
-       uxzint = interpNL[0]; wxzint = interpNL[1]; pxzint = interpNL[2]; txzint = interpNL[3]
+       uxz = nativeLN[0]; wxz = nativeLN[1]; pxz = nativeLN[2]; txz = nativeLN[3]
+       uxzint = interpLN[0]; wxzint = interpLN[1]; pxzint = interpLN[2]; txzint = interpLN[3]
        
        #% Make the new grid XLI, ZTLI
        import HerfunChebNodesWeights as hcnw
