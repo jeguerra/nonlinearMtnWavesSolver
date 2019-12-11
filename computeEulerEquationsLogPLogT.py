@@ -148,8 +148,11 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
-       T_prime = (1.0 / Rd) * (RdT - RdT_bar[:,0])
-       T_ratio = T_prime * np.reciprocal((1.0 / Rd) * RdT_bar[:,0])
+       T_bar = (1.0 / Rd) * RdT_bar[:,0]
+       #T_prime = (1.0 / Rd) * (RdT - RdT_bar[:,0])
+       #T_ratio = T_prime * np.reciprocal((1.0 / Rd) * RdT_bar[:,0])
+       T_ratio = np.exp(fields[:,2] + fields[:,3]) - 1.0
+       T_prime = T_ratio * T_bar
        RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
@@ -323,7 +326,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       #UBC = np.array(U[botdex])
        #print('Boundary constraint: ', np.linalg.norm(WXZ[botdex]))
        
        # Compute advective (multiplicative) operators
@@ -343,14 +345,19 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        transport = UDqDx + WDqDz + wDQDZ
        
        # Compute pressure gradient forces
-       RdT_bar = REFS[9]
-       RdT_prime = (RdT - RdT_bar[:,0])
-       T_ratio = RdT_prime * np.reciprocal(RdT_bar[:,0])
+       #RdT_bar = REFS[9]
+       #RdT_prime = (RdT - RdT_bar[:,0])
+       #T_ratio = RdT_prime * np.reciprocal(RdT_bar[:,0])
+       T_ratio = np.exp(fields[:,2] + fields[:,3]) - 1.0
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
-       PGFZ = RdT * (DqDz[:,2]) - gc * T_ratio
+       PGFZ1 = RdT * (DqDz[:,2])
+       PGFZ2 = -gc * T_ratio
+       PGFZ = PGFZ1 + PGFZ2
        
-       #print('W transport: ', np.linalg.norm(transport[:,1]))
-       #print('W force: ', np.linalg.norm(PGFZ))
+       print('U transport: ', np.linalg.norm(transport[:,0]))
+       print('U force: ', np.linalg.norm(PGFX))
+       print('W transport: ', np.linalg.norm(transport[:,1]))
+       print('W force: ', np.linalg.norm(PGFZ1), np.linalg.norm(PGFZ2), np.linalg.norm(PGFZ))
 
        def DqDt():
               # Horizontal momentum equation
