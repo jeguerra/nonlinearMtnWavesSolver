@@ -99,7 +99,7 @@ if __name__ == '__main__':
        
        # Set restarting
        toRestart = True
-       isRestart = False
+       isRestart = True
        restart_file = 'restartDB'
        
        # Set physical constants (dry air)
@@ -299,7 +299,7 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Update vertical velocity at boundary
-              WBC = dHdX * SOLT[ubdex,0]
+              WBC = dHdX * SOLT[ubdex,1]
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -310,7 +310,6 @@ if __name__ == '__main__':
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
               
-       SOLT[wbdex,0] += WBC
        fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
        RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
@@ -319,7 +318,6 @@ if __name__ == '__main__':
        if (StaticSolve or LinearSolve):
               
               # Test evaluation of FIRST Jacobian with/without boundary condition
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,1]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               print('Compute Jacobian operator blocks: DONE!')
@@ -333,38 +331,11 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
-              '''
-              print('**Coupling dq in Jacobian**')
-                     # Set up the coupled boundary condition in Jacobian and RHS
-                     DHDX = sps.diags(dHdX, offsets=0, format='csr')
-                     (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
-                     (DOPS[4])[:,ubdex] += ((DOPS[5] + ROPS[1])[:,ubdex]).dot(DHDX)
-                     (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
-                     (DOPS[12])[:,ubdex] += ((DOPS[13])[:,ubdex]).dot(DHDX)
-                     del(DHDX)
-              '''
-              
-              '''
-              if isRestart:
-                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-                     print('**Initial boundary forcing by Jacobian product**')
-                     WBC = (SOLT[ubdex,0] - SOLT[ubdex,1]) * dHdX
-                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-                     RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
-                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-              elif not isRestart:
-                     fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)       
-                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-                     print('**Initial boundary forcing by Jacobian product**')
-                     WBC = U[ubdex] * dHdX
-                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-                     RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
-                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-              '''
+              print('**Boundary forcing by Jacobian product on dW**')
+              RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
+              RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
+              RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
+              RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
                      
               bN = np.array(RHS)
               del(U); del(fields)
@@ -485,8 +456,13 @@ if __name__ == '__main__':
                      del(factorDS_SC)
                      del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
-              #%% Update the interior solution
+              #%% Update the interior and boundary solution
               SOLT[sysDex,0] += sol
+              SOLT[wbdex,0] += WBC
+              
+              # Store solution change to instance 1
+              SOLT[sysDex,1] = sol
+              SOLT[wbdex,1] = WBC
               
               print('Recover full linear solution vector... DONE!')
               
@@ -511,11 +487,9 @@ if __name__ == '__main__':
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               print('Residual 2-norm after iterative NL solve: ', np.linalg.norm(RHS))
               '''
-              # Compare the linear and nonlinear solutions
-              DSOL = np.array(SOLT[:,0] - SOLT[:,1])
-              print('Norm of difference nonlinear to linear solution: ', np.linalg.norm(DSOL))
-              # Copy state instance 0 to 1
-              SOLT[:,1] = np.array(SOLT[:,0])
+              # Check the change in the solution
+              DSOL = np.array(SOLT[:,1])
+              print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
        elif LinearSolve:
               RHS[sysDex] = bN
@@ -577,6 +551,7 @@ if __name__ == '__main__':
        #% Make a database for restart
        if toRestart:
               rdb = shelve.open(restart_file, flag='n')
+              rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
               rdb['RHS'] = RHS
               rdb['NX'] = NX
@@ -647,7 +622,7 @@ if __name__ == '__main__':
        # 2 X 2 subplot with all fields at the final time
        for pp in range(4):
               plt.subplot(2,2,pp+1)
-              ccheck = plt.contourf(XLI, ZTLI, interpNL[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              ccheck = plt.contourf(XLI, ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.tight_layout()
        plt.show()

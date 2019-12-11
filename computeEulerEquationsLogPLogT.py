@@ -321,7 +321,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        #dHdX = REFS[6]
        
        # Compute terrain following terms (two way assignment into fields)
-       
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
        #UBC = np.array(U[botdex])
@@ -386,15 +385,6 @@ def computeRayleighTendency(REFG, fields, botdex, topdex):
        DpDt = - ROPS[2].dot(fields[:,2])
        DtDt = - ROPS[3].dot(fields[:,3])
        
-       # Null tendencies at essential vertical boundaries
-       #DuDt[topdex] *= 0.0
-       #DuDt[botdex] *= 0.0
-       #DwDt[topdex] *= 0.0
-       #DwDt[botdex] *= 0.0
-       #DpDt[topdex] *= 0.0
-       #DpDt[botdex] *= 0.0
-       #DtDt[topdex] *= 0.0
-       #DtDt[botdex] *= 0.0
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
