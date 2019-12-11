@@ -318,14 +318,14 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
-       dHdX = REFS[6]
+       #dHdX = REFS[6]
        
        # Compute terrain following terms (two way assignment into fields)
        
        wxz = fields[:,1]
        WXZ = wxz - U * DZDX
-       UBC = np.array(U[botdex])
-       print('Boundary constraint: ', np.linalg.norm(WXZ[botdex]))
+       #UBC = np.array(U[botdex])
+       #print('Boundary constraint: ', np.linalg.norm(WXZ[botdex]))
        
        # Compute advective (multiplicative) operators
        U = sps.diags(U, offsets=0, format='csr')
@@ -350,13 +350,12 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
        PGFZ = RdT * (DqDz[:,2]) - gc * T_ratio
        
-       print('W transport: ', np.linalg.norm(transport[:,1]))
-       print('W force: ', np.linalg.norm(PGFZ))
+       #print('W transport: ', np.linalg.norm(transport[:,1]))
+       #print('W force: ', np.linalg.norm(PGFZ))
 
        def DqDt():
               # Horizontal momentum equation
               DuDt = -(transport[:,0] + PGFX)
-              DuDt[botdex] = -UBC * (np.ravel(DqDx[botdex,0]) + dHdX * np.ravel(DQDZ[botdex,0]))
               # Vertical momentum equation
               DwDt = -(transport[:,1] + PGFZ)
               # Pressure (mass) equation
@@ -364,11 +363,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               PwPz = DqDz[:,1]
               LD33 = gam * (PuPx + PwPz)
               DpDt = -(transport[:,2] + LD33)
-              DpDt[botdex] = -UBC * (np.ravel(DqDx[botdex,2]) + dHdX * np.ravel(DQDZ[botdex,2])) \
-                             + gam * (np.ravel(DqDx[botdex,0]) + dHdX * dHdX * np.ravel(DQDZ[botdex,0]))
               # Potential Temperature equation
               DtDt = -(transport[:,3])
-              DtDt[botdex] = -UBC * (np.ravel(DqDx[botdex,3]) + dHdX * np.ravel(DQDZ[botdex,3]))
               
               # Make boundary adjustments
               DwDt[topdex] *= 0.0

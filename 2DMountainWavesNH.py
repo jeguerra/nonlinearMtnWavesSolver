@@ -297,17 +297,10 @@ if __name__ == '__main__':
        if isRestart:
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
-              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
-              
-              # Initialize boundary condition
-              #print('**Initial boundary forcing by function evaluation**')
-              #fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              #print('**Initial boundary forcing by direct substitution**')
-              #SOLT[wbdex,0] = dHdX * INIT[ubdex]
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
@@ -332,29 +325,38 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd].tolil())
                      else:
                             DOPS.append(DOPS_NL[dd])
-              '''              
-              print('**Coupling dq in Jacobian**')
-              # Set up the coupled boundary condition in Jacobian and RHS
-              DHDX = sps.diags(dHdX, offsets=0, format='csr')
-              (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
-              (DOPS[4])[:,ubdex] += ((DOPS[5] + ROPS[1])[:,ubdex]).dot(DHDX)
-              (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
-              (DOPS[12])[:,ubdex] += ((DOPS[13])[:,ubdex]).dot(DHDX)
-              del(DHDX)
+              del(DOPS_NL)
+              
               '''
-              if not isRestart:
+              print('**Coupling dq in Jacobian**')
+                     # Set up the coupled boundary condition in Jacobian and RHS
+                     DHDX = sps.diags(dHdX, offsets=0, format='csr')
+                     (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
+                     (DOPS[4])[:,ubdex] += ((DOPS[5] + ROPS[1])[:,ubdex]).dot(DHDX)
+                     (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
+                     (DOPS[12])[:,ubdex] += ((DOPS[13])[:,ubdex]).dot(DHDX)
+                     del(DHDX)
+              '''
+              #'''
+              if isRestart:
+                     print('**Initial boundary forcing by Jacobian product**')
+                     WBC = (SOLT[ubdex,0] - SOLT[ubdex,1]) * dHdX
+                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
+                     RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
+                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
+                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+
+              elif not isRestart:
                      print('**Initial boundary forcing by Jacobian product**')
                      WBC = U[ubdex] * dHdX
                      RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
                      RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
                      RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
                      RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-                     del(WBC)         
-              
-              bN = np.array(RHS)
-              del(DOPS_NL)
-              del(U); del(fields)
               #'''
+                     
+              bN = np.array(RHS)
+              del(U); del(fields)
               
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              
@@ -486,7 +488,8 @@ if __name__ == '__main__':
               SOLT[sysDex,0] += sol
               
               # Update vertical velocity at boundary
-              SOLT[wbdex,0] = dHdX * (SOLT[ubdex,0] + INIT[ubdex])
+              SOLT[wbdex,0] += WBC
+              del(WBC)
               
               print('Recover full linear solution vector... DONE!')
               
