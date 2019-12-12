@@ -54,7 +54,8 @@ def displayResiduals(message, RHS, thisTime, udex, wded, pdex, tdex):
        err2 = np.linalg.norm(RHS[wdex])
        err3 = np.linalg.norm(RHS[pdex])
        err4 = np.linalg.norm(RHS[tdex])
-       print(message)
+       if message != '':
+              print(message)
        print('Time: %d, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
              % (thisTime, err1, err2, err3, err4, err))
        
@@ -310,18 +311,13 @@ if __name__ == '__main__':
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
        
-       SOLT[wbdex,0] += WBC
-       SOLT[wbdex,1] = WBC
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-       RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-       RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
-       
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
-              
               # Test evaluation of FIRST Jacobian with/without boundary condition
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              del(U); del(fields)
               print('Compute Jacobian operator blocks: DONE!')
               
               # Convert blocks to 'lil' format for indexing
@@ -333,6 +329,12 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
+              # Compute the RHS for this iteration
+              SOLT[wbdex,0] += WBC
+              SOLT[wbdex,1] = WBC
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
               bN = np.array(RHS)
               del(U); del(fields)
               
