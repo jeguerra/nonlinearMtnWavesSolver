@@ -318,11 +318,15 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
-       #dHdX = REFS[6]
+       dHdX = REFS[6]
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
-       WXZ = wxz - U * DZDX
+       UZX = U * DZDX
+       WXZ = wxz - UZX
+       
+       wxz[botdex] = UZX[botdex]
+       WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        UM = sps.diags(U, offsets=0, format='csr')
@@ -353,14 +357,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        PwPz = DqDz[:,1]
        incomp = gam * (PuPx + PwPz)
        
-       # Compute boundary adjustments
-       dHdX = REFS[6]
-       wbc = sps.diags(dHdX * U[botdex], offsets=0, format='csr')
-       transport[botdex,:] = UDqDx[botdex,:] + wbc.dot(DQDZ[botdex,:])
-       #incomp[botdex] = gam * (DqDx[botdex,0] + dHdX * DQDZ[botdex,0])
-       #PGFX[botdex] *= 0.0
-       #PGFZ[botdex] *= 0.0
-       
        '''
        print('U transport: ', np.linalg.norm(transport[:,0]))
        print('U force: ', np.linalg.norm(PGFX))
@@ -380,7 +376,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               
               # Make boundary adjustments
               DwDt[topdex] *= 0.0
-              DwDt[botdex] *= 0.0
+              #DwDt[botdex] *= 0.0
+              DwDt[botdex] = dHdX * DuDt[botdex]
               DtDt[topdex] *= 0.0
               
               return (DuDt, DwDt, DpDt, DtDt)
