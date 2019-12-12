@@ -102,16 +102,14 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        gam = PHYS[6]
        
        # Get the derivative operators
-       #DDXBC = REFS[2]
-       #DDZBC = REFS[3]
-       #dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
        
-       # Compute terrain following terms
+       # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
-       WXZ = wxz - U * DZDX
+       UZX = U * DZDX
+       WXZ = wxz - UZX
 
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
@@ -178,14 +176,14 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        LD31 = (gam * PPXM + PlpPxM).tolil()
        LD32 = gam * DDZM + DlpDzM + DLPDZM
-       LD33 = UPXM.tolil()
+       LD33 = UPXM
        LD34 = None
        
        LD41 = PltPxM.tolil()
        LD42 = DltDzM + DLPTDZM
        LD43 = None
-       LD44 = UPXM.tolil()
-       
+       LD44 = UPXM
+       '''
        DDXBC = REFS[2]
        dHdX = REFS[6]
        # Compute coupled boundary adjustments
@@ -204,13 +202,11 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        ZDLPDZBC = sps.diags(dHdX * DQDZ[botdex,2], offsets=0, format='csr')
        CONTBC = gam * DDXBC 
        LD31[np.ix_(botdex,botdex)] = DlpDxBC + ZDLPDZBC + CONTBC
-       LD33[np.ix_(botdex,botdex)] = UBC.dot(DDXBC)
        
        DlptDxBC = sps.diags(DqDx[botdex,3], offsets=0, format='csr')
        ZDLPTDZBC = sps.diags(dHdX * DQDZ[botdex,3], offsets=0, format='csr')
        LD41[np.ix_(botdex,botdex)] = DlptDxBC + ZDLPTDZBC
-       LD44[np.ix_(botdex,botdex)] = UBC.dot(DDXBC)
-       
+       '''
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
                LD31, LD32, LD33, LD34, \
@@ -318,15 +314,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
-       dHdX = REFS[6]
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = fields[:,1]
        UZX = U * DZDX
        WXZ = wxz - UZX
-       
-       wxz[botdex] = UZX[botdex]
-       WXZ[botdex] *= 0.0
        
        # Compute advective (multiplicative) operators
        UM = sps.diags(U, offsets=0, format='csr')
@@ -376,8 +368,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               
               # Make boundary adjustments
               DwDt[topdex] *= 0.0
-              #DwDt[botdex] *= 0.0
-              DwDt[botdex] = dHdX * DuDt[botdex]
+              DwDt[botdex] *= 0.0
               DtDt[topdex] *= 0.0
               
               return (DuDt, DwDt, DpDt, DtDt)

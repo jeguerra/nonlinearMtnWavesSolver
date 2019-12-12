@@ -299,13 +299,13 @@ if __name__ == '__main__':
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
-              # Update vertical velocity at boundary
+              # Change in vertical velocity at boundary
               WBC = dHdX * SOLT[ubdex,1]
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
               
-              # Initialize vertical velocity at boundary
+              # Initial change in vertical velocity at boundary
               WBC = dHdX * INIT[ubdex]
        
               # Initialize time array
@@ -330,11 +330,16 @@ if __name__ == '__main__':
               del(DOPS_NL)
               
               # Compute the RHS for this iteration
-              #SOLT[wbdex,0] += WBC
-              #SOLT[wbdex,1] = WBC
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+              
+              # Compute the boundary forcing
+              RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
+              RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
+              RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
+              RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+              
               bN = np.array(RHS)
               del(U); del(fields)
               
