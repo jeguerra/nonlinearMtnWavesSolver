@@ -53,12 +53,13 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, wbdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[:,0]
        SGS = 0.0
+       dHdX = REFS[6]
        def computeDynSGSUpdate(fields):
               if DynSGS:
                      RESCF = computeResidualViscCoeffs(sol, RHS, DX, DZ, udex, wdex, pdex, tdex)
@@ -73,13 +74,19 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
               rhs += tendency.computeRayleighTendency(REFG, fields, botdex, topdex)
        
               return rhs
+       
+       def computeUpdate(coeff, sol, RHS, SGS):
+              sol += coeff * DT * (RHS + SGS)
+              sol[wbdex] = dHdX * sol[botdex]
+              
+              return sol
        #'''
        #%% THE KETCHENSON SSP(9,3) METHOD
        if order == 3:
               # Compute stages 1 - 5
               for ii in range(7):
-                     sol += c1 * DT * (RHS + SGS)
-                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     sol = computeUpdate(c1, sol, RHS, SGS)
+                     fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
                      
                      if ii == 1:
@@ -90,8 +97,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
-                     sol += c1 * DT * (RHS + SGS)
-                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     sol = computeUpdate(c1, sol, RHS, SGS)
+                     fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
                      SGS = computeDynSGSUpdate(fields)
        

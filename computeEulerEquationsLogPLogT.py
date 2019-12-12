@@ -325,7 +325,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        WXZ = wxz - U * DZDX
        
        # Compute advective (multiplicative) operators
-       U = sps.diags(U, offsets=0, format='csr')
+       UM = sps.diags(U, offsets=0, format='csr')
        wxz = sps.diags(wxz, offsets=0, format='csr')
        WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
@@ -337,7 +337,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DqDz = DDZM.dot(fields)
        
        # Compute advection
-       UDqDx = U.dot(DqDx)
+       UDqDx = UM.dot(DqDx)
        WDqDz = WXZ.dot(DqDz)
        transport = UDqDx + WDqDz + wDQDZ
        
@@ -355,8 +355,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        
        # Compute boundary adjustments
        dHdX = REFS[6]
-       transport[botdex] = UDqDx[botdex] + dHdX * U[botdex] * DQDZ[botdex,0]
-       incomp[botdex] = gam * (DqDx[botdex,0] + dHdX * DQDZ[botdex,0])
+       wbc = sps.diags(dHdX * U[botdex], offsets=0, format='csr')
+       transport[botdex,:] = UDqDx[botdex,:] + wbc.dot(DQDZ[botdex,:])
+       #incomp[botdex] = gam * (DqDx[botdex,0] + dHdX * DQDZ[botdex,0])
+       #PGFX[botdex] *= 0.0
+       #PGFZ[botdex] *= 0.0
        
        '''
        print('U transport: ', np.linalg.norm(transport[:,0]))
