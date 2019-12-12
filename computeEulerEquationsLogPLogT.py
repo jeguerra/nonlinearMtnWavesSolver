@@ -167,51 +167,50 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute the blocks of the Jacobian operator
        LD11 = (UPXM + PuPxM).tolil()
-       LD12 = (DuDzM + DUDZM).tolil()
+       LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
        LD21 = PwPxM.tolil()
-       LD22 = (UPXM + DwDzM).tolil()
+       LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
        LD31 = (gam * PPXM + PlpPxM).tolil()
        LD32 = gam * DDZM + DlpDzM + DLPDZM
-       LD33 = UPXM
+       LD33 = UPXM.tolil()
        LD34 = None
        
        LD41 = PltPxM.tolil()
        LD42 = DltDzM + DLPTDZM
        LD43 = None
-       LD44 = UPXM
-       '''
+       LD44 = UPXM.tolil()
+       
+       DDXBC = REFS[2]
+       dHdX = REFS[6]
        # Compute coupled boundary adjustments
        UBC = sps.diags(U[botdex], offsets=0, format='csr')
        DuDxBC = sps.diags(DqDx[botdex,0], offsets=0, format='csr')
        ZDUDZBC = sps.diags(dHdX * DQDZ[botdex,0], offsets=0, format='csr')
        LD11[np.ix_(botdex,botdex)] = UBC.dot(DDXBC) + DuDxBC + ZDUDZBC
-       LD12[np.ix_(botdex,botdex)] *= 0.0
        
-       WBC = sps.diags(fields[botdex,1], offsets=0, format='csr')
-       ZDUDXBC = sps.diags(dHdX * DDXBC.dot(U[botdex]), offsets=0, format='csr')
+       WBC = sps.diags(dHdX * U[botdex], offsets=0, format='csr')
+       ZDuDxBC = sps.diags(dHdX * DqDx[botdex,0], offsets=0, format='csr')
+       ZDUDXBC = sps.diags(np.power(dHdX, 2.0) * DQDZ[botdex,0], offsets=0, format='csr')
        METBC = sps.diags(2.0 * U[botdex] * DDXBC.dot(dHdX), offsets=0, format='csr')
-       LD21[np.ix_(botdex,botdex)] = WBC.dot(DDXBC) + ZDUDXBC + METBC
-       LD22[np.ix_(botdex,botdex)] *= 0.0
-       #
+       LD21[np.ix_(botdex,botdex)] = WBC.dot(DDXBC) + ZDuDxBC + ZDUDXBC + METBC
+       
        DlpDxBC = sps.diags(DqDx[botdex,2], offsets=0, format='csr')
        ZDLPDZBC = sps.diags(dHdX * DQDZ[botdex,2], offsets=0, format='csr')
-       CONTBC = gam * DDXBC
+       CONTBC = gam * DDXBC 
        LD31[np.ix_(botdex,botdex)] = DlpDxBC + ZDLPDZBC + CONTBC
-       LD32[np.ix_(botdex,botdex)] *= 0.0
        LD33[np.ix_(botdex,botdex)] = UBC.dot(DDXBC)
-       #
+       
        DlptDxBC = sps.diags(DqDx[botdex,3], offsets=0, format='csr')
        ZDLPTDZBC = sps.diags(dHdX * DQDZ[botdex,3], offsets=0, format='csr')
        LD41[np.ix_(botdex,botdex)] = DlptDxBC + ZDLPTDZBC
-       LD42[np.ix_(botdex,botdex)] *= 0.0
        LD44[np.ix_(botdex,botdex)] = UBC.dot(DDXBC)
-       '''
+       
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
                LD31, LD32, LD33, LD34, \
@@ -336,6 +335,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        # Compute derivative of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
+       
        # Compute advection
        UDqDx = U.dot(DqDx)
        WDqDz = WXZ.dot(DqDz)
@@ -347,22 +347,31 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        PGFZ1 = RdT * (DqDz[:,2])
        PGFZ2 = -gc * T_ratio
        PGFZ = PGFZ1 + PGFZ2
+       
+       # Compute incompressibility constraint
+       PuPx = np.array(DqDx[:,0] - DZDX * DqDz[:,0])
+       PwPz = DqDz[:,1]
+       incomp = gam * (PuPx + PwPz)
+       
+       # Compute boundary adjustments
+       dHdX = REFS[6]
+       transport[botdex] = UDqDx[botdex] + dHdX * U[botdex] * DQDZ[botdex,0]
+       incomp[botdex] = gam * (DqDx[botdex,0] + dHdX * DQDZ[botdex,0])
+       
        '''
        print('U transport: ', np.linalg.norm(transport[:,0]))
        print('U force: ', np.linalg.norm(PGFX))
        print('W transport: ', np.linalg.norm(transport[:,1]))
        print('W force: ', np.linalg.norm(PGFZ1), np.linalg.norm(PGFZ2), np.linalg.norm(PGFZ))
        '''
+
        def DqDt():
               # Horizontal momentum equation
               DuDt = -(transport[:,0] + PGFX)
               # Vertical momentum equation
               DwDt = -(transport[:,1] + PGFZ)
               # Pressure (mass) equation
-              PuPx = np.array(DqDx[:,0] - DZDX * DqDz[:,0])
-              PwPz = DqDz[:,1]
-              LD33 = gam * (PuPx + PwPz)
-              DpDt = -(transport[:,2] + LD33)
+              DpDt = -(transport[:,2] + incomp)
               # Potential Temperature equation
               DtDt = -(transport[:,3])
               

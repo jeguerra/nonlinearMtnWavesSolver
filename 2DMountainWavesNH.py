@@ -330,8 +330,8 @@ if __name__ == '__main__':
               del(DOPS_NL)
               
               # Compute the RHS for this iteration
-              SOLT[wbdex,0] += WBC
-              SOLT[wbdex,1] = WBC
+              #SOLT[wbdex,0] += WBC
+              #SOLT[wbdex,1] = WBC
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
@@ -456,9 +456,10 @@ if __name__ == '__main__':
                      
               #%% Update the interior and boundary solution
               SOLT[sysDex,0] += sol
-              
+              SOLT[wbdex,0] += WBC
               # Store solution change to instance 1
               SOLT[sysDex,1] = sol
+              SOLT[wbdex,1] = WBC
               
               print('Recover full linear solution vector... DONE!')
               
