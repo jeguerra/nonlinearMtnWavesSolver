@@ -100,7 +100,7 @@ if __name__ == '__main__':
        
        # Set restarting
        toRestart = True
-       isRestart = True
+       isRestart = False
        restart_file = 'restartDB'
        
        # Set physical constants (dry air)
@@ -301,6 +301,9 @@ if __name__ == '__main__':
               
               # Change in vertical velocity at boundary
               WBC = dHdX * SOLT[ubdex,1]
+              
+              # Check the RHS for this iteration
+              err = displayResiduals('Applied boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -310,12 +313,39 @@ if __name__ == '__main__':
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
+              
+              # Initialize boundary forcing
+              #'''
+              # USE THIS TO SET THE INITIAL W FIELD WITH EVANESCENT MODES
+              # Compute the background Scorer parameter
+              D2UDZ2 = (REFS[11]).dot(DQDZ[:,0])
+              D2UDZ2 = np.reshape(D2UDZ2, (NZ,NX+1), order='F')
+              DLPTDZ = np.reshape(DQDZ[:,3], (NZ,NX+1), order='F')
+              l2 = gc * DLPTDZ * np.reciprocal(np.power(UZ, 2.0))
+              l2 -= D2UDZ2 * np.reciprocal(UZ)
+              # Compute the evanescent decay
+              m2 = l2[0,:] - mt.pi / lC
+              fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex, m2)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+              err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
+              #'''
+              '''
+              # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
+              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+              err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
+              del(U); del(fields)
+              '''
        
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
-              # Test evaluation of FIRST Jacobian with/without boundary condition
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex, isRestart)
+              
+              # UNCOMMENT THIS TO SET JACOBIAN TO REST STATE
+              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
+              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex, True)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               del(U); del(fields)
               print('Compute Jacobian operator blocks: DONE!')
@@ -329,54 +359,8 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
-              if isRestart:
-                     ''' INWARD COUPLING ISN'T NECESSARY
-                     DHDX = sps.diags(dHdX, offsets=0, format='csr')
-                     (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
-                     (DOPS[4])[:,ubdex] += ((DOPS[5] + ROPS[1])[:,ubdex]).dot(DHDX)
-                     (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
-                     (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
-                     del(DHDX)
-                     '''
-                     # Compute the RHS for this iteration
-                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
-                     err = displayResiduals('Applied boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
-              else:
-                     # Initialize boundary forcing
-                     #'''
-                     # Compute the background Scorer parameter
-                     D2UDZ2 = (REFS[11]).dot(DQDZ[:,0])
-                     D2UDZ2 = np.reshape(D2UDZ2, (NZ,NX+1), order='F')
-                     DLPTDZ = np.reshape(DQDZ[:,3], (NZ,NX+1), order='F')
-                     l2 = gc * DLPTDZ * np.reciprocal(np.power(UZ, 2.0))
-                     l2 -= D2UDZ2 * np.reciprocal(UZ)
-                     # Compute the evanescent decay
-                     m2 = l2[0,:] - mt.pi / lC
-                     fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex, m2)
-                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
-                     err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
-                     del(U); del(fields)
-                     #'''
-                     '''
-                     RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
-                     RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
-                     RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
-                     RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
-                     err = displayResiduals('Initial boundary Jacobian product: ', RHS, 0.0, udex, wdex, pdex, tdex)
-                     '''
-                     '''
-                     fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
-                     err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
-                     del(U); del(fields)
-                     '''
-              
               bN = np.array(RHS)
-              input()
+              #input()
               
               # Apply the BC adjustments and indexing block-wise
               A = DOPS[0]              

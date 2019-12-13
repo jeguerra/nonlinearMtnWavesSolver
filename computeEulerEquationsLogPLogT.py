@@ -350,13 +350,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        PuPx = np.array(DqDx[:,0] - DZDX * DqDz[:,0])
        PwPz = DqDz[:,1]
        incomp = gam * (PuPx + PwPz)
-       
-       '''
-       print('U transport: ', np.linalg.norm(transport[:,0]))
-       print('U force: ', np.linalg.norm(PGFX))
-       print('W transport: ', np.linalg.norm(transport[:,1]))
-       print('W force: ', np.linalg.norm(PGFZ1), np.linalg.norm(PGFZ2), np.linalg.norm(PGFZ))
-       '''
 
        def DqDt():
               # Horizontal momentum equation
