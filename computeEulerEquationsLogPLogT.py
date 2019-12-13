@@ -99,6 +99,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
+       kap = PHYS[4]
        gam = PHYS[6]
        
        # Get the derivative operators
@@ -107,7 +108,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
-       wxz = fields[:,1]
+       wxz = np.array(fields[:,1])
        UZX = U * DZDX
        WXZ = wxz - UZX
 
@@ -147,7 +148,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
        T_bar = (1.0 / Rd) * RdT_bar[:,0]
-       T_ratio = np.exp(fields[:,2] + fields[:,3]) - 1.0
+       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        T_prime = T_ratio * T_bar
        RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
@@ -164,13 +165,15 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       LD11 = (UPXM + PuPxM).tolil()
+       #LD11 = (UPXM + PuPxM).tolil()
+       LD11 = PuPxM + PPXM
        LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
        LD21 = PwPxM.tolil()
-       LD22 = UPXM + DwDzM
+       #LD22 = UPXM + DwDzM
+       LD22 = UM.dot(PPXM) + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
@@ -307,6 +310,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
+       kap = PHYS[4]
        gam = PHYS[6]
        
        # Get the derivative operators
@@ -316,7 +320,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
-       wxz = fields[:,1]
+       wxz = np.array(fields[:,1])
        UZX = U * DZDX
        WXZ = wxz - UZX
        
@@ -338,7 +342,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
        transport = UDqDx + WDqDz + wDQDZ
        
        # Compute pressure gradient forces
-       T_ratio = np.exp(fields[:,2] + fields[:,3]) - 1.0
+       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
        PGFZ1 = RdT * (DqDz[:,2])
        PGFZ2 = -gc * T_ratio
