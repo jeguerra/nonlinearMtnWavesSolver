@@ -329,17 +329,6 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
-              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
-              err = displayResiduals('Applied boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
-              del(U); del(fields); del(RHS)
-
-              # Compute the RHS for this iteration
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
-              err = displayResiduals('Initial function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
               if isRestart:
                      DHDX = sps.diags(dHdX, offsets=0, format='csr')
                      (DOPS[0])[:,ubdex] += ((DOPS[1])[:,ubdex]).dot(DHDX)
@@ -347,14 +336,26 @@ if __name__ == '__main__':
                      (DOPS[8])[:,ubdex] += ((DOPS[9])[:,ubdex]).dot(DHDX)
                      (DOPS[12])[:,ubdex] +=((DOPS[13])[:,ubdex]).dot(DHDX)
                      del(DHDX)
+                     
+                     # Compute the RHS for this iteration
+                     fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+                     err = displayResiduals('Initial function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
               else:
+                     '''
                      # Initialize boundary forcing
                      RHS[udex] -= ((DOPS[1])[:,ubdex]).dot(WBC)
                      RHS[wdex] -= ((DOPS[5] + ROPS[1])[:,ubdex]).dot(WBC)
                      RHS[pdex] -= ((DOPS[9])[:,ubdex]).dot(WBC)
                      RHS[tdex] -= ((DOPS[13])[:,ubdex]).dot(WBC)
+                     err = displayResiduals('Applied boundary Jacobian product: ', RHS, 0.0, udex, wdex, pdex, tdex)
+                     '''
+                     fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+                     RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
+                     RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+                     err = displayResiduals('Applied boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
               
-              err = displayResiduals('Applied boundary Jacobian product: ', RHS, 0.0, udex, wdex, pdex, tdex)
               bN = np.array(RHS)
               del(U); del(fields)
               #input()
