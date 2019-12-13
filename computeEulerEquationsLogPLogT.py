@@ -10,7 +10,7 @@ import math as mt
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
-def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, m2):
        # Get some physical quantities
        P0 = PHYS[1]
        Rd = PHYS[3]
@@ -30,21 +30,14 @@ def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        # Update vertical velocity at the boundary
        dHdX = REFS[6]
        fields[botdex,1] = dHdX * np.array(U[botdex])
-       #plt.figure()
-       #plt.plot(fields[botdex,1])
+       
        # Make a smooth vertical decay for the input W
        ZTL = REFS[5]
-       zeroLev = 10
-       p = 4
-       DZ = ZTL[zeroLev,:] - ZTL[0,:]
-       for kk in range(1,zeroLev+1):
-              normZlev = ZTL[kk,:] * np.reciprocal(DZ)
-              # Polynomial decay
-              fields[botdex+kk,1] = np.power(normZlev - 1.0, p) * \
-                                    np.array(fields[botdex,1])
-              # Polynomial cosine decay
-              #fields[botdex+kk,1] = np.power(np.cos(0.5 * mt.pi * normZlev), p) * \
-              #                      np.array(fields[botdex,1])
+       
+       for kk in range(ZTL.shape[0]):
+              zlev = ZTL[kk,:] - ZTL[0,:]
+              # exponential decay by evanescent mode
+              fields[botdex+kk,1] = np.array(fields[botdex,1]) * np.exp(m2 * zlev)
               
               #plt.plot(fields[botdex+kk,1])
               
