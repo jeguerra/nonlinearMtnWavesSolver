@@ -95,7 +95,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        return fields, U, RdT
 
 #%% Evaluate the Jacobian matrix
-def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
+def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, isRestart):
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
@@ -161,28 +161,33 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       UDXM = UM.dot(DDXM)
        
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       #LD11 = (UPXM + PuPxM).tolil()
-       LD11 = PuPxM + PPXM
+       if not isRestart:
+              LD11 = UDXM + PuPxM
+       else:
+              LD11 = UPXM + PuPxM
        LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = PwPxM.tolil()
-       #LD22 = UPXM + DwDzM
-       LD22 = UM.dot(PPXM) + DwDzM
+       LD21 = PwPxM
+       if not isRestart:
+              LD22 = UDXM + DwDzM
+       else:
+              LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
-       LD31 = (gam * PPXM + PlpPxM).tolil()
+       LD31 = gam * PPXM + PlpPxM
        LD32 = gam * DDZM + DlpDzM + DLPDZM
        LD33 = UPXM
        LD34 = None
        
-       LD41 = PltPxM.tolil()
+       LD41 = PltPxM
        LD42 = DltDzM + DLPTDZM
        LD43 = None
        LD44 = UPXM
