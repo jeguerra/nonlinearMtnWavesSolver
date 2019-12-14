@@ -300,7 +300,7 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Change in vertical velocity at boundary
-              WBC = dHdX * SOLT[ubdex,1]
+              #WBC = dHdX * SOLT[ubdex,1]
               
               # Check the RHS for this iteration
               err = displayResiduals('Applied boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
@@ -310,12 +310,13 @@ if __name__ == '__main__':
               
               # Initial change in vertical velocity at boundary
               WBC = dHdX * INIT[ubdex]
+              SOLT[wbdex,0] = WBC
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
               
               # Initialize boundary forcing
-              #'''
+              '''
               # USE THIS TO SET THE INITIAL W FIELD WITH EVANESCENT MODES
               # Compute the background Scorer parameter
               D2UDZ2 = (REFS[11]).dot(DQDZ[:,0])
@@ -329,23 +330,28 @@ if __name__ == '__main__':
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
               err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
-              #'''
               '''
+              #'''
               # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
-              fields, U, RdT = eqs.computeUpdatedFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
               err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields)
-              '''
+              #'''
        
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
-              # UNCOMMENT THIS TO SET JACOBIAN TO REST STATE
-              #fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              # MULTIPLY SOLUTION ARGUMENT BY 0.0 TO EVALUATE INTIAL JACOBIAN AT REST STATE
+              if not isRestart:
+                     currentState = 0.0 * np.array(SOLT[:,0])
+              else:
+                     currentState = np.array(SOLT[:,0])
+                     
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, currentState, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
-              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex, True)
+              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex, isRestart)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
               del(U); del(fields)
               print('Compute Jacobian operator blocks: DONE!')
@@ -480,10 +486,11 @@ if __name__ == '__main__':
                      
               #%% Update the interior and boundary solution
               SOLT[sysDex,0] += sol
-              SOLT[wbdex,0] += WBC
+              dWBC = dHdX * SOLT[ubdex,0]
+              SOLT[wbdex,0] += dWBC
               # Store solution change to instance 1
               SOLT[sysDex,1] = sol
-              SOLT[wbdex,1] = WBC
+              SOLT[wbdex,1] = dWBC
               
               print('Recover full linear solution vector... DONE!')
               
