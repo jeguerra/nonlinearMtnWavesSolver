@@ -300,7 +300,7 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Change in vertical velocity at boundary
-              WBC = dHdX * SOLT[ubdex,1]
+              dWBC = dHdX * SOLT[ubdex,1]
               
               # Check the RHS for this iteration
               err = displayResiduals('Applied boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
@@ -309,39 +309,29 @@ if __name__ == '__main__':
               SOLT = np.zeros((numVar * OPS, 2))
               
               # Initial change in vertical velocity at boundary
-              WBC = dHdX * INIT[ubdex]
+              dWBC = dHdX * INIT[ubdex]
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
               
-              # Initialize boundary forcing
-              '''
-              # USE THIS TO SET THE INITIAL W FIELD WITH EVANESCENT MODES
-              # Compute the background Scorer parameter
-              D2UDZ2 = (REFS[11]).dot(DQDZ[:,0])
-              D2UDZ2 = np.reshape(D2UDZ2, (NZ,NX+1), order='F')
-              DLPTDZ = np.reshape(DQDZ[:,3], (NZ,NX+1), order='F')
-              l2 = gc * DLPTDZ * np.reciprocal(np.power(UZ, 2.0))
-              l2 -= D2UDZ2 * np.reciprocal(UZ)
-              # Compute the evanescent decay
-              m2 = l2[0,:] - mt.pi / lC
-              fields, U, RdT = eqs.computeInitialFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex, m2)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
-              err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
-              '''
+       # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
+       currentState = np.array(SOLT[:,0])
+       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, currentState, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              
+       # Update the boundary condition
+       SOLT[wbdex,0] += dWBC
+       
+       # Prepared the forced fields (TO EVALUATE CHANGE IN FORCING)
+       forcedState = np.array(SOLT[:,0])
+       fields_Fc, U_Fc, RdT_Fc = eqs.computePrepareFields(PHYS, REFS, forcedState, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
        
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
-              # MULTIPLY SOLUTION ARGUMENT BY 0.0 TO EVALUATE INTIAL JACOBIAN AT REST STATE
-              currentState = np.array(SOLT[:,0])
-                     
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, currentState, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
-              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex, isRestart)
+              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex, True)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
-              del(U); del(fields)
+
               print('Compute Jacobian operator blocks: DONE!')
               
               # Convert blocks to 'lil' format for efficient indexing
@@ -353,16 +343,13 @@ if __name__ == '__main__':
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
-              # Update the boundary condition
-              SOLT[wbdex,0] += WBC
-              
+              #'''
               # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields_Fc), U_Fc, RdT_Fc, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields_Fc), ubdex, utdex) 
               err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields)
-              
+              #'''
               bN = np.array(RHS)
               #input()
               
@@ -474,7 +461,7 @@ if __name__ == '__main__':
                      f2 = f2 - CS.dot(sol1)
                      sol2 = dsl.lu_solve(factorDS, f2)
                      print('Solve for ln(p) and ln(theta)... DONE!')
-                     sol = np.concatenate((sol1, sol2))
+                     dsol = np.concatenate((sol1, sol2))
                      
                      # Get memory back
                      del(BS); del(CS)
@@ -483,11 +470,9 @@ if __name__ == '__main__':
                      del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
-              SOLT[sysDex,0] += sol
-              #dWBC = dHdX * SOLT[ubdex,0]
-              #SOLT[wbdex,0] += dWBC
+              SOLT[sysDex,0] += dsol
               # Store solution change to instance 1
-              SOLT[sysDex,1] = sol
+              SOLT[sysDex,1] = dsol
               
               print('Recover full linear solution vector... DONE!')
               
@@ -552,8 +537,6 @@ if __name__ == '__main__':
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
                                    cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
-                            
-                     #sys.exit(2)
                      
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
@@ -563,6 +546,7 @@ if __name__ == '__main__':
                             sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
                      SOLT[sysDex,0] = sol
+                     SOLT[wbdex,0] = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
                      RHS[sysDex] = rhs
               
               # Copy state instance 0 to 1
