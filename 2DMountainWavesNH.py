@@ -98,9 +98,11 @@ if __name__ == '__main__':
        SolveFull = False
        SolveSchur = True
        
-       # Set restarting
-       toRestart = True
-       isRestart = False
+       # Set Newton solve initial and restarting parameters
+       toRestart = True # Saves resulting state to restart database
+       isRestart = True # Initializes from a restart database
+       isLinMFlux = False # Neglect nonlinear momentum flux terms in Jacobian
+       updateForceBC = False # Updates boundary forcing on restart or not
        restart_file = 'restartDB'
        
        # Set physical constants (dry air)
@@ -300,10 +302,12 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Change in vertical velocity at boundary
-              dWBC = dHdX * SOLT[ubdex,1]
-              
-              # Check the RHS for this iteration
-              err = displayResiduals('Applied boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
+              if updateForceBC:
+                     # Updates nolinear boundary condition to next Newton iteration
+                     dWBC = dHdX * SOLT[ubdex,1]
+              else:
+                     # Keeps boundary condition from previous iteration
+                     dWBC = 0.0
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -329,7 +333,8 @@ if __name__ == '__main__':
        if (StaticSolve or LinearSolve):
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
-              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex, True)
+              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
+                            np.array(fields_Fc), U_Fc, RdT_Fc, ubdex, utdex, isLinMFlux)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
@@ -345,7 +350,8 @@ if __name__ == '__main__':
               
               #'''
               # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields_Fc), U_Fc, RdT_Fc, ubdex, utdex)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, \
+                            np.array(fields_Fc), U_Fc, RdT_Fc, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields_Fc), ubdex, utdex) 
               err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields)

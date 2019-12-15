@@ -88,7 +88,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        return fields, U, RdT
 
 #%% Evaluate the Jacobian matrix
-def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, isRestart):
+def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, isLinMFlux):
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
@@ -152,26 +152,25 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute partial in X terrain following block
        PPXM = DDXM - DZDXM.dot(DDZM)
        
+       # Switch nonlinearities in momentum flux on or off
+       if isLinMFlux:
+              NLS = 0.0
+       else:
+              NLS = 1.0
+       
        # Compute common horizontal transport block
-       UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
-       UDXM = UM.dot(DDXM)
+       UPXM = UM.dot(DDXM) + NLS * WXZM.dot(DDZM)
        
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       if not isRestart:
-              LD11 = UDXM + PuPxM
-       else:
-              LD11 = UPXM + PuPxM
-       LD12 = DuDzM + DUDZM
+       LD11 = UPXM + NLS * PuPxM
+       LD12 = NLS * DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = PwPxM
-       if not isRestart:
-              LD22 = UDXM + DwDzM
-       else:
-              LD22 = UPXM + DwDzM
+       LD21 = NLS * PwPxM
+       LD22 = UPXM + NLS * DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
