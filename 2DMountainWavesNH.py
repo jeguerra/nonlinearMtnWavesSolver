@@ -612,24 +612,35 @@ if __name__ == '__main__':
        if StaticSolve:
               fig = plt.figure(figsize=(12.0, 6.0))
               # 1 X 3 subplot of W for linear, nonlinear, and difference
+              
               plt.subplot(2,2,1)
-              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-              plt.title('Linear - W (m/s)')
-              plt.subplot(2,2,3)
-              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpNL[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-              cbar = fig.colorbar(ccheck)
-              plt.xlim(-30.0, 50.0)
-              plt.title('Nonlinear - W (m/s)')
-              plt.subplot(1,2,2)
-              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)
-              cbar = fig.colorbar(ccheck)
-              #plt.contour(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 51, colors='black', linewidths=1.25)
-              plt.xlim(-15.0, 25.0)
               plt.ylim(0.0, 30.0)
-              plt.title('Difference - W (m/s)')
+              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+              plt.title('Change U - (m/s/s)')
+              
+              plt.subplot(2,2,3)
+              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              cbar = fig.colorbar(ccheck)
+              plt.xlim(-30.0, 50.0)
+              plt.ylim(0.0, 30.0)
+              plt.title('Change W - (m/s/s)')
+              
+              flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
+              slopeAngle = np.arctan(dHdX)
+              
+              plt.subplot(2,2,2)
+              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b--', 1.0E-3 * REFS[0], slopeAngle, 'b--')
+              plt.xlim(-15.0, 25.0)
+              plt.title('Flow vector angle and terrain angle')
+              
+              plt.subplot(2,2,4)
+              plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
+              plt.xlim(-15.0, 25.0)
+              plt.title('Boundary Constraint |Delta| - (m/s)')
+              
               plt.tight_layout()
               plt.show()
               
