@@ -16,10 +16,14 @@ from computeResidualViscCoeffs import computeResidualViscCoeffs
 def pause():
     input("Press the <ENTER> key to continue...")
 
-def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, sysDex):
+def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, wbdex, sysDex):
+       dHdX = REFS[6]
        lastSol = SOLT[:,0]
        
        def computeRHSUpdate(sol):
+              # Update the BC
+              sol[wbdex] = dHdX * (INIT[botdex] + sol[botdex])
+              # Function evaluation
               fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
               rhs += tendency.computeRayleighTendency(REFG, fields, botdex, topdex)

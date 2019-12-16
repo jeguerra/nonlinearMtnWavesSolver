@@ -495,13 +495,15 @@ if __name__ == '__main__':
               '''
               #%% Use the linear solution as the initial guess to the nonlinear solution
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
-              SOLT[:,1] = sol
+              SOLT[:,1] = sol - SOLT[:,0]
+              SOLT[:,0] = sol
               
               # Initialize the RHS and forcing for each field
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-              print('Residual 2-norm after iterative NL solve: ', np.linalg.norm(RHS))
+              message = 'Residual 2-norm AFTER NL iterative steps:'
+              err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               '''
               # Check the change in the solution
               DSOL = np.array(SOLT[:,1])
@@ -552,7 +554,7 @@ if __name__ == '__main__':
                             sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
                      SOLT[sysDex,0] = sol
-                     SOLT[wbdex,0] = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
+                     #SOLT[wbdex,0] = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
                      RHS[sysDex] = rhs
               
               # Copy state instance 0 to 1

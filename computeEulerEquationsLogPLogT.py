@@ -89,6 +89,12 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
 
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex, isLinMFlux):
+       # Switch nonlinearities in momentum flux on or off
+       if isLinMFlux:
+              NLS = 0.0
+       else:
+              NLS = 1.0
+              
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
@@ -135,6 +141,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        
        # Compute advective (multiplicative) diagonal operators
        UM = sps.diags(U, offsets=0, format='csr')
+       WM = sps.diags(wxz, offsets=0, format='csr')
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
        RdTM = sps.diags(RdT, offsets=0, format='csr')
        
@@ -152,25 +159,21 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute partial in X terrain following block
        PPXM = DDXM - DZDXM.dot(DDZM)
        
-       # Switch nonlinearities in momentum flux on or off
-       if isLinMFlux:
-              NLS = 0.0
-       else:
-              NLS = 1.0
-       
        # Compute common horizontal transport block
-       UPXM = UM.dot(DDXM) + NLS * WXZM.dot(DDZM)
+       UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       # Compute the vertical velocity transport block with nonlinearity switch
+       UPXMW = UM.dot(PPXM) + NLS * (WM.dot(DDZM) + DwDzM)
        
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UPXM + NLS * PuPxM
+       LD11 = UPXM + PuPxM
        LD12 = NLS * DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = NLS * PwPxM
-       LD22 = UPXM + NLS * DwDzM
+       LD21 = PwPxM + (1.0 - NLS) * DZDXM.dot(DwDzM) # NLS = 0.0 will cancel TF term
+       LD22 = UPXMW
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        

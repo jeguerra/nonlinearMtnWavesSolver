@@ -78,7 +78,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex
        def computeUpdate(coeff, sol, RHS, SGS):
               dsol = coeff * DT * (RHS + SGS)
               sol += dsol
-              #sol[wbdex] += dHdX * dsol[botdex]
+              sol[wbdex] += dHdX * dsol[botdex]
               
               return sol
        #'''
