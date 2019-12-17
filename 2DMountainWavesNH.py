@@ -102,7 +102,7 @@ if __name__ == '__main__':
        toRestart = True # Saves resulting state to restart database
        isRestart = True # Initializes from a restart database
        isLinMFlux = False # Neglect nonlinear momentum flux terms in Jacobian
-       updateForceBC = False # Updates boundary forcing on restart or not
+       #updateForceBC = False # Updates boundary forcing on restart or not
        restart_file = 'restartDB'
        
        # Set physical constants (dry air)
@@ -301,13 +301,8 @@ if __name__ == '__main__':
               print('Restarting from previous solution...')
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
-              # Change in vertical velocity at boundary
-              if updateForceBC:
-                     # Updates nolinear boundary condition to next Newton iteration
-                     dWBC = dHdX * SOLT[ubdex,1]
-              else:
-                     # Keeps boundary condition from previous iteration
-                     dWBC = 0.0
+              # Updates nolinear boundary condition to next Newton iteration
+              dWBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -317,24 +312,17 @@ if __name__ == '__main__':
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
-              
+            
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
        fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, currentState, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
               
-       # Update the boundary condition
-       SOLT[wbdex,0] += dWBC
-       
-       # Prepared the forced fields (TO EVALUATE CHANGE IN FORCING)
-       forcedState = np.array(SOLT[:,0])
-       fields_Fc, U_Fc, RdT_Fc = eqs.computePrepareFields(PHYS, REFS, forcedState, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-       
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                            np.array(fields_Fc), U_Fc, RdT_Fc, ubdex, utdex, isLinMFlux)
+                            np.array(fields), U, RdT, ubdex, utdex, isLinMFlux)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
@@ -351,15 +339,38 @@ if __name__ == '__main__':
               #'''
               # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, \
-                            np.array(fields_Fc), U_Fc, RdT_Fc, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields_Fc), ubdex, utdex) 
-              err = displayResiduals('Initial boundary function evaluation: ', RHS, 0.0, udex, wdex, pdex, tdex)
+                            np.array(fields), U, RdT, ubdex, utdex)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+              err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields)
-              #'''
-              bN = np.array(RHS)
-              #input()
               
-              # Apply the BC adjustments and indexing block-wise
+              bN = np.concatenate((RHS, dWBC))
+              
+              # Compute Lagrange multiplier augmentation matrices
+              C1 = sps.diags(-dHdX, offsets=0, format='lil')
+              C2 = sps.eye(NX+1, format='lil')
+              colShape = (OPS,NX+1)
+              LD = sps.lil_matrix(colShape)
+              LD[ubdex,:] = C1
+              LH = sps.lil_matrix(colShape)
+              LH[ubdex,:] = C2
+              LM = sps.lil_matrix(colShape)
+              LQ = sps.lil_matrix(colShape)
+              
+              # Apply BC adjustments  and indexing block-wise (Lagrange blocks)
+              LDA = LD
+              LHA = LH[wbcDex,:]
+              LMA = LM
+              LQAC = LQ[tbcDex,:]
+              
+              # Apply transpose for row augmentation
+              LNA = LDA.T
+              LOA = LHA.T
+              LPA = LMA.T
+              LQAR = LQAC.T
+              LDIA = C2
+              
+              # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0]              
               B = DOPS[1][:,wbcDex]
               C = DOPS[2]
@@ -390,11 +401,23 @@ if __name__ == '__main__':
               
               # Set up Schur blocks or full operator...
               if (StaticSolve and SolveSchur) and not LinearSolve:
+                     # Add Rayleigh damping terms
+                     A += R1
+                     F += R2
+                     K += R3
+                     Q += R4
+                     
                      # Compute the partitions for Schur Complement solution (SPARSE)
-                     AS = sps.bmat([[A + R1, B], [E, F + R2]], format='csc')
-                     BS = sps.bmat([[C, D], [G, H]], format='csc')
-                     CS = sps.bmat([[I, J], [N, O]], format='csc')
-                     DS = sps.bmat([[K + R3, M], [P, Q + R4]], format='csc')
+                     AS = sps.bmat([[A, B], \
+                                    [E, F]], format='csc')
+                     BS = sps.bmat([[C, D, LDA], \
+                                    [G, H, LHA]], format='csc')
+                     CS = sps.bmat([[I, J], \
+                                    [N, O], \
+                                    [LNA, LOA]], format='csc')
+                     DS = sps.bmat([[K, M, LMA], \
+                                    [P, Q, LQAC], \
+                                    [LPA, LQAR, LDIA]], format='csc')
                      
                      # Compute the partitions for Schur Complement solution (FULL)
                      AS = AS.toarray()
@@ -406,7 +429,7 @@ if __name__ == '__main__':
                      fw = bN[wdex]
                      f1 = np.concatenate((bN[udex], fw[wbcDex]))
                      ft = bN[tdex]
-                     f2 = np.concatenate((bN[pdex], ft[tbcDex]))
+                     f2 = np.concatenate((bN[pdex], ft[tbcDex], dWBC))
                      del(bN)
                      
               if LinearSolve or (StaticSolve and SolveFull):
@@ -476,9 +499,10 @@ if __name__ == '__main__':
                      del(f1_hat); del(f2_hat); del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
-              SOLT[sysDex,0] += dsol
+              dsolQ = dsol[0:(len(dsol) - (NX+1))]
+              SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
-              SOLT[sysDex,1] = dsol
+              SOLT[sysDex,1] = dsolQ
               
               print('Recover full linear solution vector... DONE!')
               
@@ -492,8 +516,9 @@ if __name__ == '__main__':
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              '''
+              
               #%% Use the linear solution as the initial guess to the nonlinear solution
+              '''
               sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
               SOLT[:,1] = sol - SOLT[:,0]
               SOLT[:,0] = sol
@@ -634,7 +659,7 @@ if __name__ == '__main__':
               slopeAngle = np.arctan(dHdX)
               
               plt.subplot(2,2,2)
-              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b--', 1.0E-3 * REFS[0], slopeAngle, 'b--')
+              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b--', 1.0E-3 * REFS[0], slopeAngle, 'k-')
               plt.xlim(-15.0, 25.0)
               plt.title('Flow vector angle and terrain angle')
               

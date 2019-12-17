@@ -31,15 +31,16 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        ttdex = np.add(utdex, iT * OPS)
        
        # Local block-wide indices
-       rowsOutW = set(np.concatenate((ubdex, utdex)))
+       #rowsOutW = set(np.concatenate((ubdex, utdex)))
+       rowsOutW = set(utdex)
        rowsOutT = set(utdex)
        rowsAll = set(np.array(range(0,OPS)))
        
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
-       # BC: w' = dh/dx (U + u') so that w' is at top and bottom boundaries
-       rowsOutBC = set(np.concatenate((wbdex, wtdex, ttdex)))
+       # BC: W' and Theta' = 0.0 at the top boundary
+       rowsOutBC = set(np.concatenate((wtdex, ttdex)))
        # DOF along the vertical boundaries
        #rowsInterior = set(np.concatenate((ubdex, utdex, wbdex, wtdex, pbdex, ptdex, tbdex, ttdex)))
        # All DOF

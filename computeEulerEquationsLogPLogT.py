@@ -186,30 +186,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD42 = DltDzM + DLPTDZM
        LD43 = None
        LD44 = UPXM
-       '''
-       DDXBC = REFS[2]
-       dHdX = REFS[6]
-       # Compute coupled boundary adjustments
-       UBC = sps.diags(U[botdex], offsets=0, format='csr')
-       DuDxBC = sps.diags(DqDx[botdex,0], offsets=0, format='csr')
-       ZDUDZBC = sps.diags(dHdX * DQDZ[botdex,0], offsets=0, format='csr')
-       LD11[np.ix_(botdex,botdex)] = UBC.dot(DDXBC) + DuDxBC + ZDUDZBC
        
-       WBC = sps.diags(dHdX * U[botdex], offsets=0, format='csr')
-       ZDuDxBC = sps.diags(dHdX * DqDx[botdex,0], offsets=0, format='csr')
-       ZDUDXBC = sps.diags(np.power(dHdX, 2.0) * DQDZ[botdex,0], offsets=0, format='csr')
-       METBC = sps.diags(2.0 * U[botdex] * DDXBC.dot(dHdX), offsets=0, format='csr')
-       LD21[np.ix_(botdex,botdex)] = WBC.dot(DDXBC) + ZDuDxBC + ZDUDXBC + METBC
-       
-       DlpDxBC = sps.diags(DqDx[botdex,2], offsets=0, format='csr')
-       ZDLPDZBC = sps.diags(dHdX * DQDZ[botdex,2], offsets=0, format='csr')
-       CONTBC = gam * DDXBC 
-       LD31[np.ix_(botdex,botdex)] = DlpDxBC + ZDLPDZBC + CONTBC
-       
-       DlptDxBC = sps.diags(DqDx[botdex,3], offsets=0, format='csr')
-       ZDLPTDZBC = sps.diags(dHdX * DQDZ[botdex,3], offsets=0, format='csr')
-       LD41[np.ix_(botdex,botdex)] = DlptDxBC + ZDLPTDZBC
-       '''
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
                LD31, LD32, LD33, LD34, \
