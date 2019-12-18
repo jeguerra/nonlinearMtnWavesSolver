@@ -302,7 +302,7 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
-              dWBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
+              dWBC = dHdX * SOLT[ubdex,0]
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -322,7 +322,7 @@ if __name__ == '__main__':
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                            np.array(fields), U, RdT, ubdex, utdex, isLinMFlux)
+                            np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
@@ -344,6 +344,7 @@ if __name__ == '__main__':
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields)
               
+              # Compute forcing vector adding boundary forcing to the end
               bN = np.concatenate((RHS, dWBC))
               
               # Compute Lagrange multiplier augmentation matrices
@@ -363,7 +364,7 @@ if __name__ == '__main__':
               LMA = LM
               LQAC = LQ[tbcDex,:]
               
-              # Apply transpose for row augmentation
+              # Apply transpose for row augmentation (Lagrange blocks)
               LNA = LDA.T
               LOA = LHA.T
               LPA = LMA.T
@@ -433,11 +434,17 @@ if __name__ == '__main__':
                      del(bN)
                      
               if LinearSolve or (StaticSolve and SolveFull):
+                     # Add Rayleigh damping terms
+                     A += R1
+                     F += R2
+                     K += R3
+                     Q += R4
+                     
                      # Compute the global linear operator
-                     AN = sps.bmat([[A + R1, B, C, D], \
-                              [E, F + R2, G, H], \
-                              [I, J, K + R3, M], \
-                              [N, O, P, Q + R4]], format='csr')
+                     AN = sps.bmat([[A, B, C, D], \
+                              [E, F, G, H], \
+                              [I, J, K, M], \
+                              [N, O, P, Q]], format='csr')
               
                      # Compute the global linear force vector
                      bN = bN[sysDex]
@@ -579,7 +586,7 @@ if __name__ == '__main__':
                             sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
                      SOLT[sysDex,0] = sol
-                     #SOLT[wbdex,0] = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
+                     SOLT[wbdex,0] = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
                      RHS[sysDex] = rhs
               
               # Copy state instance 0 to 1
@@ -659,13 +666,12 @@ if __name__ == '__main__':
               slopeAngle = np.arctan(dHdX)
               
               plt.subplot(2,2,2)
-              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b--', 1.0E-3 * REFS[0], slopeAngle, 'k-')
-              plt.xlim(-15.0, 25.0)
+              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
+              plt.xlim(-20.0, 20.0)
               plt.title('Flow vector angle and terrain angle')
               
               plt.subplot(2,2,4)
               plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
-              plt.xlim(-15.0, 25.0)
               plt.title('Boundary Constraint |Delta| - (m/s)')
               
               plt.tight_layout()

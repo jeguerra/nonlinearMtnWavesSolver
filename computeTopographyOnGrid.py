@@ -9,6 +9,7 @@ import sys
 import numpy as np
 import math as mt
 from scipy import signal
+import matplotlib.pyplot as plt
 
 def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        
@@ -16,7 +17,7 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        xh = REFS[0]
        l2 = np.amax(xh)
        l1 = np.amin(xh)
-       numRL = 3 # number of Rayleigh width lengths to place the window function
+       numRL = 2 # number of Rayleigh width lengths to place the window function
        r2 = l2 - numRL * latRayX
        r1 = l1 + numRL * latRayX
        
@@ -41,6 +42,8 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        padP = NP - WP
        padZ = np.zeros(int(padP / 2))
        kaiserDom = np.concatenate((padZ, kaiserWin, padZ))
+       #plt.figure()
+       #plt.plot(x, kaiserDom)
        
        # Evaluate the function with different options
        if profile == 1:
