@@ -21,36 +21,36 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
+       uldex = np.array(range(1, NZ)) # exclude the corner node
+       #urdex = np.array(range(OPS-NZ, OPS))
        ubdex = np.array(range(0, (OPS - NZ + 1), NZ))
        utdex = np.array(range(NZ-1, OPS, NZ))
        wbdex = np.add(ubdex, iW * OPS)
        wtdex = np.add(utdex, iW * OPS)
        pbdex = np.add(ubdex, iP * OPS)
-       ptdex = np.add(utdex, iP * OPS)
+       #ptdex = np.add(utdex, iP * OPS)
        tbdex = np.add(ubdex, iT * OPS)
        ttdex = np.add(utdex, iT * OPS)
        
        # Local block-wide indices
-       #rowsOutW = set(np.concatenate((ubdex, utdex)))
+       rowsOutU = set(uldex)
        rowsOutW = set(utdex)
        rowsOutT = set(utdex)
        rowsAll = set(np.array(range(0,OPS)))
        
+       ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
-       # BC: W' and Theta' = 0.0 at the top boundary
-       rowsOutBC = set(np.concatenate((wtdex, ttdex)))
-       # DOF along the vertical boundaries
-       #rowsInterior = set(np.concatenate((ubdex, utdex, wbdex, wtdex, pbdex, ptdex, tbdex, ttdex)))
+       # BC: W' and Theta' = 0.0 at the top boundary, U' = 0 at the left boundary
+       rowsOutBC_static = set(np.concatenate((uldex, wtdex, ttdex)))
+       rowsOutBC_transient = set(np.concatenate((uldex, wbdex, wtdex, ttdex)))
        # All DOF
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
        # Compute set difference from all rows to rows to be taken out LINEAR
-       sysDex = rowsAll.difference(rowsOutBC)
+       sysDex = rowsAll.difference(rowsOutBC_static)
        sysDex = sorted(sysDex)
+       zeroDex = sorted(rowsOutBC_transient)
        
-       # Get index array for DOF along vertical boundaries
-       #vbcDex = sorted(rowsInterior)
-       
-       return ubdex, utdex, wbdex, pbdex, tbdex, sysDex, wbcDex, tbcDex
+       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, tbcDex, zeroDex, sysDex

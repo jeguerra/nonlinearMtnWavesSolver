@@ -68,7 +68,7 @@ def computeUpdatedFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex,
        
        return fields, U, RdT
 
-def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
+def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        # Get some physical quantities
        P0 = PHYS[1]
        Rd = PHYS[3]
@@ -275,7 +275,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
 
 # Function evaluation of the non linear equations (dynamic components)
 #@jit(nopython=True)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -331,16 +331,13 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, t
               # Potential Temperature equation
               DtDt = -(transport[:,3])
               
-              # Make boundary adjustments
-              DwDt[topdex] *= 0.0
-              DwDt[botdex] *= 0.0
-              DtDt[topdex] *= 0.0
-              
               return (DuDt, DwDt, DpDt, DtDt)
+       
+       DqDt = np.concatenate(DqDt())
                      
-       return np.concatenate(DqDt())
+       return DqDt
 
-def computeRayleighTendency(REFG, fields, botdex, topdex):
+def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
        ROPS = REFG[5]

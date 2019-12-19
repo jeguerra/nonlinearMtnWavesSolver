@@ -43,25 +43,25 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      XRL = X[ii,jj]
                      ZRL = Z[ii,jj]
                      if applyLateral:
-                            # Left layer or right layer or not?
+                            # Left layer or right layer or not? [0 1]
                             if XRL >= dLayerR:
-                                   dNormX = (L2 - XRL) / width
+                                   dNormX = (XRL - dLayerR) / width
                             elif XRL <= dLayerL:
-                                   dNormX = (XRL - L1) / width
+                                   dNormX = (dLayerL - XRL) / width
                             else:
-                                   dNormX = 1.0
-                            # Evaluate the strength of the field
-                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**4
+                                   dNormX = 0.0
+                            # Evaluate the GML factor
+                            RFX = 1.0 - (mt.cos(0.5 * mt.pi * dNormX))**4
                      else:
                             RFX = 0.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
-                                   dNormZ = (ZH - ZRL) / (ZH - height[jj])
+                                   dNormZ = (ZRL - dLayerZ[jj]) / (ZH - height[jj])
                             else:
-                                   dNormZ = 1.0
+                                   dNormZ = 0.0
                             # Evaluate the strength of the field
-                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**4
+                            RFZ = 1.0 - (mt.cos(0.5 * mt.pi * dNormZ))**4
                      else:
                             RFZ = 0.0
                      
@@ -69,12 +69,48 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      RL[ii,jj] = np.amax([RFX, RFZ])
                      # Set the binary matrix
                      if RL[ii,jj] != 0.0:
-                            SBR[ii,jj] = 1.0
+                            SBR[ii,jj] = 1.0                            
+       '''
+       plt.figure()
+       plt.contourf(X, Z, RL, 101, cmap=cm.seismic)
+       plt.show()
+       input()
+       '''                     
+       # Assemble the Grid Matching Layer field (lateral only)
+       GML = np.zeros((NZ, NX))
+       applyTopGML = False       
+       for ii in range(NZ):
+              for jj in range(NX):
+                     # Get this X location
+                     XRL = X[ii,jj]
+                     ZRL = Z[ii,jj]
+                     if applyLateral:
+                            # Left layer or right layer or not? [0 1]
+                            if XRL >= dLayerR:
+                                   dNormX = (XRL - dLayerR) / width
+                            elif XRL <= dLayerL:
+                                   dNormX = (dLayerL - XRL) / width
+                            else:
+                                   dNormX = 0.0
+                            # Evaluate the GML factor
+                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**4
+                     else:
+                            RFX = 0.0
+                     if applyTopGML:
+                            # In the top layer?
+                            if ZRL >= dLayerZ[jj]:
+                                   dNormZ = (ZRL - dLayerZ[jj]) / (ZH - height[jj])
+                            else:
+                                   dNormZ = 0.0
+                            # Evaluate the strength of the field
+                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**4
+                     else:
+                            RFZ = 0.0
+                     
+                     # Set the field to max(lateral, top) to handle corners
+                     GML[ii,jj] = np.amax([RFX, RFZ])
                             
-       #plt.figure()
-       #plt.contourf(X, Z, RL, 101, cmap=cm.seismic)
-                            
-       return RL, SBR
+       return GML, RL, SBR
 
 def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, topdex, botdex):
        # Get DIMS data
@@ -83,7 +119,7 @@ def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLatera
        OPS = NX * NZ
        
        # Set up the Rayleigh field
-       RL, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
+       GML, RL, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
        
        # Get the individual mu for each prognostic
        mu_U = mu[0]
@@ -102,6 +138,6 @@ def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLatera
        # Store the diagonal blocks corresponding to Rayleigh damping terms
        ROPS = [mu_U * RLM, mu_W * RLM, mu_P * RLM, mu_T * RLM]
        
-       return ROPS
+       return ROPS, GML
        
                             

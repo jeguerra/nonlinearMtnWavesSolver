@@ -100,9 +100,7 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = True # Initializes from a restart database
-       isLinMFlux = False # Neglect nonlinear momentum flux terms in Jacobian
-       #updateForceBC = False # Updates boundary forcing on restart or not
+       isRestart = False # Initializes from a restart database
        restart_file = 'restartDB'
        
        # Set physical constants (dry air)
@@ -194,7 +192,7 @@ if __name__ == '__main__':
        DZ = np.mean(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, pbdex, tbdex, sysDex, wbcDex, tbcDex = \
+       ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, tbcDex, zeroDex, sysDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -257,6 +255,11 @@ if __name__ == '__main__':
        del(DLPDZ)
        del(DLPTDZ)
        
+       #%% Rayleigh opearator and GML weight
+       ROPS, GML = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
+       REFG.append(ROPS)
+       GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
+       
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr')
@@ -267,7 +270,8 @@ if __name__ == '__main__':
        #REFG.append(DDZM_SP)
        
        # Update the data storage
-       REFS.append(DDXM)
+       REFS.append(GMLOP.dot(DDXM))
+       #REFS.append(DDXM)
        REFS.append(DDZM)
        # 2nd order derivatives or compact FD sparse 1st derivatives
        #REFS.append(DDXM.dot(DDXM))
@@ -283,9 +287,7 @@ if __name__ == '__main__':
        #del(DDZM_SP)
        del(DZDX)
        
-       #% Rayleigh opearator
-       ROPS = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
-       REFG.append(ROPS)
+       #%% SOLUTION INITIALIZATION
        
        # Initialize hydrostatic background
        INIT = np.zeros((numVar * OPS,))
@@ -315,7 +317,7 @@ if __name__ == '__main__':
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, currentState, INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
@@ -339,8 +341,8 @@ if __name__ == '__main__':
               #'''
               # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, \
-                            np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex) 
+                            np.array(fields), U, RdT)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields)) 
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields)
               
@@ -359,7 +361,7 @@ if __name__ == '__main__':
               LQ = sps.lil_matrix(colShape)
               
               # Apply BC adjustments  and indexing block-wise (Lagrange blocks)
-              LDA = LD
+              LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
               LMA = LM
               LQAC = LQ[tbcDex,:]
@@ -372,28 +374,28 @@ if __name__ == '__main__':
               LDIA = C2
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
-              A = DOPS[0]              
-              B = DOPS[1][:,wbcDex]
-              C = DOPS[2]
-              D = DOPS[3][:,tbcDex]
+              A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
+              B = DOPS[1][np.ix_(ubcDex,wbcDex)]
+              C = DOPS[2][ubcDex,:]
+              D = DOPS[3][np.ix_(ubcDex,tbcDex)]
               
-              E = DOPS[4][wbcDex,:]
+              E = DOPS[4][np.ix_(wbcDex,ubcDex)]
               F = DOPS[5][np.ix_(wbcDex,wbcDex)] 
               G = DOPS[6][wbcDex,:]
               H = DOPS[7][np.ix_(wbcDex,tbcDex)]
               
-              I = DOPS[8]
+              I = DOPS[8][:,ubcDex]
               J = DOPS[9][:,wbcDex]
               K = DOPS[10]
               M = DOPS[11]
               
-              N = DOPS[12][tbcDex,:]
+              N = DOPS[12][np.ix_(tbcDex,ubcDex)]
               O = DOPS[13][np.ix_(tbcDex,wbcDex)]
               P = DOPS[14]
               Q = DOPS[15][np.ix_(tbcDex,tbcDex)]
               
               # The Rayleigh operators are block diagonal
-              R1 = ROPS[0]
+              R1 = (ROPS[1].tolil())[np.ix_(ubcDex,ubcDex)]
               R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
               R3 = ROPS[2]
               R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
@@ -514,13 +516,13 @@ if __name__ == '__main__':
               print('Recover full linear solution vector... DONE!')
               
               #%% Check the output residual
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex, ubdex, utdex)
+              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
               
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
+              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT)
+              RHS += eqs.computeRayleighTendency(REFG, np.array(fields))
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               
@@ -545,11 +547,12 @@ if __name__ == '__main__':
               RHS[sysDex] = bN
               print('Starting Linear Transient Solver...')
        elif NonLinSolve:
-              sysDex = np.array(range(0, numVar * OPS))
+              #sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
                                           
        #%% Start the time loop
        if LinearSolve or NonLinSolve:
+              rampTime = 600  # 10 minutes to ramp up U_bar
               intMethodOrder = 3
               error = [np.linalg.norm(RHS)]
               for tt in range(len(TI)):
@@ -578,16 +581,24 @@ if __name__ == '__main__':
                                    cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
                      
+                     # Ramp up the background wind to decrease transients
+                     if thisTime <= rampTime:
+                            uRamp = 0.5 * (1.0 - mt.cos(mt.pi / rampTime * thisTime))
+                            UT = uRamp * INIT[udex]
+                     else:
+                            UT = INIT[udex]
+                            
+                     SOLT[wbdex,0] = dHdX * (UT[ubdex] + SOLT[ubdex,0])
+                     
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
                             sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
+                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zeroDex, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
-                     SOLT[sysDex,0] = sol
-                     SOLT[wbdex,0] = dHdX * (INIT[ubdex] + SOLT[ubdex,0])
-                     RHS[sysDex] = rhs
+                     SOLT[:,0] = sol
+                     RHS[:] = rhs
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])
