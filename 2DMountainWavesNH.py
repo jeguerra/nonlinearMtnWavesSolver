@@ -582,13 +582,12 @@ if __name__ == '__main__':
                             plt.show()
                      
                      # Ramp up the background wind to decrease transients
-                     if thisTime <= rampTime:
-                            uRamp = 0.5 * (1.0 - mt.cos(mt.pi / rampTime * thisTime))
-                            UT = uRamp * INIT[udex]
-                     else:
-                            UT = INIT[udex]
-                            
-                     SOLT[wbdex,0] = dHdX * (UT[ubdex] + SOLT[ubdex,0])
+                     if not isRestart:
+                            if thisTime <= rampTime:
+                                   uRamp = 0.5 * (1.0 - mt.cos(mt.pi / rampTime * thisTime))
+                                   UT = uRamp * INIT[udex]
+                            else:
+                                   UT = INIT[udex]
                      
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
@@ -598,6 +597,7 @@ if __name__ == '__main__':
                             sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zeroDex, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
                      SOLT[:,0] = sol
+                     SOLT[wbdex,0] = dHdX * (UT[ubdex] + SOLT[ubdex,0])
                      RHS[:] = rhs
               
               # Copy state instance 0 to 1
