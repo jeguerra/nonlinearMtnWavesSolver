@@ -21,30 +21,38 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
-       uldex = np.array(range(1, NZ)) # exclude the corner node
+       uldex = np.array(range(0, NZ)) # exclude the corner node
        #urdex = np.array(range(OPS-NZ, OPS))
        ubdex = np.array(range(0, (OPS - NZ + 1), NZ))
        utdex = np.array(range(NZ-1, OPS, NZ))
+       
+       wldex = np.add(uldex, iW * OPS)
        wbdex = np.add(ubdex, iW * OPS)
        wtdex = np.add(utdex, iW * OPS)
+       
+       pldex = np.add(uldex, iP * OPS)
        pbdex = np.add(ubdex, iP * OPS)
-       #ptdex = np.add(utdex, iP * OPS)
+       ptdex = np.add(utdex, iP * OPS)
+       
+       tldex = np.add(uldex, iT * OPS)
        tbdex = np.add(ubdex, iT * OPS)
        ttdex = np.add(utdex, iT * OPS)
        
        # Local block-wide indices
        rowsOutU = set(uldex)
-       rowsOutW = set(utdex)
-       rowsOutT = set(utdex)
+       rowsOutW = set(np.concatenate((uldex,utdex)))
+       rowsOutP = set(uldex)
+       rowsOutT = set(np.concatenate((uldex,utdex)))
        rowsAll = set(np.array(range(0,OPS)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
+       pbcDex = rowsAll.difference(rowsOutP); pbcDex = sorted(pbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
        # BC: W' and Theta' = 0.0 at the top boundary, U' = 0 at the left boundary
-       rowsOutBC_static = set(np.concatenate((uldex, wtdex, ttdex)))
-       rowsOutBC_transient = set(np.concatenate((uldex, wbdex, wtdex, ttdex)))
+       rowsOutBC_static = set(np.concatenate((uldex, wldex, pldex, tldex, wtdex, ttdex)))
+       rowsOutBC_transient = set(np.concatenate((uldex, wldex, pldex, tldex, wbdex, wtdex, ttdex)))
        # All DOF
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
@@ -53,4 +61,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        sysDex = sorted(sysDex)
        zeroDex = sorted(rowsOutBC_transient)
        
-       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, tbcDex, zeroDex, sysDex
+       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex, sysDex

@@ -117,8 +117,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 90
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 72
        OPS = (NX + 1) * NZ
        numVar = 4
        iU = 0
@@ -145,7 +145,7 @@ if __name__ == '__main__':
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-       mu *= 1.0
+       mu *= 0.5
        
        #% Transient solve parameters
        DT = 0.05 # Linear transient
@@ -193,7 +193,7 @@ if __name__ == '__main__':
        DZ = np.mean(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, tbcDex, zeroDex, sysDex = \
+       ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex, sysDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -257,9 +257,11 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Rayleigh opearator and GML weight
-       ROPS, GML = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
+       ROPS, GMLX, GMLZ = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
        REFG.append(ROPS)
-       GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
+       GMLXOP = sps.diags(np.reshape(GMLX, (OPS,), order='F'), offsets=0, format='csr')
+       GMLZOP = sps.diags(np.reshape(GMLZ, (OPS,), order='F'), offsets=0, format='csr')
+       del(GMLX); del(GMLZ)
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
@@ -271,14 +273,14 @@ if __name__ == '__main__':
        #REFG.append(DDZM_SP)
        
        # Update the data storage
-       REFS.append(GMLOP.dot(DDXM))
+       REFS.append(GMLXOP.dot(DDXM))
        #REFS.append(DDXM)
-       REFS.append(DDZM)
+       REFS.append(GMLZOP.dot(DDZM))
        # 2nd order derivatives or compact FD sparse 1st derivatives
        #REFS.append(DDXM.dot(DDXM))
        #REFS.append(DDZM.dot(DDZM))
-       REFS.append(GMLOP.dot(DDXM_SP))
-       REFS.append(DDZM_SP)
+       REFS.append(GMLXOP.dot(DDXM_SP))
+       REFS.append(GMLZOP.dot(DDZM_SP))
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
        
@@ -348,23 +350,24 @@ if __name__ == '__main__':
               del(U); del(fields)
               
               # Compute forcing vector adding boundary forcing to the end
-              bN = np.concatenate((RHS, dWBC))
+              bN = np.concatenate((RHS, dWBC[1:]))
               
-              # Compute Lagrange multiplier augmentation matrices
-              C1 = sps.diags(-dHdX, offsets=0, format='lil')
-              C2 = sps.eye(NX+1, format='lil')
-              colShape = (OPS,NX+1)
+              # Compute Lagrange multiplier augmentation matrices (exclude left corner node)
+              C1 = sps.diags(-dHdX[1:], offsets=0, format='lil')
+              C2 = sps.eye(NX, format='lil')
+              
+              colShape = (OPS,NX)
               LD = sps.lil_matrix(colShape)
-              LD[ubdex,:] = C1
+              LD[ubdex[1:],:] = C1
               LH = sps.lil_matrix(colShape)
-              LH[ubdex,:] = C2
+              LH[ubdex[1:],:] = C2
               LM = sps.lil_matrix(colShape)
               LQ = sps.lil_matrix(colShape)
               
               # Apply BC adjustments  and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
-              LMA = LM
+              LMA = LM[pbcDex,:]
               LQAC = LQ[tbcDex,:]
               
               # Apply transpose for row augmentation (Lagrange blocks)
@@ -377,28 +380,28 @@ if __name__ == '__main__':
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
               B = DOPS[1][np.ix_(ubcDex,wbcDex)]
-              C = DOPS[2][ubcDex,:]
+              C = DOPS[2][np.ix_(ubcDex,pbcDex)]
               D = DOPS[3][np.ix_(ubcDex,tbcDex)]
               
               E = DOPS[4][np.ix_(wbcDex,ubcDex)]
               F = DOPS[5][np.ix_(wbcDex,wbcDex)] 
-              G = DOPS[6][wbcDex,:]
+              G = DOPS[6][np.ix_(wbcDex,pbcDex)]
               H = DOPS[7][np.ix_(wbcDex,tbcDex)]
               
-              I = DOPS[8][:,ubcDex]
-              J = DOPS[9][:,wbcDex]
-              K = DOPS[10]
-              M = DOPS[11]
+              I = DOPS[8][np.ix_(pbcDex,ubcDex)]
+              J = DOPS[9][np.ix_(pbcDex,wbcDex)]
+              K = DOPS[10][np.ix_(pbcDex,pbcDex)]
+              M = DOPS[11] # Block of None
               
               N = DOPS[12][np.ix_(tbcDex,ubcDex)]
               O = DOPS[13][np.ix_(tbcDex,wbcDex)]
-              P = DOPS[14]
+              P = DOPS[14] # Block of None
               Q = DOPS[15][np.ix_(tbcDex,tbcDex)]
               
               # The Rayleigh operators are block diagonal
-              R1 = (ROPS[1].tolil())[np.ix_(ubcDex,ubcDex)]
+              R1 = (ROPS[0].tolil())[np.ix_(ubcDex,ubcDex)]
               R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
-              R3 = ROPS[2]
+              R3 = (ROPS[2].tolil())[np.ix_(pbcDex,pbcDex)]
               R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
                
               del(DOPS)
@@ -433,8 +436,9 @@ if __name__ == '__main__':
                      fu = bN[udex]
                      fw = bN[wdex]
                      f1 = np.concatenate((fu[ubcDex], fw[wbcDex]))
+                     fp = bN[pdex]
                      ft = bN[tdex]
-                     f2 = np.concatenate((bN[pdex], ft[tbcDex], dWBC))
+                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex], dWBC[1:]))
                      del(bN)
                      
               if LinearSolve or (StaticSolve and SolveFull):
@@ -515,7 +519,7 @@ if __name__ == '__main__':
                      del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
-              dsolQ = dsol[0:(len(dsol) - (NX+1))]
+              dsolQ = dsol[0:(len(dsol) - NX)]
               SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ
