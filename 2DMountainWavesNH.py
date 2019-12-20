@@ -480,17 +480,17 @@ if __name__ == '__main__':
                      print('Factor D... DONE!')
                      del(DS)
                      alpha = dsl.lu_solve(factorDS, CS)
-                     print('Solve DS^-1 * CS... DONE!')
-                     DS_SC = AS - BS.dot(alpha)
-                     print('Compute Schur Complement of D... DONE!')
-                     # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
+                     # Compute f2_hat = DS^-1 * f2 and f1_hat
                      f2_hat = dsl.lu_solve(factorDS, f2)
-                     f1_hat = -BS.dot(f2_hat)
-                     del(BS)
+                     f1_hat = f1 - BS.dot(f2_hat)
                      del(f2_hat)
                      print('Compute modified force vectors... DONE!')
+                     print('Solve DS^-1 * CS... DONE!')
+                     DS_SC = AS - BS.dot(alpha)
                      del(AS)
+                     del(BS)
                      del(alpha)
+                     print('Compute Schur Complement of D... DONE!')
                      
                      # Apply Schur C. solver on block partitioned DS_SC
                      #sol1a, sol1b = computeSchurSolve(DS_SC, f1_hat)
@@ -500,8 +500,8 @@ if __name__ == '__main__':
                      
                      sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
                      print('Solve for u and w... DONE!')
-                     f2 = f2 - CS.dot(sol1)
-                     sol2 = dsl.lu_solve(factorDS, f2)
+                     f2_hat = f2 - CS.dot(sol1)
+                     sol2 = dsl.lu_solve(factorDS, f2_hat)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))
                      
@@ -509,7 +509,9 @@ if __name__ == '__main__':
                      del(CS)
                      del(factorDS)
                      del(factorDS_SC)
-                     del(f1_hat); del(sol1); del(sol2)
+                     del(f1); del(f2)
+                     del(f1_hat); del(f2_hat)
+                     del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
               dsolQ = dsol[0:(len(dsol) - (NX+1))]
@@ -592,7 +594,9 @@ if __name__ == '__main__':
                                    UT = uRamp * INIT[udex]
                             else:
                                    UT = INIT[udex]
-                     
+                     else:
+                            UT = INIT[udex]
+                            
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
