@@ -40,9 +40,9 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        
        # Local block-wide indices
        rowsOutU = set(uldex)
-       rowsOutW = set(np.concatenate((uldex,utdex)))
+       rowsOutW = set(np.concatenate((uldex,utdex[1:])))
        rowsOutP = set(uldex)
-       rowsOutT = set(np.concatenate((uldex,utdex)))
+       rowsOutT = set(np.concatenate((uldex,utdex[1:])))
        rowsAll = set(np.array(range(0,OPS)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
@@ -50,8 +50,9 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        pbcDex = rowsAll.difference(rowsOutP); pbcDex = sorted(pbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
-       # BC: W' and Theta' = 0.0 at the top boundary, U' = 0 at the left boundary
-       rowsOutBC_static = set(np.concatenate((uldex, wldex, pldex, tldex, wtdex, ttdex)))
+       # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
+       rowsOutBC_static = set(np.concatenate((uldex, wldex, pldex, tldex, wtdex[1:], ttdex[1:])))
+       # W is treated as an essential BC at terrain in solution by direct substitution
        rowsOutBC_transient = set(np.concatenate((uldex, wldex, pldex, tldex, wbdex, wtdex, ttdex)))
        # All DOF
        rowsAll = set(np.array(range(0,numVar*OPS)))
