@@ -16,6 +16,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
        sol = SOLT[sysDex,0]
        rhs = RHS[sysDex]
        sgs = 0.0
+       
        def computeDynSGSUpdate():
               if DynSGS:
                      fields, wxz, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
