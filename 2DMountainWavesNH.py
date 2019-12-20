@@ -481,19 +481,23 @@ if __name__ == '__main__':
                      del(DS)
                      alpha = dsl.lu_solve(factorDS, CS)
                      print('Solve DS^-1 * CS... DONE!')
-                     DS_SC = -BS.dot(alpha)
-                     DS_SC += AS
+                     DS_SC = AS - BS.dot(alpha)
                      print('Compute Schur Complement of D... DONE!')
+                     # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
+                     f2_hat = dsl.lu_solve(factorDS, f2)
+                     f1_hat = -BS.dot(f2_hat)
+                     del(BS)
+                     del(f2_hat)
+                     print('Compute modified force vectors... DONE!')
                      del(AS)
                      del(alpha)
+                     
+                     # Apply Schur C. solver on block partitioned DS_SC
+                     #sol1a, sol1b = computeSchurSolve(DS_SC, f1_hat)
                      factorDS_SC = dsl.lu_factor(DS_SC)
                      del(DS_SC)
                      print('Factor D and Schur Complement of D matrix... DONE!')
                      
-                     # Compute alpha f2_hat = DS^-1 * f2 and f1_hat
-                     f2_hat = dsl.lu_solve(factorDS, f2)
-                     f1_hat = -BS.dot(f2_hat)
-                     # Use dense linear algebra at this point
                      sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
                      print('Solve for u and w... DONE!')
                      f2 = f2 - CS.dot(sol1)
@@ -502,10 +506,10 @@ if __name__ == '__main__':
                      dsol = np.concatenate((sol1, sol2))
                      
                      # Get memory back
-                     del(BS); del(CS)
+                     del(CS)
                      del(factorDS)
                      del(factorDS_SC)
-                     del(f1_hat); del(f2_hat); del(sol1); del(sol2)
+                     del(f1_hat); del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
               dsolQ = dsol[0:(len(dsol) - (NX+1))]
