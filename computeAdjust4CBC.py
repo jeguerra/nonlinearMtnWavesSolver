@@ -59,6 +59,9 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # Compute set difference from all rows to rows to be taken out LINEAR
        sysDex = rowsAll.difference(rowsOutBC_static)
        sysDex = sorted(sysDex)
-       zeroDex = sorted(rowsOutBC_transient)
+       # DOF's not dynamically updated in static solution (use Lagrange Multiplier)
+       zeroDex_stat = sorted(rowsOutBC_static)
+       # DOF's not dynamically updated in transient solution (use direct BC substitution)
+       zeroDex_tran = sorted(rowsOutBC_transient)
        
-       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex, sysDex
+       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex

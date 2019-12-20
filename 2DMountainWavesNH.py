@@ -117,7 +117,7 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
        NZ = 72
        OPS = (NX + 1) * NZ
        numVar = 4
@@ -134,7 +134,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 100.0
+       h0 = 10.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -193,7 +193,9 @@ if __name__ == '__main__':
        DZ = np.mean(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex, sysDex = \
+       ubdex, utdex, wbdex, pbdex, tbdex, \
+              ubcDex, wbcDex, pbcDex, tbcDex, \
+              zeroDex_stat, zeroDex_tran, sysDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -307,7 +309,7 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
-              dWBC = dHdX * SOLT[ubdex,0]
+              dWBC = 0.0 * dHdX * SOLT[ubdex,0]
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -346,6 +348,7 @@ if __name__ == '__main__':
               RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, \
                             np.array(fields), U, RdT)
               RHS += eqs.computeRayleighTendency(REFG, np.array(fields)) 
+              RHS[zeroDex_stat] *= 0.0
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields)
               
@@ -607,7 +610,7 @@ if __name__ == '__main__':
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
                             sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zeroDex, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
+                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zeroDex_tran, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
                      SOLT[:,0] = sol
                      SOLT[wbdex,0] = dHdX * (UT[ubdex] + SOLT[ubdex,0])
