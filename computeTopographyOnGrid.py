@@ -18,8 +18,8 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        l2 = np.amax(xh)
        l1 = np.amin(xh)
        numRL = 2 # number of Rayleigh width lengths to place the window function
-       r2 = l2 - numRL * latRayX
-       r1 = l1 + numRL * latRayX
+       r2 = 20000.0 #l2 - numRL * latRayX
+       r1 = -r2     #l1 + numRL * latRayX
        
        DX = 50.0 # maximum resolution in meters
        NP = int((l2 - l1) / DX)

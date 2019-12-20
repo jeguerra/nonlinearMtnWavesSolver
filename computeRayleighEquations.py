@@ -93,7 +93,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormX = 0.0
                             # Evaluate the GML factor
-                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**4
+                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**2
                      else:
                             RFX = 0.0
                      if applyTopGML:
@@ -103,7 +103,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormZ = 0.0
                             # Evaluate the strength of the field
-                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**4
+                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**2
                      else:
                             RFZ = 0.0
                      

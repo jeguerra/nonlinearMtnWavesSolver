@@ -117,7 +117,7 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
        NZ = 90
        OPS = (NX + 1) * NZ
        numVar = 4
@@ -144,7 +144,8 @@ if __name__ == '__main__':
        width = 24000.0
        applyTop = True
        applyLateral = True
-       mu = [1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2]
+       mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
+       mu *= 1.0
        
        #% Transient solve parameters
        DT = 0.05 # Linear transient
@@ -276,7 +277,7 @@ if __name__ == '__main__':
        # 2nd order derivatives or compact FD sparse 1st derivatives
        #REFS.append(DDXM.dot(DDXM))
        #REFS.append(DDZM.dot(DDZM))
-       REFS.append(DDXM_SP)
+       REFS.append(GMLOP.dot(DDXM_SP))
        REFS.append(DDZM_SP)
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
@@ -429,8 +430,9 @@ if __name__ == '__main__':
                      DS = DS.toarray()
                      
                      # Compute the partitions for Schur Complement solution
+                     fu = bN[udex]
                      fw = bN[wdex]
-                     f1 = np.concatenate((bN[udex], fw[wbcDex]))
+                     f1 = np.concatenate((fu[ubcDex], fw[wbcDex]))
                      ft = bN[tdex]
                      f2 = np.concatenate((bN[pdex], ft[tbcDex], dWBC))
                      del(bN)
@@ -479,24 +481,23 @@ if __name__ == '__main__':
                      factorDS = dsl.lu_factor(DS)
                      print('Factor D... DONE!')
                      del(DS)
-                     alpha = dsl.lu_solve(factorDS, CS)
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
                      f2_hat = dsl.lu_solve(factorDS, f2)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(f2_hat)
                      print('Compute modified force vectors... DONE!')
+                     DS = dsl.lu_solve(factorDS, CS) # LONG EXECUTION
                      print('Solve DS^-1 * CS... DONE!')
-                     DS_SC = AS - BS.dot(alpha)
-                     del(AS)
+                     AS -= BS.dot(DS) # LONG EXECUTION
                      del(BS)
-                     del(alpha)
+                     del(DS)
                      print('Compute Schur Complement of D... DONE!')
                      
                      # Apply Schur C. solver on block partitioned DS_SC
-                     #sol1a, sol1b = computeSchurSolve(DS_SC, f1_hat)
-                     factorDS_SC = dsl.lu_factor(DS_SC)
-                     del(DS_SC)
-                     print('Factor D and Schur Complement of D matrix... DONE!')
+                     #sol1 = computeSchurSolve(AS, f1_hat)
+                     factorDS_SC = dsl.lu_factor(AS)
+                     del(AS)
+                     print('Factor D and Schur Complement of D... DONE!')
                      
                      sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
                      print('Solve for u and w... DONE!')
