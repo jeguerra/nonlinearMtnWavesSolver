@@ -111,20 +111,19 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
        elif order == 4:
               SOLT[:,1] = SOLT[:,0]
               for ii in range(1,6):
-                     sol += c1 * DT * (RHS + SGS)
-                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     sol = computeUpdate(c1, sol, RHS, SGS)
+                     fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
               
               SOLT[:,1] = 0.04 * SOLT[:,1] + 0.36 * sol
               sol = 15.0 * SOLT[:,1] - 5.0 * sol
               
               for ii in range(6,10):
-                     sol += c1 * DT * (RHS + SGS)
-                     fields, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     sol = computeUpdate(c1, sol, RHS, SGS)
+                     fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
                      SGS = computeDynSGSUpdate(fields)
                      
               sol = SOLT[:,1] + 0.6 * sol + 0.1 * DT * RHS
-              computeRHSUpdate()
               
        return sol, RHS

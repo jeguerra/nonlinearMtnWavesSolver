@@ -121,6 +121,7 @@ if __name__ == '__main__':
        NZ = 72
        OPS = (NX + 1) * NZ
        numVar = 4
+       NQ = OPS * numVar
        iU = 0
        iW = 1
        iP = 2
@@ -134,7 +135,7 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the terrain options
-       h0 = 10.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -145,12 +146,13 @@ if __name__ == '__main__':
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-       mu *= 0.5
+       mu *= 1.0
        
        #% Transient solve parameters
-       DT = 0.05 # Linear transient
-       #DT = 0.05 # Nonlinear transient
-       HR = 1.0
+       DT = 0.1
+       HR = 5.0
+       rampTime = 600  # 10 minutes to ramp up U_bar
+       intMethodOrder = 3 # 3rd or 4th order time integrator
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
        ITI = 1000 # Stride for image output
@@ -566,8 +568,6 @@ if __name__ == '__main__':
                                           
        #%% Start the time loop
        if LinearSolve or NonLinSolve:
-              rampTime = 600  # 10 minutes to ramp up U_bar
-              intMethodOrder = 3
               error = [np.linalg.norm(RHS)]
               for tt in range(len(TI)):
                      # Print out diagnostics every OTI steps
