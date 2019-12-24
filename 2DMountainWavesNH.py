@@ -42,6 +42,7 @@ from computeInterpolatedFields import computeInterpolatedFields
 # Numerical stuff
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
+import computeSchurSolve as sch
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 #from computeIterativeSolveNL import computeIterativeSolveNL
@@ -84,6 +85,34 @@ def getFromRestart(name, ET, NX, NZ, StaticSolve):
        rdb.close()
        
        return SOLT, RHS, NX_in, NZ_in, TI
+
+# Store a matrix to disk in column wise chucks
+def storeColumnChunks(MM, Mname):
+       # Set up storage and store full array
+       mdb = shelve.open(Mname, flag='n')
+       # Get the number of cpus
+       import multiprocessing as mtp
+       NCPU = mtp.cpu_count()
+       # Partition CS into NCPU column wise chuncks
+       NC = MM.shape[1] # Number of columns in MM
+       RC = NC % NCPU # Remainder of columns when dividing by NCPU
+       SC = int((NC - RC) / NCPU) # Number of columns in each chunk
+       
+       # Loop over NCPU column chunks and store
+       cranges = []
+       for cc in range(NCPU):
+              cbegin  = cc * SC
+              if cc < NCPU - 1:
+                     crange = range(cbegin,cbegin + SC)
+              elif cc == NCPU - 1:
+                     crange = range(cbegin,cbegin + SC + RC)
+              
+              cranges.append(crange)
+              mdb[Mname + str(cc)] = MM[:,crange]
+              
+       mdb.close()
+              
+       return NCPU, cranges
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
@@ -311,7 +340,7 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
-              dWBC = 0.0 * dHdX * SOLT[ubdex,0]
+              dWBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0]) - SOLT[wbdex,0]
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
@@ -488,37 +517,52 @@ if __name__ == '__main__':
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
                      factorDS = dsl.lu_factor(DS)
-                     print('Factor D... DONE!')
                      del(DS)
+                     print('Factor D... DONE!')
+                     
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
                      f2_hat = dsl.lu_solve(factorDS, f2)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(f2_hat)
                      print('Compute modified force vectors... DONE!')
-                     DS = dsl.lu_solve(factorDS, CS) # LONG EXECUTION
-                     print('Solve DS^-1 * CS... DONE!')
-                     AS -= BS.dot(DS) # LONG EXECUTION
+                     
+                     # Store partitioned CS
+                     NCPU, cranges = storeColumnChunks(CS, 'CS')
+                     #del(CS)
+                     # Loop over the chunks from disk
+                     mdb = shelve.open('CS', flag='r')
+                     for cc in range(NCPU):
+                            crange = cranges[cc] 
+                            CS_chunk = mdb['CS' + str(cc)]
+                            
+                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
+                            del(CS_chunk)
+                            AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
+                            del(DS_chunk)
+                            
+                     mdb.close()
                      del(BS)
-                     del(DS)
+                     print('Solve DS^-1 * CS... DONE!')
                      print('Compute Schur Complement of D... DONE!')
                      
                      # Apply Schur C. solver on block partitioned DS_SC
-                     #sol1 = computeSchurSolve(AS, f1_hat)
+                     #sol1 = sch.computeSchurSolve(AS, f1_hat)
                      factorDS_SC = dsl.lu_factor(AS)
                      del(AS)
                      print('Factor D and Schur Complement of D... DONE!')
                      
                      sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
+                     del(factorDS_SC)
                      print('Solve for u and w... DONE!')
+                     
                      f2_hat = f2 - CS.dot(sol1)
                      sol2 = dsl.lu_solve(factorDS, f2_hat)
+                     del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))
                      
                      # Get memory back
                      del(CS)
-                     del(factorDS)
-                     del(factorDS_SC)
                      del(f1); del(f2)
                      del(f1_hat); del(f2_hat)
                      del(sol1); del(sol2)
