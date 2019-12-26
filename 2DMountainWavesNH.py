@@ -87,9 +87,9 @@ def getFromRestart(name, ET, NX, NZ, StaticSolve):
        return SOLT, RHS, NX_in, NZ_in, TI
 
 # Store a matrix to disk in column wise chucks
-def storeColumnChunks(MM, Mname):
+def storeColumnChunks(MM, Mname, dbName):
        # Set up storage and store full array
-       mdb = shelve.open(Mname, flag='n')
+       mdb = shelve.open(dbName, flag='n')
        # Get the number of cpus
        import multiprocessing as mtp
        NCPU = mtp.cpu_count()
@@ -171,9 +171,9 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       ZH = 38000.0
-       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 90
+       ZH = 36000.0
+       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -196,7 +196,7 @@ if __name__ == '__main__':
        HOPT = [h0, aC, lC]
        
        # Set the Rayleigh options
-       depth = 12000.0
+       depth = 11000.0
        width = 24000.0
        applyTop = True
        applyLateral = True
@@ -570,7 +570,7 @@ if __name__ == '__main__':
                      # Get CS block and store in column chunks
                      CS = computeSchurBlock(schurName, 'CS')
                      fileCS = localDir + 'CS'
-                     NCPU, cranges = storeColumnChunks(CS, fileCS)
+                     NCPU, cranges = storeColumnChunks(CS, 'CS', fileCS)
                      del(CS)
                      
                      # Loop over the chunks from disk
