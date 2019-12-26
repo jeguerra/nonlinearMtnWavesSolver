@@ -113,6 +113,30 @@ def storeColumnChunks(MM, Mname):
        mdb.close()
               
        return NCPU, cranges
+
+def computeSchurBlock(dbName, blockName):
+       # Open the blocks database
+       bdb = shelve.open(dbName, flag='r')
+       
+       if blockName == 'AS':
+              SB = sps.bmat([[bdb['A'], bdb['B']], \
+                             [bdb['E'], bdb['F']]], format='csc')
+       elif blockName == 'BS':
+              SB = sps.bmat([[bdb['C'], bdb['D'], bdb['LDA']], \
+                             [bdb['G'], bdb['H'], bdb['LHA']]], format='csc')
+       elif blockName == 'CS':
+              SB = sps.bmat([[bdb['I'], bdb['J']], \
+                             [bdb['N'], bdb['O']], \
+                             [bdb['LNA'], bdb['LOA']]], format='csc')
+       elif blockName == 'DS':
+              SB = sps.bmat([[bdb['K'], bdb['M'], bdb['LMA']], \
+                             [bdb['P'], bdb['Q'], bdb['LQAC']], \
+                             [bdb['LPA'], bdb['LQAR'], bdb['LDIA']]], format='csc')
+       else:
+              print('INVALID SCHUR BLOCK NAME!')
+              
+       bdb.close()
+       return SB.toarray()
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
@@ -145,9 +169,9 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       ZH = 36000.0
-       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 72
+       ZH = 38000.0
+       NX = 199 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 128
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -171,7 +195,7 @@ if __name__ == '__main__':
        
        # Set the Rayleigh options
        depth = 12000.0
-       width = 24000.0
+       width = 22000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
@@ -448,7 +472,21 @@ if __name__ == '__main__':
                      K += R3
                      Q += R4
                      
+                     # Store the operators...
+                     schurName = 'SchurOps'
+                     opdb = shelve.open(schurName, flag='n')
+                     opdb['A'] = A; opdb['B'] = B; opdb['C'] = C; opdb['D'] = D
+                     opdb['E'] = E; opdb['F'] = F; opdb['G'] = G; opdb['H'] = H
+                     opdb['I'] = I; opdb['J'] = J; opdb['K'] = K; opdb['M'] = M
+                     opdb['N'] = N; opdb['O'] = O; opdb['P'] = P; opdb['Q'] = Q
+                     opdb['N'] = N; opdb['O'] = O; opdb['P'] = P; opdb['Q'] = Q
+                     opdb['LDA'] = LDA; opdb['LHA'] = LHA; opdb['LMA'] = LMA; opdb['LQAC'] = LQAC
+                     opdb['LNA'] = LNA; opdb['LOA'] = LOA; opdb['LPA'] = LPA; opdb['LQAR'] = LQAR
+                     opdb['LDIA'] = LDIA
+                     opdb.close()
+                      
                      # Compute the partitions for Schur Complement solution (SPARSE)
+                     '''
                      AS = sps.bmat([[A, B], \
                                     [E, F]], format='csc')
                      BS = sps.bmat([[C, D, LDA], \
@@ -465,7 +503,7 @@ if __name__ == '__main__':
                      BS = BS.toarray()
                      CS = CS.toarray()
                      DS = DS.toarray()
-                     
+                     '''
                      # Compute the partitions for Schur Complement solution
                      fu = bN[udex]
                      fw = bN[wdex]
@@ -516,20 +554,26 @@ if __name__ == '__main__':
               if SolveSchur and not SolveFull:
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
+                     DS = computeSchurBlock(schurName,'DS')
                      factorDS = dsl.lu_factor(DS)
                      del(DS)
                      print('Factor D... DONE!')
                      
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
+                     BS = computeSchurBlock(schurName,'BS')
                      f2_hat = dsl.lu_solve(factorDS, f2)
                      f1_hat = f1 - BS.dot(f2_hat)
-                     del(f2_hat)
+                     del(BS); del(f2_hat)
                      print('Compute modified force vectors... DONE!')
                      
-                     # Store partitioned CS
+                     # Get CS block and store in column chunks
+                     CS = computeSchurBlock(schurName, 'CS')
                      NCPU, cranges = storeColumnChunks(CS, 'CS')
-                     #del(CS)
+                     del(CS)
+                     
                      # Loop over the chunks from disk
+                     AS = computeSchurBlock(schurName, 'AS')
+                     BS = computeSchurBlock(schurName, 'BS')
                      mdb = shelve.open('CS', flag='r')
                      for cc in range(NCPU):
                             crange = cranges[cc] 
@@ -555,14 +599,15 @@ if __name__ == '__main__':
                      del(factorDS_SC)
                      print('Solve for u and w... DONE!')
                      
+                     CS = computeSchurBlock(schurName, 'CS')
                      f2_hat = f2 - CS.dot(sol1)
+                     del(CS)
                      sol2 = dsl.lu_solve(factorDS, f2_hat)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))
                      
                      # Get memory back
-                     del(CS)
                      del(f1); del(f2)
                      del(f1_hat); del(f2_hat)
                      del(sol1); del(sol2)
