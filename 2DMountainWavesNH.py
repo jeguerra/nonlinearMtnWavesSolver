@@ -154,7 +154,9 @@ if __name__ == '__main__':
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
-       restart_file = 'restartDB'
+       localDir = '/scratch/'
+       restart_file = localDir + 'restartDB'
+       schurName = localDir + 'SchurOps'
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -170,8 +172,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 38000.0
-       NX = 199 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 128
+       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 90
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -195,11 +197,11 @@ if __name__ == '__main__':
        
        # Set the Rayleigh options
        depth = 12000.0
-       width = 22000.0
+       width = 24000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-       mu *= 1.0
+       mu *= 0.5
        
        #% Transient solve parameters
        DT = 0.1
@@ -221,7 +223,7 @@ if __name__ == '__main__':
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
-       # Update the REFS collection
+       # Update the REFS https://www.anandtech.com/show/15234/samsungs-galaxy-a51-a71-galaxy-smartphones-unveiledcollection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
        
@@ -473,7 +475,6 @@ if __name__ == '__main__':
                      Q += R4
                      
                      # Store the operators...
-                     schurName = 'SchurOps'
                      opdb = shelve.open(schurName, flag='n')
                      opdb['A'] = A; opdb['B'] = B; opdb['C'] = C; opdb['D'] = D
                      opdb['E'] = E; opdb['F'] = F; opdb['G'] = G; opdb['H'] = H
@@ -568,13 +569,14 @@ if __name__ == '__main__':
                      
                      # Get CS block and store in column chunks
                      CS = computeSchurBlock(schurName, 'CS')
-                     NCPU, cranges = storeColumnChunks(CS, 'CS')
+                     fileCS = localDir + 'CS'
+                     NCPU, cranges = storeColumnChunks(CS, fileCS)
                      del(CS)
                      
                      # Loop over the chunks from disk
                      AS = computeSchurBlock(schurName, 'AS')
                      BS = computeSchurBlock(schurName, 'BS')
-                     mdb = shelve.open('CS', flag='r')
+                     mdb = shelve.open(fileCS, flag='r')
                      for cc in range(NCPU):
                             crange = cranges[cc] 
                             CS_chunk = mdb['CS' + str(cc)]

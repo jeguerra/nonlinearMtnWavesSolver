@@ -18,7 +18,7 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        l2 = np.amax(xh)
        l1 = np.amin(xh)
        numRL = 2 # number of Rayleigh width lengths to place the window function
-       r2 = 5000.0 #l2 - numRL * latRayX
+       r2 = 10000.0 #l2 - numRL * latRayX
        r1 = -r2     #l1 + numRL * latRayX
        
        DX = 50.0 # maximum resolution in meters
@@ -60,7 +60,7 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
               ht2 = np.power(np.cos(mt.pi / lC * x), 2.0)
               ht3 = np.reciprocal((1.0 / aC)**2.0 * np.power(x, 2.0) + 1.0)
               #htfft = kaiserDom * (ht1 * ht2 * ht3)
-              htfft = kaiserDom
+              htfft = h0 * kaiserDom
               # Compute the slope field perfectly
               '''
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))

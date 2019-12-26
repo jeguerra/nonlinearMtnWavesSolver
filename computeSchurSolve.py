@@ -51,18 +51,17 @@ def computeSchurSolve(SYS, b):
        
        # Factor D
        factorD = dsl.lu_factor(D)
-       del(D)
-       # Solve D against C
-       alpha = dsl.lu_solve(factorD, C)
        # Compute alpha f2_hat = D^-1 * f2 and f1_hat
        f2_hat = dsl.lu_solve(factorD, f2)
        f1_hat = f1 - B.dot(f2_hat)
        del(f2_hat)
+       # Solve D against C
+       D = dsl.lu_solve(factorD, C)
        # Compute Schur Complement of D
-       D_SC = A - B.dot(alpha)
+       D_SC = A - B.dot(D)
        del(A)
        del(B)
-       del(alpha)
+       del(D)
        # Factor Schur Complement of D
        factorD_SC = dsl.lu_factor(D_SC)
        del(D_SC)
