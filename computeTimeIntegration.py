@@ -59,7 +59,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[:,0]
-       SGS = 0.0
+       SGS = np.array(0.0 * RHS)
        dHdX = REFS[6]
        def computeDynSGSUpdate(fields):
               if DynSGS:
@@ -91,6 +91,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
               # Compute stages 1 - 5
               for ii in range(7):
                      sol = computeUpdate(c1, sol, RHS)
+                     
                      if DynSGS:
                             sol = computeUpdate(c1, sol, SGS)
                             
@@ -106,7 +107,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
-                     sol = computeUpdate(c1, sol, RHS, SGS)
+                     sol = computeUpdate(c1, sol, RHS)
                      fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
                      #SGS = computeDynSGSUpdate(fields)
@@ -115,18 +116,22 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
        elif order == 4:
               SOLT[:,1] = SOLT[:,0]
               for ii in range(1,6):
-                     sol = computeUpdate(c1, sol, RHS, SGS)
+                     sol = computeUpdate(c1, sol, RHS)
+                     
+                     if DynSGS:
+                            sol = computeUpdate(c1, sol, SGS)
+                            
                      fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
+                     SGS = computeDynSGSUpdate(fields)
               
               SOLT[:,1] = 0.04 * SOLT[:,1] + 0.36 * sol
               sol = 15.0 * SOLT[:,1] - 5.0 * sol
               
               for ii in range(6,10):
-                     sol = computeUpdate(c1, sol, RHS, SGS)
+                     sol = computeUpdate(c1, sol, RHS)
                      fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
-                     SGS = computeDynSGSUpdate(fields)
                      
               sol = SOLT[:,1] + 0.6 * sol + 0.1 * DT * RHS
               
