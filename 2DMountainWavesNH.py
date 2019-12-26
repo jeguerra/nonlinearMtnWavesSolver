@@ -40,6 +40,7 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
+import computeSchurSolve as sch
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 import computeSchurSolve as sch
@@ -144,6 +145,10 @@ if __name__ == '__main__':
        LinearSolve = False
        NonLinSolve = False
        
+       # Set the grid type
+       HermCheb = False
+       UniformDelta = True
+       
        # Set residual diffusion switch
        ResDiff = False
        
@@ -204,7 +209,7 @@ if __name__ == '__main__':
        mu *= 0.5
        
        #% Transient solve parameters
-       DT = 0.1
+       DT = 0.05
        HR = 5.0
        rampTime = 600  # 10 minutes to ramp up U_bar
        intMethodOrder = 3 # 3rd or 4th order time integrator
@@ -214,7 +219,7 @@ if __name__ == '__main__':
        RTI = 1 # Stride for residual visc update
        
        #% Define the computational and physical grids+
-       REFS = computeGrid(DIMS)
+       REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)

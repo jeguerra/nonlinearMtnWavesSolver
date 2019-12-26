@@ -12,7 +12,7 @@ from HerfunChebNodesWeights import hefunclb
 from HerfunChebNodesWeights import cheblb
 #from HerfunChebNodesWeights import chebpolym
 
-def computeGrid(DIMS):
+def computeGrid(DIMS, HermCheb, UniformGrid):
        # Get the domain dimensions
        L1 = DIMS[0]
        L2 = DIMS[1]
