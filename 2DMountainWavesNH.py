@@ -141,16 +141,16 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
+       NonLinSolve = True
        
        # Set the grid type
-       HermCheb = False
-       UniformDelta = True
+       HermCheb = True
+       UniformDelta = False
        
        # Set residual diffusion switch
-       ResDiff = False
+       ResDiff = True
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
