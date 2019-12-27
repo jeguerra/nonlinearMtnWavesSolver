@@ -388,17 +388,17 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        DtDt = DDXM.dot(DltDx) - DZDX * DDZM.dot(DltDx) + DDZM.dot(DltDz)
        #'''
        # Null tendencies along vertical boundaries
-       '''
+       #'''
        DuDt[topdex] *= 0.0
        DwDt[topdex] *= 0.0
        DpDt[topdex] *= 0.0
        DtDt[topdex] *= 0.0
-
+       
        DuDt[botdex] *= 0.0
        DwDt[botdex] *= 0.0
        DpDt[botdex] *= 0.0
        DtDt[botdex] *= 0.0
-       '''
+
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        

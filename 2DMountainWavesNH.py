@@ -176,9 +176,9 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       ZH = 36000.0
-       NX = 139 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       ZH = 40000.0
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -194,6 +194,10 @@ if __name__ == '__main__':
        pdex = np.add(wdex, OPS)
        tdex = np.add(pdex, OPS)
        
+       # Set the background temperature profile
+       T_in = [300.0, 228.5, 228.5, 248.5]
+       Z_in = [0.0, 1.1E4, 2.0E4, ZH]
+       
        # Set the terrain options
        h0 = 100.0
        aC = 5000.0
@@ -201,12 +205,12 @@ if __name__ == '__main__':
        HOPT = [h0, aC, lC]
        
        # Set the Rayleigh options
-       depth = 11000.0
+       depth = 12000.0
        width = 24000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-       mu *= 0.5
+       mu *= 1.0
        
        #% Transient solve parameters
        DT = 0.05
@@ -233,12 +237,12 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        #% Read in topography profile or compute from analytical function
-       AGNESI = 1 # "Witch of Agnesi" profile
+       KAISER = 1 # Kaiser window profile
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT, width)
+       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT, width)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -261,8 +265,6 @@ if __name__ == '__main__':
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
-       T_in = [300.0, 228.5, 228.5, 244.5]
-       Z_in = [0.0, 1.1E4, 2.0E4, 3.6E4]
        SENSIBLE = 1
        POTENTIAL = 2
        # Map the sounding to the computational vertical 2D grid [0 H]

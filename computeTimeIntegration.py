@@ -90,11 +90,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
        if order == 3:
               # Compute stages 1 - 5
               for ii in range(7):
-                     sol = computeUpdate(c1, sol, RHS)
-                     
-                     if DynSGS:
-                            sol = computeUpdate(c1, sol, SGS)
-                            
+                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
                      SGS = computeDynSGSUpdate(fields)
@@ -116,11 +112,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
        elif order == 4:
               SOLT[:,1] = SOLT[:,0]
               for ii in range(1,6):
-                     sol = computeUpdate(c1, sol, RHS)
-                     
-                     if DynSGS:
-                            sol = computeUpdate(c1, sol, SGS)
-                            
+                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
                      SGS = computeDynSGSUpdate(fields)

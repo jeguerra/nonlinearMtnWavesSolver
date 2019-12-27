@@ -9,17 +9,21 @@ import sys
 import numpy as np
 import math as mt
 from scipy import signal
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def computeTopographyOnGrid(REFS, profile, opt, latRayX):
+       h0 = opt[0]
+       aC = opt[1]
+       lC = opt[2]
        
        # Get data from REFS
        xh = REFS[0]
        l2 = np.amax(xh)
        l1 = np.amin(xh)
-       numRL = 2 # number of Rayleigh width lengths to place the window function
-       r2 = 10000.0 #l2 - numRL * latRayX
-       r1 = -r2     #l1 + numRL * latRayX
+       
+       # Make width for the Kaiser window
+       r2 = 2.0 * aC
+       r1 = -r2
        
        DX = 50.0 # maximum resolution in meters
        NP = int((l2 - l1) / DX)
@@ -47,20 +51,15 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        
        # Evaluate the function with different options
        if profile == 1:
-              # Witch of Agnesi here
-              h0 = opt[0]
-              aC = opt[1]
+              # Kaiser bell curve
+              htfft = h0 * kaiserDom
        elif profile == 2:
-              # Schar mountain
-              h0 = opt[0]
-              aC = opt[1]
-              lC = opt[2]
+              # Schar mountain (windowed with Kaiser bell)
               # Compute the height field
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(x, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * x), 2.0)
               ht3 = np.reciprocal((1.0 / aC)**2.0 * np.power(x, 2.0) + 1.0)
-              #htfft = kaiserDom * (ht1 * ht2 * ht3)
-              htfft = h0 * kaiserDom
+              htfft = kaiserDom * (ht1 * ht2 * ht3)
               # Compute the slope field perfectly
               '''
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
@@ -76,15 +75,12 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
               '''
        elif profile == 3:
               # General even power exponential times a cosine series
-              h0 = opt[0]
               ht = np.zeros(len(x))
        elif profile == 4:
               # General even power exponential times a polynomial series
-              h0 = opt[0]
               ht = np.zeros(len(x))
        elif profile == 5:
               # Terrain data input from a file, maximum elevation set in opt[0]
-              h0 = opt[0]
               ht = np.zeros(len(x))
        else:
               print('ERROR: invalid terrain option.')
