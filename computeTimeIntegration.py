@@ -103,10 +103,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
-                     sol = computeUpdate(c1, sol, RHS)
+                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(fields, U, RdT)
-                     #SGS = computeDynSGSUpdate(fields)
+                     SGS = computeDynSGSUpdate(fields)
        
        #%% THE KETCHENSON SSP(10,4) METHOD
        elif order == 4:

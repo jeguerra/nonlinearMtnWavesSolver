@@ -177,7 +177,7 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 40000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
        NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
@@ -215,7 +215,7 @@ if __name__ == '__main__':
        #% Transient solve parameters
        DT = 0.05
        HR = 5.0
-       rampTime = 600  # 10 minutes to ramp up U_bar
+       rampTime = 900  # 10 minutes to ramp up U_bar
        intMethodOrder = 3 # 3rd or 4th order time integrator
        ET = HR * 60 * 60 # End time in seconds
        OTI = 200 # Stride for diagnostic output
@@ -232,7 +232,7 @@ if __name__ == '__main__':
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
-       # Update the REFS https://www.anandtech.com/show/15234/samsungs-galaxy-a51-a71-galaxy-smartphones-unveiledcollection
+       # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
        
@@ -242,7 +242,7 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT, width)
+       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT, width)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -373,13 +373,13 @@ if __name__ == '__main__':
               SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
-              dWBC = dHdX * (INIT[ubdex] + SOLT[ubdex,0]) - SOLT[wbdex,0]
+              dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])
        else:
               # Initialize solution storage
               SOLT = np.zeros((numVar * OPS, 2))
               
               # Initial change in vertical velocity at boundary
-              dWBC = dHdX * INIT[ubdex]
+              dWBC = -dHdX * INIT[ubdex]
        
               # Initialize time array
               TI = np.array(np.arange(DT, ET, DT))
@@ -419,30 +419,44 @@ if __name__ == '__main__':
               # Compute forcing vector adding boundary forcing to the end
               bN = np.concatenate((RHS, dWBC[1:]))
               
-              # Compute Lagrange multiplier augmentation matrices (exclude left corner node)
-              C1 = sps.diags(-dHdX[1:], offsets=0, format='lil')
-              C2 = sps.eye(NX, format='lil')
+              # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
+              R1 = sps.diags(-dHdX[1:], offsets=0, format='lil')
+              R2 = sps.eye(NX, format='lil')
+              C1 = sps.diags(dWBC, offsets=0, fortmat='lil')
               
+              rowShape = (NX,OPS)
+              LN = sps.lil_matrix(rowShape)
+              LN[ubdex[1:],:] = R1
+              LO = sps.lil_matrix(rowShape)
+              LO[ubdex[1:],:] = R2
+              LP = sps.lil_matrix(rowShape)
+              LQ = sps.lil_matrix(rowShape)
+              
+              # Apply BC adjustments and indexing block-wise (Lagrange blocks)
+              LNA = LN[:,ubcDex]
+              LOA = LO[:,wbcDex]
+              LPA = LP[:,pbcDex]
+              LQAR = LQ[:,tbcDex]
+              
+              # Compute Lagrange multiplier column augmentation matrices (exclude left corner node)
               colShape = (OPS,NX)
               LD = sps.lil_matrix(colShape)
               LD[ubdex[1:],:] = C1
               LH = sps.lil_matrix(colShape)
-              LH[ubdex[1:],:] = C2
+              LH[ubdex[1:],:] = C1
               LM = sps.lil_matrix(colShape)
+              LM[ubdex[1:],:] = C1
               LQ = sps.lil_matrix(colShape)
+              LH[ubdex[1:],:] = C1
               
-              # Apply BC adjustments  and indexing block-wise (Lagrange blocks)
+              # Apply BC adjustments and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
               LMA = LM[pbcDex,:]
               LQAC = LQ[tbcDex,:]
               
-              # Apply transpose for row augmentation (Lagrange blocks)
-              LNA = LDA.T
-              LOA = LHA.T
-              LPA = LMA.T
-              LQAR = LQAC.T
-              LDIA = C2
+              # Diagonal corner block
+              LDIA = C1
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
