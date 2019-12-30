@@ -687,9 +687,12 @@ if __name__ == '__main__':
                                    UT = uRamp * INIT[udex]
                             else:
                                    UT = INIT[udex]
+                                   
+                            # Set current boundary condition
+                            SOLT[wbdex,0] = dHdX * (UT[ubdex] + SOLT[ubdex,0])
                      else:
                             UT = INIT[udex]
-                            
+                                   
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
@@ -698,7 +701,6 @@ if __name__ == '__main__':
                             sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zeroDex_tran, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
                      SOLT[:,0] = sol
-                     SOLT[wbdex,0] = dHdX * (UT[ubdex] + SOLT[ubdex,0])
                      RHS[:] = rhs
               
               # Copy state instance 0 to 1
