@@ -101,23 +101,23 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, LMS, botdex,
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UPXM + PuPxM
-       LD12 = DuDzM + DUDZM
+       LD11 = sps.lil_matrix(UPXM + PuPxM)
+       LD12 = sps.lil_matrix(DuDzM + DUDZM)
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = PwPxM
-       LD22 = UPXM + DwDzM
+       LD21 = sps.lil_matrix(PwPxM)
+       LD22 = sps.lil_matrix(UPXM + DwDzM)
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
-       LD31 = gam * PPXM + PlpPxM
-       LD32 = gam * DDZM + DlpDzM + DLPDZM
+       LD31 = sps.lil_matrix(gam * PPXM + PlpPxM)
+       LD32 = sps.lil_matrix(gam * DDZM + DlpDzM + DLPDZM)
        LD33 = UPXM
        LD34 = None
        
-       LD41 = PltPxM
-       LD42 = DltDzM + DLPTDZM
+       LD41 = sps.lil_matrix(PltPxM)
+       LD42 = sps.lil_matrix(DltDzM + DLPTDZM)
        LD43 = None
        LD44 = UPXM
        
