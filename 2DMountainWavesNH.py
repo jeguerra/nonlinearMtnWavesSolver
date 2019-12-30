@@ -179,8 +179,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -244,7 +244,7 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT, width)
+       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT, width)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -422,9 +422,9 @@ if __name__ == '__main__':
               bN = np.concatenate((RHS, np.zeros(NX)))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
-              R1 = sps.diags(-LMS * dHdX[1:], offsets=0, format='lil')
-              R2 = sps.diags(LMS, offsets=0, format='lil')
-              C1 = sps.diags(dWBC[1:], offsets=0, format='lil')
+              R1 = sps.diags(LMS * dHdX[1:], offsets=0, format='lil')
+              R2 = sps.diags(-LMS, offsets=0, format='lil')
+              C1 = sps.diags(-dWBC[1:], offsets=0, format='lil')
               
               rowShape = (NX,OPS)
               LN = sps.lil_matrix(rowShape)
