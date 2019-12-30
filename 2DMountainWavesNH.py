@@ -141,16 +141,16 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
+       NonLinSolve = False
        
        # Set the grid type
        HermCheb = True
        UniformDelta = False
        
        # Set residual diffusion switch
-       ResDiff = True
+       ResDiff = False
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
@@ -158,8 +158,8 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = False # Initializes from a restart database
-       localDir = '/scratch/'
+       isRestart = True # Initializes from a restart database
+       localDir = '/media/jeguerra/DATA/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -176,9 +176,9 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       ZH = 40000.0
-       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       ZH = 36000.0
+       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 100
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -417,18 +417,18 @@ if __name__ == '__main__':
               del(U); del(fields)
               
               # Compute forcing vector adding boundary forcing to the end
-              bN = np.concatenate((RHS, dWBC[1:]))
+              bN = np.concatenate((RHS, 0.0*dWBC[1:]))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
-              R1 = sps.diags(-dHdX[1:], offsets=0, format='lil')
-              R2 = sps.eye(NX, format='lil')
-              C1 = sps.diags(dWBC, offsets=0, fortmat='lil')
+              R1 = sps.diags(dHdX[1:], offsets=0, format='lil')
+              R2 = -sps.eye(NX, format='lil')
+              C1 = sps.diags(-dWBC[1:], offsets=0, format='lil')
               
               rowShape = (NX,OPS)
               LN = sps.lil_matrix(rowShape)
-              LN[ubdex[1:],:] = R1
+              LN[:,ubdex[1:]] = R1
               LO = sps.lil_matrix(rowShape)
-              LO[ubdex[1:],:] = R2
+              LO[:,ubdex[1:]] = R2
               LP = sps.lil_matrix(rowShape)
               LQ = sps.lil_matrix(rowShape)
               
