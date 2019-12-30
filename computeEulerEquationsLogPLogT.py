@@ -10,64 +10,6 @@ import math as mt
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
-def computeInitialFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, m2):
-       # Get some physical quantities
-       P0 = PHYS[1]
-       Rd = PHYS[3]
-       kap = PHYS[4]
-       
-       TQ = SOLT + INIT
-       # Make the total quatities
-       U = TQ[udex]
-       LP = TQ[pdex]
-       LT = TQ[tdex]
-       
-       # Compute the sensible temperature scaling to PGF
-       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
-       
-       fields = np.reshape(SOLT, (len(udex), 4), order='F')
-       
-       # Update vertical velocity at the boundary
-       dHdX = REFS[6]
-       fields[botdex,1] = dHdX * np.array(U[botdex])
-       
-       # Make a smooth vertical decay for the input W
-       ZTL = REFS[5]
-       
-       for kk in range(ZTL.shape[0]):
-              zlev = ZTL[kk,:] - ZTL[0,:]
-              # exponential decay by evanescent mode
-              fields[botdex+kk,1] = np.array(fields[botdex,1]) * np.exp(m2 * zlev)
-              
-              #plt.plot(fields[botdex+kk,1])
-              
-       #plt.show()
-       
-       return fields, U, RdT
-
-def computeUpdatedFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex):
-       # Get some physical quantities
-       P0 = PHYS[1]
-       Rd = PHYS[3]
-       kap = PHYS[4]
-       
-       TQ = SOLT + INIT
-       # Make the total quatities
-       U = TQ[udex]
-       LP = TQ[pdex]
-       LT = TQ[tdex]
-       
-       # Compute the sensible temperature scaling to PGF
-       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
-       
-       fields = np.reshape(SOLT, (len(udex), 4), order='F')
-       
-       # Update vertical velocity at the boundary
-       dHdX = REFS[6]
-       fields[botdex,1] = dHdX * np.array(U[botdex])
-       
-       return fields, U, RdT
-
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        # Get some physical quantities
        P0 = PHYS[1]
@@ -88,7 +30,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        return fields, U, RdT
 
 #%% Evaluate the Jacobian matrix
-def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
+def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, LMS, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
@@ -96,6 +38,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        gam = PHYS[6]
        
        # Get the derivative operators
+       dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -177,6 +120,19 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        LD42 = DltDzM + DLPTDZM
        LD43 = None
        LD44 = UPXM
+       
+       # Compute adjustments by terrain constraint
+       tfdex = botdex[1:]
+       dHdXM = sps.diags(LMS * dHdX[1:], offsets=0, format='csr')
+       LMSM = sps.diags(LMS, offsets=0, format='csr')
+       LD11[np.ix_(tfdex,tfdex)] += dHdXM
+       LD12[np.ix_(tfdex,tfdex)] -= LMSM
+       LD21[np.ix_(tfdex,tfdex)] += dHdXM
+       LD22[np.ix_(tfdex,tfdex)] -= LMSM
+       LD31[np.ix_(tfdex,tfdex)] += dHdXM
+       LD32[np.ix_(tfdex,tfdex)] -= LMSM
+       LD41[np.ix_(tfdex,tfdex)] += dHdXM
+       LD42[np.ix_(tfdex,tfdex)] -= LMSM
        
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \

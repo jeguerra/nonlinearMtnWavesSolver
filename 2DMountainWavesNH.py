@@ -158,8 +158,9 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = True # Initializes from a restart database
-       localDir = '/media/jeguerra/DATA/scratch/'
+       isRestart = False # Initializes from a restart database
+       #localDir = '/media/jeguerra/DATA/scratch/'
+       localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -177,8 +178,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 100
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -199,7 +200,7 @@ if __name__ == '__main__':
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Set the terrain options
-       h0 = 100.0
+       h0 = 10.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -242,7 +243,7 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT, width)
+       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT, width)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -335,16 +336,11 @@ if __name__ == '__main__':
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
-       #REFG.append(PPXM_SP)
-       #REFG.append(DDZM_SP)
        
        # Update the data storage
        REFS.append(GMLXOP.dot(DDXM))
-       #REFS.append(DDXM)
        REFS.append(GMLZOP.dot(DDZM))
-       # 2nd order derivatives or compact FD sparse 1st derivatives
-       #REFS.append(DDXM.dot(DDXM))
-       #REFS.append(DDZM.dot(DDZM))
+       # Store sparse derivatives
        REFS.append(GMLXOP.dot(DDXM_SP))
        REFS.append(GMLZOP.dot(DDZM_SP))
        REFS.append(DZT)
@@ -357,10 +353,12 @@ if __name__ == '__main__':
        del(DZDX)
        
        #%% SOLUTION INITIALIZATION
+       physDOF = numVar * OPS
+       totalDOF = physDOF + NX
        
        # Initialize hydrostatic background
-       INIT = np.zeros((numVar * OPS,))
-       RHS = np.zeros((numVar * OPS,))
+       INIT = np.zeros((physDOF,))
+       RHS = np.zeros((physDOF,))
        
        # Initialize the Background fields
        INIT[udex] = np.reshape(UZ, (OPS,), order='F')
@@ -370,13 +368,16 @@ if __name__ == '__main__':
        
        if isRestart:
               print('Restarting from previous solution...')
-              SOLT, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
+              SOLT, LMS, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
               dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])
        else:
               # Initialize solution storage
-              SOLT = np.zeros((numVar * OPS, 2))
+              SOLT = np.zeros((physDOF, 2))
+              
+              # Initialize Lagrange Multiplier storage
+              LMS = np.zeros(NX)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
@@ -393,7 +394,7 @@ if __name__ == '__main__':
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                            np.array(fields), U, RdT, ubdex, utdex)
+                            np.array(fields), U, RdT, LMS, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
@@ -417,7 +418,7 @@ if __name__ == '__main__':
               del(U); del(fields)
               
               # Compute forcing vector adding boundary forcing to the end
-              bN = np.concatenate((RHS, 0.0*dWBC[1:]))
+              bN = np.concatenate((RHS, np.zeros(NX)))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
               R1 = sps.diags(dHdX[1:], offsets=0, format='lil')
@@ -507,25 +508,6 @@ if __name__ == '__main__':
                      opdb['LDIA'] = LDIA
                      opdb.close()
                       
-                     # Compute the partitions for Schur Complement solution (SPARSE)
-                     '''
-                     AS = sps.bmat([[A, B], \
-                                    [E, F]], format='csc')
-                     BS = sps.bmat([[C, D, LDA], \
-                                    [G, H, LHA]], format='csc')
-                     CS = sps.bmat([[I, J], \
-                                    [N, O], \
-                                    [LNA, LOA]], format='csc')
-                     DS = sps.bmat([[K, M, LMA], \
-                                    [P, Q, LQAC], \
-                                    [LPA, LQAR, LDIA]], format='csc')
-                     
-                     # Compute the partitions for Schur Complement solution (FULL)
-                     AS = AS.toarray()
-                     BS = BS.toarray()
-                     CS = CS.toarray()
-                     DS = DS.toarray()
-                     '''
                      # Compute the partitions for Schur Complement solution
                      fu = bN[udex]
                      fw = bN[wdex]
@@ -640,6 +622,8 @@ if __name__ == '__main__':
               SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ
+              # Store the Lagrange Multipliers
+              LMS += dsol[physDOF:totalDOF]
               
               print('Recover full linear solution vector... DONE!')
               
@@ -654,19 +638,6 @@ if __name__ == '__main__':
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               
-              #%% Use the linear solution as the initial guess to the nonlinear solution
-              '''
-              sol = computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, sysDex)
-              SOLT[:,1] = sol - SOLT[:,0]
-              SOLT[:,0] = sol
-              
-              # Initialize the RHS and forcing for each field
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, SOLT[:,1], INIT, udex, wdex, pdex, tdex, ubdex, utdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT, ubdex, utdex)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields), ubdex, utdex)
-              message = 'Residual 2-norm AFTER NL iterative steps:'
-              err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              '''
               # Check the change in the solution
               DSOL = np.array(SOLT[:,1])
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
@@ -741,6 +712,7 @@ if __name__ == '__main__':
               rdb = shelve.open(restart_file, flag='n')
               rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
+              rdb['LMS'] = LMS
               rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ
