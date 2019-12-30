@@ -75,6 +75,7 @@ def getFromRestart(name, ET, NX, NZ, StaticSolve):
               sys.exit(2)
        
        SOLT = rdb['SOLT']
+       LMS = rdb['LMS']
        RHS = rdb['RHS']
        IT = rdb['ET']
        if ET <= IT and not StaticSolve:
@@ -85,7 +86,7 @@ def getFromRestart(name, ET, NX, NZ, StaticSolve):
        TI = np.array(np.arange(IT + DT, ET, DT))
        rdb.close()
        
-       return SOLT, RHS, NX_in, NZ_in, TI
+       return SOLT, LMS, RHS, NX_in, NZ_in, TI
 
 # Store a matrix to disk in column wise chucks
 def storeColumnChunks(MM, Mname, dbName):
@@ -178,8 +179,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -200,7 +201,7 @@ if __name__ == '__main__':
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Set the terrain options
-       h0 = 10.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
        HOPT = [h0, aC, lC]
@@ -243,7 +244,7 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT, width)
+       HofX, dHdX = computeTopographyOnGrid(REFS, SCHAR, HOPT, width)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -421,9 +422,9 @@ if __name__ == '__main__':
               bN = np.concatenate((RHS, np.zeros(NX)))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
-              R1 = sps.diags(dHdX[1:], offsets=0, format='lil')
-              R2 = -sps.eye(NX, format='lil')
-              C1 = sps.diags(-dWBC[1:], offsets=0, format='lil')
+              R1 = sps.diags(-LMS * dHdX[1:], offsets=0, format='lil')
+              R2 = sps.diags(LMS, offsets=0, format='lil')
+              C1 = sps.diags(dWBC[1:], offsets=0, format='lil')
               
               rowShape = (NX,OPS)
               LN = sps.lil_matrix(rowShape)
@@ -618,12 +619,13 @@ if __name__ == '__main__':
                      del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
-              dsolQ = dsol[0:(len(dsol) - NX)]
+              SL = len(dsol)
+              dsolQ = dsol[0:(SL - NX)]
               SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ
               # Store the Lagrange Multipliers
-              LMS += dsol[physDOF:totalDOF]
+              LMS += dsol[(SL - NX):SL]
               
               print('Recover full linear solution vector... DONE!')
               
