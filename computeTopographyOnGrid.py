@@ -22,7 +22,7 @@ def computeTopographyOnGrid(REFS, profile, opt, latRayX):
        l1 = np.amin(xh)
        
        # Make width for the Kaiser window
-       r2 = 2.0 * aC
+       r2 = 1.0 * aC
        r1 = -r2
        
        DX = 50.0 # maximum resolution in meters

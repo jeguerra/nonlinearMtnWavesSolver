@@ -160,8 +160,8 @@ if __name__ == '__main__':
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
-       #localDir = '/media/jeguerra/DATA/scratch/'
-       localDir = '/scratch/'
+       localDir = '/media/jeguerra/DATA/scratch/'
+       #localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -179,8 +179,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 135 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -349,8 +349,6 @@ if __name__ == '__main__':
        
        del(DDXM)
        del(DDZM)
-       #del(DDXM_SP)
-       #del(DDZM_SP)
        del(DZDX)
        
        #%% SOLUTION INITIALIZATION
@@ -378,7 +376,7 @@ if __name__ == '__main__':
               SOLT = np.zeros((physDOF, 2))
               
               # Initialize Lagrange Multiplier storage
-              LMS = np.ones(NX)
+              LMS = 0.0 * np.ones(NX)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
@@ -419,46 +417,32 @@ if __name__ == '__main__':
               del(U); del(fields)
               
               # Compute forcing vector adding boundary forcing to the end
-              bN = np.concatenate((RHS, np.zeros(NX)))
+              bN = np.concatenate((RHS, dWBC[1:]))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
-              R1 = sps.diags(LMS * dHdX[1:], offsets=0, format='lil')
-              R2 = sps.diags(-LMS, offsets=0, format='lil')
-              C1 = sps.diags(-dWBC[1:], offsets=0, format='lil')
+              C1 = -1.0 * sps.diags(dHdX[1:], offsets=0, format='csr')
+              C2 = +1.0 * sps.eye(NX, format='csr')
               
-              rowShape = (NX,OPS)
-              LN = sps.lil_matrix(rowShape)
-              LN[:,ubdex[1:]] = R1
-              LO = sps.lil_matrix(rowShape)
-              LO[:,ubdex[1:]] = R2
-              LP = sps.lil_matrix(rowShape)
-              LQ = sps.lil_matrix(rowShape)
-              
-              # Apply BC adjustments and indexing block-wise (Lagrange blocks)
-              LNA = LN[:,ubcDex]
-              LOA = LO[:,wbcDex]
-              LPA = LP[:,pbcDex]
-              LQAR = LQ[:,tbcDex]
-              
-              # Compute Lagrange multiplier column augmentation matrices (exclude left corner node)
               colShape = (OPS,NX)
               LD = sps.lil_matrix(colShape)
               LD[ubdex[1:],:] = C1
               LH = sps.lil_matrix(colShape)
-              LH[ubdex[1:],:] = C1
+              LH[ubdex[1:],:] = C2
               LM = sps.lil_matrix(colShape)
-              LM[ubdex[1:],:] = C1
               LQ = sps.lil_matrix(colShape)
-              LH[ubdex[1:],:] = C1
               
-              # Apply BC adjustments and indexing block-wise (Lagrange blocks)
+              # Apply BC adjustments  and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
               LMA = LM[pbcDex,:]
               LQAC = LQ[tbcDex,:]
               
-              # Diagonal corner block
-              LDIA = C1
+              # Apply transpose for row augmentation (Lagrange blocks)
+              LNA = LDA.T
+              LOA = LHA.T
+              LPA = LMA.T
+              LQAR = LQAC.T
+              LDIA = sps.lil_matrix((NX,NX))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -560,13 +544,18 @@ if __name__ == '__main__':
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
                      DS = computeSchurBlock(schurName,'DS')
-                     factorDS = dsl.lu_factor(DS)
+                     PDS, LDS, UDS = dsl.lu(DS, permute_l=False, overwrite_a=True)
+                     PLDS = PDS.dot(LDS)
+                     del(PDS); del(LDS)
+                     #factorDS = dsl.lu_factor(DS, overwrite_a=True)
                      del(DS)
                      print('Factor D... DONE!')
                      
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
                      BS = computeSchurBlock(schurName,'BS')
-                     f2_hat = dsl.lu_solve(factorDS, f2)
+                     #f2_hat = dsl.lu_solve(factorDS, f2)
+                     f2_hat = dsl.solve(PLDS, f2)
+                     f2_hat = dsl.solve_triangular(UDS, f2_hat)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(BS); del(f2_hat)
                      print('Compute modified force vectors... DONE!')
@@ -585,7 +574,9 @@ if __name__ == '__main__':
                             crange = cranges[cc] 
                             CS_chunk = mdb['CS' + str(cc)]
                             
-                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
+                            #DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
+                            DS_chunk = dsl.solve(PLDS, CS_chunk)
+                            DS_chunk = dsl.solve_triangular(UDS, DS_chunk)
                             del(CS_chunk)
                             AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
                             del(DS_chunk)
@@ -597,7 +588,7 @@ if __name__ == '__main__':
                      
                      # Apply Schur C. solver on block partitioned DS_SC
                      #sol1 = sch.computeSchurSolve(AS, f1_hat)
-                     factorDS_SC = dsl.lu_factor(AS)
+                     factorDS_SC = dsl.lu_factor(AS, overwrite_a=True)
                      del(AS)
                      print('Factor D and Schur Complement of D... DONE!')
                      
@@ -608,7 +599,9 @@ if __name__ == '__main__':
                      CS = computeSchurBlock(schurName, 'CS')
                      f2_hat = f2 - CS.dot(sol1)
                      del(CS)
-                     sol2 = dsl.lu_solve(factorDS, f2_hat)
+                     #sol2 = dsl.lu_solve(factorDS, f2_hat)
+                     sol2 = dsl.solve(PLDS, f2_hat)
+                     sol2 = dsl.solve_triangular(UDS, sol2)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))

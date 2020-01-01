@@ -122,18 +122,19 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, LMS, botdex,
        LD44 = UPXM
        
        # Compute adjustments by terrain constraint
+       '''
        tfdex = botdex[1:]
-       dHdXM = sps.diags(LMS * dHdX[1:], offsets=0, format='csr')
-       LMSM = sps.diags(LMS, offsets=0, format='csr')
+       dHdXM = +1.0 * sps.diags(LMS * dHdX[1:], offsets=0, format='csr')
+       LMSM = -1.0 * sps.diags(LMS, offsets=0, format='csr')
        LD11[np.ix_(tfdex,tfdex)] += dHdXM
-       LD12[np.ix_(tfdex,tfdex)] -= LMSM
+       LD12[np.ix_(tfdex,tfdex)] += LMSM
        LD21[np.ix_(tfdex,tfdex)] += dHdXM
-       LD22[np.ix_(tfdex,tfdex)] -= LMSM
+       LD22[np.ix_(tfdex,tfdex)] += LMSM
        LD31[np.ix_(tfdex,tfdex)] += dHdXM
-       LD32[np.ix_(tfdex,tfdex)] -= LMSM
+       LD32[np.ix_(tfdex,tfdex)] += LMSM
        LD41[np.ix_(tfdex,tfdex)] += dHdXM
-       LD42[np.ix_(tfdex,tfdex)] -= LMSM
-       
+       LD42[np.ix_(tfdex,tfdex)] += LMSM
+       '''
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
                LD31, LD32, LD33, LD34, \
