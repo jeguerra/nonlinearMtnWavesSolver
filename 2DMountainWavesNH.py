@@ -377,7 +377,7 @@ if __name__ == '__main__':
               SOLT = np.zeros((physDOF, 2))
               
               # Initialize Lagrange Multiplier storage
-              LMS = 0.0 * np.ones(NX)
+              LMS = 0.0 * np.ones(NX+1)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
