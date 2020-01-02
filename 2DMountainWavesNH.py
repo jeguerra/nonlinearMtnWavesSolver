@@ -160,7 +160,7 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = False # Initializes from a restart database
+       isRestart = True # Initializes from a restart database
        #localDir = '/media/jeguerra/DATA/scratch/'
        localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
@@ -205,7 +205,8 @@ if __name__ == '__main__':
        h0 = 100.0
        aC = 5000.0
        lC = 4000.0
-       HOPT = [h0, aC, lC]
+       kC = 6000.0
+       HOPT = [h0, aC, lC, kC]
        
        # Set the Rayleigh options
        depth = 12000.0
