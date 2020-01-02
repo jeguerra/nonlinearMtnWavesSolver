@@ -121,24 +121,28 @@ def computeSchurBlock(dbName, blockName):
        bdb = shelve.open(dbName, flag='r')
        
        if blockName == 'AS':
-              SB = sps.bmat([[bdb['A'], bdb['B']], \
-                             [bdb['E'], bdb['F']]], format='csc')
+              SB = sps.bmat([[bdb['LDIA'], bdb['LNA'], bdb['LOR']]
+                             [bdb['LDA'], bdb['A'], bdb['B']], \
+                             [bdb['LHA'], bdb['E'], bdb['F']]], format='csc')
        elif blockName == 'BS':
-              SB = sps.bmat([[bdb['C'], bdb['D'], bdb['LDA']], \
-                             [bdb['G'], bdb['H'], bdb['LHA']]], format='csc')
+              SB = sps.bmat([[bdb['LPA'], bdb['LQAR']], \
+                             [bdb['C'], bdb['D']], \
+                             [bdb['G'], bdb['H']]], format='csc')
        elif blockName == 'CS':
-              SB = sps.bmat([[bdb['I'], bdb['J']], \
-                             [bdb['N'], bdb['O']], \
-                             [bdb['LNA'], bdb['LOA']]], format='csc')
+              SB = sps.bmat([[bdb['LMA'], bdb['I'], bdb['J']], \
+                             [bdb['LQAC'], bdb['N'], bdb['O']]], format='csc')
        elif blockName == 'DS':
-              SB = sps.bmat([[bdb['K'], bdb['M'], bdb['LMA']], \
-                             [bdb['P'], bdb['Q'], bdb['LQAC']], \
-                             [bdb['LPA'], bdb['LQAR'], bdb['LDIA']]], format='csc')
+              SB = sps.bmat([[bdb['K'], bdb['M']], \
+                             [bdb['P'], bdb['Q']]], format='csc')
        else:
               print('INVALID SCHUR BLOCK NAME!')
               
        bdb.close()
-       return SB.toarray()
+       
+       if blockName == 'DS':
+              return SB
+       else:
+              return SB.toarray()
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
@@ -179,8 +183,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 84
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -417,7 +421,8 @@ if __name__ == '__main__':
               del(U); del(fields)
               
               # Compute forcing vector adding boundary forcing to the end
-              bN = np.concatenate((RHS, dWBC[1:]))
+              LMRHS = dWBC[1:]
+              bN = np.concatenate((RHS, LMRHS))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
               C1 = -1.0 * sps.diags(dHdX[1:], offsets=0, format='csr')
@@ -499,7 +504,7 @@ if __name__ == '__main__':
                      f1 = np.concatenate((fu[ubcDex], fw[wbcDex]))
                      fp = bN[pdex]
                      ft = bN[tdex]
-                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex], dWBC[1:]))
+                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex], LMRHS))
                      del(bN)
                      
               if LinearSolve or (StaticSolve and SolveFull):
@@ -510,13 +515,14 @@ if __name__ == '__main__':
                      Q += R4
                      
                      # Compute the global linear operator
-                     AN = sps.bmat([[A, B, C, D], \
-                              [E, F, G, H], \
-                              [I, J, K, M], \
-                              [N, O, P, Q]], format='csr')
+                     AN = sps.bmat([[A, B, C, D, LDA], \
+                              [E, F, G, H, LHA], \
+                              [I, J, K, M, LMA], \
+                              [N, O, P, Q, LQAC], \
+                              [LNA, LOA, LPA, LQAR, LDIA]], format='csc')
               
                      # Compute the global linear force vector
-                     bN = bN[sysDex]
+                     bN = np.concatenate((bN[sysDex], LMRHS))
               
               # Get memory back
               del(A); del(B); del(C); del(D)
@@ -544,9 +550,8 @@ if __name__ == '__main__':
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
                      DS = computeSchurBlock(schurName,'DS')
-                     PDS, LDS, UDS = dsl.lu(DS, permute_l=False, overwrite_a=True)
-                     PLDS = PDS.dot(LDS)
-                     del(PDS); del(LDS)
+                     opts = dict(Equil=True, IterRefine='DOUBLE')
+                     factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
                      #factorDS = dsl.lu_factor(DS, overwrite_a=True)
                      del(DS)
                      print('Factor D... DONE!')
@@ -554,8 +559,7 @@ if __name__ == '__main__':
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
                      BS = computeSchurBlock(schurName,'BS')
                      #f2_hat = dsl.lu_solve(factorDS, f2)
-                     f2_hat = dsl.solve(PLDS, f2)
-                     f2_hat = dsl.solve_triangular(UDS, f2_hat)
+                     f2_hat = factorDS.solve(f2)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(BS); del(f2_hat)
                      print('Compute modified force vectors... DONE!')
@@ -575,8 +579,7 @@ if __name__ == '__main__':
                             CS_chunk = mdb['CS' + str(cc)]
                             
                             #DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
-                            DS_chunk = dsl.solve(PLDS, CS_chunk)
-                            DS_chunk = dsl.solve_triangular(UDS, DS_chunk)
+                            DS_chunk = factorDS.solve(CS_chunk)
                             del(CS_chunk)
                             AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
                             del(DS_chunk)
@@ -600,8 +603,7 @@ if __name__ == '__main__':
                      f2_hat = f2 - CS.dot(sol1)
                      del(CS)
                      #sol2 = dsl.lu_solve(factorDS, f2_hat)
-                     sol2 = dsl.solve(PLDS, f2_hat)
-                     sol2 = dsl.solve_triangular(UDS, sol2)
+                     sol2 = factorDS.solve(f2_hat)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))
