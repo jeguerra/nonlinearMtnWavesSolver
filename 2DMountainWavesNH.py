@@ -121,7 +121,7 @@ def computeSchurBlock(dbName, blockName):
        bdb = shelve.open(dbName, flag='r')
        
        if blockName == 'AS':
-              SB = sps.bmat([[bdb['LDIA'], bdb['LNA'], bdb['LOR']]
+              SB = sps.bmat([[bdb['LDIA'], bdb['LNA'], bdb['LOA']], \
                              [bdb['LDA'], bdb['A'], bdb['B']], \
                              [bdb['LHA'], bdb['E'], bdb['F']]], format='csc')
        elif blockName == 'BS':
@@ -138,11 +138,8 @@ def computeSchurBlock(dbName, blockName):
               print('INVALID SCHUR BLOCK NAME!')
               
        bdb.close()
-       
-       if blockName == 'DS':
-              return SB
-       else:
-              return SB.toarray()
+
+       return SB.toarray()
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
@@ -164,8 +161,8 @@ if __name__ == '__main__':
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
-       localDir = '/media/jeguerra/DATA/scratch/'
-       #localDir = '/scratch/'
+       #localDir = '/media/jeguerra/DATA/scratch/'
+       localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -183,8 +180,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 129 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 84
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -421,18 +418,18 @@ if __name__ == '__main__':
               del(U); del(fields)
               
               # Compute forcing vector adding boundary forcing to the end
-              LMRHS = dWBC[1:]
+              LMRHS = -dWBC
               bN = np.concatenate((RHS, LMRHS))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
-              C1 = -1.0 * sps.diags(dHdX[1:], offsets=0, format='csr')
-              C2 = +1.0 * sps.eye(NX, format='csr')
+              C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
+              C2 = +1.0 * sps.eye(NX+1, format='csr')
               
-              colShape = (OPS,NX)
+              colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
-              LD[ubdex[1:],:] = C1
+              LD[ubdex,:] = C1
               LH = sps.lil_matrix(colShape)
-              LH[ubdex[1:],:] = C2
+              LH[ubdex,:] = C2
               LM = sps.lil_matrix(colShape)
               LQ = sps.lil_matrix(colShape)
               
@@ -447,7 +444,7 @@ if __name__ == '__main__':
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((NX,NX))
+              LDIA = sps.lil_matrix((NX+1,NX+1))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -501,10 +498,10 @@ if __name__ == '__main__':
                      # Compute the partitions for Schur Complement solution
                      fu = bN[udex]
                      fw = bN[wdex]
-                     f1 = np.concatenate((fu[ubcDex], fw[wbcDex]))
+                     f1 = np.concatenate((LMRHS, fu[ubcDex], fw[wbcDex]))
                      fp = bN[pdex]
                      ft = bN[tdex]
-                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex], LMRHS))
+                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))
                      del(bN)
                      
               if LinearSolve or (StaticSolve and SolveFull):
@@ -543,23 +540,23 @@ if __name__ == '__main__':
                      opts = dict(Equil=True, IterRefine='DOUBLE')
                      factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
                      del(AN)
-                     sol = factor.solve(bN)
+                     dsol = factor.solve(bN)
                      del(bN)
                      del(factor)
               if SolveSchur and not SolveFull:
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
                      DS = computeSchurBlock(schurName,'DS')
-                     opts = dict(Equil=True, IterRefine='DOUBLE')
-                     factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
-                     #factorDS = dsl.lu_factor(DS, overwrite_a=True)
+                     #opts = dict(Equil=True, IterRefine='DOUBLE')
+                     #factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
+                     factorDS = dsl.lu_factor(DS, overwrite_a=True)
                      del(DS)
                      print('Factor D... DONE!')
                      
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
                      BS = computeSchurBlock(schurName,'BS')
-                     #f2_hat = dsl.lu_solve(factorDS, f2)
-                     f2_hat = factorDS.solve(f2)
+                     f2_hat = dsl.lu_solve(factorDS, f2)
+                     #f2_hat = factorDS.solve(f2)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(BS); del(f2_hat)
                      print('Compute modified force vectors... DONE!')
@@ -578,8 +575,8 @@ if __name__ == '__main__':
                             crange = cranges[cc] 
                             CS_chunk = mdb['CS' + str(cc)]
                             
-                            #DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
-                            DS_chunk = factorDS.solve(CS_chunk)
+                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
+                            #DS_chunk = factorDS.solve(CS_chunk)
                             del(CS_chunk)
                             AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
                             del(DS_chunk)
@@ -602,8 +599,8 @@ if __name__ == '__main__':
                      CS = computeSchurBlock(schurName, 'CS')
                      f2_hat = f2 - CS.dot(sol1)
                      del(CS)
-                     #sol2 = dsl.lu_solve(factorDS, f2_hat)
-                     sol2 = factorDS.solve(f2_hat)
+                     sol2 = dsl.lu_solve(factorDS, f2_hat)
+                     #sol2 = factorDS.solve(f2_hat)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))
@@ -614,13 +611,13 @@ if __name__ == '__main__':
                      del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
-              SL = len(dsol)
-              dsolQ = dsol[0:(SL - NX)]
+              #SL = len(dsol)
+              # Store the Lagrange Multipliers
+              LMS += dsol[0:NX]
+              dsolQ = dsol[NX:]
               SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ
-              # Store the Lagrange Multipliers
-              LMS += dsol[(SL - NX):SL]
               
               print('Recover full linear solution vector... DONE!')
               
