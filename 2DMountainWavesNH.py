@@ -613,8 +613,8 @@ if __name__ == '__main__':
               #%% Update the interior and boundary solution
               #SL = len(dsol)
               # Store the Lagrange Multipliers
-              LMS += dsol[0:NX]
-              dsolQ = dsol[NX:]
+              LMS += dsol[0:NX+1]
+              dsolQ = dsol[NX+1:]
               SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ
