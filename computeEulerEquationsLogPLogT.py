@@ -101,40 +101,26 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, LMS, botdex,
        bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
        
        # Compute the blocks of the Jacobian operator
-       LD11 = sps.lil_matrix(UPXM + PuPxM)
-       LD12 = sps.lil_matrix(DuDzM + DUDZM)
+       LD11 = UPXM + PuPxM
+       LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = sps.lil_matrix(PwPxM)
-       LD22 = sps.lil_matrix(UPXM + DwDzM)
+       LD21 = PwPxM
+       LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bf
        
-       LD31 = sps.lil_matrix(gam * PPXM + PlpPxM)
-       LD32 = sps.lil_matrix(gam * DDZM + DlpDzM + DLPDZM)
+       LD31 = gam * PPXM + PlpPxM
+       LD32 = gam * DDZM + DlpDzM + DLPDZM
        LD33 = UPXM
        LD34 = None
        
-       LD41 = sps.lil_matrix(PltPxM)
-       LD42 = sps.lil_matrix(DltDzM + DLPTDZM)
+       LD41 = PltPxM
+       LD42 = DltDzM + DLPTDZM
        LD43 = None
        LD44 = UPXM
        
-       # Compute adjustments by terrain constraint
-       '''
-       tfdex = botdex[1:]
-       dHdXM = +1.0 * sps.diags(LMS * dHdX[1:], offsets=0, format='csr')
-       LMSM = -1.0 * sps.diags(LMS, offsets=0, format='csr')
-       LD11[np.ix_(tfdex,tfdex)] += dHdXM
-       LD12[np.ix_(tfdex,tfdex)] += LMSM
-       LD21[np.ix_(tfdex,tfdex)] += dHdXM
-       LD22[np.ix_(tfdex,tfdex)] += LMSM
-       LD31[np.ix_(tfdex,tfdex)] += dHdXM
-       LD32[np.ix_(tfdex,tfdex)] += LMSM
-       LD41[np.ix_(tfdex,tfdex)] += dHdXM
-       LD42[np.ix_(tfdex,tfdex)] += LMSM
-       '''
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
                LD31, LD32, LD33, LD34, \
@@ -240,8 +226,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        
        # Get the derivative operators
        DQDZ = REFG[4]
-       DDXM = REFS[10]
-       DDZM = REFS[11]
+       DDXM = REFS[12]
+       DDZM = REFS[13]
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
@@ -313,10 +299,10 @@ def computeRayleighTendency(REFG, fields):
 def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
-       DDXM = REFS[10]
-       DDZM = REFS[11]
-       #DDXM = REFS[12]
-       #DDZM = REFS[13]
+       #DDXM = REFS[10]
+       #DDZM = REFS[11]
+       DDXM = REFS[12]
+       DDZM = REFS[13]
        DZDX = REFS[15]
        
        # Get the anisotropic coefficients

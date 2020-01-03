@@ -180,8 +180,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -202,7 +202,7 @@ if __name__ == '__main__':
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Set the terrain options
-       h0 = 100.0
+       h0 = 10.0
        aC = 5000.0
        lC = 4000.0
        kC = 6000.0
@@ -343,9 +343,12 @@ if __name__ == '__main__':
        # Update the data storage
        REFS.append(GMLXOP.dot(DDXM))
        REFS.append(GMLZOP.dot(DDZM))
+       # Update the data storage (full arrays)
+       REFS.append((GMLXOP.dot(DDXM)).toarray())
+       REFS.append((GMLZOP.dot(DDZM)).toarray())
        # Store sparse derivatives
-       REFS.append(GMLXOP.dot(DDXM_SP))
-       REFS.append(GMLZOP.dot(DDZM_SP))
+       #REFS.append(GMLXOP.dot(DDXM_SP))
+       #REFS.append(GMLZOP.dot(DDZM_SP))
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
        
