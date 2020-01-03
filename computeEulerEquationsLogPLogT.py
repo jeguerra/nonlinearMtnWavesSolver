@@ -30,7 +30,7 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        return fields, U, RdT
 
 #%% Evaluate the Jacobian matrix
-def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, LMS, botdex, topdex):
+def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
@@ -38,7 +38,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, LMS, botdex,
        gam = PHYS[6]
        
        # Get the derivative operators
-       dHdX = REFS[6]
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
@@ -226,8 +225,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        
        # Get the derivative operators
        DQDZ = REFG[4]
-       DDXM = REFS[12]
-       DDZM = REFS[13]
+       DDXM = REFS[10]
+       DDZM = REFS[11]
        DZDX = REFS[15]
        
        # Compute terrain following terms (two way assignment into fields)
@@ -299,10 +298,8 @@ def computeRayleighTendency(REFG, fields):
 def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
        # Get the derivative operators
-       #DDXM = REFS[10]
-       #DDZM = REFS[11]
-       DDXM = REFS[12]
-       DDZM = REFS[13]
+       DDXM = REFS[10]
+       DDZM = REFS[11]
        DZDX = REFS[15]
        
        # Get the anisotropic coefficients

@@ -16,7 +16,7 @@ from computeResidualViscCoeffs import computeResidualViscCoeffs
 def pause():
     input("Press the <ENTER> key to continue...")
 
-def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, wbdex, sysDex):
+def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, botdex, topdex, wbdex, sysDex, DynSGS):
        dHdX = REFS[6]
        lastSol = SOLT[:,0]
        
@@ -24,18 +24,19 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               # Update the BC
               sol[wbdex] = dHdX * (INIT[botdex] + sol[botdex])
               # Function evaluation
-              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
-              rhs += tendency.computeRayleighTendency(REFG, fields, botdex, topdex)
+              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT)
+              rhs += tendency.computeRayleighTendency(REFG, fields)
               
-              RESCF = computeResidualViscCoeffs(sol, rhs, DX, DZ, udex, wdex, pdex, tdex)
-              rhs += tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
+              if DynSGS:
+                     RESCF = computeResidualViscCoeffs(sol, rhs, DX, DZ, udex, wdex, pdex, tdex)
+                     rhs += tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
        
               return rhs
        
        def computeJacVecUpdate(sol, vec):
               # Prepare the Jacobian
-              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex, botdex, topdex)
+              fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
               DOPS = tendency.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex)
               # Compute the product
               jv = tendency.computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex)
@@ -43,8 +44,8 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
               return jv
        
        # Solve for nonlinear equilibrium (default krylov)
-       '''
-       jac_options = {'method':'gmres','inner_maxiter':5000,'outer_k':5}
+       #'''
+       jac_options = {'method':'gmres','inner_maxiter':1000,'outer_k':3}
        sol, info = opt.nonlin.nonlin_solve(computeRHSUpdate, lastSol, 
                                   jacobian=opt.nonlin.KrylovJacobian(**jac_options),
                                   iter=5, verbose=True,
@@ -66,7 +67,7 @@ def computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pd
                                   line_search='armijo',
                                   full_output=True,
                                   raise_exception=False)
-       #'''
+       '''
        print('NL solver exit on: ', info)
        
        return sol

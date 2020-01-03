@@ -40,10 +40,9 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
-import computeSchurSolve as sch
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
-import computeSchurSolve as sch
+#import computeIterativeSolveNL as itr
 from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
 #from computeIterativeSolveNL import computeIterativeSolveNL
@@ -160,7 +159,8 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = True # Initializes from a restart database
+       isRestart = False # Initializes from a restart database
+       #relaxIterative = False # Apply an iterative root finder... DynSGS can be used here.
        #localDir = '/media/jeguerra/DATA/scratch/'
        localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
@@ -202,10 +202,10 @@ if __name__ == '__main__':
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Set the terrain options
-       h0 = 10.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
-       kC = 6000.0
+       kC = 5000.0
        HOPT = [h0, aC, lC, kC]
        
        # Set the Rayleigh options
@@ -341,14 +341,11 @@ if __name__ == '__main__':
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
        # Update the data storage
-       REFS.append(GMLXOP.dot(DDXM))
-       REFS.append(GMLZOP.dot(DDZM))
-       # Update the data storage (full arrays)
-       REFS.append((GMLXOP.dot(DDXM)).toarray())
-       REFS.append((GMLZOP.dot(DDZM)).toarray())
+       REFS.append((GMLXOP.dot(DDXM)).tocsr())
+       REFS.append((GMLZOP.dot(DDZM)).tocsr())
        # Store sparse derivatives
-       #REFS.append(GMLXOP.dot(DDXM_SP))
-       #REFS.append(GMLZOP.dot(DDZM_SP))
+       REFS.append((GMLXOP.dot(DDXM_SP)).tocsr())
+       REFS.append((GMLZOP.dot(DDZM_SP)).tocsr())
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
        
@@ -381,7 +378,7 @@ if __name__ == '__main__':
               SOLT = np.zeros((physDOF, 2))
               
               # Initialize Lagrange Multiplier storage
-              LMS = 0.0 * np.ones(NX+1)
+              LMS = np.zeros(NX+1)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
@@ -398,7 +395,7 @@ if __name__ == '__main__':
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                            np.array(fields), U, RdT, LMS, ubdex, utdex)
+                            np.array(fields), U, RdT, ubdex, utdex)
               #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
@@ -551,8 +548,6 @@ if __name__ == '__main__':
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
                      DS = computeSchurBlock(schurName,'DS')
-                     #opts = dict(Equil=True, IterRefine='DOUBLE')
-                     #factorDS = spl.splu(DS, permc_spec='MMD_ATA', options=opts)
                      factorDS = dsl.lu_factor(DS, overwrite_a=True)
                      del(DS)
                      print('Factor D... DONE!')
@@ -560,7 +555,6 @@ if __name__ == '__main__':
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
                      BS = computeSchurBlock(schurName,'BS')
                      f2_hat = dsl.lu_solve(factorDS, f2)
-                     #f2_hat = factorDS.solve(f2)
                      f1_hat = f1 - BS.dot(f2_hat)
                      del(BS); del(f2_hat)
                      print('Compute modified force vectors... DONE!')
@@ -580,7 +574,6 @@ if __name__ == '__main__':
                             CS_chunk = mdb['CS' + str(cc)]
                             
                             DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
-                            #DS_chunk = factorDS.solve(CS_chunk)
                             del(CS_chunk)
                             AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
                             del(DS_chunk)
@@ -591,7 +584,6 @@ if __name__ == '__main__':
                      print('Compute Schur Complement of D... DONE!')
                      
                      # Apply Schur C. solver on block partitioned DS_SC
-                     #sol1 = sch.computeSchurSolve(AS, f1_hat)
                      factorDS_SC = dsl.lu_factor(AS, overwrite_a=True)
                      del(AS)
                      print('Factor D and Schur Complement of D... DONE!')
@@ -604,7 +596,6 @@ if __name__ == '__main__':
                      f2_hat = f2 - CS.dot(sol1)
                      del(CS)
                      sol2 = dsl.lu_solve(factorDS, f2_hat)
-                     #sol2 = factorDS.solve(f2_hat)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))
@@ -615,16 +606,43 @@ if __name__ == '__main__':
                      del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
-              #SL = len(dsol)
               # Store the Lagrange Multipliers
               LMS += dsol[0:NX+1]
               dsolQ = dsol[NX+1:]
-              SOLT[sysDex,0] += dsolQ
+              
+              # Implement a crude bracket line search
+              def funcEval(eta):
+                     SOLT[sysDex,0] += eta * dsolQ
+                     qv, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+                     rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(qv), U, RdT)
+                     rhs += eqs.computeRayleighTendency(REFG, np.array(qv))
+                     
+                     return np.linalg.norm(rhs)
+              
+              import scipy.optimize as opt
+              ls = opt.minimize_scalar(funcEval, bounds=(0.0, 1.0), method='bounded')
+              print('Estimated STEP LENGTH: ', ls.x)
+              
+              if ls.x <= 1.0 and ls.x > 0.0:
+                     alpha = ls.x
+              else:
+                     alpha = 1.0
+              
+              SOLT[sysDex,0] += alpha * dsolQ
               # Store solution change to instance 1
-              SOLT[sysDex,1] = dsolQ
+              SOLT[sysDex,1] = alpha * dsolQ
               
               print('Recover full linear solution vector... DONE!')
               
+              #%% Use the linear solution as the initial guess to the nonlinear solution
+              '''
+              if relaxIterative:
+                     sol = itr.computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, sysDex, ResDiff)
+                     SOLT[:,1] = sol - np.array(SOLT[:,0])
+                     SOLT[:,0] = sol
+                     del(sol)
+                     print('Applied iterative root find from initial Newton... DONE!')
+              '''
               #%% Check the output residual
               fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
               
