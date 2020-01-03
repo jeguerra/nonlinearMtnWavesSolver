@@ -6,9 +6,9 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
-import math as mt
+#import math as mt
 import scipy.sparse as sps
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        # Get some physical quantities

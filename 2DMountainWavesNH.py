@@ -32,7 +32,7 @@ from computeColumnInterp import computeColumnInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
-#from computeStretchedDomain2D import computeStretchedDomain2D
+from computeStretchedDomain2D import computeStretchedDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
@@ -180,8 +180,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -250,8 +250,10 @@ if __name__ == '__main__':
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
-       XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
-       #XL, ZTL, DZT, sigma = computeStretchedDomain2D(DIMS, REFS, HofX, dHdX)
+       # USE THE GUELLRICH TERRAIN DECAY
+       #XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       # USE UNIFORM STRETCHING
+       XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)

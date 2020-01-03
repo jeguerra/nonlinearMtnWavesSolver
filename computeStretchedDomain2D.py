@@ -10,7 +10,7 @@ Grid stretching that preserves the layout of Chebyshev nodes on columns.
 
 import numpy as np
 
-def computeStretchedDomain2D(DIMS, REFS, hx, dhdx):
+def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
        NX = DIMS[3] + 1
@@ -28,15 +28,18 @@ def computeStretchedDomain2D(DIMS, REFS, hx, dhdx):
        # Make the global array of terrain height and slope features
        ZTL = np.zeros((NZ,NX))
        
-       sigma = []
+       sigma = np.ones((NZ,NX))
        for cc in range(NX):
               thisZH = ZH - hx[cc]
-              sigma.append(ZH / thisZH)
+              sigma[:,cc] *= (ZH / thisZH)
               ZTL[:,cc] = ZL[:,cc] * thisZH / ZH
               ZTL[:,cc] += hx[cc]
        
        # Compute the terrain derivatives       
        for rr in range(1,NZ):
               DZT[rr,:] = DDX_1D.dot(ZTL[rr,:] - z[rr])
+              
+       # Compute the coordinate surface at the edge of the Rayleigh layer
+       ZRL = (1.0 - zRay / ZH) * hx + zRay
        
-       return XL, ZTL, DZT, sigma
+       return XL, ZTL, DZT, sigma, ZRL
