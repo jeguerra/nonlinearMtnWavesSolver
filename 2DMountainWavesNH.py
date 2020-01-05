@@ -159,10 +159,9 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = False # Initializes from a restart database
-       #relaxIterative = False # Apply an iterative root finder... DynSGS can be used here.
-       #localDir = '/media/jeguerra/DATA/scratch/'
-       localDir = '/scratch/'
+       isRestart = True # Initializes from a restart database
+       localDir = '/media/jeguerra/scratch/'
+       #localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -180,8 +179,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -199,13 +198,14 @@ if __name__ == '__main__':
        
        # Set the background temperature profile
        T_in = [300.0, 228.5, 228.5, 248.5]
+       #T_in = [300.0, 290.0, 290.0, 300.0] # Near isothermal
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Set the terrain options
-       h0 = 100.0
+       h0 = 1.0
        aC = 5000.0
        lC = 4000.0
-       kC = 5000.0
+       kC = 10000.0
        HOPT = [h0, aC, lC, kC]
        
        # Set the Rayleigh options
@@ -251,9 +251,9 @@ if __name__ == '__main__':
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
        # USE THE GUELLRICH TERRAIN DECAY
-       #XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # USE UNIFORM STRETCHING
-       XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       #XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -611,7 +611,7 @@ if __name__ == '__main__':
               # Store the Lagrange Multipliers
               LMS += dsol[0:NX+1]
               dsolQ = dsol[NX+1:]
-              
+              '''
               # Implement a crude bracket line search
               def funcEval(eta):
                      SOLT[sysDex,0] += eta * dsolQ
@@ -629,7 +629,8 @@ if __name__ == '__main__':
                      alpha = ls.x
               else:
                      alpha = 1.0
-              
+              '''
+              alpha = 1.0
               SOLT[sysDex,0] += alpha * dsolQ
               # Store solution change to instance 1
               SOLT[sysDex,1] = alpha * dsolQ
