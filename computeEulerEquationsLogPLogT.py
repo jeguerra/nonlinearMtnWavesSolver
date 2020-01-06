@@ -297,9 +297,9 @@ def computeRayleighTendency(REFG, fields):
 
 def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex):
        
-       # Get the derivative operators
-       DDXM = REFS[10]
-       DDZM = REFS[11]
+       # Get the derivative operators (without GML adjustment)
+       DDXM = REFS[12]
+       DDZM = REFS[13]
        DZDX = REFS[15]
        
        # Get the anisotropic coefficients

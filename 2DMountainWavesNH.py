@@ -209,8 +209,8 @@ if __name__ == '__main__':
        HOPT = [h0, aC, lC, kC]
        
        # Set the Rayleigh options
-       depth = 12000.0
-       width = 24000.0
+       depth = 6000.0
+       width = 20000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
@@ -261,8 +261,8 @@ if __name__ == '__main__':
        REFS.append(sigma)
        
        # Compute DX and DZ grid length scales
-       DX = np.mean(np.abs(np.diff(REFS[0])))
-       DZ = np.mean(np.abs(np.diff(REFS[1])))
+       DX = np.max(np.abs(np.diff(REFS[0])))
+       DZ = np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
        ubdex, utdex, wbdex, pbdex, tbdex, \
@@ -342,12 +342,12 @@ if __name__ == '__main__':
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       # Update the data storage
+       # Store derivative operators with GML
        REFS.append((GMLXOP.dot(DDXM)).tocsr())
        REFS.append((GMLZOP.dot(DDZM)).tocsr())
-       # Store sparse derivatives
-       REFS.append((GMLXOP.dot(DDXM_SP)).tocsr())
-       REFS.append((GMLZOP.dot(DDZM_SP)).tocsr())
+       # Store derivative operators without GML
+       REFS.append(DDXM.tocsr())
+       REFS.append(DDZM.tocsr())
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
        
