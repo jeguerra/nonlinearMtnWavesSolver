@@ -142,26 +142,29 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
+       NonLinSolve = True
        
-       # Set the grid type
+       # Set the grid type (NOT IMPLEMENTED)
        HermCheb = True
        UniformDelta = False
        
+       # Set 4th order compact finite difference derivatives switch
+       SparseDerivatives = False
+       
        # Set residual diffusion switch
-       ResDiff = False
+       ResDiff = True
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
-       SolveFull = False
-       SolveSchur = True
+       SolveFull = True
+       SolveSchur = False
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = True # Initializes from a restart database
-       localDir = '/media/jeguerra/scratch/'
-       #localDir = '/scratch/'
+       isRestart = False # Initializes from a restart database
+       #localDir = '/media/jeguerra/scratch/'
+       localDir = '/Users/TempestGuerra/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -173,13 +176,14 @@ if __name__ == '__main__':
        Kp = Rd / cp
        cv = cp - Rd
        gam = cp / cv
-       PHYS = [gc, P0, cp, Rd, Kp, cv, gam]
+       NBVP = 0.01
+       PHYS = [gc, P0, cp, Rd, Kp, cv, gam, NBVP]
        
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
        NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
@@ -197,20 +201,21 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Set the background temperature profile
+       smooth3Layer = False
+       uniformStrat = True
        T_in = [300.0, 228.5, 228.5, 248.5]
-       #T_in = [300.0, 290.0, 290.0, 300.0] # Near isothermal
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Set the terrain options
-       h0 = 1.0
+       h0 = 100.0
        aC = 5000.0
        lC = 4000.0
-       kC = 10000.0
+       kC = 7500.0
        HOPT = [h0, aC, lC, kC]
        
        # Set the Rayleigh options
        depth = 6000.0
-       width = 20000.0
+       width = 24000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
@@ -246,7 +251,7 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT, width)
+       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -274,7 +279,7 @@ if __name__ == '__main__':
        SENSIBLE = 1
        POTENTIAL = 2
        # Map the sounding to the computational vertical 2D grid [0 H]
-       TZ, DTDZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS, True)
+       TZ, DTDZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS, smooth3Layer, uniformStrat, PHYS)
        
        # Compute background fields on the reference column
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
@@ -341,6 +346,10 @@ if __name__ == '__main__':
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       
+       if SparseDerivatives:
+              DDXM = DDXM_SP
+              #DDZM = DDZM_SP
        
        # Store derivative operators with GML
        REFS.append((GMLXOP.dot(DDXM)).tocsr())

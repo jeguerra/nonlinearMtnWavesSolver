@@ -11,7 +11,7 @@ import math as mt
 from scipy import signal
 #import matplotlib.pyplot as plt
 
-def computeTopographyOnGrid(REFS, profile, opt, latRayX):
+def computeTopographyOnGrid(REFS, profile, opt):
        h0 = opt[0]
        aC = opt[1]
        lC = opt[2]

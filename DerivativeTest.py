@@ -25,7 +25,7 @@ NZ = 128
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS)
+REFS = computeGrid(DIMS, True, False)
 
 #% Compute the raw derivative matrix operators in alpha-xi computational space
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -97,7 +97,8 @@ DY = np.multiply(term1, term2);
 h0 = 100.0
 aC = 5000.0
 lC = 4000.0
-HOPT = [h0, aC, lC]
+kC = 6000.0
+HOPT = [h0, aC, lC, kC]
 HofX, dHdX = top.computeTopographyOnGrid(REFS, 2, HOPT)
     
 DYD = DDX_1D.dot(HofX)
