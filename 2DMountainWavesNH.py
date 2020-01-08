@@ -142,9 +142,9 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
+       NonLinSolve = False
        
        # Set the grid type (NOT IMPLEMENTED)
        HermCheb = True
@@ -154,17 +154,18 @@ if __name__ == '__main__':
        SparseDerivatives = False
        
        # Set residual diffusion switch
-       ResDiff = True
+       ResDiff = False
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
-       SolveFull = True
-       SolveSchur = False
+       SolveFull = False
+       SolveSchur = True
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
        #localDir = '/media/jeguerra/scratch/'
-       localDir = '/Users/TempestGuerra/scratch/'
+       #localDir = '/Users/TempestGuerra/scratch/'
+       localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -182,7 +183,7 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       ZH = 36000.0
+       ZH = 30000.0
        NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
        NZ = 96
        OPS = (NX + 1) * NZ
@@ -200,22 +201,31 @@ if __name__ == '__main__':
        pdex = np.add(wdex, OPS)
        tdex = np.add(pdex, OPS)
        
-       # Set the background temperature profile
+       # Background temperature profile
        smooth3Layer = False
        uniformStrat = True
        T_in = [300.0, 228.5, 228.5, 248.5]
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
+       # Background wind profile
+       JETOPS = [10.0, 16.822, 1.386]
+       
        # Set the terrain options
-       h0 = 100.0
+       h0 = 250.0
        aC = 5000.0
        lC = 4000.0
-       kC = 7500.0
+       kC = 25000.0
        HOPT = [h0, aC, lC, kC]
+       KAISER = 1 # Kaiser window profile
+       SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
+       EXPCOS = 3 # Even exponential and squared cosines product
+       EXPPOL = 4 # Even exponential and even polynomial product
+       INFILE = 5 # Data from a file (equally spaced points)
+       MtnType = SCHAR
        
        # Set the Rayleigh options
-       depth = 6000.0
-       width = 24000.0
+       depth = 10000.0
+       width = 20000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
@@ -231,6 +241,8 @@ if __name__ == '__main__':
        ITI = 1000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
+       
+       #%% SET UP THE GRID AND INITIAL STATE
        #% Define the computational and physical grids+
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
@@ -246,12 +258,7 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        #% Read in topography profile or compute from analytical function
-       KAISER = 1 # Kaiser window profile
-       SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
-       EXPCOS = 3 # Even exponential and squared cosines product
-       EXPPOL = 4 # Even exponential and even polynomial product
-       INFILE = 5 # Data from a file (equally spaced points)
-       HofX, dHdX = computeTopographyOnGrid(REFS, KAISER, HOPT)
+       HofX, dHdX = computeTopographyOnGrid(REFS, MtnType, HOPT)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
@@ -286,9 +293,6 @@ if __name__ == '__main__':
               computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE)
        
        # Read in or compute background horizontal wind profile
-       MEANJET = 1 # Analytical smooth jet profile
-       JETOPS = [10.0, 16.822, 1.386]
-
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
        
        #% Compute the background gradients in physical 2D space
@@ -792,7 +796,7 @@ if __name__ == '__main__':
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 30.0)
+              plt.ylim(0.0, ZH)
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.title('Change U - (m/s/s)')
               
@@ -800,7 +804,7 @@ if __name__ == '__main__':
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 30.0)
+              plt.ylim(0.0, ZH)
               plt.title('Change W - (m/s/s)')
               
               flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
