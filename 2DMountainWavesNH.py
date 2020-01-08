@@ -204,10 +204,11 @@ if __name__ == '__main__':
        # Background temperature profile
        smooth3Layer = False
        uniformStrat = True
-       T_in = [300.0, 228.5, 228.5, 248.5]
+       T_in = [280.0, 228.5, 228.5, 248.5]
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Background wind profile
+       uniformWind = True
        JETOPS = [10.0, 16.822, 1.386]
        
        # Set the terrain options
@@ -293,7 +294,7 @@ if __name__ == '__main__':
               computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE)
        
        # Read in or compute background horizontal wind profile
-       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz)
+       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz, uniformWind)
        
        #% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(dUdz, axis=1)
