@@ -300,7 +300,7 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        # Get the derivative operators (without GML adjustment)
        DDXM = REFS[12]
        DDZM = REFS[13]
-       DZDX = REFS[15]
+       DZDX = REFS[16]
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -309,12 +309,14 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        # Compute derivative of perturbations
        DDz = DDZM.dot(fields)
        DDx = DDXM.dot(fields)
+       DDz_TF = DZDX.dot(DDz)
+       PPx = DDx - DDz_TF
        
        # Compute diffusive fluxes
-       DuDx = RESCFX[udex] * (DDx[:,0] - DZDX * DDz[:,0])
-       DwDx = RESCFX[wdex] * (DDx[:,1] - DZDX * DDz[:,1])
-       DlpDx = RESCFX[pdex] * (DDx[:,2] - DZDX * DDz[:,2])
-       DltDx = RESCFX[tdex] * (DDx[:,3] - DZDX * DDz[:,3])
+       DuDx = RESCFX[udex] * PPx[:,0]
+       DwDx = RESCFX[wdex] * PPx[:,1]
+       DlpDx = RESCFX[pdex] * PPx[:,2]
+       DltDx = RESCFX[tdex] * PPx[:,3]
        DuDz = RESCFZ[udex] * DDz[:,0]
        DwDz = RESCFZ[wdex] * DDz[:,1]
        DlpDz = RESCFZ[pdex] * DDz[:,2]

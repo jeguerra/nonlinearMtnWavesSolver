@@ -364,14 +364,15 @@ if __name__ == '__main__':
               DDXM = DDXM_SP
               #DDZM = DDZM_SP
        
-       # Store derivative operators with GML
+       # Store derivative operators with GML damping
        REFS.append((GMLXOP.dot(DDXM)).tocsr())
        REFS.append((GMLZOP.dot(DDZM)).tocsr())
-       # Store derivative operators without GML
+       # Store derivative operators without GML damping
        REFS.append(DDXM.tocsr())
        REFS.append(DDZM.tocsr())
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
+       REFS.append(sps.diags(DZDX.diagonal(), offsets=0, format='csr'))
        
        del(DDXM)
        del(DDZM)
@@ -805,7 +806,7 @@ if __name__ == '__main__':
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 1.0E-3 * ZH)
+              plt.ylim(0.0, 1.0E-3*ZH)
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.title('Change U - (m/s/s)')
               
@@ -813,7 +814,7 @@ if __name__ == '__main__':
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 1.0E-3 * ZH)
+              plt.ylim(0.0, 1.0E-3*ZH)
               plt.title('Change W - (m/s/s)')
               
               flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
