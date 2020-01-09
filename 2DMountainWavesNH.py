@@ -177,15 +177,16 @@ if __name__ == '__main__':
        Kp = Rd / cp
        cv = cp - Rd
        gam = cp / cv
-       NBVP = 0.01
+       NBVP = 0.0125
        PHYS = [gc, P0, cp, Rd, Kp, cv, gam, NBVP]
        
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       ZH = 30000.0
+       
+       ZH = 36000.0
        NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -202,35 +203,42 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Background temperature profile
-       smooth3Layer = False
-       uniformStrat = True
-       T_in = [280.0, 228.5, 228.5, 248.5]
+       smooth3Layer = True
+       uniformStrat = False
+       T_in = [300.0, 228.5, 228.5, 248.5]
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Background wind profile
-       uniformWind = True
+       uniformWind = False
        JETOPS = [10.0, 16.822, 1.386]
        
+       # Set the Rayleigh options
+       depth = 6000.0
+       width = 16000.0
+       applyTop = True
+       applyLateral = True
+       mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
+       mu *= 1.0
+       
        # Set the terrain options
-       h0 = 250.0
-       aC = 5000.0
-       lC = 4000.0
-       kC = 25000.0
-       HOPT = [h0, aC, lC, kC]
        KAISER = 1 # Kaiser window profile
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
        MtnType = SCHAR
+       h0 = 100.0
+       aC = 5000.0
+       lC = 4000.0
        
-       # Set the Rayleigh options
-       depth = 10000.0
-       width = 20000.0
-       applyTop = True
-       applyLateral = True
-       mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-       mu *= 1.0
+       if MtnType == KAISER:
+              # When using this profile as the terrain
+              kC = 20000.0
+       else:
+              # When applying windowing to a different profile
+              kC = L2 - width
+              
+       HOPT = [h0, aC, lC, kC]
        
        #% Transient solve parameters
        DT = 0.05
@@ -797,7 +805,7 @@ if __name__ == '__main__':
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, ZH)
+              plt.ylim(0.0, 1.0E-3 * ZH)
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.title('Change U - (m/s/s)')
               
@@ -805,7 +813,7 @@ if __name__ == '__main__':
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               cbar = fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, ZH)
+              plt.ylim(0.0, 1.0E-3 * ZH)
               plt.title('Change W - (m/s/s)')
               
               flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
