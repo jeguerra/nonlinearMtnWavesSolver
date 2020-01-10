@@ -361,17 +361,23 @@ if __name__ == '__main__':
        
        if SparseDerivatives:
               DDXM = DDXM_SP
-              #DDZM = DDZM_SP
+              DDZM = DDZM_SP
        
        # Store derivative operators with GML damping
-       REFS.append((GMLXOP.dot(DDXM)).tocsr())
-       REFS.append((GMLZOP.dot(DDZM)).tocsr())
+       DDXM_GML = GMLXOP.dot(DDXM)
+       DDZM_GML = GMLZOP.dot(DDZM)
+       REFS.append(DDXM_GML.tocsr())
+       REFS.append(DDZM_GML.tocsr())
        # Store derivative operators without GML damping
        REFS.append(DDXM.tocsr())
        REFS.append(DDZM.tocsr())
        REFS.append(DZT)
        REFS.append(DZDX.diagonal())
-       REFS.append(sps.diags(DZDX.diagonal(), offsets=0, format='csr'))
+       # Store terrain following partial derivative in X
+       DZDXM = sps.diags(DZDX.diagonal(), offsets=0, format='csr')
+       REFS.append(DZDXM)
+       #REFS.append((DDXM_GML - DZDXM.dot(DDZM_GML)).toarray())
+       #REFS.append((DDXM - DZDXM.dot(DDZM)).toarray())
        
        del(DDXM)
        del(DDZM)

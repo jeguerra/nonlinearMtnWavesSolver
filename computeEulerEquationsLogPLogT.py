@@ -227,41 +227,40 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        DQDZ = REFG[4]
        DDXM = REFS[10]
        DDZM = REFS[11]
-       DZDX = REFS[15]
+       DZDX = REFS[16]
        
        # Compute terrain following terms (two way assignment into fields)
-       wxz = np.array(fields[:,1])
-       UZX = U * DZDX
-       WXZ = wxz - UZX
+       #wxz = np.array(fields[:,1])
+       #WXZ = wxz - U * DZDX
        
        # Compute advective (multiplicative) operators
        UM = sps.diags(U, offsets=0, format='csr')
-       wxz = sps.diags(wxz, offsets=0, format='csr')
-       WXZ = sps.diags(WXZ, offsets=0, format='csr')
+       wxz = sps.diags(fields[:,1], offsets=0, format='csr')
+       #WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
        # Get the static horizontal and vertical derivatives
-       wDQDZ = wxz.dot(DQDZ)
+       #wDQDZ = wxz.dot(DQDZ)
        
        # Compute derivative of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
+       PqPx = DqDx - DZDX.dot(DqDz)
        
        # Compute advection
-       UDqDx = UM.dot(DqDx)
-       WDqDz = WXZ.dot(DqDz)
-       transport = UDqDx + WDqDz + wDQDZ
+       UPqPx = UM.dot(PqPx)
+       wDQqDz = wxz.dot(DqDz + DQDZ)
+       #transport = UDqDx + WDqDz + wDQDZ
+       transport = UPqPx + wDQqDz
        
        # Compute pressure gradient forces
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
-       PGFX = RdT * (DqDx[:,2] - DZDX * DqDz[:,2])
-       PGFZ1 = RdT * (DqDz[:,2])
+       PGFX = RdT * PqPx[:,2]
+       PGFZ1 = RdT * DqDz[:,2]
        PGFZ2 = -gc * T_ratio
        PGFZ = PGFZ1 + PGFZ2
        
        # Compute incompressibility constraint
-       PuPx = np.array(DqDx[:,0] - DZDX * DqDz[:,0])
-       PwPz = DqDz[:,1]
-       incomp = gam * (PuPx + PwPz)
+       incomp = gam * (PqPx[:,0] + DqDz[:,1])
 
        def DqDt():
               # Horizontal momentum equation
@@ -303,31 +302,29 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        DZDX = REFS[16]
        
        # Get the anisotropic coefficients
-       RESCFX = RESCF[0]
-       RESCFZ = RESCF[1]
+       RESCFX = np.reshape(RESCF[0], (len(udex), 4), order='F')
+       RESCFZ = np.reshape(RESCF[1], (len(udex), 4), order='F')
        
-       # Compute derivative of perturbations
+       # Compute derivatives of perturbations
        DDx = DDXM.dot(fields)
        DDz = DDZM.dot(fields)
-       DDz_TF = DZDX.dot(DDz)
-       PPx = DDx - DDz_TF
+       PPx = DDx - DZDX.dot(DDz)
        
        # Compute diffusive fluxes
-       DuDx = RESCFX[udex] * PPx[:,0]
-       DwDx = RESCFX[wdex] * PPx[:,1]
-       DlpDx = RESCFX[pdex] * PPx[:,2]
-       DltDx = RESCFX[tdex] * PPx[:,3]
-       DuDz = RESCFZ[udex] * DDz[:,0]
-       DwDz = RESCFZ[wdex] * DDz[:,1]
-       DlpDz = RESCFZ[pdex] * DDz[:,2]
-       DltDz = RESCFZ[tdex] * DDz[:,3]
+       xflux = RESCFX * PPx
+       zflux = RESCFZ * DDz
+       
+       # Compute derivatives of fluxes
+       DDx = DDXM.dot(xflux)
+       DDz = DDZM.dot(zflux)
+       PPx = DDx - DZDX.dot(DDz)
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        #'''
-       DuDt = DDXM.dot(DuDx) - DZDX * DDZM.dot(DuDx) + DDZM.dot(DuDz)
-       DwDt = DDXM.dot(DwDx) - DZDX * DDZM.dot(DwDx) + DDZM.dot(DwDz)
-       DpDt = DDXM.dot(DlpDx) - DZDX * DDZM.dot(DlpDx) + DDZM.dot(DlpDz)
-       DtDt = DDXM.dot(DltDx) - DZDX * DDZM.dot(DltDx) + DDZM.dot(DltDz)
+       DuDt = PPx[:,0] + DDz[:,0]
+       DwDt = PPx[:,1] + DDz[:,1]
+       DpDt = PPx[:,2] + DDz[:,2]
+       DtDt = PPx[:,3] + DDz[:,3]
        #'''
        # Null tendencies along vertical boundaries
        #'''

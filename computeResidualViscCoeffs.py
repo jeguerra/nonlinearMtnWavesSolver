@@ -8,13 +8,13 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 
-def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, wdex, pdex, tdex):
+def computeResidualViscCoeffs(fields, RES, DX, DZ, udex, wdex, pdex, tdex):
        
        ARES = np.abs(RES)
-       DSOL = np.abs(SOL)
+       DSOL = np.abs(fields)
               
-       QRESX = 0.0 * SOL
-       QRESZ = 0.0 * SOL
+       QRESX = 0.0 * RES
+       QRESZ = 0.0 * RES
        
        for vv in range(4):
               
@@ -28,7 +28,7 @@ def computeResidualViscCoeffs(SOL, RES, DX, DZ, udex, wdex, pdex, tdex):
                      qdex = tdex
                      
               # Get the normalization from the current estimate
-              QM = np.amax(DSOL[qdex])
+              QM = np.amax(DSOL[:,vv])
               
               if QM > 0.0:
                      # Compute the anisotropic coefficients

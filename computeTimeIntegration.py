@@ -20,7 +20,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
        def computeDynSGSUpdate():
               if DynSGS:
                      fields, wxz, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
-                     RESCF = computeResidualViscCoeffs(SOLT[:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
+                     RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
                      rhs = rhsSGS[sysDex] 
               else:
@@ -63,7 +63,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
        dHdX = REFS[6]
        def computeDynSGSUpdate(fields):
               if DynSGS:
-                     RESCF = computeResidualViscCoeffs(sol, RHS, DX, DZ, udex, wdex, pdex, tdex)
+                     RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
                      # Null tendency at essential boundary
                      rhsSGS[zeroDex] *= 0.0
