@@ -6,9 +6,13 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
-#import math as mt
+#from multiprocessing import Pool
 import scipy.sparse as sps
 #import matplotlib.pyplot as plt
+
+def localDotProduct(arg):
+              res = arg[0].dot(arg[1])
+              return res
 
 def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        # Get some physical quantities
@@ -216,7 +220,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-#@jit(nopython=True)
 def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        # Get physical constants
        gc = PHYS[0]
@@ -229,17 +232,12 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        DDZM = REFS[11]
        DZDX = REFS[16]
        
-       # Compute terrain following terms (two way assignment into fields)
-       #wxz = np.array(fields[:,1])
-       #WXZ = wxz - U * DZDX
-       
        # Compute advective (multiplicative) operators
        UM = sps.diags(U, offsets=0, format='csr')
        wxz = sps.diags(fields[:,1], offsets=0, format='csr')
-       #WXZ = sps.diags(WXZ, offsets=0, format='csr')
        
-       # Get the static horizontal and vertical derivatives
-       #wDQDZ = wxz.dot(DQDZ)
+       #with Pool(2) as pl:
+       #       dervs = pl.map(localDotProduct, [(DDXM, fields), (DDZM, fields)])
        
        # Compute derivative of perturbations
        DqDx = DDXM.dot(fields)
@@ -249,7 +247,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        # Compute advection
        UPqPx = UM.dot(PqPx)
        wDQqDz = wxz.dot(DqDz + DQDZ)
-       #transport = UDqDx + WDqDz + wDQDZ
        transport = UPqPx + wDQqDz
        
        # Compute pressure gradient forces
@@ -262,19 +259,16 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        # Compute incompressibility constraint
        incomp = gam * (PqPx[:,0] + DqDz[:,1])
 
-       def DqDt():
-              # Horizontal momentum equation
-              DuDt = -(transport[:,0] + PGFX)
-              # Vertical momentum equation
-              DwDt = -(transport[:,1] + PGFZ)
-              # Pressure (mass) equation
-              DpDt = -(transport[:,2] + incomp)
-              # Potential Temperature equation
-              DtDt = -(transport[:,3])
-              
-              return (DuDt, DwDt, DpDt, DtDt)
-       
-       DqDt = np.concatenate(DqDt())
+       # Horizontal momentum equation
+       DuDt = -(transport[:,0] + PGFX)
+       # Vertical momentum equation
+       DwDt = -(transport[:,1] + PGFZ)
+       # Pressure (mass) equation
+       DpDt = -(transport[:,2] + incomp)
+       # Potential Temperature equation
+       DtDt = -(transport[:,3])
+                     
+       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
                      
        return DqDt
 
