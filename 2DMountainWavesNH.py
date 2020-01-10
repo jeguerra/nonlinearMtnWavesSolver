@@ -390,6 +390,7 @@ if __name__ == '__main__':
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
        RHS = np.zeros((physDOF,))
+       SGS = np.zeros((physDOF,))
        
        # Initialize the Background fields
        INIT[udex] = np.reshape(UZ, (OPS,), order='F')
@@ -741,12 +742,13 @@ if __name__ == '__main__':
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol, rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol, rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SGS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zeroDex_tran, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
+                            sol, rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex_tran, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
                      
                      SOLT[:,0] = sol
-                     RHS[:] = rhs
+                     RHS = rhs
+                     SGS = sgs
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])

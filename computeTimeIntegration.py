@@ -9,13 +9,13 @@ import numpy as np
 import computeEulerEquationsLogPLogT as tendency
 from computeResidualViscCoeffs import computeResidualViscCoeffs
 
-def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
+def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SGS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[sysDex,0]
        rhs = RHS[sysDex]
-       sgs = 0.0
+       sgs = SGS[sysDex]
        
        def computeDynSGSUpdate():
               if DynSGS:
@@ -54,16 +54,20 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zeroDex, udex, wdex, pdex, tdex, botdex, topdex, wbdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex, udex, wdex, pdex, tdex, botdex, topdex, wbdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[:,0]
-       SGS = np.array(0.0 * RHS)
        dHdX = REFS[6]
+       
+       # Compute DynSGS coefficients at the top of the time step
+       fields, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
+       RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
+       
        def computeDynSGSUpdate(fields):
               if DynSGS:
-                     RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
+                     #RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
                      # Null tendency at essential boundary
                      rhsSGS[zeroDex] *= 0.0
@@ -128,4 +132,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SOLT, INIT, zero
                      
               sol = SOLT[:,1] + 0.6 * sol + 0.1 * DT * RHS
               
-       return sol, RHS
+       return sol, RHS, SGS
