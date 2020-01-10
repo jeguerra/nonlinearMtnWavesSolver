@@ -24,6 +24,9 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        NX = DIMS[3] + 1
        NZ = DIMS[4]
        
+       RP = 4
+       GP = 4
+       
        # Get REFS data
        X = REFS[4]
        Z = REFS[5]
@@ -51,7 +54,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormX = 0.0
                             # Evaluate the GML factor
-                            RFX = 1.0 - (mt.cos(0.5 * mt.pi * dNormX))**2
+                            RFX = 1.0 - (mt.cos(0.5 * mt.pi * dNormX))**RP
                      else:
                             RFX = 0.0
                      if applyTop:
@@ -61,7 +64,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormZ = 0.0
                             # Evaluate the strength of the field
-                            RFZ = 1.0 - (mt.cos(0.5 * mt.pi * dNormZ))**2
+                            RFZ = 1.0 - (mt.cos(0.5 * mt.pi * dNormZ))**RP
                      else:
                             RFZ = 0.0
                      
@@ -93,7 +96,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormX = 0.0
                             # Evaluate the GML factor
-                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**2
+                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**GP
                      else:
                             RFX = 0.0
                      if applyTop:
@@ -103,7 +106,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormZ = 0.0
                             # Evaluate the strength of the field
-                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**2
+                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**GP
                      else:
                             RFZ = 0.0
                      

@@ -307,8 +307,8 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        RESCFZ = RESCF[1]
        
        # Compute derivative of perturbations
-       DDz = DDZM.dot(fields)
        DDx = DDXM.dot(fields)
+       DDz = DDZM.dot(fields)
        DDz_TF = DZDX.dot(DDz)
        PPx = DDx - DDz_TF
        

@@ -142,9 +142,9 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
+       NonLinSolve = True
        
        # Set the grid type (NOT IMPLEMENTED)
        HermCheb = True
@@ -154,7 +154,7 @@ if __name__ == '__main__':
        SparseDerivatives = False
        
        # Set residual diffusion switch
-       ResDiff = False
+       ResDiff = True
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
@@ -164,8 +164,8 @@ if __name__ == '__main__':
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
        #localDir = '/media/jeguerra/scratch/'
-       #localDir = '/Users/TempestGuerra/scratch/'
-       localDir = '/scratch/'
+       localDir = '/Users/TempestGuerra/scratch/'
+       #localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -183,8 +183,7 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       
-       ZH = 36000.0
+       ZH = 31000.0
        NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
        NZ = 92
        OPS = (NX + 1) * NZ
@@ -226,14 +225,14 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       MtnType = SCHAR
+       MtnType = KAISER
        h0 = 100.0
        aC = 5000.0
        lC = 4000.0
        
        if MtnType == KAISER:
               # When using this profile as the terrain
-              kC = 20000.0
+              kC = 10000.0
        else:
               # When applying windowing to a different profile
               kC = L2 - width
