@@ -164,8 +164,8 @@ if __name__ == '__main__':
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
        #localDir = '/media/jeguerra/scratch/'
-       localDir = '/Users/TempestGuerra/scratch/'
-       #localDir = '/scratch/'
+       #localDir = '/Users/TempestGuerra/scratch/'
+       localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -261,6 +261,10 @@ if __name__ == '__main__':
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
+       # Blend the operators...
+       DDX_SP[[0, 1, NX-1, NX],:] = np.array(DDX_1D[[0, 1, NX-1, NX],:])
+       DDZ_SP[[0, 1, NZ-2, NZ-1],:] = np.array(DDZ_1D[[0, 1, NZ-2, NZ-1],:])
+       
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
@@ -354,7 +358,6 @@ if __name__ == '__main__':
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       DZDX = sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr')
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
@@ -371,17 +374,16 @@ if __name__ == '__main__':
        # Store derivative operators without GML damping
        REFS.append(DDXM.tocsr())
        REFS.append(DDZM.tocsr())
+       # Store the terrain profile in 3 ways
        REFS.append(DZT)
-       REFS.append(DZDX.diagonal())
-       # Store terrain following partial derivative in X
-       DZDXM = sps.diags(DZDX.diagonal(), offsets=0, format='csr')
+       DZDX = np.reshape(DZT, (OPS,), order='F')
+       REFS.append(DZDX)
+       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        REFS.append(DZDXM)
-       #REFS.append((DDXM_GML - DZDXM.dot(DDZM_GML)).toarray())
-       #REFS.append((DDXM - DZDXM.dot(DDZM)).toarray())
        
        del(DDXM)
        del(DDZM)
-       del(DZDX)
+       del(DZDX); del(DZDXM)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
