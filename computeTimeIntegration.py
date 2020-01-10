@@ -19,9 +19,9 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SGS, SOL
        
        def computeDynSGSUpdate():
               if DynSGS:
-                     fields, wxz, U, RdT = tendency.computeUpdatedFields(PHYS, REFS, SOLT[:,0], INIT, udex, wdex, pdex, tdex, botdex, topdex)
+                     fields, wxz, U, RdT = tendency.computePrepareFields(PHYS, REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
-                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
+                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex)
                      rhs = rhsSGS[sysDex] 
               else:
                      rhs = 0.0
@@ -54,7 +54,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SGS, SOL
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex, udex, wdex, pdex, tdex, botdex, topdex, wbdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex, extDex, uBotDex, wBotDex, udex, wdex, pdex, tdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -68,9 +68,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
        def computeDynSGSUpdate(fields):
               if DynSGS:
                      #RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
-                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex)
-                     # Null tendency at essential boundary
-                     rhsSGS[zeroDex] *= 0.0
+                     rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex)
+                     # Null tendency at all boundary DOF
+                     rhsSGS[extDex] *= 0.0
               else:
                      rhsSGS = 0.0
                      
@@ -79,14 +79,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
        def computeRHSUpdate(fields, U, RdT):
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT)
               rhs += tendency.computeRayleighTendency(REFG, fields)
-              # Null tendencies at essential boundary
+              # Null tendencies at essential boundary DOF
               rhs[zeroDex] *= 0.0
               return rhs
        
        def computeUpdate(coeff, sol, rhs):
               dsol = coeff * DT * rhs
               sol += dsol
-              sol[wbdex] += dHdX * dsol[botdex]
+              sol[wBotDex] += dHdX * dsol[uBotDex]
               
               return sol
        #'''

@@ -164,8 +164,8 @@ if __name__ == '__main__':
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
        #localDir = '/media/jeguerra/scratch/'
-       #localDir = '/Users/TempestGuerra/scratch/'
-       localDir = '/scratch/'
+       localDir = '/Users/TempestGuerra/scratch/'
+       #localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -291,7 +291,7 @@ if __name__ == '__main__':
        #% Compute the BC index vector
        ubdex, utdex, wbdex, pbdex, tbdex, \
               ubcDex, wbcDex, pbcDex, tbcDex, \
-              zeroDex_stat, zeroDex_tran, sysDex = \
+              zeroDex_stat, zeroDex_tran, sysDex, extDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -746,7 +746,7 @@ if __name__ == '__main__':
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
                             sol, rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SGS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex_tran, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, ResDiff, intMethodOrder)
+                            sol, rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex_tran, extDex, ubdex, wbdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
                      
                      SOLT[:,0] = sol
                      RHS = rhs

@@ -288,7 +288,7 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, topdex):
+def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
        
        # Get the derivative operators (without GML adjustment)
        DDXM = REFS[12]
@@ -319,18 +319,6 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex, botdex, t
        DwDt = PPx[:,1] + DDz[:,1]
        DpDt = PPx[:,2] + DDz[:,2]
        DtDt = PPx[:,3] + DDz[:,3]
-       #'''
-       # Null tendencies along vertical boundaries
-       #'''
-       DuDt[topdex] *= 0.0
-       DwDt[topdex] *= 0.0
-       DpDt[topdex] *= 0.0
-       DtDt[topdex] *= 0.0
-       
-       DuDt[botdex] *= 0.0
-       DwDt[botdex] *= 0.0
-       DpDt[botdex] *= 0.0
-       DtDt[botdex] *= 0.0
 
        # Concatenate
        DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
