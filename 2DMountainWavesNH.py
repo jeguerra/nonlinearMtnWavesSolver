@@ -142,9 +142,9 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
+       NonLinSolve = False
        
        # Set the grid type (NOT IMPLEMENTED)
        HermCheb = True
@@ -155,7 +155,7 @@ if __name__ == '__main__':
        SparseDerivativesDynSGS = True
        
        # Set residual diffusion switch
-       ResDiff = True
+       ResDiff = False
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
@@ -288,8 +288,8 @@ if __name__ == '__main__':
        REFS.append(sigma)
        
        # Compute DX and DZ grid length scales
-       DX = np.max(np.abs(np.diff(REFS[0])))
-       DZ = np.max(np.abs(np.diff(REFS[1])))
+       DX = 2 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 2 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
        ubdex, utdex, wbdex, pbdex, tbdex, \

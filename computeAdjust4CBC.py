@@ -21,7 +21,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
-       uldex = np.array(range(0, NZ)) # exclude the corner node
+       uldex = np.array(range(0, NZ)) # include the corner node
        urdex = np.array(range(OPS-NZ, OPS))
        ubdex = np.array(range(0, (OPS - NZ + 1), NZ))
        utdex = np.array(range(NZ-1, OPS, NZ))
@@ -49,6 +49,11 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        extDex = sorted(extDex)
        
        # Local block-wide indices
+       uldex = np.array(range(1, NZ)) # exclude the corner node
+       wldex = np.add(uldex, iW * OPS)
+       pldex = np.add(uldex, iP * OPS)
+       tldex = np.add(uldex, iT * OPS)
+       
        rowsOutU = set(uldex)
        rowsOutW = set(np.unique(np.concatenate((uldex,utdex))))
        rowsOutP = set(uldex)
