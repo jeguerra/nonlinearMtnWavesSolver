@@ -151,7 +151,8 @@ if __name__ == '__main__':
        UniformDelta = False
        
        # Set 4th order compact finite difference derivatives switch
-       SparseDerivatives = False
+       SparseDerivativesDynamics = False
+       SparseDerivativesDynSGS = True
        
        # Set residual diffusion switch
        ResDiff = True
@@ -164,8 +165,8 @@ if __name__ == '__main__':
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
        #localDir = '/media/jeguerra/scratch/'
-       localDir = '/Users/TempestGuerra/scratch/'
-       #localDir = '/scratch/'
+       #localDir = '/Users/TempestGuerra/scratch/'
+       localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -261,9 +262,11 @@ if __name__ == '__main__':
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
-       # Blend the operators...
-       DDX_SP[[0, 1, NX-1, NX],:] = np.array(DDX_1D[[0, 1, NX-1, NX],:])
-       DDZ_SP[[0, 1, NZ-2, NZ-1],:] = np.array(DDZ_1D[[0, 1, NZ-2, NZ-1],:])
+       # Set the ends of the operator to the spectral derivative
+       xDex = [0, 1, 2, NZ-2, NX-1, NX]
+       zDex = [0, 1, 2, NZ-3, NZ-2, NZ-1]
+       DDX_SP[xDex,:] = np.array(DDX_1D[xDex,:])
+       DDZ_SP[zDex,:] = np.array(DDZ_1D[zDex,:])
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -362,18 +365,23 @@ if __name__ == '__main__':
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       if SparseDerivatives:
-              DDXM = DDXM_SP
-              DDZM = DDZM_SP
-       
        # Store derivative operators with GML damping
-       DDXM_GML = GMLXOP.dot(DDXM)
-       DDZM_GML = GMLZOP.dot(DDZM)
+       if SparseDerivativesDynamics:
+              DDXM_GML = GMLXOP.dot(DDXM_SP)
+              DDZM_GML = GMLZOP.dot(DDZM_SP)
+       else:
+              DDXM_GML = GMLXOP.dot(DDXM)
+              DDZM_GML = GMLZOP.dot(DDZM)
+              
        REFS.append(DDXM_GML.tocsr())
        REFS.append(DDZM_GML.tocsr())
        # Store derivative operators without GML damping
-       REFS.append(DDXM.tocsr())
-       REFS.append(DDZM.tocsr())
+       if SparseDerivativesDynSGS:
+              REFS.append(DDXM_SP.tocsr())
+              REFS.append(DDZM_SP.tocsr())
+       else:
+              REFS.append(DDXM.tocsr())
+              REFS.append(DDZM.tocsr())
        # Store the terrain profile in 3 ways
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,), order='F')
@@ -381,8 +389,8 @@ if __name__ == '__main__':
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        REFS.append(DZDXM)
        
-       del(DDXM)
-       del(DDZM)
+       del(DDXM); del(DDXM_GML)
+       del(DDZM); del(DDZM_GML)
        del(DZDX); del(DZDXM)
        
        #%% SOLUTION INITIALIZATION
