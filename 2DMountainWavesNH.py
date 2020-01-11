@@ -710,28 +710,26 @@ if __name__ == '__main__':
        #%% Start the time loop
        if LinearSolve or NonLinSolve:
               error = [np.linalg.norm(RHS)]
+              
+              # Reshape main solution vectors
+              sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
+              rhs = np.reshape(RHS, (OPS, numVar), order='F')
+              sgs = np.reshape(SGS, (OPS, numVar), order='F')
+              
               for tt in range(len(TI)):
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             message = ''
                             thisTime = DT * tt
-                            err = displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex)
+                            err = displayResiduals(message, np.reshape(rhs, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
                      if tt % ITI == 0:
                             fig = plt.figure(figsize=(10.0, 6.0))
                             # Check the tendencies
-                            for pp in range(4):
+                            for pp in range(numVar):
                                    plt.subplot(2,2,pp+1)
-                                   if pp == 0:
-                                          qdex = udex
-                                   elif pp == 1:
-                                          qdex = wdex
-                                   elif pp == 2:
-                                          qdex = pdex
-                                   else:
-                                          qdex = tdex
-                                   dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
+                                   dqdt = np.reshape(rhs[:,pp], (NZ, NX+1), order='F')
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
                                    cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
@@ -745,20 +743,21 @@ if __name__ == '__main__':
                                    UT = INIT[udex]
                                    
                             # Set current boundary condition
-                            SOLT[wbdex,0] = dHdX * (UT[ubdex] + SOLT[ubdex,0])
+                            sol[ubdex,1,0] = dHdX * (UT[ubdex] + sol[ubdex,0,0])
                      else:
                             UT = INIT[udex]
                                    
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol, rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SGS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, rhs, sgs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol, rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex_tran, extDex, ubdex, wbdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
+                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
                      
-                     SOLT[:,0] = sol
-                     RHS = rhs
-                     SGS = sgs
+              # Reshape back to a column vector after time loop
+              SOLT[:,0] = np.reshape(sol, (OPS*numVar, 1), order='F')
+              RHS = np.reshape(rhs, (OPS*numVar, 1), order='F')
+              SGS = np.reshape(sgs, (OPS*numVar, 1), order='F')
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])

@@ -33,6 +33,22 @@ def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, RdT
 
+def computeWeightFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
+       # Get some physical quantities
+       P0 = PHYS[1]
+       Rd = PHYS[3]
+       kap = PHYS[4]
+       
+       # Make the total quatities
+       U = SOLT[:,0] + INIT[udex]
+       LP = SOLT[:,2] + INIT[pdex]
+       LT = SOLT[:,3] + INIT[tdex]
+       
+       # Compute the sensible temperature scaling to PGF
+       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
+       
+       return U, RdT
+
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
        # Get physical constants
@@ -296,8 +312,8 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
        DZDX = REFS[16]
        
        # Get the anisotropic coefficients
-       RESCFX = np.reshape(RESCF[0], (len(udex), 4), order='F')
-       RESCFZ = np.reshape(RESCF[1], (len(udex), 4), order='F')
+       RESCFX = RESCF[0]
+       RESCFZ = RESCF[1]
        
        # Compute derivatives of perturbations
        DDx = DDXM.dot(fields)

@@ -17,29 +17,19 @@ def computeResidualViscCoeffs(fields, RES, DX, DZ, udex, wdex, pdex, tdex):
        QRESZ = 0.0 * RES
        
        for vv in range(4):
-              
-              if vv == 0:
-                     qdex = udex
-              elif vv == 1:
-                     qdex = wdex
-              elif vv == 2:
-                     qdex = pdex
-              elif vv == 3:
-                     qdex = tdex
-                     
+                                   
               # Get the normalization from the current estimate
               QM = np.amax(DSOL[:,vv])
               
               if QM > 0.0:
                      # Compute the anisotropic coefficients
-                     QRESX[qdex] = (DX**2 / QM) * ARES[qdex]
-                     QRESZ[qdex] = (DZ**2 / QM) * ARES[qdex]
+                     QRESX[:,vv] = (DX**2 / QM) * ARES[:,vv]
+                     QRESZ[:,vv] = (DZ**2 / QM) * ARES[:,vv]
        
-       # Fix SGS to upwind value where needed
-       #'''
-       updex = np.argwhere(QRESX >= 0.5 * DX)
-       QRESX[updex] = 0.5 * DX
-       updex = np.argwhere(QRESZ >= 0.5 * DZ)
-       QRESZ[updex] = 0.5 * DZ
-       #'''
+              # Fix SGS to upwind value where needed
+              updex = np.argwhere(QRESX[:,vv] >= 0.5 * DX)
+              QRESX[updex,vv] = 0.5 * DX
+              updex = np.argwhere(QRESZ[:,vv] >= 0.5 * DZ)
+              QRESZ[updex,vv] = 0.5 * DZ
+       
        return (QRESX, QRESZ)
