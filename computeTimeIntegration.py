@@ -69,19 +69,25 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
                      #RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex)
                      # Null tendency at all boundary DOF
-                     rhsSGS[extDex] *= 0.0
+                     rhsSGS[extDex[0],0] *= 0.0
+                     rhsSGS[extDex[1],1] *= 0.0
+                     rhsSGS[extDex[2],2] *= 0.0
+                     rhsSGS[extDex[3],3] *= 0.0
               else:
                      rhsSGS = 0.0
                      
-              return np.reshape(rhsSGS, (len(udex), 4), order='F')
+              return rhsSGS
        
        def computeRHSUpdate(fields, U, RdT):
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT)
               rhs += tendency.computeRayleighTendency(REFG, fields)
               # Null tendencies at essential boundary DOF
-              rhs[zeroDex] *= 0.0
+              rhs[zeroDex[0],0] *= 0.0
+              rhs[zeroDex[1],1] *= 0.0
+              rhs[zeroDex[2],2] *= 0.0
+              rhs[zeroDex[3],3] *= 0.0
               
-              return np.reshape(rhs, (len(udex), 4), order='F')
+              return rhs
        
        def computeUpdate(coeff, sol, rhs):
               dsol = coeff * DT * rhs
@@ -96,11 +102,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               for ii in range(7):
                      SOLT[:,:,0] = computeUpdate(c1, SOLT[:,:,0], (RHS + SGS))
                      U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(SOLT[:,:,0], U, RdT)
-                     SGS = computeDynSGSUpdate(SOLT[:,:,0])
+                     sol = np.array(SOLT[:,:,0])
+                     RHS = computeRHSUpdate(sol, U, RdT)
+                     SGS = computeDynSGSUpdate(sol)
                      
                      if ii == 1:
-                            SOLT[:,:,1] = np.array(SOLT[:,:,0])
+                            SOLT[:,:,1] = sol
                      
               # Compute stage 6 with linear combination
               SOLT[:,:,0] = np.array(c2 * (3.0 * SOLT[:,:,1] + 2.0 * SOLT[:,:,0]))
@@ -109,8 +116,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               for ii in range(2):
                      SOLT[:,:,0] = computeUpdate(c1, SOLT[:,:,0], (RHS + SGS))
                      U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(SOLT[:,:,0], U, RdT)
-                     SGS = computeDynSGSUpdate(SOLT[:,:,0])
+                     sol = np.array(SOLT[:,:,0])
+                     RHS = computeRHSUpdate(sol, U, RdT)
+                     SGS = computeDynSGSUpdate(sol)
        
        #%% THE KETCHENSON SSP(10,4) METHOD
        elif order == 4:

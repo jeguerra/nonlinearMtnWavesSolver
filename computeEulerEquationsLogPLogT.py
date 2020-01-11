@@ -251,10 +251,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        # Compute advective (multiplicative) operators
        UM = sps.diags(U, offsets=0, format='csr')
        wxz = sps.diags(fields[:,1], offsets=0, format='csr')
-       
-       #with Pool(2) as pl:
-       #       dervs = pl.map(localDotProduct, [(DDXM, fields), (DDZM, fields)])
-       
+              
        # Compute derivative of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
@@ -276,17 +273,17 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        incomp = gam * (PqPx[:,0] + DqDz[:,1])
 
        # Horizontal momentum equation
-       DuDt = -(transport[:,0] + PGFX)
+       fields[:,0] = -(transport[:,0] + PGFX)
        # Vertical momentum equation
-       DwDt = -(transport[:,1] + PGFZ)
+       fields[:,1] = -(transport[:,1] + PGFZ)
        # Pressure (mass) equation
-       DpDt = -(transport[:,2] + incomp)
+       fields[:,2] = -(transport[:,2] + incomp)
        # Potential Temperature equation
-       DtDt = -(transport[:,3])
+       fields[:,3] = -(transport[:,3])
                      
-       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
-                     
-       return DqDt
+       #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))        
+             
+       return fields
 
 def computeRayleighTendency(REFG, fields):
        
@@ -294,15 +291,15 @@ def computeRayleighTendency(REFG, fields):
        ROPS = REFG[5]
        
        # Compute the tendencies
-       DuDt = - ROPS[0].dot(fields[:,0])
-       DwDt = - ROPS[1].dot(fields[:,1])
-       DpDt = - ROPS[2].dot(fields[:,2])
-       DtDt = - ROPS[3].dot(fields[:,3])
+       fields[:,0] = - ROPS[0].dot(fields[:,0])
+       fields[:,1] = - ROPS[1].dot(fields[:,1])
+       fields[:,2] = - ROPS[2].dot(fields[:,2])
+       fields[:,3] = - ROPS[3].dot(fields[:,3])
        
        # Concatenate
-       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       return DqDt
+       return fields
 
 def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
        
@@ -331,13 +328,13 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        #'''
-       DuDt = PPx[:,0] + DDz[:,0]
-       DwDt = PPx[:,1] + DDz[:,1]
-       DpDt = PPx[:,2] + DDz[:,2]
-       DtDt = PPx[:,3] + DDz[:,3]
+       fields[:,0] = PPx[:,0] + DDz[:,0]
+       fields[:,1] = PPx[:,1] + DDz[:,1]
+       fields[:,2] = PPx[:,2] + DDz[:,2]
+       fields[:,3] = PPx[:,3] + DDz[:,3]
 
        # Concatenate
-       DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       return DqDt
+       return fields
        

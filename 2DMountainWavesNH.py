@@ -452,12 +452,13 @@ if __name__ == '__main__':
               
               #'''
               # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, \
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, \
                             np.array(fields), U, RdT)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields)) 
+              rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
+              RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
-              del(U); del(fields)
+              del(U); del(fields); del(rhs)
               
               # Compute forcing vector adding boundary forcing to the end
               LMRHS = -dWBC
@@ -691,8 +692,9 @@ if __name__ == '__main__':
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              RHS = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT)
-              RHS += eqs.computeRayleighTendency(REFG, np.array(fields))
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT)
+              rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
+              RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               

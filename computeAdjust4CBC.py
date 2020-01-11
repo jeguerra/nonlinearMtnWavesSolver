@@ -14,6 +14,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        NZ = DIMS[4]
        OPS = NX * NZ
        
+       rowsAll = set(np.array(range(0,OPS)))
+       
        # Get prognostic ordering
        #iU = varDex[0]
        iW = varDex[1]
@@ -27,44 +29,46 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        utdex = np.array(range(NZ-1, OPS, NZ))
        
        wldex = np.add(uldex, iW * OPS)
-       wrdex = np.add(urdex, iW * OPS)
+       #wrdex = np.add(urdex, iW * OPS)
        wbdex = np.add(ubdex, iW * OPS)
        wtdex = np.add(utdex, iW * OPS)
        
        pldex = np.add(uldex, iP * OPS)
-       prdex = np.add(urdex, iP * OPS)
+       #prdex = np.add(urdex, iP * OPS)
        pbdex = np.add(ubdex, iP * OPS)
-       ptdex = np.add(utdex, iP * OPS)
+       #ptdex = np.add(utdex, iP * OPS)
        
        tldex = np.add(uldex, iT * OPS)
-       trdex = np.add(urdex, iT * OPS)
+       #trdex = np.add(urdex, iT * OPS)
        tbdex = np.add(ubdex, iT * OPS)
        ttdex = np.add(utdex, iT * OPS)
        
        # Index all boundary DOF
-       extDex = set(np.concatenate((uldex,urdex,ubdex,utdex, \
-                                    wldex,wrdex,wbdex,wtdex, \
-                                    pldex,prdex,pbdex,ptdex, \
-                                    tldex,trdex,tbdex,ttdex)))
-       extDex = sorted(extDex)
+       vDex = np.concatenate((uldex,urdex,ubdex,utdex))
+       extDex = (vDex, vDex, vDex, vDex)
        
+       # BC indices for static solution (per variable)
        rowsOutU = set(uldex[1:])
        rowsOutW = set(np.concatenate((uldex[1:],utdex[1:])))
        rowsOutP = set(uldex[1:])
        rowsOutT = set(np.concatenate((uldex[1:],utdex[1:])))
-       rowsAll = set(np.array(range(0,OPS)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
        pbcDex = rowsAll.difference(rowsOutP); pbcDex = sorted(pbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
+       # BC indices for transient solution (per variable)
+       rowsOutW_trans = set(np.concatenate((ubdex,uldex[1:],utdex[1:])))
+       
        left = np.concatenate((uldex[1:], wldex[1:], pldex[1:], tldex[1:]))
        top = np.concatenate((wtdex[1:], ttdex[1:]))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
        rowsOutBC_static = set(np.concatenate((left, top)))
        # W is treated as an essential BC at terrain in solution by direct substitution
-       rowsOutBC_transient = set(np.concatenate((left, wbdex, top)))
+       rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
+                              sorted(rowsOutP), sorted(rowsOutT))
+       #rowsOutBC_transient = set(np.concatenate((left, wbdex, top)))
        # All DOF
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
@@ -74,6 +78,6 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # DOF's not dynamically updated in static solution (use Lagrange Multiplier)
        zeroDex_stat = sorted(rowsOutBC_static)
        # DOF's not dynamically updated in transient solution (use direct BC substitution)
-       zeroDex_tran = sorted(rowsOutBC_transient)
+       zeroDex_tran = rowsOutBC_transient
        
        return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex
