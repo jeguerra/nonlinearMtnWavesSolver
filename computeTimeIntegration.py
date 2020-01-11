@@ -86,7 +86,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               rhs[zeroDex[1],1] *= 0.0
               rhs[zeroDex[2],2] *= 0.0
               rhs[zeroDex[3],3] *= 0.0
-              
+
               return rhs
        
        def computeUpdate(coeff, sol, rhs):

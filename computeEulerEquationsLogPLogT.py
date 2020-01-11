@@ -272,34 +272,36 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        # Compute incompressibility constraint
        incomp = gam * (PqPx[:,0] + DqDz[:,1])
 
+       DqDt = 0.0 * np.array(fields)
        # Horizontal momentum equation
-       fields[:,0] = -(transport[:,0] + PGFX)
+       DqDt[:,0] = -(transport[:,0] + PGFX)
        # Vertical momentum equation
-       fields[:,1] = -(transport[:,1] + PGFZ)
+       DqDt[:,1] = -(transport[:,1] + PGFZ)
        # Pressure (mass) equation
-       fields[:,2] = -(transport[:,2] + incomp)
+       DqDt[:,2] = -(transport[:,2] + incomp)
        # Potential Temperature equation
-       fields[:,3] = -(transport[:,3])
+       DqDt[:,3] = -(transport[:,3])
                      
        #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))        
              
-       return fields
+       return DqDt
 
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
        ROPS = REFG[5]
        
+       DqDt = 0.0 * np.array(fields)
        # Compute the tendencies
-       fields[:,0] = - ROPS[0].dot(fields[:,0])
-       fields[:,1] = - ROPS[1].dot(fields[:,1])
-       fields[:,2] = - ROPS[2].dot(fields[:,2])
-       fields[:,3] = - ROPS[3].dot(fields[:,3])
+       DqDt[:,0] = - ROPS[0].dot(fields[:,0])
+       DqDt[:,1] = - ROPS[1].dot(fields[:,1])
+       DqDt[:,2] = - ROPS[2].dot(fields[:,2])
+       DqDt[:,3] = - ROPS[3].dot(fields[:,3])
        
        # Concatenate
        #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       return fields
+       return DqDt
 
 def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
        
@@ -327,14 +329,14 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
        PPx = DDx - DZDX.dot(DDz)
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
-       #'''
-       fields[:,0] = PPx[:,0] + DDz[:,0]
-       fields[:,1] = PPx[:,1] + DDz[:,1]
-       fields[:,2] = PPx[:,2] + DDz[:,2]
-       fields[:,3] = PPx[:,3] + DDz[:,3]
+       DqDt = 0.0 * np.array(fields)
+       DqDt[:,0] = PPx[:,0] + DDz[:,0]
+       DqDt[:,1] = PPx[:,1] + DDz[:,1]
+       DqDt[:,2] = PPx[:,2] + DDz[:,2]
+       DqDt[:,3] = PPx[:,3] + DDz[:,3]
 
        # Concatenate
        #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
        
-       return fields
+       return DqDt
        
