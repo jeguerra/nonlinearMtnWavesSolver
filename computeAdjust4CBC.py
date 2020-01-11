@@ -48,16 +48,10 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
                                     tldex,trdex,tbdex,ttdex)))
        extDex = sorted(extDex)
        
-       # Local block-wide indices
-       uldex = np.array(range(1, NZ)) # exclude the corner node
-       wldex = np.add(uldex, iW * OPS)
-       pldex = np.add(uldex, iP * OPS)
-       tldex = np.add(uldex, iT * OPS)
-       
-       rowsOutU = set(uldex)
-       rowsOutW = set(np.unique(np.concatenate((uldex,utdex))))
-       rowsOutP = set(uldex)
-       rowsOutT = set(np.unique(np.concatenate((uldex,utdex))))
+       rowsOutU = set(uldex[1:])
+       rowsOutW = set(np.concatenate((uldex[1:],utdex[1:])))
+       rowsOutP = set(uldex[1:])
+       rowsOutT = set(np.concatenate((uldex[1:],utdex[1:])))
        rowsAll = set(np.array(range(0,OPS)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
@@ -65,10 +59,12 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        pbcDex = rowsAll.difference(rowsOutP); pbcDex = sorted(pbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
+       left = np.concatenate((uldex[1:], wldex[1:], pldex[1:], tldex[1:]))
+       top = np.concatenate((wtdex[1:], ttdex[1:]))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
-       rowsOutBC_static = set(np.unique(np.concatenate((uldex, wldex, pldex, tldex, wtdex, ttdex))))
+       rowsOutBC_static = set(np.concatenate((left, top)))
        # W is treated as an essential BC at terrain in solution by direct substitution
-       rowsOutBC_transient = set(np.unique(np.concatenate((uldex, wldex, pldex, tldex, wbdex, wtdex, ttdex))))
+       rowsOutBC_transient = set(np.concatenate((left, wbdex, top)))
        # All DOF
        rowsAll = set(np.array(range(0,numVar*OPS)))
        

@@ -164,9 +164,9 @@ if __name__ == '__main__':
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
-       #localDir = '/media/jeguerra/scratch/'
+       localDir = '/media/jeguerra/scratch/'
        #localDir = '/Users/TempestGuerra/scratch/'
-       localDir = '/scratch/'
+       #localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -185,8 +185,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 31000.0
-       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -210,7 +210,7 @@ if __name__ == '__main__':
        
        # Background wind profile
        uniformWind = False
-       JETOPS = [10.0, 16.822, 1.386]
+       JETOPS = [15.0, 16.822, 1.386]
        
        # Set the Rayleigh options
        depth = 6000.0
@@ -227,7 +227,7 @@ if __name__ == '__main__':
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
        MtnType = KAISER
-       h0 = 100.0
+       h0 = 10.0
        aC = 5000.0
        lC = 4000.0
        
