@@ -80,8 +80,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        input()
        '''                     
        # Assemble the Grid Matching Layer field X and Z directions
-       GMLX = np.zeros((NZ, NX))
-       GMLZ = np.zeros((NZ, NX))
+       GML = np.zeros((NZ, NX))
        for ii in range(NZ):
               for jj in range(NX):
                      # Get this X location
@@ -111,10 +110,9 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             RFZ = 0.0
                      
                      # Set the field to max(lateral, top) to handle corners
-                     GMLX[ii,jj] = RFX
-                     GMLZ[ii,jj] = RFZ
+                     GML[ii,jj] = np.amax([RFX, RFZ])
                             
-       return GMLX, GMLZ, RL, SBR
+       return GML, RL, SBR
 
 def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, topdex, botdex):
        # Get DIMS data
@@ -123,7 +121,7 @@ def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLatera
        OPS = NX * NZ
        
        # Set up the Rayleigh field
-       GMLX, GMLZ, RL, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
+       GML, RL, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
        
        # Get the individual mu for each prognostic
        mu_U = mu[0]
@@ -142,6 +140,6 @@ def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLatera
        # Store the diagonal blocks corresponding to Rayleigh damping terms
        ROPS = [mu_U * RLM, mu_W * RLM, mu_P * RLM, mu_T * RLM]
        
-       return ROPS, GMLX, GMLZ
+       return ROPS, GML
        
                             

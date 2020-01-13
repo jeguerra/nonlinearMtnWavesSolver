@@ -255,6 +255,10 @@ if __name__ == '__main__':
        #% Define the computational and physical grids+
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
+       # Compute DX and DZ grid length scales
+       DX = 2 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 2 * np.max(np.abs(np.diff(REFS[1])))
+       
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
@@ -286,10 +290,6 @@ if __name__ == '__main__':
        REFS.append(ZTL)
        REFS.append(dHdX)
        REFS.append(sigma)
-       
-       # Compute DX and DZ grid length scales
-       DX = 2 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 2 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the BC index vector
        ubdex, utdex, wbdex, pbdex, tbdex, \
@@ -353,11 +353,10 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Rayleigh opearator and GML weight
-       ROPS, GMLX, GMLZ = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
+       ROPS, GML = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
        REFG.append(ROPS)
-       GMLXOP = sps.diags(np.reshape(GMLX, (OPS,), order='F'), offsets=0, format='csr')
-       GMLZOP = sps.diags(np.reshape(GMLZ, (OPS,), order='F'), offsets=0, format='csr')
-       del(GMLX); del(GMLZ)
+       GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
+       del(GML)
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
@@ -367,11 +366,11 @@ if __name__ == '__main__':
        
        # Store derivative operators with GML damping
        if SparseDerivativesDynamics:
-              DDXM_GML = GMLXOP.dot(DDXM_SP)
-              DDZM_GML = GMLZOP.dot(DDZM_SP)
+              DDXM_GML = GMLOP.dot(DDXM_SP)
+              DDZM_GML = GMLOP.dot(DDZM_SP)
        else:
-              DDXM_GML = GMLXOP.dot(DDXM)
-              DDZM_GML = GMLZOP.dot(DDZM)
+              DDXM_GML = GMLOP.dot(DDXM)
+              DDZM_GML = GMLOP.dot(DDZM)
               
        REFS.append(DDXM_GML.tocsr())
        REFS.append(DDZM_GML.tocsr())
@@ -717,8 +716,12 @@ if __name__ == '__main__':
               sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
               sgs = np.reshape(SGS, (OPS, numVar), order='F')
+              res = np.array(0.0 * rhs)
               
               for tt in range(len(TI)):
+                     # Put previous solution into index 1 storage
+                     sol[:,:,1] = np.array(sol[:,:,0])
+                            
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             message = ''
@@ -754,7 +757,9 @@ if __name__ == '__main__':
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
                             sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, rhs, sgs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
+                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, res, rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
+                     
+                     res = 1.0 / DT * (sol[:,:,0] - sol[:,:,1]) - rhs
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol, (OPS*numVar, 1), order='F')

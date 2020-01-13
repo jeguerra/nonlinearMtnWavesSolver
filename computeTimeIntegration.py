@@ -54,7 +54,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SGS, SOL
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RES, RHS, SGS, SOLT, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -62,11 +62,11 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
        
        # Compute DynSGS coefficients at the top of the time step
        U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
-       RESCF = computeResidualViscCoeffs(SOLT[:,:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
+       RESCF = computeResidualViscCoeffs(SOLT[:,:,0], RES, DX, DZ, udex, wdex, pdex, tdex)
        
        def computeDynSGSUpdate(fields):
               if DynSGS:
-                     #RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
+                     #RESCF = computeResidualViscCoeffs(SOLT[:,:,0], RHS, DX, DZ, udex, wdex, pdex, tdex)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex)
                      # Null tendency at all boundary DOF
                      rhsSGS[extDex[0],0] *= 0.0
