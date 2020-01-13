@@ -181,10 +181,6 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Get REFS data
        UZ = REFS[8]
        PORZ = REFS[9]
-       DUDZ = REFG[0]
-       DLTDZ = REFG[1]
-       DLPDZ = REFG[2]
-       DLPTDZ = REFG[3]
        # Full spectral transform derivative matrices
        DDXM = REFS[10]
        DDZM = REFS[11]
@@ -194,29 +190,33 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        DZDX = REFS[15]
               
        #%% Compute the various blocks needed
-       UM = sps.spdiags(UZ[:,0], 0, OPS, OPS)
-       PORZM = sps.spdiags(PORZ[:,0], 0, OPS, OPS)
+       UM = sps.diags(UZ[:,0], offsets=0, format='csr')
+       PORZM = sps.diags(PORZ[:,0], offsets=0, format='csr')
+       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        
-       DUDZM = sps.spdiags(DUDZ[:,0], 0, OPS, OPS)
-       DLTDZM = sps.spdiags(DLTDZ[:,0], 0, OPS, OPS)
-       DLPDZM = sps.spdiags(DLPDZ[:,0], 0, OPS, OPS)
-       DLPTDZM = sps.spdiags(DLPTDZ[:,0], 0, OPS, OPS)
+       # Compute hydrostatic state diagonal operators
+       DLTDZ = REFG[1]
+       DLTDZM = sps.diags(DLTDZ[:,0], offsets=0, format='csr')
+       DQDZ = REFG[4]
+       DUDZM = sps.diags(DQDZ[:,0], offsets=0, format='csr')
+       DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
+       DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
        unit = sps.identity(OPS)
-       
-       DZDXM = sps.spdiags(DZDX, 0, OPS, OPS)
-       
+              
        #%% Compute the terms in the equations
-       #U0DDX = UM.dot(DDXM)
+       U0DDX = UM.dot(DDXM)
        PPXM = DDXM - DZDXM.dot(DDZM)
-       U0PPX = UM.dot(PPXM)
+       #U0PPX = UM.dot(PPXM)
        
        # Horizontal momentum
-       LD11 = U0PPX
+       LD11 = U0DDX
        LD12 = DUDZM
        LD13 = PORZM.dot(PPXM)
+       LD14 = sps.csr_matrix((OPS,OPS))
        
        # Vertical momentum
-       LD22 = U0PPX
+       LD21 = sps.csr_matrix((OPS,OPS))
+       LD22 = U0DDX
        LD23 = PORZM.dot(DDZM + DLTDZM)
        # Equivalent form from direct linearization
        #LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
@@ -225,13 +225,19 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Log-P equation
        LD31 = gam * PPXM
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0PPX
+       LD33 = U0DDX
+       LD34 = None
        
        # Log-Theta equation
+       LD41 = sps.csr_matrix((OPS,OPS))
        LD42 = DLPTDZM
-       LD44 = U0PPX
+       LD43 = None
+       LD44 = U0DDX
        
-       DOPS = [LD11, LD12, LD13, LD22, LD23, LD24, LD31, LD32, LD33, LD42, LD44]
+       DOPS = [LD11, LD12, LD13, LD14, \
+               LD21, LD22, LD23, LD24, \
+               LD31, LD32, LD33, LD34, \
+               LD41, LD42, LD43, LD44]
        
        return DOPS
 

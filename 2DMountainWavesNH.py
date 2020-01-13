@@ -226,8 +226,8 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       MtnType = KAISER
-       h0 = 10.0
+       MtnType = SCHAR
+       h0 = 1.0
        aC = 5000.0
        lC = 4000.0
        
@@ -435,9 +435,9 @@ if __name__ == '__main__':
        if (StaticSolve or LinearSolve):
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
-              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                            np.array(fields), U, RdT, ubdex, utdex)
-              #DOPS = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              #DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
+              #              np.array(fields), U, RdT, ubdex, utdex)
+              DOPS_NL = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
