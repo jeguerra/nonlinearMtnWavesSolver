@@ -7,7 +7,7 @@ Created on Sat Jul 20 12:58:27 2019
 """
 import numpy as np
 
-def computeTemperatureProfileOnGrid(Z_in, T_in, REFS, isSmooth, isUniform, PHYS):
+def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform):
        
        # Get REFS data
        z = REFS[1]

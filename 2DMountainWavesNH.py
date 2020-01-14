@@ -152,7 +152,7 @@ if __name__ == '__main__':
        
        # Set 4th order compact finite difference derivatives switch
        SparseDerivativesDynamics = False
-       SparseDerivativesDynSGS = True
+       SparseDerivativesDynSGS = False
        
        # Set residual diffusion switch
        ResDiff = False
@@ -164,9 +164,9 @@ if __name__ == '__main__':
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
-       localDir = '/media/jeguerra/scratch/'
+       #localDir = '/media/jeguerra/scratch/'
        #localDir = '/Users/TempestGuerra/scratch/'
-       #localDir = '/scratch/'
+       localDir = '/scratch/'
        restart_file = localDir + 'restartDB'
        schurName = localDir + 'SchurOps'
        
@@ -178,15 +178,15 @@ if __name__ == '__main__':
        Kp = Rd / cp
        cv = cp - Rd
        gam = cp / cv
-       NBVP = 0.0125
+       NBVP = 0.01
        PHYS = [gc, P0, cp, Rd, Kp, cv, gam, NBVP]
        
        # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
-       ZH = 31000.0
-       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       ZH = 26000.0
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -203,18 +203,18 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Background temperature profile
-       smooth3Layer = True
-       uniformStrat = False
-       T_in = [300.0, 228.5, 228.5, 248.5]
+       smooth3Layer = False
+       uniformStrat = True
+       T_in = [280.0, 228.5, 228.5, 248.5]
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Background wind profile
-       uniformWind = False
-       JETOPS = [15.0, 16.822, 1.386]
+       uniformWind = True
+       JETOPS = [10.0, 16.822, 1.386]
        
        # Set the Rayleigh options
        depth = 6000.0
-       width = 16000.0
+       width = 15000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
@@ -227,7 +227,7 @@ if __name__ == '__main__':
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
        MtnType = SCHAR
-       h0 = 1.0
+       h0 = 250.0
        aC = 5000.0
        lC = 4000.0
        
@@ -236,7 +236,8 @@ if __name__ == '__main__':
               kC = 10000.0
        else:
               # When applying windowing to a different profile
-              kC = L2 - width
+              kC = 0.0
+              #kC = L2 - width
               
        HOPT = [h0, aC, lC, kC]
        
@@ -301,11 +302,11 @@ if __name__ == '__main__':
        SENSIBLE = 1
        POTENTIAL = 2
        # Map the sounding to the computational vertical 2D grid [0 H]
-       TZ, DTDZ = computeTemperatureProfileOnGrid(Z_in, T_in, REFS, smooth3Layer, uniformStrat, PHYS)
+       TZ, DTDZ = computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
        
        # Compute background fields on the reference column
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE)
+              computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE, uniformStrat)
        
        # Read in or compute background horizontal wind profile
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz, uniformWind)
@@ -434,9 +435,9 @@ if __name__ == '__main__':
        if (StaticSolve or LinearSolve):
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
-              #DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-              #              np.array(fields), U, RdT, ubdex, utdex)
-              DOPS_NL = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
+                            np.array(fields), U, RdT, ubdex, utdex)
+              #DOPS_NL = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -469,7 +470,7 @@ if __name__ == '__main__':
               
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
-              LD[ubdex,:] = C1
+              #LD[ubdex,:] = C1
               LH = sps.lil_matrix(colShape)
               LH[ubdex,:] = C2
               LM = sps.lil_matrix(colShape)

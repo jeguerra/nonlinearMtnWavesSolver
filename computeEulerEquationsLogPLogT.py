@@ -204,19 +204,19 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        unit = sps.identity(OPS)
               
        #%% Compute the terms in the equations
-       U0DDX = UM.dot(DDXM)
+       #U0DDX = UM.dot(DDXM)
        PPXM = DDXM - DZDXM.dot(DDZM)
-       #U0PPX = UM.dot(PPXM)
+       U0PPX = UM.dot(PPXM)
        
        # Horizontal momentum
-       LD11 = U0DDX
+       LD11 = U0PPX
        LD12 = DUDZM
        LD13 = PORZM.dot(PPXM)
        LD14 = sps.csr_matrix((OPS,OPS))
        
        # Vertical momentum
        LD21 = sps.csr_matrix((OPS,OPS))
-       LD22 = U0DDX
+       LD22 = U0PPX
        LD23 = PORZM.dot(DDZM + DLTDZM)
        # Equivalent form from direct linearization
        #LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
@@ -225,14 +225,14 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Log-P equation
        LD31 = gam * PPXM
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0DDX
+       LD33 = U0PPX
        LD34 = None
        
        # Log-Theta equation
        LD41 = sps.csr_matrix((OPS,OPS))
        LD42 = DLPTDZM
        LD43 = None
-       LD44 = U0DDX
+       LD44 = U0PPX
        
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
