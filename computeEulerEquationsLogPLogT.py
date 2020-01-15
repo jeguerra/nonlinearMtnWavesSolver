@@ -14,43 +14,24 @@ def localDotProduct(arg):
               res = arg[0].dot(arg[1])
               return res
 
-def computePrepareFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
-       # Get some physical quantities
-       P0 = PHYS[1]
-       Rd = PHYS[3]
-       kap = PHYS[4]
+def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        
        TQ = SOLT + INIT
        # Make the total quatities
        U = TQ[udex]
-       LP = TQ[pdex]
-       LT = TQ[tdex]
-       
-       # Compute the sensible temperature scaling to PGF
-       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
 
-       return fields, U, RdT
+       return fields, U
 
-def computeWeightFields(PHYS, REFS, SOLT, INIT, udex, wdex, pdex, tdex):
-       # Get some physical quantities
-       P0 = PHYS[1]
-       Rd = PHYS[3]
-       kap = PHYS[4]
-       
+def computeWeightFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        # Make the total quatities
        U = SOLT[:,0] + INIT[udex]
-       LP = SOLT[:,2] + INIT[pdex]
-       LT = SOLT[:,3] + INIT[tdex]
        
-       # Compute the sensible temperature scaling to PGF
-       RdT = Rd * P0**(-kap) * np.exp(LT + kap * LP)
-       
-       return U, RdT
+       return U
 
 #%% Evaluate the Jacobian matrix
-def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topdex):
+def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
        Rd = PHYS[3]
@@ -244,7 +225,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -274,26 +255,16 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        # Compute pressure gradient forces
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        RdT = RdT_bar * (1.0 + T_ratio)
-       PGFX = RdT * PqPx[:,2]
-       PGFZ1 = RdT * DqDz[:,2]
-       PGFZ2 = -gc * T_ratio
-       PGFZ = PGFZ1 + PGFZ2
-       
-       # Compute incompressibility constraint
-       incomp = gam * (PqPx[:,0] + DqDz[:,1])
 
-       DqDt = 0.0 * np.array(fields)
+       DqDt = -transport
        # Horizontal momentum equation
-       DqDt[:,0] = -(transport[:,0] + PGFX)
+       DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
-       DqDt[:,1] = -(transport[:,1] + PGFZ)
+       DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
        # Pressure (mass) equation
-       DqDt[:,2] = -(transport[:,2] + incomp)
+       DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
        # Potential Temperature equation
-       DqDt[:,3] = -(transport[:,3])
-                     
-       #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))        
-             
+                                  
        return DqDt
 
 def computeRayleighTendency(REFG, fields):
@@ -339,14 +310,7 @@ def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
        PPx = DDx - DZDX.dot(DDz)
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
-       DqDt = 0.0 * np.array(fields)
-       DqDt[:,0] = PPx[:,0] + DDz[:,0]
-       DqDt[:,1] = PPx[:,1] + DDz[:,1]
-       DqDt[:,2] = PPx[:,2] + DDz[:,2]
-       DqDt[:,3] = PPx[:,3] + DDz[:,3]
-
-       # Concatenate
-       #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
+       DqDt = PPx + DDz
        
        return DqDt
        

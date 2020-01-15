@@ -61,7 +61,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RES, RHS, SGS, SOLT, 
        dHdX = REFS[6]
        
        # Compute DynSGS coefficients at the top of the time step
-       U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
+       U = tendency.computeWeightFields(REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
        RESCF = computeResidualViscCoeffs(SOLT[:,:,0], RES, DX, DZ, udex, wdex, pdex, tdex)
        
        def computeDynSGSUpdate(fields):
@@ -78,8 +78,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RES, RHS, SGS, SOLT, 
                      
               return rhsSGS
        
-       def computeRHSUpdate(fields, U, RdT):
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT)
+       def computeRHSUpdate(fields, U):
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U)
               rhs += tendency.computeRayleighTendency(REFG, fields)
               # Null tendencies at essential boundary DOF
               rhs[zeroDex[0],0] *= 0.0
@@ -101,9 +101,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RES, RHS, SGS, SOLT, 
               # Compute stages 1 - 5
               for ii in range(7):
                      SOLT[:,:,0] = computeUpdate(c1, SOLT[:,:,0], (RHS + SGS))
-                     U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
+                     U = tendency.computeWeightFields(REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
                      sol = np.array(SOLT[:,:,0])
-                     RHS = computeRHSUpdate(sol, U, RdT)
+                     RHS = computeRHSUpdate(sol, U)
                      SGS = computeDynSGSUpdate(sol)
                      
                      if ii == 1:
@@ -115,9 +115,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RES, RHS, SGS, SOLT, 
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
                      SOLT[:,:,0] = computeUpdate(c1, SOLT[:,:,0], (RHS + SGS))
-                     U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
+                     U = tendency.computeWeightFields(REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
                      sol = np.array(SOLT[:,:,0])
-                     RHS = computeRHSUpdate(sol, U, RdT)
+                     RHS = computeRHSUpdate(sol, U)
                      SGS = computeDynSGSUpdate(sol)
        
        #%% THE KETCHENSON SSP(10,4) METHOD
@@ -125,8 +125,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RES, RHS, SGS, SOLT, 
               SOLT[:,:,1] = SOLT[:,:,0]
               for ii in range(1,6):
                      SOLT[:,:,0] = computeUpdate(c1, SOLT[:,:,0], (RHS + SGS))
-                     U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(SOLT[:,:,0], U, RdT)
+                     U = tendency.computeWeightFields(REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
+                     RHS = computeRHSUpdate(SOLT[:,:,0], U)
                      SGS = computeDynSGSUpdate(SOLT[:,:,0])
               
               SOLT[:,:,1] = 0.04 * SOLT[:,:,1] + 0.36 * SOLT[:,:,0]
@@ -134,8 +134,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RES, RHS, SGS, SOLT, 
               
               for ii in range(6,10):
                      SOLT[:,:,0] = computeUpdate(c1, SOLT[:,:,0], (RHS + SGS))
-                     U, RdT = tendency.computeWeightFields(PHYS, REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(SOLT[:,:,0], U, RdT)
+                     U = tendency.computeWeightFields(REFS, SOLT[:,:,0], INIT, udex, wdex, pdex, tdex)
+                     RHS = computeRHSUpdate(SOLT[:,:,0], U)
                      SGS = computeDynSGSUpdate(SOLT[:,:,0])
                      
               SOLT[:,:,0] = SOLT[:,:,1] + 0.6 * SOLT[:,:,0] + 0.1 * DT * RHS

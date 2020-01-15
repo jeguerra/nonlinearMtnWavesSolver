@@ -184,11 +184,11 @@ if __name__ == '__main__':
        PHYS = [gc, P0, cp, Rd, Kp, cv, gam, NBVP]
        
        # Set grid dimensions and order
-       L2 = 1.0E4 * 3.0 * mt.pi
+       L2 = 1.0E4 * 2.5 * mt.pi
        L1 = -L2
        ZH = 26000.0
-       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 90
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -259,8 +259,8 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 2 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 2 * np.max(np.abs(np.diff(REFS[1])))
+       DX = np.max(np.abs(np.diff(REFS[0])))
+       DZ = np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -431,7 +431,7 @@ if __name__ == '__main__':
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
-       fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, currentState, INIT, udex, wdex, pdex, tdex)
+       fields, U = eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
@@ -439,7 +439,7 @@ if __name__ == '__main__':
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
                             np.array(fields), U, RdT, ubdex, utdex)
-              DOPS_LN = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              #DOPS_LN = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -458,8 +458,7 @@ if __name__ == '__main__':
               
               #'''
               # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, \
-                            np.array(fields), U, RdT)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
@@ -661,8 +660,8 @@ if __name__ == '__main__':
               # Implement a crude bracket line search
               def funcEval(eta):
                      SOLT[sysDex,0] += eta * dsolQ
-                     qv, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
-                     rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(qv), U, RdT)
+                     qv, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+                     rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(qv), U)
                      rhs += eqs.computeRayleighTendency(REFG, np.array(qv))
                      
                      return np.linalg.norm(rhs)
@@ -693,12 +692,12 @@ if __name__ == '__main__':
                      print('Applied iterative root find from initial Newton... DONE!')
               '''
               #%% Check the output residual
-              fields, U, RdT = eqs.computePrepareFields(PHYS, REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+              fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
               
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U, RdT)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               message = 'Residual 2-norm AFTER Newton step:'
