@@ -79,15 +79,25 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Compute advective (multiplicative) diagonal operators
        UM = sps.diags(U, offsets=0, format='csr')
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
-       #RdTM = sps.diags(RdT, offsets=0, format='csr')
        
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = (REFS[9])[:,0]
        T_bar = (1.0 / Rd) * RdT_bar
-       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
+       
+       # Exact cancelation in the bouyancy force
+       if np.linalg.norm(fields[:,2]) <= 1.0E-16 and np.linalg.norm(fields[:,3]) < 1.0E-16:
+              bf = np.ones(len(T_bar))
+              T_ratio = np.zeros(len(T_bar))
+       else:
+              bf = np.exp(kap * fields[:,2] + fields[:,3])
+              T_ratio = bf - 1.0
+       
+       # Compute T'
        T_prime = T_ratio * T_bar
+       
        RdT_barM = sps.diags(RdT_bar, offsets=0, format='csr')
-       RdTM = sps.diags(RdT_bar * (1.0 + T_ratio), offsets=0, format='csr')
+       RdTM = sps.diags(RdT_bar * bf, offsets=0, format='csr')
+       bfM = sps.diags(bf, offsets=0, format='csr')
        
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
@@ -100,8 +110,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
        
-       bf = sps.diags(T_ratio + 1.0, offsets=0, format='csr')
-       
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + PuPxM
        LD12 = DuDzM + DUDZM
@@ -111,7 +119,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        LD21 = PwPxM
        LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
-       LD24 = RdTM.dot(DlpDzM) - gc * bf
+       LD24 = RdTM.dot(DlpDzM) - gc * bfM
        
        LD31 = gam * PPXM + PlpPxM
        LD32 = gam * DDZM + DlpDzM + DLPDZM
@@ -187,19 +195,19 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        unit = sps.identity(OPS)
               
        #%% Compute the terms in the equations
-       #U0DDX = UM.dot(DDXM)
+       U0DDX = UM.dot(DDXM)
        PPXM = DDXM - DZDXM.dot(DDZM)
        U0PPX = UM.dot(PPXM)
        
        # Horizontal momentum
-       LD11 = U0PPX
+       LD11 = U0DDX
        LD12 = DUDZM
        LD13 = PORZM.dot(PPXM)
        LD14 = sps.csr_matrix((OPS,OPS))
        
        # Vertical momentum
        LD21 = sps.csr_matrix((OPS,OPS))
-       LD22 = U0PPX
+       LD22 = U0DDX
        LD23 = PORZM.dot(DDZM + DLTDZM)
        # Equivalent form from direct linearization
        #LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
@@ -208,14 +216,14 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Log-P equation
        LD31 = gam * PPXM
        LD32 = gam * DDZM + DLPDZM
-       LD33 = U0PPX
+       LD33 = U0DDX
        LD34 = None
        
        # Log-Theta equation
        LD41 = sps.csr_matrix((OPS,OPS))
        LD42 = DLPTDZM
        LD43 = None
-       LD44 = U0PPX
+       LD44 = U0DDX
        
        DOPS = [LD11, LD12, LD13, LD14, \
                LD21, LD22, LD23, LD24, \
