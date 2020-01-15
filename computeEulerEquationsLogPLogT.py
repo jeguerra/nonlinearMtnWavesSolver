@@ -84,18 +84,14 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        RdT_bar = (REFS[9])[:,0]
        T_bar = (1.0 / Rd) * RdT_bar
        
-       # Exact cancelation in the bouyancy force
-       if np.linalg.norm(fields[:,2]) <= 1.0E-16 and np.linalg.norm(fields[:,3]) < 1.0E-16:
-              bf = np.ones(len(T_bar))
-              T_ratio = np.zeros(len(T_bar))
-       else:
-              bf = np.exp(kap * fields[:,2] + fields[:,3])
-              T_ratio = bf - 1.0
+       bf = np.exp(kap * fields[:,2] + fields[:,3])
+       T_ratio = bf - 1.0
        
        # Compute T'
        T_prime = T_ratio * T_bar
        
        RdT_barM = sps.diags(RdT_bar, offsets=0, format='csr')
+       RdT_primeM = sps.diags(RdT_bar * T_ratio, offsets=0, format='csr')
        RdTM = sps.diags(RdT_bar * bf, offsets=0, format='csr')
        bfM = sps.diags(bf, offsets=0, format='csr')
        
@@ -118,7 +114,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        
        LD21 = PwPxM
        LD22 = UPXM + DwDzM
-       LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
+       LD23 = RdT_barM.dot(DDZM + DLTDZM) + RdT_primeM.dot(DDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bfM
        
        LD31 = gam * PPXM + PlpPxM
@@ -209,6 +205,7 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        LD21 = sps.csr_matrix((OPS,OPS))
        LD22 = U0DDX
        LD23 = PORZM.dot(DDZM + DLTDZM)
+       #LD23 = PORZM.dot(DLTDZM)
        # Equivalent form from direct linearization
        #LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
