@@ -49,6 +49,13 @@ from computeTimeIntegration import computeTimeIntegrationNL
 
 import faulthandler; faulthandler.enable()
 
+# Disk settings
+#localDir = '/media/jeguerra/scratch/'
+localDir = '/Users/TempestGuerra/scratch/'
+#localDir = '/scratch/'
+restart_file = localDir + 'restartDB'
+schurName = localDir + 'SchurOps'
+
 def displayResiduals(message, RHS, thisTime, udex, wded, pdex, tdex):
        err = np.linalg.norm(RHS)
        err1 = np.linalg.norm(RHS[udex])
@@ -164,11 +171,6 @@ if __name__ == '__main__':
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
        isRestart = False # Initializes from a restart database
-       #localDir = '/media/jeguerra/scratch/'
-       #localDir = '/Users/TempestGuerra/scratch/'
-       localDir = '/scratch/'
-       restart_file = localDir + 'restartDB'
-       schurName = localDir + 'SchurOps'
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -437,14 +439,18 @@ if __name__ == '__main__':
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
                             np.array(fields), U, RdT, ubdex, utdex)
-              #DOPS_NL = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+              DOPS_LN = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
               # Convert blocks to 'lil' format for efficient indexing
               DOPS = []
               for dd in range(len(DOPS_NL)):
-                     if (DOPS_NL[dd]) is not None: 
+                     if (DOPS_NL[dd]) is not None:
+                            # Check against linear blocks
+                            #DOPS_DEL = np.reshape((DOPS_NL[dd] - DOPS_LN[dd]).toarray(), (OPS*OPS,), order='F')
+                            #print(dd, np.linalg.norm(DOPS_DEL))
+                            
                             DOPS.append(DOPS_NL[dd].tolil())
                      else:
                             DOPS.append(DOPS_NL[dd])

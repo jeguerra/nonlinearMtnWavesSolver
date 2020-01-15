@@ -98,14 +98,16 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, RdT, botdex, topd
        # Compute advective (multiplicative) diagonal operators
        UM = sps.diags(U, offsets=0, format='csr')
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
-       RdTM = sps.diags(RdT, offsets=0, format='csr')
+       #RdTM = sps.diags(RdT, offsets=0, format='csr')
        
        # Compute diagonal blocks related to sensible temperature
-       RdT_bar = REFS[9]
-       T_bar = (1.0 / Rd) * RdT_bar[:,0]
+       RdT_bar = (REFS[9])[:,0]
+       T_bar = (1.0 / Rd) * RdT_bar
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        T_prime = T_ratio * T_bar
-       RdT_barM = sps.diags(RdT_bar[:,0], offsets=0, format='csr')
+       RdT_barM = sps.diags(RdT_bar, offsets=0, format='csr')
+       RdTM = sps.diags(RdT_bar * (1.0 + T_ratio), offsets=0, format='csr')
+       
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
        PtPxM = sps.diags(PtPx, offsets=0, format='csr')
@@ -247,6 +249,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
+       RdT_bar = (REFS[9])[:,0]
        
        # Get the derivative operators
        DQDZ = REFG[4]
@@ -270,6 +273,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U, RdT):
        
        # Compute pressure gradient forces
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
+       RdT = RdT_bar * (1.0 + T_ratio)
        PGFX = RdT * PqPx[:,2]
        PGFZ1 = RdT * DqDz[:,2]
        PGFZ2 = -gc * T_ratio
