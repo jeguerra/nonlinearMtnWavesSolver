@@ -19,12 +19,13 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
               TZ = np.zeros(ZTL.shape)
               DTDZ = np.zeros(ZTL.shape)
               T0 = T_in[0]
-              C0 = (PHYS[4] * PHYS[0]**2) / (PHYS[3] * PHYS[7]**2)
-              C1 = PHYS[7]**2 / PHYS[0]
+              A = PHYS[7]**2 / PHYS[0]
+              C = PHYS[0] / PHYS[2]
               for cc in range(NC):
                      zcol = ZTL[:,cc]
-                     TZ[:,cc] = (T0 - C0) * np.exp(C1*zcol) + C0
-                     DTDZ[:,cc] = C1 * (T0 - C0) * np.exp(C1*zcol)
+                     EXPF = np.exp(A * zcol)
+                     TZ[:,cc] = T0 * EXPF + (C / A) * (1.0 - EXPF)
+                     DTDZ[:,cc] = (A * T0 - C) * EXPF
        else:
               if isSmooth:
                      ZTP = Z_in[1] # tropopause height
