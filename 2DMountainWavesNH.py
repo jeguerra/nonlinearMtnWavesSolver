@@ -149,9 +149,9 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
+       NonLinSolve = True
        
        # Set the grid type (NOT IMPLEMENTED)
        HermCheb = True
@@ -162,7 +162,7 @@ if __name__ == '__main__':
        SparseDerivativesDynSGS = False
        
        # Set residual diffusion switch
-       ResDiff = False
+       ResDiff = True
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
@@ -186,9 +186,9 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 2.5 * mt.pi
        L1 = -L2
-       ZH = 26000.0
-       NX = 147 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 90
+       ZH = 31000.0
+       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -205,18 +205,18 @@ if __name__ == '__main__':
        tdex = np.add(pdex, OPS)
        
        # Background temperature profile
-       smooth3Layer = False
-       uniformStrat = True
-       T_in = [280.0, 228.5, 228.5, 248.5]
+       smooth3Layer = True
+       uniformStrat = False
+       T_in = [300.0, 228.5, 228.5, 248.5]
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
        
        # Background wind profile
-       uniformWind = True
+       uniformWind = False
        JETOPS = [10.0, 16.822, 1.386]
        
        # Set the Rayleigh options
        depth = 6000.0
-       width = 15000.0
+       width = 12000.0
        applyTop = True
        applyLateral = True
        mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
@@ -228,7 +228,7 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       MtnType = SCHAR
+       MtnType = KAISER
        h0 = 250.0
        aC = 5000.0
        lC = 4000.0
@@ -438,8 +438,8 @@ if __name__ == '__main__':
               
               # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
               DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                            np.array(fields), U, RdT, ubdex, utdex)
-              #DOPS_LN = eqs.computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG)
+                            np.array(fields), U, ubdex, utdex)
+              #DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -475,7 +475,7 @@ if __name__ == '__main__':
               
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
-              #LD[ubdex,:] = C1
+              LD[ubdex,:] = C1
               LH = sps.lil_matrix(colShape)
               LH[ubdex,:] = C2
               LM = sps.lil_matrix(colShape)
@@ -656,25 +656,7 @@ if __name__ == '__main__':
               # Store the Lagrange Multipliers
               LMS += dsol[0:NX+1]
               dsolQ = dsol[NX+1:]
-              '''
-              # Implement a crude bracket line search
-              def funcEval(eta):
-                     SOLT[sysDex,0] += eta * dsolQ
-                     qv, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
-                     rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(qv), U)
-                     rhs += eqs.computeRayleighTendency(REFG, np.array(qv))
-                     
-                     return np.linalg.norm(rhs)
               
-              import scipy.optimize as opt
-              ls = opt.minimize_scalar(funcEval, bounds=(0.0, 1.0), method='bounded')
-              print('Estimated STEP LENGTH: ', ls.x)
-              
-              if ls.x <= 1.0 and ls.x > 0.0:
-                     alpha = ls.x
-              else:
-                     alpha = 1.0
-              '''
               alpha = 1.0
               SOLT[sysDex,0] += alpha * dsolQ
               # Store solution change to instance 1
@@ -682,15 +664,6 @@ if __name__ == '__main__':
               
               print('Recover full linear solution vector... DONE!')
               
-              #%% Use the linear solution as the initial guess to the nonlinear solution
-              '''
-              if relaxIterative:
-                     sol = itr.computeIterativeSolveNL(PHYS, REFS, REFG, DX, DZ, SOLT, INIT, udex, wdex, pdex, tdex, ubdex, utdex, wbdex, sysDex, ResDiff)
-                     SOLT[:,1] = sol - np.array(SOLT[:,0])
-                     SOLT[:,0] = sol
-                     del(sol)
-                     print('Applied iterative root find from initial Newton... DONE!')
-              '''
               #%% Check the output residual
               fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
               
@@ -700,6 +673,7 @@ if __name__ == '__main__':
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, np.array(fields), U)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
+              RHS[zeroDex_stat] *= 0.0
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               

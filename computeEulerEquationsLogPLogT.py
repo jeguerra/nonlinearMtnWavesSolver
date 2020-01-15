@@ -155,7 +155,7 @@ def computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex):
        return -qprod
     
 #%% The linear equation operator
-def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
+def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        # Get physical constants
        gc = PHYS[0]
        gam = PHYS[6]
@@ -171,15 +171,12 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
        # Full spectral transform derivative matrices
        DDXM = REFS[10]
        DDZM = REFS[11]
-       # Sparse 4th order compact FD derivative matrices
-       #DDXM = REFS[12]
-       #DDZM = REFS[13]
-       DZDX = REFS[15]
+       #DZDX = REFS[15]
               
        #%% Compute the various blocks needed
        UM = sps.diags(UZ[:,0], offsets=0, format='csr')
        PORZM = sps.diags(PORZ[:,0], offsets=0, format='csr')
-       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
+       #DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
        DLTDZ = REFG[1]
@@ -192,26 +189,25 @@ def computeEulerEquationsLogPLogT(DIMS, PHYS, REFS, REFG):
               
        #%% Compute the terms in the equations
        U0DDX = UM.dot(DDXM)
-       PPXM = DDXM - DZDXM.dot(DDZM)
-       U0PPX = UM.dot(PPXM)
+       #PPXM = DDXM - DZDXM.dot(DDZM)
+       #U0PPX = UM.dot(PPXM)
        
        # Horizontal momentum
        LD11 = U0DDX
        LD12 = DUDZM
-       LD13 = PORZM.dot(PPXM)
+       LD13 = PORZM.dot(DDXM)
        LD14 = sps.csr_matrix((OPS,OPS))
        
        # Vertical momentum
        LD21 = sps.csr_matrix((OPS,OPS))
        LD22 = U0DDX
        LD23 = PORZM.dot(DDZM + DLTDZM)
-       #LD23 = PORZM.dot(DLTDZM)
        # Equivalent form from direct linearization
        #LD23 = PORZM.dot(DDZM) + gc * (1.0 / gam - 1.0) * unit
        LD24 = -gc * unit
        
        # Log-P equation
-       LD31 = gam * PPXM
+       LD31 = gam * DDXM
        LD32 = gam * DDZM + DLPDZM
        LD33 = U0DDX
        LD34 = None
