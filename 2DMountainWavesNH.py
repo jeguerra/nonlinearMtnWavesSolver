@@ -207,10 +207,15 @@ if __name__ == '__main__':
        # Background temperature profile
        smooth3Layer = True
        uniformStrat = False
-       T_in = [300.0, 228.5, 228.5, 248.5]
        Z_in = [0.0, 1.1E4, 2.0E4, ZH]
+       GAMS = 0.001 # Lapse rate in the stratosphere
+       GAMT = 0.0065 # Lapse rate in the troposphere
+       T0 = 300.0
+       TTP = T0 - GAMT * (Z_in[1] - Z_in[0])
+       TH = TTP + GAMS * (Z_in[3] - Z_in[2])
+       T_in = [T0, TTP, TTP, TH]
        
-       # Background wind profile
+       # Background wind profil e
        uniformWind = False
        JETOPS = [10.0, 16.822, 1.386]
        
@@ -285,9 +290,9 @@ if __name__ == '__main__':
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
        # USE THE GUELLRICH TERRAIN DECAY
-       XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       #XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # USE UNIFORM STRETCHING
-       #XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
