@@ -217,6 +217,7 @@ if __name__ == '__main__':
        
        # Background wind profil e
        uniformWind = False
+       linearShear = True
        JETOPS = [10.0, 16.822, 1.386]
        
        # Set the Rayleigh options
@@ -316,7 +317,7 @@ if __name__ == '__main__':
               computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE, uniformStrat)
        
        # Read in or compute background horizontal wind profile
-       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz, uniformWind)
+       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz, uniformWind, linearShear)
        
        #% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(dUdz, axis=1)
@@ -350,8 +351,8 @@ if __name__ == '__main__':
        REFG = [DUDZ, DLTDZ, DLPDZ, DLPTDZ, DQDZ]
        
        # Update the REFS collection
-       REFS.append(np.reshape(UZ, (OPS,1), order='F'))
-       REFS.append(np.reshape(PORZ, (OPS,1), order='F'))
+       REFS.append(np.reshape(UZ, (OPS,), order='F'))
+       REFS.append(np.reshape(PORZ, (OPS,), order='F'))
        
        # Get some memory back here
        del(PORZ)

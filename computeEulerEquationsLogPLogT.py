@@ -81,7 +81,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
        
        # Compute diagonal blocks related to sensible temperature
-       RdT_bar = (REFS[9])[:,0]
+       RdT_bar = REFS[9]
        T_bar = (1.0 / Rd) * RdT_bar
        
        bf = np.exp(kap * fields[:,2] + fields[:,3])
@@ -231,7 +231,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U):
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
-       RdT_bar = (REFS[9])[:,0]
+       RdT_bar = REFS[9]
        
        # Get the derivative operators
        DQDZ = REFG[4]

@@ -9,8 +9,9 @@ SUPPORTS AN ANALYTICAL PROFILE FOR WIND ONLY...
 """
 
 import numpy as np
+import math as mt
 
-def computeShearProfileOnGrid(PHYS, JETOPS, P0, PZ, dlnPZdz, uniformWind):
+def computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPZdz, uniformWind, linearShear):
        
        # Get jet profile options
        U0 = JETOPS[0]
@@ -20,6 +21,12 @@ def computeShearProfileOnGrid(PHYS, JETOPS, P0, PZ, dlnPZdz, uniformWind):
        if uniformWind:
               UZ = U0 * np.ones(len(PZ))
               dUdz = np.zeros(len(PZ))  
+       elif linearShear:
+              zcoord = REFS[1]
+              ZH = zcoord[len(zcoord)-1]
+              DUZ = (10.0 / ZH**2) * np.power(zcoord, 2.0)
+              UZ = DUZ + U0
+              dUdz = (20.0 / ZH**2) * zcoord
        else:
               # Compute the normalized pressure coordinate (Ullrich, 2015)
               pcoord = 1.0 / P0 * PZ;
