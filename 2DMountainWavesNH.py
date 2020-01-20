@@ -50,8 +50,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 import faulthandler; faulthandler.enable()
 
 # Disk settings
-#localDir = '/media/jeguerra/scratch/'
-localDir = '/Users/TempestGuerra/scratch/'
+localDir = '/media/jeguerra/scratch/'
+#localDir = '/Users/TempestGuerra/scratch/'
 #localDir = '/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
@@ -149,9 +149,9 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
+       StaticSolve = True
        LinearSolve = False
-       NonLinSolve = True
+       NonLinSolve = False
        
        # Set the grid type (NOT IMPLEMENTED)
        HermCheb = True
@@ -162,7 +162,7 @@ if __name__ == '__main__':
        SparseDerivativesDynSGS = False
        
        # Set residual diffusion switch
-       ResDiff = True
+       ResDiff = False
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
@@ -170,7 +170,7 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = False # Initializes from a restart database
+       isRestart = True # Initializes from a restart database
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -186,9 +186,9 @@ if __name__ == '__main__':
        # Set grid dimensions and order
        L2 = 1.0E4 * 2.5 * mt.pi
        L1 = -L2
-       ZH = 31000.0
-       NX = 155 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
+       ZH = 26000.0
+       NX = 183 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 100
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -207,8 +207,8 @@ if __name__ == '__main__':
        # Background temperature profile
        smooth3Layer = True
        uniformStrat = False
-       Z_in = [0.0, 1.1E4, 2.0E4, ZH]
-       GAMS = 0.001 # Lapse rate in the stratosphere
+       Z_in = [0.0, 1.1E4, 1.8E4, ZH]
+       GAMS = 0.002 # Lapse rate in the stratosphere
        GAMT = 0.0065 # Lapse rate in the troposphere
        T0 = 300.0
        TTP = T0 - GAMT * (Z_in[1] - Z_in[0])
@@ -218,7 +218,7 @@ if __name__ == '__main__':
        # Background wind profil e
        uniformWind = False
        linearShear = True
-       JETOPS = [10.0, 16.822, 1.386]
+       JETOPS = [10.0, 16.822, 1.386, 30.0]
        
        # Set the Rayleigh options
        depth = 6000.0
@@ -234,8 +234,8 @@ if __name__ == '__main__':
        EXPCOS = 3 # Even exponential and squared cosines product
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
-       MtnType = KAISER
-       h0 = 250.0
+       MtnType = SCHAR
+       h0 = 10.0
        aC = 5000.0
        lC = 4000.0
        
@@ -770,6 +770,9 @@ if __name__ == '__main__':
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = ET
+              rdb['REFS'] = REFS
+              rdb['PHYS'] = PHYS
+              rdb['DIMS'] = DIMS
               rdb.close()
        
        #%% Recover the solution (or check the residual)

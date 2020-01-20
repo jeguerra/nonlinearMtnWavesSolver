@@ -17,6 +17,7 @@ def computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPZdz, uniformWind, linear
        U0 = JETOPS[0]
        uj = JETOPS[1]
        b = JETOPS[2]
+       Utop = JETOPS[3]
        
        if uniformWind:
               UZ = U0 * np.ones(len(PZ))
@@ -24,9 +25,9 @@ def computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPZdz, uniformWind, linear
        elif linearShear:
               zcoord = REFS[1]
               ZH = zcoord[len(zcoord)-1]
-              DUZ = (10.0 / ZH**2) * np.power(zcoord, 2.0)
+              DUZ = (Utop / ZH**2) * np.power(zcoord, 2.0)
               UZ = DUZ + U0
-              dUdz = (20.0 / ZH**2) * zcoord
+              dUdz = 2.0 * (Utop / ZH**2) * zcoord
        else:
               # Compute the normalized pressure coordinate (Ullrich, 2015)
               pcoord = 1.0 / P0 * PZ;

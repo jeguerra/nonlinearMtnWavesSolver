@@ -6,7 +6,7 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
-#from multiprocessing import Pool
+from numba import njit
 import scipy.sparse as sps
 #import matplotlib.pyplot as plt
 
@@ -31,6 +31,7 @@ def computeWeightFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        return U
 
 #%% Evaluate the Jacobian matrix
+#@jit(nopython=True)
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
@@ -280,21 +281,20 @@ def computeRayleighTendency(REFG, fields):
        DqDt[:,2] = - ROPS[2].dot(fields[:,2])
        DqDt[:,3] = - ROPS[3].dot(fields[:,3])
        
-       # Concatenate
-       #DqDt = np.concatenate((DuDt, DwDt, DpDt, DtDt))
-       
        return DqDt
 
-def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
+#def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
+@njit
+def computeDynSGSTendency(RESCFX, RESCFZ, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
        
        # Get the derivative operators (without GML adjustment)
-       DDXM = REFS[12]
-       DDZM = REFS[13]
-       DZDX = REFS[16]
+       #DDXM = REFS[12]
+       #DDZM = REFS[13]
+       #DZDX = REFS[16]
        
        # Get the anisotropic coefficients
-       RESCFX = RESCF[0]
-       RESCFZ = RESCF[1]
+       #RESCFX = RESCF[0]
+       #RESCFZ = RESCF[1]
        
        # Compute derivatives of perturbations
        DDx = DDXM.dot(fields)
