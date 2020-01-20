@@ -187,8 +187,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 2.5 * mt.pi
        L1 = -L2
        ZH = 26000.0
-       NX = 183 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 100
+       NX = 171 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 96
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -207,10 +207,10 @@ if __name__ == '__main__':
        # Background temperature profile
        smooth3Layer = True
        uniformStrat = False
-       Z_in = [0.0, 1.1E4, 1.8E4, ZH]
-       GAMS = 0.002 # Lapse rate in the stratosphere
+       Z_in = [0.0, 1.1E4, 1.6E4, ZH]
+       GAMS = 0.001 # Lapse rate in the stratosphere
        GAMT = 0.0065 # Lapse rate in the troposphere
-       T0 = 300.0
+       T0 = 300
        TTP = T0 - GAMT * (Z_in[1] - Z_in[0])
        TH = TTP + GAMS * (Z_in[3] - Z_in[2])
        T_in = [T0, TTP, TTP, TH]
@@ -218,7 +218,7 @@ if __name__ == '__main__':
        # Background wind profil e
        uniformWind = False
        linearShear = True
-       JETOPS = [10.0, 16.822, 1.386, 30.0]
+       JETOPS = [10.0, 16.822, 1.386, 20.0]
        
        # Set the Rayleigh options
        depth = 6000.0
@@ -241,11 +241,10 @@ if __name__ == '__main__':
        
        if MtnType == KAISER:
               # When using this profile as the terrain
-              kC = 10000.0
+              kC = 7500.0
        else:
               # When applying windowing to a different profile
-              kC = 0.0
-              #kC = L2 - width
+              kC = L2 - width
               
        HOPT = [h0, aC, lC, kC]
        

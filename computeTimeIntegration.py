@@ -9,12 +9,13 @@ import numpy as np
 import computeEulerEquationsLogPLogT as tendency
 from computeResidualViscCoeffs import computeResidualViscCoeffs
 
-def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botdex, topdex, DynSGS): 
+def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, INIT, sysDex, udex, wdex, pdex, tdex, botDex, topdex, DynSGS): 
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
        sol = SOLT[sysDex,0]
        rhs = RHS[sysDex]
+       dHdX = REFS[6]
        
        def computeRHSUpdate():
               rhs = bN - AN.dot(sol)
@@ -31,7 +32,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
        sol = np.array(SOLT[:,0])
        for ii in range(7):
               sol = computeUpdate(c1, sol, RHS)
-              RHS = computeRHSUpdate(sol, U)
+              RHS = computeRHSUpdate()
               
               if ii == 1:
                      SOLT[:,:,1] = sol
@@ -42,7 +43,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
        # Compute stages 7 - 9 (diffusion applied here)
        for ii in range(2):
               sol = computeUpdate(c1, sol, RHS)
-              RHS = computeRHSUpdate(sol, U)
+              RHS = computeRHSUpdate()
               
        return sol, rhs
 
@@ -75,7 +76,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               return rhsSGS
        
        def computeRHSUpdate(fields, U):
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U)
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
               rhs += tendency.computeRayleighTendency(REFG, fields)
               # Null tendencies at essential boundary DOF
               rhs[zeroDex[0],0] *= 0.0
