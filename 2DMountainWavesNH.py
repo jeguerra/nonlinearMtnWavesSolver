@@ -149,9 +149,9 @@ def computeSchurBlock(dbName, blockName):
        
 if __name__ == '__main__':
        # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = True
+       StaticSolve = False
        LinearSolve = False
-       NonLinSolve = False
+       NonLinSolve = True
        
        # Set the grid type (NOT IMPLEMENTED)
        HermCheb = True
@@ -162,7 +162,7 @@ if __name__ == '__main__':
        SparseDerivativesDynSGS = False
        
        # Set residual diffusion switch
-       ResDiff = False
+       ResDiff = True
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = False
@@ -170,7 +170,7 @@ if __name__ == '__main__':
        
        # Set Newton solve initial and restarting parameters
        toRestart = True # Saves resulting state to restart database
-       isRestart = True # Initializes from a restart database
+       isRestart = False # Initializes from a restart database
        
        # Set physical constants (dry air)
        gc = 9.80601
@@ -187,8 +187,8 @@ if __name__ == '__main__':
        L2 = 1.0E4 * 2.5 * mt.pi
        L1 = -L2
        ZH = 26000.0
-       NX = 171 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 96
+       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
+       NZ = 92
        OPS = (NX + 1) * NZ
        numVar = 4
        NQ = OPS * numVar
@@ -217,8 +217,8 @@ if __name__ == '__main__':
        
        # Background wind profil e
        uniformWind = False
-       linearShear = True
-       JETOPS = [10.0, 16.822, 1.386, 20.0]
+       linearShear = False
+       JETOPS = [10.0, 16.822, 1.386, 30.0]
        
        # Set the Rayleigh options
        depth = 6000.0
@@ -236,7 +236,7 @@ if __name__ == '__main__':
        EXPPOL = 4 # Even exponential and even polynomial product
        INFILE = 5 # Data from a file (equally spaced points)
        MtnType = SCHAR
-       h0 = 10.0
+       h0 = 250.0
        aC = 5000.0
        lC = 4000.0
        
@@ -265,8 +265,8 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 1.5 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 1.5 * np.max(np.abs(np.diff(REFS[1])))
+       DX = 2.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 2.0 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)

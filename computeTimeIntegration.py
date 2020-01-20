@@ -60,10 +60,16 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
        DDXM = REFS[12]
        DDZM = REFS[13]
        DZDX = REFS[16]
+       
+       # Get normalization for DynSGS coefficients
+       if DynSGS:
+              QM = np.amax(SOLT[:,:,0], axis=0)
+       else:
+              QM = 0.0
               
        def computeDynSGSUpdate(fields):
               if DynSGS:
-                     RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ)
+                     RESCF = computeResidualViscCoeffs(fields, RHS, QM, DX, DZ)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      # Null tendency at all boundary DOF
                      rhsSGS[extDex[0],0] *= 0.0
@@ -101,7 +107,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
                      sol = computeUpdate(c1, sol, (RHS + SGS))
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol)
+                     SGS = 0.0 #computeDynSGSUpdate(sol)
                      
                      if ii == 1:
                             SOLT[:,:,1] = sol
