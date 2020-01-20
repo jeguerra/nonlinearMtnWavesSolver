@@ -26,7 +26,7 @@ def computeTopographyOnGrid(REFS, profile, opt, withWindow):
        r2 = 1.0 * kC
        r1 = -r2
        
-       DX = 50.0 # maximum resolution in meters
+       DX = 25.0 # maximum resolution in meters
        NP = int((l2 - l1) / DX)
        # Make this number odd... helps windowing
        if NP % 2 == 0:
@@ -60,7 +60,10 @@ def computeTopographyOnGrid(REFS, profile, opt, withWindow):
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(x, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * x), 2.0)
               ht3 = np.reciprocal((1.0 / aC)**2.0 * np.power(x, 2.0) + 1.0)
-              htfft = kaiserDom * (ht1 * ht2 * ht3)
+              if withWindow:
+                     htfft = kaiserDom * (ht1 * ht2 * ht3)
+              else:
+                     htfft = 1.0 * (ht1 * ht2 * ht3)
               # Compute the slope field perfectly
               '''
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
