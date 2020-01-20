@@ -255,8 +255,8 @@ if __name__ == '__main__':
        rampTime = 900  # 10 minutes to ramp up U_bar
        intMethodOrder = 3 # 3rd or 4th order time integrator
        ET = HR * 60 * 60 # End time in seconds
-       OTI = 200 # Stride for diagnostic output
-       ITI = 1000 # Stride for image output
+       OTI = 400 # Stride for diagnostic output
+       ITI = 2000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
        
@@ -265,8 +265,8 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = np.max(np.abs(np.diff(REFS[0])))
-       DZ = np.max(np.abs(np.diff(REFS[1])))
+       DX = 1.5 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 1.5 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -702,7 +702,6 @@ if __name__ == '__main__':
               sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
               sgs = np.reshape(SGS, (OPS, numVar), order='F')
-              res = np.array(0.0 * rhs)
               
               for tt in range(len(TI)):
                      # Put previous solution into index 1 storage
@@ -741,12 +740,10 @@ if __name__ == '__main__':
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, rhs, sgs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, rhs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, res, rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
-                     
-                     res = 1.0 / DT * (sol[:,:,0] - sol[:,:,1]) - rhs
-                     
+                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
+                                          
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol, (OPS*numVar, 1), order='F')
               RHS = np.reshape(rhs, (OPS*numVar, 1), order='F')

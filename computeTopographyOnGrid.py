@@ -60,7 +60,7 @@ def computeTopographyOnGrid(REFS, profile, opt):
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(x, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * x), 2.0)
               ht3 = np.reciprocal((1.0 / aC)**2.0 * np.power(x, 2.0) + 1.0)
-              htfft = (ht1 * ht2 * ht3)
+              htfft = kaiserDom * (ht1 * ht2 * ht3)
               # Compute the slope field perfectly
               '''
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))

@@ -227,18 +227,14 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFS, REFG, fields, U):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
-       RdT_bar = REFS[9]
        
-       # Get the derivative operators
+       # Get hydrostatic initial fields
        DQDZ = REFG[4]
-       DDXM = REFS[10]
-       DDZM = REFS[11]
-       DZDX = REFS[16]
        
        # Compute advective (multiplicative) operators
        UM = sps.diags(U, offsets=0, format='csr')
@@ -284,17 +280,12 @@ def computeRayleighTendency(REFG, fields):
        return DqDt
 
 #def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
-@njit
-def computeDynSGSTendency(RESCFX, RESCFZ, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
-       
-       # Get the derivative operators (without GML adjustment)
-       #DDXM = REFS[12]
-       #DDZM = REFS[13]
-       #DZDX = REFS[16]
+#@njit
+def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
        
        # Get the anisotropic coefficients
-       #RESCFX = RESCF[0]
-       #RESCFZ = RESCF[1]
+       RESCFX = RESCF[0]
+       RESCFZ = RESCF[1]
        
        # Compute derivatives of perturbations
        DDx = DDXM.dot(fields)
