@@ -63,7 +63,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               
        def computeDynSGSUpdate(fields):
               if DynSGS:
-                     RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ, udex, wdex, pdex, tdex)
+                     RESCF = computeResidualViscCoeffs(fields, RHS, DX, DZ)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      # Null tendency at all boundary DOF
                      rhsSGS[extDex[0],0] *= 0.0

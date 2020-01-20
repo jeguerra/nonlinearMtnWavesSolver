@@ -8,7 +8,7 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 
-def computeResidualViscCoeffs(fields, RES, DX, DZ, udex, wdex, pdex, tdex):
+def computeResidualViscCoeffs(fields, RES, DX, DZ):
        
        ARES = np.abs(RES)
        DSOL = np.abs(fields)

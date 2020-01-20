@@ -229,6 +229,7 @@ if __name__ == '__main__':
        mu *= 1.0
        
        # Set the terrain options
+       withWindow = True
        KAISER = 1 # Kaiser window profile
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
        EXPCOS = 3 # Even exponential and squared cosines product
@@ -285,7 +286,7 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        #% Read in topography profile or compute from analytical function
-       HofX, dHdX = computeTopographyOnGrid(REFS, MtnType, HOPT)
+       HofX, dHdX = computeTopographyOnGrid(REFS, MtnType, HOPT, withWindow)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth

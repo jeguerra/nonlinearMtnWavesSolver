@@ -6,7 +6,6 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
-from numba import njit
 import scipy.sparse as sps
 #import matplotlib.pyplot as plt
 
@@ -31,7 +30,6 @@ def computeWeightFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        return U
 
 #%% Evaluate the Jacobian matrix
-#@jit(nopython=True)
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Get physical constants
        gc = PHYS[0]
@@ -279,8 +277,6 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-#def computeDynSGSTendency(RESCF, REFS, fields, udex, wdex, pdex, tdex):
-#@njit
 def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
        
        # Get the anisotropic coefficients
