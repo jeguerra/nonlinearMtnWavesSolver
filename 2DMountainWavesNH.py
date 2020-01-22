@@ -479,7 +479,7 @@ if __name__ == '__main__':
               C1 = -1.0 * sps.diags(dHdX[1:], offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX, format='csr')
               
-              colShape = (OPS,NX+1)
+              colShape = (OPS,NX)
               LD = sps.lil_matrix(colShape)
               LD[ubdex[1:],:] = C1
               LH = sps.lil_matrix(colShape)
@@ -498,7 +498,7 @@ if __name__ == '__main__':
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((NX+1,NX+1))
+              LDIA = sps.lil_matrix((NX,NX))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
