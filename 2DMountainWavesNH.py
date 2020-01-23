@@ -468,6 +468,7 @@ if __name__ == '__main__':
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
+              RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
@@ -479,7 +480,7 @@ if __name__ == '__main__':
               C1 = -1.0 * sps.diags(dHdX[1:], offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX, format='csr')
               
-              colShape = (OPS,NX+1)
+              colShape = (OPS,NX)
               LD = sps.lil_matrix(colShape)
               LD[ubdex[1:],:] = C1
               LH = sps.lil_matrix(colShape)
@@ -498,7 +499,7 @@ if __name__ == '__main__':
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((NX+1,NX+1))
+              LDIA = sps.lil_matrix((NX,NX))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -680,6 +681,7 @@ if __name__ == '__main__':
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               RHS[zeroDex_stat] *= 0.0
+              RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               

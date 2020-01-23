@@ -107,7 +107,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
                      sol = computeUpdate(c1, sol, (RHS + SGS))
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = 0.0 #computeDynSGSUpdate(sol)
+                     SGS = computeDynSGSUpdate(sol)
                      
                      if ii == 1:
                             SOLT[:,:,1] = sol
