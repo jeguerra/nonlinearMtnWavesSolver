@@ -67,9 +67,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
        else:
               QM = 0.0
               
-       def computeDynSGSUpdate(fields):
+       def computeDynSGSUpdate(fields, rhs):
               if DynSGS:
-                     RESCF = computeResidualViscCoeffs(fields, RHS, QM, DX, DZ)
+                     RESCF = computeResidualViscCoeffs(fields, rhs, QM, DX, DZ)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      # Null tendency at all boundary DOF
                      rhsSGS[extDex[0],0] *= 0.0
@@ -93,6 +93,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               return rhs
        
        def computeUpdate(coeff, sol, rhs):
+              #Apply updates
               dsol = coeff * DT * rhs
               sol += dsol
               sol[botDex,1] += dHdX * dsol[botDex,0]
@@ -104,10 +105,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               # Compute stages 1 - 5
               sol = np.array(SOLT[:,:,0])
               for ii in range(7):
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol)
+                     SGS = computeDynSGSUpdate(sol, RHS)
+                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      
                      if ii == 1:
                             SOLT[:,:,1] = sol
@@ -117,29 +118,29 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol)
+                     SGS = computeDynSGSUpdate(sol, RHS)
+                     sol = computeUpdate(c1, sol, (RHS + SGS))
        
        #%% THE KETCHENSON SSP(10,4) METHOD
        elif order == 4:
               SOLT[:,:,1] = SOLT[:,:,0]
               sol = np.array(SOLT[:,:,0])
               for ii in range(1,6):
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol)
+                     SGS = computeDynSGSUpdate(sol, RHS)
+                     sol = computeUpdate(c1, sol, (RHS + SGS))
               
               SOLT[:,:,1] = 0.04 * SOLT[:,:,1] + 0.36 * sol
               sol = 15.0 * SOLT[:,:,1] - 5.0 * sol
               
               for ii in range(6,10):
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol)
+                     SGS = computeDynSGSUpdate(sol, RHS)
+                     sol = computeUpdate(c1, sol, (RHS + SGS))
                      
               sol = SOLT[:,:,1] + 0.6 * sol + 0.1 * DT * RHS
               

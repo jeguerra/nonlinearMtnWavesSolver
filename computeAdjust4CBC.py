@@ -43,15 +43,15 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        tbdex = np.add(ubdex, iT * OPS)
        ttdex = np.add(utdex, iT * OPS)
        
-       # Index all boundary DOF
-       vDex = np.concatenate((uldex,urdex,ubdex,utdex))
+       # Index all boundary DOF that can be diffused on
+       vDex = np.concatenate((uldex,ubdex,utdex))
        extDex = (vDex, vDex, vDex, vDex)
        
        # BC indices for static solution (per variable)
        rowsOutU = set(uldex)
        rowsOutW = set(np.concatenate((uldex,utdex)))
        rowsOutP = set(uldex)
-       rowsOutT = set(uldex)
+       rowsOutT = set(np.concatenate((uldex,utdex)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
@@ -60,6 +60,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        
        # BC indices for transient solution (per variable)
        rowsOutW_trans = set(np.concatenate((ubdex,uldex,utdex)))
+       rowsOutT_trans = set(uldex)
        
        left = np.concatenate((uldex, wldex, pldex, tldex))
        top = np.concatenate((wtdex, ttdex))
@@ -68,7 +69,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        
        # W is treated as an essential BC at terrain in solution by direct substitution
        rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
-                              sorted(rowsOutP), sorted(rowsOutT))
+                              sorted(rowsOutP), sorted(rowsOutT_trans))
        #rowsOutBC_transient = set(np.concatenate((left, wbdex, top)))
        
        # All DOF

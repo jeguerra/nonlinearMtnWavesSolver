@@ -276,8 +276,8 @@ if __name__ == '__main__':
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
        # Set the ends of the operator to the spectral derivative
-       xDex = [0, 1, 2, NZ-2, NX-1, NX]
-       zDex = [0, 1, 2, NZ-3, NZ-2, NZ-1]
+       xDex = range(0, NX+1, 2) #[0, 1, 2, NZ-2, NX-1, NX]
+       zDex = range(0, NZ, 2) #[0, 1, 2, NZ-3, NZ-2, NZ-1]
        DDX_SP[xDex,:] = np.array(DDX_1D[xDex,:])
        DDZ_SP[zDex,:] = np.array(DDZ_1D[zDex,:])
        
@@ -706,13 +706,13 @@ if __name__ == '__main__':
               sgs = np.reshape(SGS, (OPS, numVar), order='F')
               
               for tt in range(len(TI)):
+                     thisTime = DT * tt
                      # Put previous solution into index 1 storage
                      sol[:,:,1] = np.array(sol[:,:,0])
                             
                      # Print out diagnostics every OTI steps
                      if tt % OTI == 0:
                             message = ''
-                            thisTime = DT * tt
                             err = displayResiduals(message, np.reshape(rhs, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
