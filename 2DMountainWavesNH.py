@@ -217,8 +217,8 @@ if __name__ == '__main__':
        
        # Background wind profil e
        uniformWind = False
-       linearShear = False
-       JETOPS = [10.0, 16.822, 1.386, 30.0]
+       linearShear = True
+       JETOPS = [10.0, 16.822, 1.386, 20.0]
        
        # Set the Rayleigh options
        depth = 6000.0
@@ -229,7 +229,7 @@ if __name__ == '__main__':
        mu *= 1.0
        
        # Set the terrain options
-       withWindow = True
+       withWindow = False
        KAISER = 1 # Kaiser window profile
        SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
        EXPCOS = 3 # Even exponential and squared cosines product
@@ -259,7 +259,6 @@ if __name__ == '__main__':
        ITI = 2000 # Stride for image output
        RTI = 1 # Stride for residual visc update
        
-       
        #%% SET UP THE GRID AND INITIAL STATE
        #% Define the computational and physical grids+
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
@@ -275,18 +274,12 @@ if __name__ == '__main__':
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
-       # Set the ends of the operator to the spectral derivative
-       xDex = range(0, NX+1, 2) #[0, 1, 2, NZ-2, NX-1, NX]
-       zDex = range(0, NZ, 2) #[0, 1, 2, NZ-3, NZ-2, NZ-1]
-       DDX_SP[xDex,:] = np.array(DDX_1D[xDex,:])
-       DDZ_SP[zDex,:] = np.array(DDZ_1D[zDex,:])
-       
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
        
        #% Read in topography profile or compute from analytical function
-       HofX, dHdX = computeTopographyOnGrid(REFS, MtnType, HOPT, withWindow)
+       HofX, dHdX = computeTopographyOnGrid(REFS, MtnType, HOPT, DDX_SP, withWindow)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = ZH - depth
