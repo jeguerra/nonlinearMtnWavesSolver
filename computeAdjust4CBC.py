@@ -59,8 +59,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
        # BC indices for transient solution (per variable)
-       rowsOutW_trans = set(np.concatenate((ubdex,uldex,utdex)))
-       rowsOutT_trans = set(uldex)
+       rowsOutW_trans = set(np.concatenate((ubdex,uldex,urdex,utdex)))
+       rowsOutT_trans = set(np.concatenate((uldex,urdex)))
        
        left = np.concatenate((uldex, wldex, pldex, tldex))
        right = np.concatenate((urdex, wrdex, prdex, trdex))
