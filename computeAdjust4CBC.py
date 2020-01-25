@@ -29,17 +29,17 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        utdex = np.array(range(NZ-1, OPS, NZ))
        
        wldex = np.add(uldex, iW * OPS)
-       #wrdex = np.add(urdex, iW * OPS)
+       wrdex = np.add(urdex, iW * OPS)
        wbdex = np.add(ubdex, iW * OPS)
        wtdex = np.add(utdex, iW * OPS)
        
        pldex = np.add(uldex, iP * OPS)
-       #prdex = np.add(urdex, iP * OPS)
+       prdex = np.add(urdex, iP * OPS)
        pbdex = np.add(ubdex, iP * OPS)
        #ptdex = np.add(utdex, iP * OPS)
        
        tldex = np.add(uldex, iT * OPS)
-       #trdex = np.add(urdex, iT * OPS)
+       trdex = np.add(urdex, iT * OPS)
        tbdex = np.add(ubdex, iT * OPS)
        ttdex = np.add(utdex, iT * OPS)
        
@@ -48,10 +48,10 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        extDex = (vDex, vDex, vDex, vDex)
        
        # BC indices for static solution (per variable)
-       rowsOutU = set(uldex)
-       rowsOutW = set(np.concatenate((uldex,utdex)))
-       rowsOutP = set(uldex)
-       rowsOutT = set(np.concatenate((uldex,utdex)))
+       rowsOutU = set(np.concatenate((uldex,urdex)))
+       rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
+       rowsOutP = set(np.concatenate((uldex,urdex)))
+       rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
@@ -63,9 +63,10 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        rowsOutT_trans = set(uldex)
        
        left = np.concatenate((uldex, wldex, pldex, tldex))
+       right = np.concatenate((urdex, wrdex, prdex, trdex))
        top = np.concatenate((wtdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
-       rowsOutBC_static = set(np.concatenate((left, top)))
+       rowsOutBC_static = set(np.concatenate((left, right, top)))
        
        # W is treated as an essential BC at terrain in solution by direct substitution
        rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
