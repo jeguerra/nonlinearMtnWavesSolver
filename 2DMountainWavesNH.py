@@ -264,8 +264,8 @@ if __name__ == '__main__':
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 2.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 2.0 * np.max(np.abs(np.diff(REFS[1])))
+       DX = L2 #4.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 0.5 * ZH #4.0 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -718,6 +718,13 @@ if __name__ == '__main__':
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
                                    cbar = plt.colorbar(ccheck, format='%.3e')
                             plt.show()
+                            # Check the fields
+                            for pp in range(numVar):
+                                   plt.subplot(2,2,pp+1)
+                                   dqdt = np.reshape(sol[:,pp,0], (NZ, NX+1), order='F')
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
+                                   cbar = plt.colorbar(ccheck, format='%.3e')
+                            plt.show()
                      
                      # Ramp up the background wind to decrease transients
                      if not isRestart:
@@ -740,9 +747,9 @@ if __name__ == '__main__':
                             sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
                                           
               # Reshape back to a column vector after time loop
-              SOLT[:,0] = np.reshape(sol, (OPS*numVar, 1), order='F')
-              RHS = np.reshape(rhs, (OPS*numVar, 1), order='F')
-              SGS = np.reshape(sgs, (OPS*numVar, 1), order='F')
+              SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
+              RHS = np.reshape(rhs, (OPS*numVar, ), order='F')
+              SGS = np.reshape(sgs, (OPS*numVar, ), order='F')
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])
