@@ -420,7 +420,7 @@ if __name__ == '__main__':
               SOLT = np.zeros((physDOF, 2))
               
               # Initialize Lagrange Multiplier storage
-              LMS = np.zeros(NX-1)
+              LMS = np.zeros(NX+1)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
@@ -466,18 +466,18 @@ if __name__ == '__main__':
               del(U); del(fields); del(rhs)
               
               # Compute forcing vector adding boundary forcing to the end
-              LMRHS = -dWBC[1:NX]
+              LMRHS = -dWBC
               bN = np.concatenate((RHS, LMRHS))
               
               # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
-              C1 = -1.0 * sps.diags(dHdX[1:NX], offsets=0, format='csr')
-              C2 = +1.0 * sps.eye(NX-1, format='csr')
+              C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
+              C2 = +1.0 * sps.eye(NX+1, format='csr')
               
-              colShape = (OPS,NX-1)
+              colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
-              LD[ubdex[1:NX],:] = C1
+              LD[ubdex,:] = C1
               LH = sps.lil_matrix(colShape)
-              LH[ubdex[1:NX],:] = C2
+              LH[ubdex,:] = C2
               LM = sps.lil_matrix(colShape)
               LQ = sps.lil_matrix(colShape)
               
@@ -492,7 +492,7 @@ if __name__ == '__main__':
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((NX-1,NX-1))
+              LDIA = sps.lil_matrix((NX+1,NX+1))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -654,8 +654,8 @@ if __name__ == '__main__':
                      
               #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
-              LMS += dsol[0:NX-1]
-              dsolQ = dsol[NX-1:]
+              LMS += dsol[0:NX+1]
+              dsolQ = dsol[NX+1:]
               
               alpha = 1.0
               SOLT[sysDex,0] += alpha * dsolQ

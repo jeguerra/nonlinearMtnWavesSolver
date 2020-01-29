@@ -23,8 +23,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
-       uldex = np.array(range(0, NZ)) # include the corner node
-       urdex = np.array(range(OPS-NZ, OPS))
+       uldex = np.array(range(1, NZ)) # include the corner node
+       urdex = np.array(range(OPS-NZ+1, OPS))
        ubdex = np.array(range(0, (OPS - NZ + 1), NZ))
        utdex = np.array(range(NZ-1, OPS, NZ))
        
