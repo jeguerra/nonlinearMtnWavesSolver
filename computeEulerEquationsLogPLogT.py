@@ -173,8 +173,8 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        #DZDX = REFS[15]
               
        #%% Compute the various blocks needed
-       UM = sps.diags(UZ[:,0], offsets=0, format='csr')
-       PORZM = sps.diags(PORZ[:,0], offsets=0, format='csr')
+       UM = sps.diags(UZ, offsets=0, format='csr')
+       PORZM = sps.diags(PORZ, offsets=0, format='csr')
        #DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
