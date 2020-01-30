@@ -33,7 +33,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False}
                             
-                     self.setData(167, 90, 6.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setData(167, 90, 60.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
@@ -43,7 +43,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False}
                             
-                     self.setData(167, 90, 6.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setData(167, 90, 60.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -70,10 +70,10 @@ class TestCase:
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
-                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': False, \
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False}
                             
-                     self.setData(183, 96, 8.0, 31.0, 300.0, 6000.0, 12000.0, 1000.0, 0.01, 1, 1.2E+4)
+                     self.setData(167, 90, 60.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -91,7 +91,7 @@ class TestCase:
               self.PHYS = (gc, P0, cp, Rd, Kp, cv, gam, NBVF)
               
               # Set grid dimensions and order
-              L2 = 1.0E+4 * XF # In 10s of km
+              L2 = 1.0E+3 * XF # In 10s of km
               L1 = -L2
               ZH = 1.0E+3 * ZF # In km
               OPS = (NX + 1) * NZ
