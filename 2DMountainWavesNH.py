@@ -56,7 +56,7 @@ localDir = '/media/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
-def displayResiduals(message, RHS, thisTime, udex, wded, pdex, tdex):
+def displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex):
        err = np.linalg.norm(RHS)
        err1 = np.linalg.norm(RHS[udex])
        err2 = np.linalg.norm(RHS[wdex])
@@ -69,7 +69,7 @@ def displayResiduals(message, RHS, thisTime, udex, wded, pdex, tdex):
        
        return err
 
-def getFromRestart(name, ET, NX, NZ, StaticSolve):
+def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
        rdb = shelve.open(restart_file, flag='r')
        
        NX_in = rdb['NX']
@@ -84,12 +84,12 @@ def getFromRestart(name, ET, NX, NZ, StaticSolve):
        LMS = rdb['LMS']
        RHS = rdb['RHS']
        IT = rdb['ET']
-       if ET <= IT and not StaticSolve:
+       if TOPT[4] <= IT and not StaticSolve:
               print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
               sys.exit(2)
               
        # Initialize the restart time array
-       TI = np.array(np.arange(IT + DT, ET, DT))
+       TI = np.array(np.arange(IT + TOPT[0], TOPT[4], TOPT[0]))
        rdb.close()
        
        return SOLT, LMS, RHS, NX_in, NZ_in, TI
@@ -146,126 +146,72 @@ def computeSchurBlock(dbName, blockName):
        bdb.close()
 
        return SB.toarray()
+
+def runModel(TestName):
+       import TestCase
        
-if __name__ == '__main__':
-       # Set the solution type (MUTUALLY EXCLUSIVE)
-       StaticSolve = False
+       thisTest = TestCase.TestCase(TestName)
+       
+       # Deprecated...
        LinearSolve = False
-       NonLinSolve = True
-       
-       # Set the grid type (NOT IMPLEMENTED)
-       HermCheb = True
        UniformDelta = False
-       
-       # Set 4th order compact finite difference derivatives switch
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
        
+       # Set the solution type (MUTUALLY EXCLUSIVE)
+       StaticSolve = thisTest.solType['StaticSolve']
+       NonLinSolve = thisTest.solType['NLTranSolve']
+       NewtonLin = thisTest.solType['NewtonLin']
+       ExactBC = thisTest.solType['ExactBC']
+       
+       # Set the grid type (NOT IMPLEMENTED)
+       HermCheb = thisTest.solType['HermChebGrid']      
+       
        # Set residual diffusion switch
-       ResDiff = True
+       ResDiff = thisTest.solType['DynSGS']
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
-       SolveFull = False
-       SolveSchur = True
+       SolveFull = thisTest.solType['SolveFull']
+       SolveSchur = thisTest.solType['SolveSchur']
        
        # Set Newton solve initial and restarting parameters
-       toRestart = True # Saves resulting state to restart database
-       isRestart = False # Initializes from a restart database
+       toRestart = thisTest.solType['ToRestart'] # Saves resulting state to restart database
+       isRestart = thisTest.solType['IsRestart'] # Initializes from a restart database
        
-       # Set physical constants (dry air)
-       gc = 9.80601
-       P0 = 1.0E5
-       cp = 1004.5
-       Rd = 287.06
-       Kp = Rd / cp
-       cv = cp - Rd
-       gam = cp / cv
-       NBVP = 0.01
-       PHYS = [gc, P0, cp, Rd, Kp, cv, gam, NBVP]
+       # Various background options
+       smooth3Layer = thisTest.solType['Smooth3Layer']
+       uniformStrat = thisTest.solType['UnifStrat']
+       uniformWind = thisTest.solType['UnifWind']
+       linearShear = thisTest.solType['LinShear']
        
-       # Set grid dimensions and order
-       L2 = 1.0E4 * 2.5 * mt.pi
-       L1 = -L2
-       ZH = 26000.0
-       NX = 167 # FIX: THIS HAS TO BE AN ODD NUMBER!
-       NZ = 92
-       OPS = (NX + 1) * NZ
-       numVar = 4
-       NQ = OPS * numVar
-       iU = 0
-       iW = 1
-       iP = 2
-       iT = 3
-       varDex = [iU, iW, iP, iT]
-       DIMS = [L1, L2, ZH, NX, NZ, OPS]
+       PHYS = thisTest.PHYS # Physical constants
+       varDex = thisTest.varDex # Indeces
+       DIMS = thisTest.DIMS # Grid dimensions
+       JETOPS = thisTest.JETOPS # Shear jet options
+       RLOPT = thisTest.RLOPT # Sponge layer options
+       HOPT = thisTest.HOPT # Terrain profile options
+       TOPT = thisTest.TOPT # Time integration options
+       
        # Make the equation index vectors for all DOF
+       numVar = 4
+       NX = DIMS[3]
+       NZ = DIMS[4]
+       OPS = DIMS[5]
        udex = np.array(range(OPS))
        wdex = np.add(udex, OPS)
        pdex = np.add(wdex, OPS)
        tdex = np.add(pdex, OPS)
        
-       # Background temperature profile
-       smooth3Layer = True
-       uniformStrat = False
-       Z_in = [0.0, 1.1E4, 1.6E4, ZH]
-       GAMS = 0.001 # Lapse rate in the stratosphere
-       GAMT = 0.0065 # Lapse rate in the troposphere
-       T0 = 300
-       TTP = T0 - GAMT * (Z_in[1] - Z_in[0])
-       TH = TTP + GAMS * (Z_in[3] - Z_in[2])
-       T_in = [T0, TTP, TTP, TH]
-       
-       # Background wind profil e
-       uniformWind = False
-       linearShear = True
-       JETOPS = [10.0, 16.822, 1.386, 20.0]
-       
-       # Set the Rayleigh options
-       depth = 6000.0
-       width = 12000.0
-       applyTop = True
-       applyLateral = True
-       mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-       mu *= 1.0
-       
-       # Set the terrain options
-       withWindow = False
-       KAISER = 1 # Kaiser window profile
-       SCHAR = 2 # Schar mountain profile nominal (Schar, 2001)
-       EXPCOS = 3 # Even exponential and squared cosines product
-       EXPPOL = 4 # Even exponential and even polynomial product
-       INFILE = 5 # Data from a file (equally spaced points)
-       MtnType = SCHAR
-       h0 = 250.0
-       aC = 5000.0
-       lC = 4000.0
-       
-       if MtnType == KAISER:
-              # When using this profile as the terrain
-              kC = 7500.0
-       else:
-              # When applying windowing to a different profile
-              kC = L2 - width
-              
-       HOPT = [h0, aC, lC, kC]
-       
-       #% Transient solve parameters
-       DT = 0.05
-       HR = 5.0
-       rampTime = 900  # 10 minutes to ramp up U_bar
-       intMethodOrder = 3 # 3rd or 4th order time integrator
-       ET = HR * 60 * 60 # End time in seconds
-       OTI = 400 # Stride for diagnostic output
-       ITI = 2000 # Stride for image output
-       RTI = 1 # Stride for residual visc update
+       Z_in = thisTest.Z_in
+       T_in = thisTest.T_in
        
        #%% SET UP THE GRID AND INITIAL STATE
        #% Define the computational and physical grids+
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = L2 #4.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 0.5 * ZH #4.0 * np.max(np.abs(np.diff(REFS[1])))
+       DX = 0.5 * DIMS[1] #/ (0.25 * NX) #4.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 0.25 * DIMS[2] #/ (0.25 * NZ) #4.0 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -279,10 +225,10 @@ if __name__ == '__main__':
        REFS.append(DDZ_1D)
        
        #% Read in topography profile or compute from analytical function
-       HofX, dHdX = computeTopographyOnGrid(REFS, MtnType, HOPT, DDX_SP, withWindow)
+       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_SP)
        
        # Make the 2D physical domains from reference grids and topography
-       zRay = ZH - depth
+       zRay = DIMS[2] - RLOPT[0]
        # USE THE GUELLRICH TERRAIN DECAY
        #XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # USE UNIFORM STRETCHING
@@ -301,7 +247,7 @@ if __name__ == '__main__':
        
        #% Read in sensible or potential temperature soundings (corner points)
        SENSIBLE = 1
-       POTENTIAL = 2
+       #POTENTIAL = 2
        # Map the sounding to the computational vertical 2D grid [0 H]
        TZ, DTDZ = computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
        
@@ -310,17 +256,17 @@ if __name__ == '__main__':
               computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE, uniformStrat)
        
        # Read in or compute background horizontal wind profile
-       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPdz, uniformWind, linearShear)
+       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, PHYS[1], PZ, dlnPdz, uniformWind, linearShear)
        
        #% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(dUdz, axis=1)
        DUDZ = np.tile(dUdz, NX+1)
        DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
        # Compute thermodynamic gradients (no interpolation!)
-       PORZ = Rd * TZ
-       DLPDZ = -gc / Rd * np.reciprocal(TZ)
+       PORZ = PHYS[3] * TZ
+       DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
        DLTDZ = np.reciprocal(TZ) * DTDZ
-       DLPTDZ = DLTDZ - Kp * DLPDZ
+       DLPTDZ = DLTDZ - PHYS[4] * DLPDZ
        
        # Compute the background (initial) fields
        U = np.expand_dims(U, axis=1)
@@ -355,7 +301,7 @@ if __name__ == '__main__':
        del(DLPTDZ)
        
        #%% Rayleigh opearator and GML weight
-       ROPS, GML = computeRayleighEquations(DIMS, REFS, mu, ZRL, width, applyTop, applyLateral, ubdex, utdex)
+       ROPS, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
        REFG.append(ROPS)
        GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
        del(GML)
@@ -396,7 +342,7 @@ if __name__ == '__main__':
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
-       totalDOF = physDOF + NX
+       #totalDOF = physDOF + NX
        
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
@@ -411,7 +357,7 @@ if __name__ == '__main__':
        
        if isRestart:
               print('Restarting from previous solution...')
-              SOLT, LMS, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, ET, NX, NZ, StaticSolve)
+              SOLT, LMS, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, TOPT[4], NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
               dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])
@@ -426,7 +372,7 @@ if __name__ == '__main__':
               dWBC = -dHdX * INIT[ubdex]
        
               # Initialize time array
-              TI = np.array(np.arange(DT, ET, DT))
+              TI = np.array(np.arange(TOPT[0], TOPT[4], TOPT[0]))
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
@@ -435,10 +381,13 @@ if __name__ == '__main__':
        #% Compute the global LHS operator and RHS
        if (StaticSolve or LinearSolve):
               
-              # SET THE BOOLEAN ARGUMENT TO isRestart WHEN USING DISCONTINUOUS BOUNDARY DATA
-              DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                            np.array(fields), U, ubdex, utdex)
-              #DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG)
+              if NewtonLin:
+                     # Full Newton linearization with TF terms
+                     DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
+                                   np.array(fields), U, ubdex, utdex)
+              else:
+                     # Classic linearization without TF terms
+                     DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -475,7 +424,8 @@ if __name__ == '__main__':
               
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
-              LD[ubdex,:] = C1
+              if ExactBC:
+                     LD[ubdex,:] = C1
               LH = sps.lil_matrix(colShape)
               LH[ubdex,:] = C2
               LM = sps.lil_matrix(colShape)
@@ -699,37 +649,39 @@ if __name__ == '__main__':
               sgs = np.reshape(SGS, (OPS, numVar), order='F')
               
               for tt in range(len(TI)):
-                     thisTime = DT * tt
+                     thisTime = TOPT[0] * tt
                      # Put previous solution into index 1 storage
                      sol[:,:,1] = np.array(sol[:,:,0])
                             
-                     # Print out diagnostics every OTI steps
-                     if tt % OTI == 0:
+                     # Print out diagnostics every TOPT[5] steps
+                     if tt % TOPT[5] == 0:
                             message = ''
                             err = displayResiduals(message, np.reshape(rhs, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
-                     if tt % ITI == 0:
+                     if tt % TOPT[6] == 0:
                             fig = plt.figure(figsize=(10.0, 6.0))
                             # Check the tendencies
+                            '''
                             for pp in range(numVar):
                                    plt.subplot(2,2,pp+1)
                                    dqdt = np.reshape(rhs[:,pp], (NZ, NX+1), order='F')
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
-                                   cbar = plt.colorbar(ccheck, format='%.3e')
+                                   plt.colorbar(ccheck, format='%.3e')
                             plt.show()
+                            '''
                             # Check the fields
                             for pp in range(numVar):
                                    plt.subplot(2,2,pp+1)
                                    dqdt = np.reshape(sol[:,pp,0], (NZ, NX+1), order='F')
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
-                                   cbar = plt.colorbar(ccheck, format='%.3e')
+                                   plt.colorbar(ccheck, format='%.3e')
                             plt.show()
                      
                      # Ramp up the background wind to decrease transients
                      if not isRestart:
-                            if thisTime <= rampTime:
-                                   uRamp = 0.5 * (1.0 - mt.cos(mt.pi / rampTime * thisTime))
+                            if thisTime <= TOPT[2]:
+                                   uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
                                    UT = uRamp * INIT[udex]
                             else:
                                    UT = INIT[udex]
@@ -742,9 +694,9 @@ if __name__ == '__main__':
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, rhs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, TOPT[0], rhs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, intMethodOrder)
+                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
                                           
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
@@ -768,7 +720,7 @@ if __name__ == '__main__':
               rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ
-              rdb['ET'] = ET
+              rdb['ET'] = TOPT[4]
               rdb['REFS'] = REFS
               rdb['PHYS'] = PHYS
               rdb['DIMS'] = DIMS
@@ -781,8 +733,14 @@ if __name__ == '__main__':
        nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, np.array(SOLT[:,1]), NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
        nativeDF, interpDF = computeInterpolatedFields(DIMS, ZTL, DSOL, NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
        
-       uxz = nativeLN[0]; wxz = nativeLN[1]; pxz = nativeLN[2]; txz = nativeLN[3]
-       uxzint = interpLN[0]; wxzint = interpLN[1]; pxzint = interpLN[2]; txzint = interpLN[3]
+       uxz = nativeLN[0]; 
+       wxz = nativeLN[1]; 
+       pxz = nativeLN[2]; 
+       txz = nativeLN[3]
+       uxzint = interpLN[0]; 
+       wxzint = interpLN[1]; 
+       pxzint = interpLN[2]; 
+       txzint = interpLN[3]
        
        #% Make the new grid XLI, ZTLI
        import HerfunChebNodesWeights as hcnw
@@ -791,7 +749,7 @@ if __name__ == '__main__':
        xmin = np.amin(xnew)
        # Make new reference domain grid vectors
        xnew = np.linspace(xmin, xmax, num=NXI, endpoint=True)
-       znew = np.linspace(0.0, ZH, num=NZI, endpoint=True)
+       znew = np.linspace(0.0, DIMS[2], num=NZI, endpoint=True)
        
        # Interpolate the terrain profile
        hcf = HF_TRANS.dot(ZTL[0,:])
@@ -801,9 +759,9 @@ if __name__ == '__main__':
        dhnewdx = (IHF_TRANS).dot(dhcf)
        
        # Scale znew to physical domain and make the new grid
-       xnew *= L2 / xmax
+       xnew *= DIMS[1] / xmax
        # Compute the new Guellrich domain
-       NDIMS = [L1, L2, ZH, NXI-1, NZI]
+       NDIMS = [DIMS[0], DIMS[1], DIMS[2], NXI-1, NZI]
        NREFS = [xnew, znew]
        XLI, ZTLI, DZTI, sigmaI, ZRLI = computeGuellrichDomain2D(NDIMS, NREFS, zRay, hnew, dhnewdx)
        
@@ -815,17 +773,17 @@ if __name__ == '__main__':
               
               plt.subplot(2,2,1)
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-              cbar = fig.colorbar(ccheck)
+              fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 1.0E-3*ZH)
+              plt.ylim(0.0, 1.0E-3*DIMS[2])
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.title('Change U - (m/s/s)')
               
               plt.subplot(2,2,3)
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-              cbar = fig.colorbar(ccheck)
+              fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 1.0E-3*ZH)
+              plt.ylim(0.0, 1.0E-3*DIMS[2])
               plt.title('Change W - (m/s/s)')
               
               flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
@@ -848,7 +806,7 @@ if __name__ == '__main__':
        for pp in range(4):
               plt.subplot(2,2,pp+1)
               ccheck = plt.contourf(XLI, ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-              cbar = fig.colorbar(ccheck)
+              fig.colorbar(ccheck)
               plt.tight_layout()
        plt.show()
        
@@ -865,7 +823,7 @@ if __name__ == '__main__':
                      qdex = tdex
               dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
               ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
-              cbar = plt.colorbar(ccheck, format='%.3e')
+              plt.colorbar(ccheck, format='%.3e')
               plt.tight_layout()
        plt.show()
 
@@ -901,3 +859,12 @@ if __name__ == '__main__':
        plt.plot(XLI[0,:], (interpLN[1])[0:2,:].T, XL[0,:], (nativeLN[1])[0:2,:].T)
        plt.xlim(-15000.0, 15000.0)
        '''
+       
+if __name__ == '__main__':
+       
+       #TestName = 'ClassicalSchar01'
+       #TestName = 'ClassicalScharIter'
+       #TestName = 'SmoothStratSchar010mIter'
+       #TestName = 'DiscreteStratSchar010mIter'
+       TestName = 'CustomTest'
+       runModel(TestName)

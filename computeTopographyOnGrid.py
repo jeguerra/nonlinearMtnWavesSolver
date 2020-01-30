@@ -11,11 +11,13 @@ import math as mt
 from scipy import signal
 #import matplotlib.pyplot as plt
 
-def computeTopographyOnGrid(REFS, profile, opt, DDX, withWindow):
+def computeTopographyOnGrid(REFS, opt, DDX):
        h0 = opt[0]
        aC = opt[1]
        lC = opt[2]
        kC = opt[3]
+       withWindow = opt[4]
+       profile = opt[5]
        
        # Get data from REFS
        xh = REFS[0]

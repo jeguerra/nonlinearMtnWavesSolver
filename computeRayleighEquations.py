@@ -114,7 +114,13 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             
        return GML, RL, SBR
 
-def computeRayleighEquations(DIMS, REFS, mu, depth, width, applyTop, applyLateral, topdex, botdex):
+def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
+       # Get options data
+       width = RLOPT[1]
+       applyTop = RLOPT[2]
+       applyLateral = RLOPT[3]
+       mu = RLOPT[4]
+       
        # Get DIMS data
        NX = DIMS[3] + 1
        NZ = DIMS[4]
