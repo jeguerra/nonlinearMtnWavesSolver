@@ -50,9 +50,9 @@ from computeTimeIntegration import computeTimeIntegrationNL
 import faulthandler; faulthandler.enable()
 
 # Disk settings
-localDir = '/media/jeguerra/scratch/'
+#localDir = '/media/jeguerra/scratch/'
 #localDir = '/Users/TempestGuerra/scratch/'
-#localDir = '/scratch/'
+localDir = '/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
@@ -777,14 +777,14 @@ def runModel(TestName):
               plt.xlim(-30.0, 50.0)
               plt.ylim(0.0, 1.0E-3*DIMS[2])
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-              plt.title('Change U - (m/s/s)')
+              plt.title('Change U - (m/s)')
               
               plt.subplot(2,2,3)
               ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               fig.colorbar(ccheck)
               plt.xlim(-30.0, 50.0)
               plt.ylim(0.0, 1.0E-3*DIMS[2])
-              plt.title('Change W - (m/s/s)')
+              plt.title('Change W - (m/s)')
               
               flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
               slopeAngle = np.arctan(dHdX)
@@ -800,6 +800,7 @@ def runModel(TestName):
               
               plt.tight_layout()
               plt.show()
+              plt.savefig('IterDelta_BoundaryCondition')
               
        fig = plt.figure(figsize=(12.0, 6.0))
        # 2 X 2 subplot with all fields at the final time
@@ -808,7 +809,16 @@ def runModel(TestName):
               ccheck = plt.contourf(XLI, ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
               fig.colorbar(ccheck)
               plt.tight_layout()
+              if pp == 0:
+                     plt.title('U (m/s)')
+              elif pp == 1:
+                     plt.title('W (m/s)')
+              elif pp == 2:
+                     plt.title('log-P (Pa)')
+              elif pp == 3:
+                     plt.title('log-Theta (K)')
        plt.show()
+       plt.savefig('SolutionFields')
        
        fig = plt.figure(figsize=(12.0, 6.0))
        for pp in range(4):
@@ -864,7 +874,7 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       #TestName = 'SmoothStratSchar010mIter'
-       #TestName = 'DiscreteStratSchar010mIter'
-       TestName = 'CustomTest'
+       TestName = 'SmoothStratScharIter'
+       #TestName = 'DiscreteStratScharIter'
+       #TestName = 'CustomTest'
        runModel(TestName)

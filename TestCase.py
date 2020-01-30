@@ -45,25 +45,25 @@ class TestCase:
                             
                      self.setData(167, 90, 6.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
                      
-              elif TestName == 'SmoothStratSchar010mIter':
+              elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': False,\
-                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': False, \
-                                'UnifWind': True, 'LinShear': False}
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
+                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
+                                'UnifWind': False, 'LinShear': False}
                             
-                     self.setData(183, 96, 10.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setData(167, 96, 8.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
                      
-              elif TestName == 'DiscreteStratSchar010mIter':
+              elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
-                                'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': False, \
-                                'UnifWind': True, 'LinShear': False}
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
+                                'UnifWind': False, 'LinShear': False}
                             
-                     self.setData(183, 96, 10.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setData(167, 96, 8.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
