@@ -177,6 +177,7 @@ def runModel(TestName):
        # Set Newton solve initial and restarting parameters
        toRestart = thisTest.solType['ToRestart'] # Saves resulting state to restart database
        isRestart = thisTest.solType['IsRestart'] # Initializes from a restart database
+       makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -766,76 +767,77 @@ def runModel(TestName):
        XLI, ZTLI, DZTI, sigmaI, ZRLI = computeGuellrichDomain2D(NDIMS, NREFS, zRay, hnew, dhnewdx)
        
        #%% Make some plots for static or transient solutions
-       
-       if StaticSolve:
+       if makePlots:
+              if StaticSolve:
+                     fig = plt.figure(figsize=(12.0, 6.0))
+                     # 1 X 3 subplot of W for linear, nonlinear, and difference
+                     
+                     plt.subplot(2,2,1)
+                     ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+                     fig.colorbar(ccheck)
+                     plt.xlim(-30.0, 50.0)
+                     plt.ylim(0.0, 1.0E-3*DIMS[2])
+                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+                     plt.title('Change U - (m/s)')
+                     
+                     plt.subplot(2,2,3)
+                     ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+                     fig.colorbar(ccheck)
+                     plt.xlim(-30.0, 50.0)
+                     plt.ylim(0.0, 1.0E-3*DIMS[2])
+                     plt.title('Change W - (m/s)')
+                     
+                     flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
+                     slopeAngle = np.arctan(dHdX)
+                     
+                     plt.subplot(2,2,2)
+                     plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
+                     plt.xlim(-20.0, 20.0)
+                     plt.title('Flow vector angle and terrain angle')
+                     
+                     plt.subplot(2,2,4)
+                     plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
+                     plt.title('Boundary Constraint |Delta| - (m/s)')
+                     
+                     plt.tight_layout()
+                     plt.savefig('IterDelta_BoundaryCondition.png')
+                     plt.show()
+                     
               fig = plt.figure(figsize=(12.0, 6.0))
-              # 1 X 3 subplot of W for linear, nonlinear, and difference
-              
-              plt.subplot(2,2,1)
-              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-              fig.colorbar(ccheck)
-              plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 1.0E-3*DIMS[2])
-              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-              plt.title('Change U - (m/s)')
-              
-              plt.subplot(2,2,3)
-              ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-              fig.colorbar(ccheck)
-              plt.xlim(-30.0, 50.0)
-              plt.ylim(0.0, 1.0E-3*DIMS[2])
-              plt.title('Change W - (m/s)')
-              
-              flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
-              slopeAngle = np.arctan(dHdX)
-              
-              plt.subplot(2,2,2)
-              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
-              plt.xlim(-20.0, 20.0)
-              plt.title('Flow vector angle and terrain angle')
-              
-              plt.subplot(2,2,4)
-              plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
-              plt.title('Boundary Constraint |Delta| - (m/s)')
+              # 2 X 2 subplot with all fields at the final time
+              for pp in range(4):
+                     plt.subplot(2,2,pp+1)
+                     ccheck = plt.contourf(XLI, ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+                     fig.colorbar(ccheck)
+                     if pp == 0:
+                            plt.title('U (m/s)')
+                     elif pp == 1:
+                            plt.title('W (m/s)')
+                     elif pp == 2:
+                            plt.title('log-P (Pa)')
+                     elif pp == 3:
+                            plt.title('log-Theta (K)')
               
               plt.tight_layout()
+              plt.savefig('SolutionFields.png')
               plt.show()
-              plt.savefig('IterDelta_BoundaryCondition')
               
-       fig = plt.figure(figsize=(12.0, 6.0))
-       # 2 X 2 subplot with all fields at the final time
-       for pp in range(4):
-              plt.subplot(2,2,pp+1)
-              ccheck = plt.contourf(XLI, ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-              fig.colorbar(ccheck)
-              plt.tight_layout()
-              if pp == 0:
-                     plt.title('U (m/s)')
-              elif pp == 1:
-                     plt.title('W (m/s)')
-              elif pp == 2:
-                     plt.title('log-P (Pa)')
-              elif pp == 3:
-                     plt.title('log-Theta (K)')
-       plt.show()
-       plt.savefig('SolutionFields')
-       
-       fig = plt.figure(figsize=(12.0, 6.0))
-       for pp in range(4):
-              plt.subplot(2,2,pp+1)
-              if pp == 0:
-                     qdex = udex
-              elif pp == 1:
-                     qdex = wdex
-              elif pp == 2:
-                     qdex = pdex
-              else:
-                     qdex = tdex
-              dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
-              plt.colorbar(ccheck, format='%.3e')
-              plt.tight_layout()
-       plt.show()
+              fig = plt.figure(figsize=(12.0, 6.0))
+              for pp in range(4):
+                     plt.subplot(2,2,pp+1)
+                     if pp == 0:
+                            qdex = udex
+                     elif pp == 1:
+                            qdex = wdex
+                     elif pp == 2:
+                            qdex = pdex
+                     else:
+                            qdex = tdex
+                     dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
+                     ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
+                     plt.colorbar(ccheck, format='%.3e')
+                     plt.tight_layout()
+              plt.show()
 
        #%% Check the boundary conditions
        '''
