@@ -358,7 +358,7 @@ def runModel(TestName):
        
        if isRestart:
               print('Restarting from previous solution...')
-              SOLT, LMS, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, TOPT[4], NX, NZ, StaticSolve)
+              SOLT, LMS, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
               dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])

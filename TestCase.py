@@ -73,7 +73,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': False}
                             
-                     self.setData(167, 90, 60.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setData(167, 90, 80.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
