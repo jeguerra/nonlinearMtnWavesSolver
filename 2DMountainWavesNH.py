@@ -879,4 +879,7 @@ if __name__ == '__main__':
        TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
        #TestName = 'CustomTest'
-       runModel(TestName)
+       
+       # Run the model in a loop if needed...
+       for ii in range(11):
+              runModel(TestName)
