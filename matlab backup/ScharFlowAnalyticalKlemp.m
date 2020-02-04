@@ -1,4 +1,4 @@
-function [X,Z,w] = ScharFlowAnalyticalKlemp();
+function [X,Z,w] = ScharFlowAnalyticalKlemp()
 
 %% Common physical constants
 p0 = 1.0E5;
