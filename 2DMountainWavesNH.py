@@ -231,9 +231,9 @@ def runModel(TestName):
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
        # USE THE GUELLRICH TERRAIN DECAY
-       #XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # USE UNIFORM STRETCHING
-       XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       #XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -807,16 +807,20 @@ def runModel(TestName):
               # 2 X 2 subplot with all fields at the final time
               for pp in range(4):
                      plt.subplot(2,2,pp+1)
-                     ccheck = plt.contourf(XLI, ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+                     ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
                      fig.colorbar(ccheck)
                      if pp == 0:
                             plt.title('U (m/s)')
+                            plt.xlabel('Height (km)')
                      elif pp == 1:
                             plt.title('W (m/s)')
+                            plt.xlabel('Height (km)')
                      elif pp == 2:
                             plt.title('log-P (Pa)')
+                            plt.xlabel('Distance (km)')
                      elif pp == 3:
                             plt.title('log-Theta (K)')
+                            plt.xlabel('Distance (km)')
               
               plt.tight_layout()
               plt.savefig('SolutionFields.png')
