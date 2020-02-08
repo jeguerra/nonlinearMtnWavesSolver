@@ -52,7 +52,7 @@ import faulthandler; faulthandler.enable()
 # Disk settings
 #localDir = '/media/jeguerra/scratch/'
 #localDir = '/Users/TempestGuerra/scratch/'
-localDir = '/scratch/'
+localDir = '/scratch/jorge/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
@@ -800,30 +800,37 @@ def runModel(TestName):
                      plt.title('Boundary Constraint |Delta| - (m/s)')
                      
                      plt.tight_layout()
-                     plt.savefig('IterDelta_BoundaryCondition.png')
+                     #plt.savefig('IterDelta_BoundaryCondition.png')
                      plt.show()
                      
               fig = plt.figure(figsize=(12.0, 6.0))
               # 2 X 2 subplot with all fields at the final time
               for pp in range(4):
                      plt.subplot(2,2,pp+1)
-                     ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-                     fig.colorbar(ccheck)
+                     
                      if pp == 0:
+                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-0.25, vmax=0.25)
                             plt.title('U (m/s)')
-                            plt.xlabel('Height (km)')
+                            plt.ylabel('Height (km)')
                      elif pp == 1:
+                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-0.08, vmax=0.08)
                             plt.title('W (m/s)')
-                            plt.xlabel('Height (km)')
                      elif pp == 2:
+                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-4.5E-5, vmax=4.5E-5)
                             plt.title('log-P (Pa)')
                             plt.xlabel('Distance (km)')
+                            plt.ylabel('Height (km)')
                      elif pp == 3:
+                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-6.0E-4, vmax=6.0E-4)
                             plt.title('log-Theta (K)')
                             plt.xlabel('Distance (km)')
+                            
+                     fig.colorbar(ccheck, format='%.3E')
+                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+                     plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               plt.tight_layout()
-              plt.savefig('SolutionFields.png')
+              #plt.savefig('SolutionFields.png')
               plt.show()
               
               fig = plt.figure(figsize=(12.0, 6.0))
@@ -839,7 +846,9 @@ def runModel(TestName):
                             qdex = tdex
                      dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
                      ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
-                     plt.colorbar(ccheck, format='%.3e')
+                     plt.colorbar(ccheck, format='%+.3E')
+                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+                     plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
                      plt.tight_layout()
               plt.show()
 
@@ -880,10 +889,10 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       TestName = 'SmoothStratScharIter'
+       #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       #TestName = 'CustomTest'
+       TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(11):
+       for ii in range(7):
               runModel(TestName)
