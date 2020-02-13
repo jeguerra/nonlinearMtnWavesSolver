@@ -11,6 +11,27 @@ import math as mt
 from HerfunChebNodesWeights import hefuncm, hefunclb
 from HerfunChebNodesWeights import chebpolym, cheblb
 
+def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex):
+       # D2A is the operator to adjust
+       # DOG is the original operator to adjust (unadjusted)
+       # DD is the 1st derivative operator
+       DOP = np.zeros(DD.shape)
+       # Get the column span size
+       NZ = DD.shape[1]
+       cdex = range(NZ)
+       cdex = np.delete(cdex, tdex)
+       
+       scale = - DD[tdex,tdex]       
+       # Loop over columns of the operator and adjust for BC some location tdex
+       for jj in cdex:
+              factor = DD[tdex,jj] / scale
+              v1 = (D2A[:,jj]).flatten()
+              v2 = (DOG[:,tdex]).flatten()
+              nvector = v1 + factor * v2
+              DOP[:,jj] = nvector
+       
+       return DOP
+
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):
        # Initialize the left and right derivative matrices

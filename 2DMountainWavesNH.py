@@ -221,6 +221,11 @@ def runModel(TestName):
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
+       # Adjust derivatives for Neumann condition in the static case
+       if StaticSolve:
+              DDZ_1D_NBC = derv.computeAdjustedOperatorNBC(DDZ_1D, DDZ_1D, DDZ_1D, NZ-1)
+              DDZ_SP_NBC = derv.computeAdjustedOperatorNBC(DDZ_SP, DDZ_SP, DDZ_SP, NZ-1)
+       
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
@@ -309,9 +314,11 @@ def runModel(TestName):
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       DDXM, DDZM_NBC = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D_NBC)
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       DDXM_SP, DDZM_SP_NBC = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP_NBC)
        
        # Store derivative operators with GML damping
        if SparseDerivativesDynamics:
@@ -330,12 +337,17 @@ def runModel(TestName):
        else:
               REFS.append(DDXM.tocsr())
               REFS.append(DDZM.tocsr())
+       
        # Store the terrain profile in 3 ways
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,), order='F')
        REFS.append(DZDX)
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        REFS.append(DZDXM)
+       
+       # Append the Neumann BC adjusted matrices
+       REFS.append(GMLOP.dot(DDZM_NBC).tocsr())
+       REFS.append(GMLOP.dot(DDZM_SP_NBC).tocsr())
        
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)

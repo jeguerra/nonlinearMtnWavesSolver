@@ -36,7 +36,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        pldex = np.add(uldex, iP * OPS)
        prdex = np.add(urdex, iP * OPS)
        pbdex = np.add(ubdex, iP * OPS)
-       #ptdex = np.add(utdex, iP * OPS)
+       ptdex = np.add(utdex, iP * OPS)
        
        tldex = np.add(uldex, iT * OPS)
        trdex = np.add(urdex, iT * OPS)
@@ -50,7 +50,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC indices for static solution (per variable)
        rowsOutU = set(np.concatenate((uldex,urdex,utdex)))
        rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
-       rowsOutP = set(np.concatenate((uldex,urdex)))
+       rowsOutP = set(np.concatenate((uldex,urdex,utdex)))
        rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
@@ -64,7 +64,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        
        left = np.concatenate((uldex, wldex, pldex, tldex))
        right = np.concatenate((urdex, wrdex, prdex, trdex))
-       top = np.concatenate((utdex, wtdex, ttdex))
+       top = np.concatenate((utdex, wtdex, ptdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
        rowsOutBC_static = set(np.concatenate((left, right, top)))
        
