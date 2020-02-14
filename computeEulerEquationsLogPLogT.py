@@ -41,7 +41,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DDXM = REFS[10]
        DDZM = REFS[11]
        DZDX = REFS[15]
-       DDZM_NBC = REFS[17]
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
@@ -86,13 +85,14 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        
        bf = np.exp(kap * fields[:,2] + fields[:,3])
        T_ratio = bf - 1.0
+       RdT = RdT_bar * bf
        
        # Compute T'
        T_prime = T_ratio * T_bar
        
        RdT_barM = sps.diags(RdT_bar, offsets=0, format='csr')
-       RdT_primeM = sps.diags(RdT_bar * T_ratio, offsets=0, format='csr')
-       RdTM = sps.diags(RdT_bar * bf, offsets=0, format='csr')
+       #RdT_primeM = sps.diags(RdT_bar * T_ratio, offsets=0, format='csr')
+       RdTM = sps.diags(RdT, offsets=0, format='csr')
        bfM = sps.diags(bf, offsets=0, format='csr')
        
        PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
@@ -109,20 +109,17 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + PuPxM
        LD12 = DuDzM + DUDZM
-       #LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
-       LD13 = RdTM.dot(DDXM - DZDXM.dot(DDZM_NBC)) + (Rd * PtPxM)
+       LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
        LD21 = PwPxM
        LD22 = UPXM + DwDzM
-       #LD23 = RdT_barM.dot(DDZM + DLTDZM) + RdT_primeM.dot(DDZM) + Rd * DtDzM
-       LD23 = RdT_barM.dot(DDZM_NBC + DLTDZM) + RdT_primeM.dot(DDZM_NBC) + Rd * DtDzM
+       LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bfM
        
        LD31 = gam * PPXM + PlpPxM
        LD32 = gam * DDZM + DlpDzM + DLPDZM
-       #LD33 = UPXM
-       LD33 = UM.dot(DDXM) + WXZM.dot(DDZM_NBC)
+       LD33 = UPXM
        LD34 = None
        
        LD41 = PltPxM

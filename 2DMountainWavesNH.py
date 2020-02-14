@@ -256,7 +256,25 @@ def runModel(TestName):
        #POTENTIAL = 2
        # Map the sounding to the computational vertical 2D grid [0 H]
        TZ, DTDZ = computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
-       
+       '''
+       # Make a figure of the temperature background
+       fig = plt.figure(figsize=(12.0, 6.0))
+       plt.subplot(1,2,1)
+       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
+       plt.title('Discrete Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.ylabel('Height (km)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(1,2,2)
+       plt.plot(TZ, 1.0E-3*REFS[1], 'ks-')
+       plt.title('Smooth Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.tight_layout()
+       plt.savefig('python results/Temperature_Background.png')
+       plt.show()
+       sys.exit(2)
+       '''
        # Compute background fields on the reference column
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
               computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE, uniformStrat)
@@ -314,11 +332,9 @@ def runModel(TestName):
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       DDXM, DDZM_NBC = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D_NBC)
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
-       DDXM_SP, DDZM_SP_NBC = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP_NBC)
        
        # Store derivative operators with GML damping
        if SparseDerivativesDynamics:
@@ -344,10 +360,6 @@ def runModel(TestName):
        REFS.append(DZDX)
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        REFS.append(DZDXM)
-       
-       # Append the Neumann BC adjusted matrices
-       REFS.append(GMLOP.dot(DDZM_NBC).tocsr())
-       REFS.append(GMLOP.dot(DDZM_SP_NBC).tocsr())
        
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
