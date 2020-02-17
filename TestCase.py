@@ -67,13 +67,13 @@ class TestCase:
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
-                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': True, 'LinShear': False, 'MakePlots': True}
+                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
+                                'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(167, 90, 75.0, 25.0, 280.0, 10000.0, 15000.0, 50.0, 0.01, 2, 1.2E+4)
+                     self.setData(183, 96, 82.0, 26.0, 280.0, 6000.0, 12000.0, 500.0, 0.01, 2, 1.2E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -135,7 +135,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05
-              HR = 2.0
+              HR = 5.0
               rampTime = 900  # 10 minutes to ramp up U_bar
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

@@ -211,8 +211,8 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 0.5 * DIMS[1] #/ (0.25 * NX) #4.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 0.25 * DIMS[2] #/ (0.25 * NZ) #4.0 * np.max(np.abs(np.diff(REFS[1])))
+       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -220,11 +220,6 @@ def runModel(TestName):
        
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-       
-       # Adjust derivatives for Neumann condition in the static case
-       if StaticSolve:
-              DDZ_1D_NBC = derv.computeAdjustedOperatorNBC(DDZ_1D, DDZ_1D, DDZ_1D, NZ-1)
-              DDZ_SP_NBC = derv.computeAdjustedOperatorNBC(DDZ_SP, DDZ_SP, DDZ_SP, NZ-1)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -918,5 +913,5 @@ if __name__ == '__main__':
        TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(7):
+       for ii in range(1):
               runModel(TestName)
