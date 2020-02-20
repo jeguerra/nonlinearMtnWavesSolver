@@ -73,7 +73,7 @@ class TestCase:
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(183, 96, 82.0, 26.0, 280.0, 6000.0, 12000.0, 500.0, 0.01, 2, 1.2E+4)
+                     self.setData(167, 90, 82.0, 26.0, 280.0, 6000.0, 12000.0, 500.0, 0.01, 2, 1.2E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -135,7 +135,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05
-              HR = 5.0
+              HR = 0.1
               rampTime = 900  # 10 minutes to ramp up U_bar
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

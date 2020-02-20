@@ -6,6 +6,7 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
+import bottleneck as bn
 import computeEulerEquationsLogPLogT as tendency
 from computeResidualViscCoeffs import computeResidualViscCoeffs
 
@@ -63,13 +64,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
        
        # Get normalization for DynSGS coefficients
        if DynSGS:
-              QM = np.amax(SOLT[:,:,0], axis=0)
+              #QM = np.amax(SOLT[:,:,0], axis=0)
+              QM = bn.nanmax(SOLT[:,:,0], axis=0)
+              RESCF = computeResidualViscCoeffs(SGS, QM, DX, DZ)
        else:
               QM = 0.0
               
-       def computeDynSGSUpdate(fields, rhs):
+       def computeDynSGSUpdate(fields):
               if DynSGS:
-                     RESCF = computeResidualViscCoeffs(fields, rhs, QM, DX, DZ)
                      rhsSGS = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      # Null tendency at all boundary DOF
                      rhsSGS[extDex[0],0] *= 0.0
@@ -107,7 +109,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               for ii in range(7):
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol, RHS)
+                     SGS = computeDynSGSUpdate(sol)
                      sol = computeUpdate(c1, sol, (RHS + SGS))
                      
                      if ii == 1:
@@ -120,7 +122,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               for ii in range(2):
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol, RHS)
+                     SGS = computeDynSGSUpdate(sol)
                      sol = computeUpdate(c1, sol, (RHS + SGS))
        
        #%% THE KETCHENSON SSP(10,4) METHOD

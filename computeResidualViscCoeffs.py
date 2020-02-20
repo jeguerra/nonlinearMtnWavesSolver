@@ -8,10 +8,9 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 
-def computeResidualViscCoeffs(fields, RES, QM, DX, DZ):
+def computeResidualViscCoeffs(RES, QM, DX, DZ):
        
        ARES = np.abs(RES)
-       DSOL = np.abs(fields)
               
        QRESX = 0.0 * RES
        QRESZ = 0.0 * RES

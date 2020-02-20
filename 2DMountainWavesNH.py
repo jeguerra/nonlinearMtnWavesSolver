@@ -717,7 +717,11 @@ def runModel(TestName):
                             sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, TOPT[0], rhs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
                             sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
-                                          
+                     
+
+                     # Estimate the residual...
+                     sgs = (1.0 / TOPT[0])  * (sol[:,:,0] - sol[:,:,1]) + rhs
+                     
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
               RHS = np.reshape(rhs, (OPS*numVar, ), order='F')
