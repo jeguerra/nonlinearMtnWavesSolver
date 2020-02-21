@@ -48,7 +48,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -61,14 +61,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
        DDXM = REFS[12]
        DDZM = REFS[13]
        DZDX = REFS[16]
-       
-       # Get normalization for DynSGS coefficients
-       if DynSGS:
-              #QM = np.amax(SOLT[:,:,0], axis=0)
-              QM = bn.nanmax(SOLT[:,:,0], axis=0)
-              RESCF = computeResidualViscCoeffs(SGS, QM, DX, DZ)
-       else:
-              QM = 0.0
               
        def computeDynSGSUpdate(fields):
               if DynSGS:
@@ -101,16 +93,16 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               sol[botDex,1] += dHdX * dsol[botDex,0]
               
               return sol
-       #'''
-       #%% THE KETCHENSON SSP(9,3) METHOD
-       if order == 3:
-              # Compute stages 1 - 5
-              sol = np.array(SOLT[:,:,0])
+       
+       def ketchenson93(sol, isEuler, isDynSGS):
               for ii in range(7):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol)
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
+                     if isEuler:
+                            U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
+                            rhs = computeRHSUpdate(sol, U)
+                     if isDynSGS:
+                            rhs = computeDynSGSUpdate(sol)
+                     
+                     sol = computeUpdate(c1, sol, rhs)
                      
                      if ii == 1:
                             SOLT[:,:,1] = sol
@@ -120,30 +112,63 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, RHS, SGS, SOLT, INIT,
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol)
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
+                     if isEuler:
+                            U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
+                            rhs = computeRHSUpdate(sol, U)
+                     if isDynSGS:       
+                            rhs = computeDynSGSUpdate(sol)
+                     
+                     sol = computeUpdate(c1, sol, rhs)
+                     
+              return sol, rhs
        
-       #%% THE KETCHENSON SSP(10,4) METHOD
-       elif order == 4:
-              SOLT[:,:,1] = SOLT[:,:,0]
-              sol = np.array(SOLT[:,:,0])
+       def ketchenson104(sol, isEuler, isDynSGS):
+              SOLT[:,:,1] = sol
               for ii in range(1,6):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol, RHS)
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
+                     if isEuler:
+                            U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
+                            rhs = computeRHSUpdate(sol, U)
+                     if isDynSGS:
+                            rhs = computeDynSGSUpdate(sol)
+                     
+                     sol = computeUpdate(c1, sol, rhs)
               
               SOLT[:,:,1] = 0.04 * SOLT[:,:,1] + 0.36 * sol
               sol = 15.0 * SOLT[:,:,1] - 5.0 * sol
               
               for ii in range(6,10):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     RHS = computeRHSUpdate(sol, U)
-                     SGS = computeDynSGSUpdate(sol, RHS)
-                     sol = computeUpdate(c1, sol, (RHS + SGS))
+                     if isEuler:
+                            U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
+                            rhs = computeRHSUpdate(sol, U)
+                     if isDynSGS:
+                            rhs = computeDynSGSUpdate(sol)
                      
-              sol = SOLT[:,:,1] + 0.6 * sol + 0.1 * DT * RHS
+                     sol = computeUpdate(c1, sol, rhs)
+                     
+              sol = SOLT[:,:,1] + 0.6 * sol + 0.1 * DT * rhs
               
-       return sol, RHS, SGS
+              return sol, rhs
+       #'''
+       #%% THE KETCHENSON SSP(9,3) METHOD
+       if order == 3:
+              # Compute dynamics update
+              sol, rhs = ketchenson93(SOLT[:,:,0], True, False)
+              # Compute diffusion update
+              if DynSGS:
+                     QM = bn.nanmax(SOLT[:,:,0], axis=0)
+                     RES = 1.0 / DT * (sol - SOLT[:,:,0]) + rhs
+                     RESCF = computeResidualViscCoeffs(RES, QM, DX, DZ)
+                     sol, rhs = ketchenson93(sol, False, True)
+       
+       #%% THE KETCHENSON SSP(10,4) METHOD
+       elif order == 4:
+              # Compute dynamics update
+              sol, rhs = ketchenson104(SOLT[:,:,0], True, False)
+              # Compute diffusion update
+              if DynSGS:
+                     QM = bn.nanmax(SOLT[:,:,0], axis=0)
+                     RES = 1.0 / DT * (sol - SOLT[:,:,0]) + rhs
+                     RESCF = computeResidualViscCoeffs(RES, QM, DX, DZ)
+                     sol, rhs = ketchenson104(sol, False, True)
+              
+       return sol, rhs

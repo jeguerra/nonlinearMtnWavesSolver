@@ -211,8 +211,8 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
+       DX = 2.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 2.0 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -714,13 +714,9 @@ def runModel(TestName):
                      # Compute the SSPRK93 stages at this time step
                      if LinearSolve:
                             # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, TOPT[0], rhs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
+                            sol[:,:,0], rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, TOPT[0], sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
                      elif NonLinSolve:
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
-                     
-
-                     # Estimate the residual...
-                     sgs = (1.0 / TOPT[0])  * (sol[:,:,0] - sol[:,:,1]) + rhs
+                            sol[:,:,0], rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
