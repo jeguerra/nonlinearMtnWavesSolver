@@ -94,6 +94,65 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
               
               return sol
        
+       def ssprk22(sol, isEuler, isDynSGS):
+              if isEuler:
+                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
+                     rhs = computeRHSUpdate(sol, U)
+              if isDynSGS:
+                     rhs = computeDynSGSUpdate(sol)
+              
+              sol1 = computeUpdate(1.0, sol, rhs)
+              
+              if isEuler:
+                     U = tendency.computeWeightFields(REFS, sol1, INIT, udex, wdex, pdex, tdex)
+                     rhs = computeRHSUpdate(sol1, U)
+              if isDynSGS:
+                     rhs = computeDynSGSUpdate(sol1)
+              
+              sol = computeUpdate(0.5, sol1, rhs)
+              
+              sol = 0.5 * (sol + sol1)
+              
+              return sol, rhs
+       
+       def ssprk34(sol, isEuler, isDynSGS):
+              # Stage 1
+              if isEuler:
+                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
+                     rhs = computeRHSUpdate(sol, U)
+              if isDynSGS:
+                     rhs = computeDynSGSUpdate(sol)
+              
+              sol1 = computeUpdate(0.5, sol, rhs)
+              # Stage 2
+              if isEuler:
+                     U = tendency.computeWeightFields(REFS, sol1, INIT, udex, wdex, pdex, tdex)
+                     rhs = computeRHSUpdate(sol1, U)
+              if isDynSGS:
+                     rhs = computeDynSGSUpdate(sol1)
+              
+              sol = computeUpdate(0.5, sol1, rhs)
+              # Stage 3
+              if isEuler:
+                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
+                     rhs = computeRHSUpdate(sol, U)
+              if isDynSGS:
+                     rhs = computeDynSGSUpdate(sol)
+              
+              sol1 = computeUpdate(1.0/6.0, 1.0/6.0 * sol, rhs)
+              sol1 += 2.0/3.0 * SOLT[:,:,0]
+              
+              # Stage 4
+              if isEuler:
+                     U = tendency.computeWeightFields(REFS, sol1, INIT, udex, wdex, pdex, tdex)
+                     rhs = computeRHSUpdate(sol1, U)
+              if isDynSGS:
+                     rhs = computeDynSGSUpdate(sol1)
+              
+              sol = computeUpdate(0.5, 0.25 * sol1, rhs)
+              
+              return sol, rhs
+       
        def ketchenson93(sol, isEuler, isDynSGS):
               for ii in range(7):
                      if isEuler:
@@ -158,7 +217,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
                      QM = bn.nanmax(SOLT[:,:,0], axis=0)
                      RES = 1.0 / DT * (sol - SOLT[:,:,0]) + rhs
                      RESCF = computeResidualViscCoeffs(RES, QM, DX, DZ)
-                     sol, rhs = ketchenson93(sol, False, True)
+                     #sol, rhs = ketchenson93(sol, False, True)
+                     sol, rhs = ssprk22(sol, False, True)
        
        #%% THE KETCHENSON SSP(10,4) METHOD
        elif order == 4:
