@@ -48,7 +48,7 @@ def computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, DT, RHS, SOLT, IN
               
        return sol, rhs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -111,7 +111,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
               
               sol = computeUpdate(0.5, sol1, rhs)
               
-              sol = 0.5 * (sol + sol1)
+              sol = np.array(0.5 * (sol + sol1))
               
               return sol, rhs
        
@@ -133,7 +133,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
               
               sol2 = computeUpdate(0.5, sol1, rhs)
               # Stage 3
-              sol = 2.0/3.0 * sol + 1.0 / 3.0 * sol2
+              sol = np.array(2.0/3.0 * sol + 1.0 / 3.0 * sol2)
               if isEuler:
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      rhs = computeRHSUpdate(sol, U)
@@ -163,10 +163,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
                      sol = computeUpdate(c1, sol, rhs)
                      
                      if ii == 1:
-                            SOLT[:,:,1] = sol
+                            sol1 = np.array(sol)
                      
               # Compute stage 6 with linear combination
-              sol = np.array(c2 * (3.0 * SOLT[:,:,1] + 2.0 * sol))
+              sol = np.array(c2 * (3.0 * sol1 + 2.0 * sol))
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
@@ -181,7 +181,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
               return sol, rhs
        
        def ketchenson104(sol, isEuler, isDynSGS):
-              SOLT[:,:,1] = sol
+              sol1 = np.array(sol)
               for ii in range(1,6):
                      if isEuler:
                             U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
@@ -191,8 +191,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
                      
                      sol = computeUpdate(c1, sol, rhs)
               
-              SOLT[:,:,1] = 0.04 * SOLT[:,:,1] + 0.36 * sol
-              sol = 15.0 * SOLT[:,:,1] - 5.0 * sol
+              sol1 = np.array(0.04 * sol1 + 0.36 * sol)
+              sol = np.array(15.0 * sol1 - 5.0 * sol)
               
               for ii in range(6,10):
                      if isEuler:
@@ -203,31 +203,31 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
                      
                      sol = computeUpdate(c1, sol, rhs)
                      
-              sol = SOLT[:,:,1] + 0.6 * sol + 0.1 * DT * rhs
+              sol = np.array(sol1 + 0.6 * sol + 0.1 * DT * rhs)
               
               return sol, rhs
        #'''
        #%% THE KETCHENSON SSP(9,3) METHOD
        if order == 3:
               # Compute dynamics update
-              sol, rhs = ketchenson93(SOLT[:,:,0], True, False)
+              sol, rhs = ketchenson93(sol0, True, False)
               # Compute diffusion update
               if DynSGS:
-                     QM = bn.nanmax(SOLT[:,:,0], axis=0)
-                     RES = 1.0 / DT * (sol - SOLT[:,:,0]) + rhs
+                     QM = bn.nanmax(sol, axis=0)
+                     RES = 1.0 / DT * (sol - sol0) + rhs
                      RESCF = computeResidualViscCoeffs(RES, QM, DX, DZ)
                      #sol, rhs = ketchenson93(sol, False, True)
-                     sol, rhs = ssprk22(sol, False, True)
+                     sol, rhs = ssprk34(sol, False, True)
        
        #%% THE KETCHENSON SSP(10,4) METHOD
        elif order == 4:
               # Compute dynamics update
-              sol, rhs = ketchenson104(SOLT[:,:,0], True, False)
+              sol, rhs = ketchenson104(sol0, True, False)
               # Compute diffusion update
               if DynSGS:
-                     QM = bn.nanmax(SOLT[:,:,0], axis=0)
-                     RES = 1.0 / DT * (sol - SOLT[:,:,0]) + rhs
+                     QM = bn.nanmax(sol, axis=0)
+                     RES = 1.0 / DT * (sol - sol0) + rhs
                      RESCF = computeResidualViscCoeffs(RES, QM, DX, DZ)
-                     sol, rhs = ketchenson104(sol, False, True)
+                     sol, rhs = ssprk34(sol, False, True)
               
        return sol, rhs
