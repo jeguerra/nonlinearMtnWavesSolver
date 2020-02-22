@@ -131,17 +131,16 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
               if isDynSGS:
                      rhs = computeDynSGSUpdate(sol1)
               
-              sol = computeUpdate(0.5, sol1, rhs)
+              sol2 = computeUpdate(0.5, sol1, rhs)
               # Stage 3
+              sol = 2.0/3.0 * sol + 1.0 / 3.0 * sol2
               if isEuler:
                      U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
                      rhs = computeRHSUpdate(sol, U)
               if isDynSGS:
                      rhs = computeDynSGSUpdate(sol)
               
-              sol1 = computeUpdate(1.0/6.0, 1.0/6.0 * sol, rhs)
-              sol1 += 2.0/3.0 * SOLT[:,:,0]
-              
+              sol1 = computeUpdate(1.0/6.0, sol, rhs)
               # Stage 4
               if isEuler:
                      U = tendency.computeWeightFields(REFS, sol1, INIT, udex, wdex, pdex, tdex)
@@ -149,7 +148,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOLT, INIT, zeroDex, 
               if isDynSGS:
                      rhs = computeDynSGSUpdate(sol1)
               
-              sol = computeUpdate(0.5, 0.25 * sol1, rhs)
+              sol = computeUpdate(0.5, sol1, rhs)
               
               return sol, rhs
        
