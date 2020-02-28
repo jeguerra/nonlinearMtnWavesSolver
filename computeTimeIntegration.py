@@ -30,6 +30,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        def computeRHSUpdate(fields, U, Dynamics, DynSGS, Rayleigh):
               if Dynamics:
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
+                     rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendencies at essential boundary DOF
                      rhs[zeroDex[0],0] *= 0.0
                      rhs[zeroDex[1],1] *= 0.0
@@ -148,8 +149,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        elif order == 4:
               sol, rhsDyn = ketchenson104(sol0, True, False, False)
        
-       # Compute the Rayleigh update
-       sol, rhsRL = ssprk34(sol, False, False, True)
+       # Compute the Rayleigh update outside loop
+       #sol, rhsRL = ssprk34(sol, False, False, True)
        
        # Compute diffusion update
        if DynSGS:
@@ -159,4 +160,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               # Use the locally defined custom methods...
               sol, rhsSGS = ssprk22(sol, False, True, False)
               
-       return sol, (rhsDyn + rhsSGS + rhsRL)
+       return sol, (rhsDyn + rhsSGS)
