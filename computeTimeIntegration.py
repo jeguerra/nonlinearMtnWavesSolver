@@ -38,6 +38,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
                      rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
                      rhs = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
+                     rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
                      rhs[extDex[0],0] *= 0.0
                      rhs[extDex[1],1] *= 0.0
@@ -45,7 +46,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
                      rhs[extDex[3],3] *= 0.0
               if Rayleigh:
                      rhs = tendency.computeRayleighTendency(REFG, fields) 
-
+                     # Null tendencies at essential boundary DOF
+                     rhs[zeroDex[0],0] *= 0.0
+                     rhs[zeroDex[1],1] *= 0.0
+                     rhs[zeroDex[2],2] *= 0.0
+                     rhs[zeroDex[3],3] *= 0.0
+              
               return rhs
        
        def computeUpdate(coeff, sol, rhs):
@@ -149,15 +155,15 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        elif order == 4:
               sol, rhsDyn = ketchenson104(sol0, True, False, False)
        
-       # Compute the Rayleigh update outside loop
-       #sol, rhsRL = ssprk34(sol, False, False, True)
-       
        # Compute diffusion update
        if DynSGS:
               QM = bn.nanmax(sol, axis=0)
               RES = 1.0 / DT * (sol - sol0) + rhsDyn
               RESCF = computeResidualViscCoeffs(RES, QM, DX, DZ)
               # Use the locally defined custom methods...
-              sol, rhsSGS = ssprk22(sol, False, True, False)
+              sol, rhsSGS = ssprk34(sol, False, True, False)
+              
+       # Compute the Rayleigh update outside loop
+       #sol, rhsRL = ssprk22(sol, False, False, True)
               
        return sol, (rhsDyn + rhsSGS)
