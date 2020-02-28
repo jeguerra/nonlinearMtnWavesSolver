@@ -42,10 +42,7 @@ from computeInterpolatedFields import computeInterpolatedFields
 # Numerical stuff
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
-#import computeIterativeSolveNL as itr
-from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
-#from computeIterativeSolveNL import computeIterativeSolveNL
 
 import faulthandler; faulthandler.enable()
 
@@ -153,7 +150,6 @@ def runModel(TestName):
        thisTest = TestCase.TestCase(TestName)
        
        # Deprecated...
-       LinearSolve = False
        UniformDelta = False
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
@@ -211,8 +207,8 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 2.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 2.0 * np.max(np.abs(np.diff(REFS[1])))
+       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -399,8 +395,7 @@ def runModel(TestName):
        fields, U = eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
        #% Compute the global LHS operator and RHS
-       if (StaticSolve or LinearSolve):
-              
+       if StaticSolve:
               if NewtonLin:
                      # Full Newton linearization with TF terms
                      DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
@@ -494,7 +489,7 @@ def runModel(TestName):
               del(DOPS)
               
               # Set up Schur blocks or full operator...
-              if (StaticSolve and SolveSchur) and not LinearSolve:
+              if (StaticSolve and SolveSchur):
                      # Add Rayleigh damping terms
                      A += R1
                      F += R2
@@ -522,7 +517,7 @@ def runModel(TestName):
                      f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))
                      del(bN)
                      
-              if LinearSolve or (StaticSolve and SolveFull):
+              if (StaticSolve and SolveFull):
                      # Add Rayleigh damping terms
                      A += R1
                      F += R2
@@ -652,15 +647,12 @@ def runModel(TestName):
               DSOL = np.array(SOLT[:,1])
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
-       elif LinearSolve:
-              RHS[sysDex] = bN
-              print('Starting Linear Transient Solver...')
        elif NonLinSolve:
               #sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
                                           
        #%% Start the time loop
-       if LinearSolve or NonLinSolve:
+       if NonLinSolve:
               error = [np.linalg.norm(RHS)]
               
               # Reshape main solution vectors
@@ -711,12 +703,8 @@ def runModel(TestName):
                      else:
                             UT = INIT[udex]
                                    
-                     # Compute the SSPRK93 stages at this time step
-                     if LinearSolve:
-                            # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol[:,:,0], rhs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, TOPT[0], sol[:,:,0], INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
-                     elif NonLinSolve:
-                            sol[:,:,0], rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol[:,:,0], INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
+                     # Compute the solution within a time step
+                     sol[:,:,0], rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol[:,:,0], INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
