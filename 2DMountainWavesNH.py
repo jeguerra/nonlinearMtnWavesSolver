@@ -672,7 +672,7 @@ def runModel(TestName):
                             error.append(err)
                      
                      if tt % TOPT[6] == 0:
-                            fig = plt.figure(figsize=(10.0, 6.0))
+                            fig = plt.figure(figsize=(8.0, 10.0))
                             # Check the tendencies
                             '''
                             for pp in range(numVar):
@@ -684,7 +684,7 @@ def runModel(TestName):
                             '''
                             # Check the fields
                             for pp in range(numVar):
-                                   plt.subplot(2,2,pp+1)
+                                   plt.subplot(4,1,pp+1)
                                    dqdt = np.reshape(sol[:,pp,0], (NZ, NX+1), order='F')
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
                                    plt.colorbar(ccheck, format='%.3e')

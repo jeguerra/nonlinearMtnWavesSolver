@@ -25,10 +25,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        DDZM = REFS[13]
        DZDX = REFS[16]
        
-       OPS = sol0.shape[0]
-       
-       def computeRHSUpdate(fields, U, Dynamics, DynSGS, Rayleigh):
+       def computeRHSUpdate(fields, Dynamics, DynSGS, Rayleigh):
               if Dynamics:
+                     U = tendency.computeWeightFields(REFS, fields, INIT, udex, wdex, pdex, tdex)
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendencies at essential boundary DOF
@@ -64,14 +63,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        
        def ssprk22(sol, Dynamics, DynSGS, Rayleigh):
               # Stage 1
-              U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-              rhs = computeRHSUpdate(sol, U, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
               
               sol1 = computeUpdate(1.0, sol, rhs)
               
               # Stage 2
-              U = tendency.computeWeightFields(REFS, sol1, INIT, udex, wdex, pdex, tdex)
-              rhs = computeRHSUpdate(sol1, U, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, Rayleigh)
               
               sol = computeUpdate(0.5, sol1, rhs)
               
@@ -81,34 +78,24 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        
        def ssprk34(sol, Dynamics, DynSGS, Rayleigh):
               # Stage 1
-              U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-              rhs = computeRHSUpdate(sol, U, Dynamics, DynSGS, Rayleigh)
-              
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
               sol1 = computeUpdate(0.5, sol, rhs)
               # Stage 2
-              U = tendency.computeWeightFields(REFS, sol1, INIT, udex, wdex, pdex, tdex)
-              rhs = computeRHSUpdate(sol1, U, Dynamics, DynSGS, Rayleigh)
-              
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, Rayleigh)
               sol2 = computeUpdate(0.5, sol1, rhs)
               # Stage 3
               sol = np.array(2.0/3.0 * sol + 1.0 / 3.0 * sol2)
-              U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-              rhs = computeRHSUpdate(sol, U, Dynamics, DynSGS, Rayleigh)
-              
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
               sol1 = computeUpdate(1.0/6.0, sol, rhs)
               # Stage 4
-              U = tendency.computeWeightFields(REFS, sol1, INIT, udex, wdex, pdex, tdex)
-              rhs = computeRHSUpdate(sol1, U, Dynamics, DynSGS, Rayleigh)
-              
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, Rayleigh)
               sol = computeUpdate(0.5, sol1, rhs)
               
               return sol, rhs
        
        def ketchenson93(sol, Dynamics, DynSGS, Rayleigh):
               for ii in range(7):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     rhs = computeRHSUpdate(sol, U, Dynamics, DynSGS, Rayleigh)
-                     
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
                      sol = computeUpdate(c1, sol, rhs)
                      
                      if ii == 1:
@@ -119,9 +106,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     rhs = computeRHSUpdate(sol, U, Dynamics, DynSGS, Rayleigh)
-                     
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
                      sol = computeUpdate(c1, sol, rhs)
                      
               return sol, rhs
@@ -129,18 +114,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        def ketchenson104(sol, Dynamics, DynSGS, Rayleigh):
               sol1 = np.array(sol)
               for ii in range(1,6):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     rhs = computeRHSUpdate(sol, U, Dynamics, DynSGS, Rayleigh)
-                     
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
                      sol = computeUpdate(c1, sol, rhs)
               
               sol1 = np.array(0.04 * sol1 + 0.36 * sol)
               sol = np.array(15.0 * sol1 - 5.0 * sol)
               
               for ii in range(6,10):
-                     U = tendency.computeWeightFields(REFS, sol, INIT, udex, wdex, pdex, tdex)
-                     rhs = computeRHSUpdate(sol, U, Dynamics, DynSGS, Rayleigh)
-                     
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)                     
                      sol = computeUpdate(c1, sol, rhs)
                      
               sol = np.array(sol1 + 0.6 * sol + 0.1 * DT * rhs)
