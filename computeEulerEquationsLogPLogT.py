@@ -7,7 +7,6 @@ Created on Mon Jul 22 13:11:11 2019
 """
 import numpy as np
 import scipy.sparse as sps
-#import matplotlib.pyplot as plt
 
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -22,12 +21,6 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
 
        return fields, U
-
-def computeWeightFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
-       # Make the total quatities
-       U = SOLT[:,0] + INIT[udex]
-       
-       return U
 
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
@@ -260,7 +253,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
        # Pressure (mass) equation
        DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
-       # Potential Temperature equation
+       # Potential Temperature equation (transport only)
                                   
        return DqDt
 
@@ -294,12 +287,39 @@ def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tde
        zflux = RESCFZ * DDz
        
        # Compute derivatives of fluxes
-       DDx = DDXM.dot(xflux)
+       DDxx = DDXM.dot(xflux)
+       DDxz = DDZM.dot(xflux)
        DDz = DDZM.dot(zflux)
-       PPx = DDx - DZDX.dot(DDz)
+       PPx = DDxx - DZDX.dot(DDxz)
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        DqDt = PPx + DDz
+       
+       return DqDt
+
+def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
+       
+       # Get the anisotropic coefficients
+       RESCFX = RESCF[0]
+       RESCFZ = RESCF[1]
+       
+       # Compute 1st partials of perturbations
+       DDx = DDXM.dot(fields)
+       DDz = DDZM.dot(fields)
+       PPx = DDx - DZDX.dot(DDz)
+       
+       # Compute 2nd partials of perturbations
+       DDx2 = DDXM.dot(PPx)
+       DDz2 = DDZM.dot(PPx)
+       PPx2 = DDx2 - DZDX.dot(DDz2)
+       DDz2 = DDZM.dot(DDz)
+       
+       # Compute diffusive fluxes
+       xflux = RESCFX * PPx2
+       zflux = RESCFZ * DDz2
+       
+       # Compute the tendencies (divergence of diffusive flux... discontinuous)
+       DqDt = xflux + zflux
        
        return DqDt
        

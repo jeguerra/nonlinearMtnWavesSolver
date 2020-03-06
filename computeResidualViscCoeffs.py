@@ -23,9 +23,23 @@ def computeResidualViscCoeffs(RES, QM, DX, DZ):
                      QRESZ[:,vv] = (DZ**2 / QM[vv]) * ARES[:,vv]
        
               # Fix SGS to upwind value where needed
+              #'''
               updex = np.argwhere(QRESX[:,vv] >= 0.5 * DX)
               QRESX[updex,vv] = 0.5 * DX
               updex = np.argwhere(QRESZ[:,vv] >= 0.5 * DZ)
               QRESZ[updex,vv] = 0.5 * DZ
+              #'''
+       
+       return (QRESX, QRESZ)
+
+def computeFlowVelocityCoeffs(U, W, DX, DZ):
+                     
+       QRESX = np.zeros((len(U), 4))
+       QRESZ = np.zeros((len(W), 4))
+       
+       for vv in range(4):
+              # Compute the anisotropic coefficients
+              QRESX[:,vv] = (0.5 * DX) * U
+              QRESZ[:,vv] = (0.5 * DZ) * W
        
        return (QRESX, QRESZ)

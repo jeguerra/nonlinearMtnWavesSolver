@@ -194,7 +194,7 @@ def runModel(TestName):
        NX = DIMS[3]
        NZ = DIMS[4]
        OPS = DIMS[5]
-       udex = np.array(range(OPS))
+       udex = np.arange(OPS)
        wdex = np.add(udex, OPS)
        pdex = np.add(wdex, OPS)
        tdex = np.add(pdex, OPS)
@@ -207,8 +207,8 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
+       DX = np.max(np.abs(np.diff(REFS[0])))
+       DZ = np.max(np.abs(np.diff(REFS[1])))
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)

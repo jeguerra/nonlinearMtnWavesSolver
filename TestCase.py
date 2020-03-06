@@ -70,10 +70,10 @@ class TestCase:
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
-                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(167, 90, 82.0, 26.0, 280.0, 6000.0, 12000.0, 500.0, 0.01, 2, 1.2E+4)
+                     self.setData(183, 90, 82.0, 26.0, 300.0, 6000.0, 12000.0, 1000.0, 0.01, 1, 1.0E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -134,8 +134,8 @@ class TestCase:
               self.HOPT = [h0, aC, lC, kC, withWindow, Mountain]
               
               #% Transient solve parameters
-              DT = 0.05
-              HR = 0.1
+              DT = 0.05 # seconds
+              HR = 1.0 # hours
               rampTime = 900  # 10 minutes to ramp up U_bar
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
