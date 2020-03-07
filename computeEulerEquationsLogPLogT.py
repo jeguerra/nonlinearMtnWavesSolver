@@ -255,7 +255,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
        # Potential Temperature equation (transport only)
                                   
-       return DqDt
+       return DqDt, PqPx, DqDz
 
 def computeRayleighTendency(REFG, fields):
        
@@ -297,16 +297,16 @@ def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tde
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
+def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, PPx, DDz, udex, wdex, pdex, tdex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute 1st partials of perturbations
-       DDx = DDXM.dot(fields)
-       DDz = DDZM.dot(fields)
-       PPx = DDx - DZDX.dot(DDz)
+       #DDx = DDXM.dot(fields)
+       #DDz = DDZM.dot(fields)
+       #PPx = DDx - DZDX.dot(DDz)
        
        # Compute 2nd partials of perturbations
        DDx2 = DDXM.dot(PPx)

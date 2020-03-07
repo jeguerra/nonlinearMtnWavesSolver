@@ -10,7 +10,7 @@ import bottleneck as bn
 import computeEulerEquationsLogPLogT as tendency
 import computeResidualViscCoeffs as dcoeffs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, SOL, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -24,10 +24,13 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        DDZM = REFS[13]
        DZDX = REFS[16]
        
+       sol0 = SOL[:,:,0]
+       solP = SOL[:,:,1]
+       
        def computeRHSUpdate(fields, Dynamics, DynSGS, FlowDiff2):
               if Dynamics:
                      U = fields[:,0] + INIT[udex]
-                     rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
+                     rhs, PqPx, Dqdz = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendencies at essential boundary DOF
                      rhs[zeroDex[0],0] *= 0.0
@@ -36,21 +39,23 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
                      rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
                      #rhs = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
-                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
-                     rhs += tendency.computeRayleighTendency(REFG, fields)
+                     rhsSGS = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, PqPx, Dqdz, udex, wdex, pdex, tdex)
+                     #rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
-                     rhs[extDex[0],0] *= 0.0
-                     rhs[extDex[1],1] *= 0.0
-                     rhs[extDex[2],2] *= 0.0
-                     rhs[extDex[3],3] *= 0.0
+                     rhsSGS[extDex[0],0] *= 0.0
+                     rhsSGS[extDex[1],1] *= 0.0
+                     rhsSGS[extDex[2],2] *= 0.0
+                     rhsSGS[extDex[3],3] *= 0.0
+                     rhs += rhsSGS
               if FlowDiff2:
-                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
-                     rhs += tendency.computeRayleighTendency(REFG, fields)
+                     rhsFDF = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, PqPx, Dqdz, udex, wdex, pdex, tdex)
+                     #rhsFDF += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
-                     rhs[extDex[0],0] *= 0.0
-                     rhs[extDex[1],1] *= 0.0
-                     rhs[extDex[2],2] *= 0.0
-                     rhs[extDex[3],3] *= 0.0
+                     rhsFDF[extDex[0],0] *= 0.0
+                     rhsFDF[extDex[1],1] *= 0.0
+                     rhsFDF[extDex[2],2] *= 0.0
+                     rhsFDF[extDex[3],3] *= 0.0
+                     rhs += rhsFDF
               
               return rhs
        
@@ -62,37 +67,37 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               
               return sol
        
-       def ssprk22(sol, Dynamics, DynSGS, Rayleigh):
+       def ssprk22(sol, Dynamics, DynSGS, FlowDiff):
               # Stage 1
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
               sol1 = computeUpdate(1.0, sol, rhs)
               # Stage 2
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
               sol = computeUpdate(0.5, sol1, rhs)
               sol = np.array(0.5 * (sol + sol1))
               
               return sol, rhs
        
-       def ssprk34(sol, Dynamics, DynSGS, Rayleigh):
+       def ssprk34(sol, Dynamics, DynSGS, FlowDiff):
               # Stage 1
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
               sol1 = computeUpdate(0.5, sol, rhs)
               # Stage 2
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
               sol2 = computeUpdate(0.5, sol1, rhs)
               # Stage 3
               sol = np.array(2.0/3.0 * sol + 1.0 / 3.0 * sol2)
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
               sol1 = computeUpdate(1.0/6.0, sol, rhs)
               # Stage 4
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, Rayleigh)
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
               sol = computeUpdate(0.5, sol1, rhs)
               
               return sol, rhs
        
-       def ketchenson93(sol, Dynamics, DynSGS, Rayleigh):
+       def ketchenson93(sol, Dynamics, DynSGS, FlowDiff):
               for ii in range(7):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
                      sol = computeUpdate(c1, sol, rhs)
                      
                      if ii == 1:
@@ -103,22 +108,22 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               
               # Compute stages 7 - 9 (diffusion applied here)
               for ii in range(2):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
                      sol = computeUpdate(c1, sol, rhs)
                      
               return sol, rhs
        
-       def ketchenson104(sol, Dynamics, DynSGS, Rayleigh):
+       def ketchenson104(sol, Dynamics, DynSGS, FlowDiff):
               sol1 = np.array(sol)
               for ii in range(1,6):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
                      sol = computeUpdate(c1, sol, rhs)
               
               sol1 = np.array(0.04 * sol1 + 0.36 * sol)
               sol = np.array(15.0 * sol1 - 5.0 * sol)
               
               for ii in range(6,10):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, Rayleigh)                     
+                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)                     
                      sol = computeUpdate(c1, sol, rhs)
                      
               sol = np.array(sol1 + 0.6 * sol + 0.1 * DT * rhs)
@@ -127,31 +132,35 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        #'''
        #%% THE MAIN TIME INTEGRATION STAGES
        
-       # Compute dynamics update
-       if order == 3:
-              sol, rhsDyn = ketchenson93(sol0, True, False, False)
-       elif order == 4:
-              sol, rhsDyn = ketchenson104(sol0, True, False, False)
-       
-       # Compute diffusion update
+       # Compute adaptive diffusion coefficients
        if DynSGS:
               # DynSGS compute coefficients
-              total_sol = sol + np.reshape(INIT, (len(udex), 4), order='F')
+              total_sol = sol0 + np.reshape(INIT, (len(udex), 4), order='F')
               total_sol -= bn.nanmean(total_sol, axis=0)
               QM = bn.nanmax(np.abs(total_sol), axis=0)
               # Estimate the residual
-              RES = 1.0 / DT * (sol - sol0)
-              RES -= rhsDyn
+              RES = 1.0 / DT * (sol0 - solP)
+              RES -= computeRHSUpdate(sol0, True, False, False)
               # Flow weighted diffusion (Guerra, 2016)
-              U = np.abs(INIT[udex] + sol[:,0])
-              W = np.abs(sol[:,1])
+              U = np.abs(INIT[udex] + sol0[:,0])
+              W = np.abs(sol0[:,1])
               RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
-              sol, rhsDiff = ssprk34(sol, False, True, False)
+              #sol, rhsDiff = ssprk34(sol, False, True, False)
        else: 
               # Flow weighted diffusion (Guerra, 2016)
-              U = np.abs(INIT[udex] + sol[:,0])
-              W = np.abs(sol[:,1])
+              U = np.abs(INIT[udex] + sol0[:,0])
+              W = np.abs(sol0[:,1])
               RESCF = dcoeffs.computeFlowVelocityCoeffs(U, W, DX, DZ)
-              sol, rhsDiff = ssprk34(sol, False, False, True)
-                            
+              #sol, rhsDiff = ssprk34(sol, False, False, True)
+       
+       # Compute dynamics update
+       if order == 3:
+              sol, rhsDyn = ketchenson93(sol0, True, True, False)
+       elif order == 4:
+              sol, rhsDyn = ketchenson104(sol0, True, True, False)
+       
+       # Compute diffusion update
+       #sol, rhsDiff = ssprk34(sol, False, True, False)
+       rhsDiff = 0.0
+      
        return sol, (rhsDyn + rhsDiff)
