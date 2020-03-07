@@ -142,13 +142,16 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               # Estimate the residual
               RES = 1.0 / DT * (sol - sol0)
               RES -= rhsDyn
-              RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, DX, DZ)
+              # Flow weighted diffusion (Guerra, 2016)
+              U = np.abs(INIT[udex] + sol[:,0])
+              W = np.abs(sol[:,1])
+              RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
               sol, rhsDiff = ssprk34(sol, False, True, False)
        else: 
               # Flow weighted diffusion (Guerra, 2016)
-              U = INIT[udex] + sol[:,0]
-              W = sol[:,1]
-              RESCF = dcoeffs.computeFlowVelocityCoeffs(np.abs(U), np.abs(W), DX, DZ)
+              U = np.abs(INIT[udex] + sol[:,0])
+              W = np.abs(sol[:,1])
+              RESCF = dcoeffs.computeFlowVelocityCoeffs(U, W, DX, DZ)
               sol, rhsDiff = ssprk34(sol, False, False, True)
                             
        return sol, (rhsDyn + rhsDiff)

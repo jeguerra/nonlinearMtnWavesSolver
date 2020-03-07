@@ -8,7 +8,7 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 
-def computeResidualViscCoeffs(RES, QM, DX, DZ):
+def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ):
        
        ARES = np.abs(RES)
               
@@ -25,9 +25,9 @@ def computeResidualViscCoeffs(RES, QM, DX, DZ):
               # Fix SGS to upwind value where needed
               #'''
               updex = np.argwhere(QRESX[:,vv] >= 0.5 * DX)
-              QRESX[updex,vv] = 0.5 * DX
+              QRESX[updex,vv] = 0.5 * DX * U[updex]
               updex = np.argwhere(QRESZ[:,vv] >= 0.5 * DZ)
-              QRESZ[updex,vv] = 0.5 * DZ
+              QRESZ[updex,vv] = 0.5 * DZ * W[updex]
               #'''
        
        return (QRESX, QRESZ)
