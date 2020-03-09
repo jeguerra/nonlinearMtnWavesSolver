@@ -24,15 +24,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        DDZM = REFS[13]
        DZDX = REFS[16]
        
-       PqPx = 0.0
-       DqDz = 0.0
-       
        def computeRHSUpdate(fields, Dynamics, DynSGS, FlowDiff2):
               global PqPx
               global DqDz
               if Dynamics:
                      U = fields[:,0] + INIT[udex]
-                     rhs, PqPx, DqDz = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
+                     rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendencies at essential boundary DOF
                      rhs[zeroDex[0],0] *= 0.0
@@ -42,7 +39,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
                      return rhs
               if DynSGS:
                      #rhsSGS = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
-                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, PqPx, DqDz, udex, wdex, pdex, tdex)
+                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
                      rhs[extDex[0],0] *= 0.0
@@ -147,7 +144,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               QM = bn.nanmax(np.abs(total_sol), axis=0)
               # Estimate the residual
               RES = 1.0 / DT * (sol - sol0)
-              RES -= rhsDyn #computeRHSUpdate(sol, True, False, False)
+              RES -= computeRHSUpdate(sol, True, False, False)
               # Flow weighted diffusion (Guerra, 2016)
               U = np.abs(INIT[udex] + sol[:,0])
               W = np.abs(sol[:,1])
@@ -160,4 +157,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               RESCF = dcoeffs.computeFlowVelocityCoeffs(U, W, DX, DZ)
               sol, rhsDiff = ssprk34(sol, False, False, True)
       
-       return sol, computeRHSUpdate(sol, True, False, False)
+       return sol, (rhsDyn + rhsDiff)

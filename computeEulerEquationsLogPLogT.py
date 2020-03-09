@@ -271,16 +271,16 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, PPx, DDz, udex, wdex, pdex, tdex):
+def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute derivatives of perturbations
-       #DDx = DDXM.dot(fields)
-       #DDz = DDZM.dot(fields)
-       #PPx = DDx - DZDX.dot(DDz)
+       DDx = DDXM.dot(fields)
+       DDz = DDZM.dot(fields)
+       PPx = DDx - DZDX.dot(DDz)
        
        # Compute diffusive fluxes
        xflux = RESCFX * PPx
@@ -297,16 +297,16 @@ def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, PPx, DDz, udex, wdex,
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, PPx, DDz, udex, wdex, pdex, tdex):
+def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute 1st partials of perturbations
-       #DDx = DDXM.dot(fields)
-       #DDz = DDZM.dot(fields)
-       #PPx = DDx - DZDX.dot(DDz)
+       DDx = DDXM.dot(fields)
+       DDz = DDZM.dot(fields)
+       PPx = DDx - DZDX.dot(DDz)
        
        # Compute 2nd partials of perturbations
        DDx2 = DDXM.dot(PPx)
