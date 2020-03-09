@@ -686,7 +686,14 @@ def runModel(TestName):
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
                                    dqdt = np.reshape(sol[:,pp,0], (NZ, NX+1), order='F')
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
+                                   
+                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.max())
+                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.min())
+                                   else:
+                                          clim = np.abs(dqdt.max())
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
                                    plt.colorbar(ccheck, format='%.3e')
                             plt.show()
                      
@@ -704,7 +711,7 @@ def runModel(TestName):
                             UT = INIT[udex]
                                    
                      # Compute the solution within a time step
-                     sol[:,:,0], rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
+                     sol[:,:,0], rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol[:,:,0], INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
