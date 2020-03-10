@@ -10,7 +10,7 @@ import bottleneck as bn
 import computeEulerEquationsLogPLogT as tendency
 import computeResidualViscCoeffs as dcoeffs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, zeroDex, extDex, botDex, udex, wdex, pdex, tdex, DynSGS, order):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -25,8 +25,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
        DZDX = REFS[16]
        
        def computeRHSUpdate(fields, Dynamics, DynSGS, FlowDiff2):
-              global PqPx
-              global DqDz
               if Dynamics:
                      U = fields[:,0] + INIT[udex]
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
@@ -48,7 +46,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
                      rhs[extDex[3],3] *= 0.0
                      return rhs
               if FlowDiff2:
-                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, PqPx, DqDz, udex, wdex, pdex, tdex)
+                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
                      rhs[extDex[0],0] *= 0.0
@@ -61,7 +59,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, zeroDex, 
               #Apply updates
               dsol = coeff * DT * rhs
               sol += dsol
-              sol[botDex,1] += dHdX * dsol[botDex,0]
+              #sol[botDex,1] += dHdX * dsol[botDex,0]
+              sol[botDex,1] = np.array(dHdX * (sol[botDex,0] + (uRamp * INIT[udex])[botDex]))
               
               return sol
        

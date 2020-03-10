@@ -255,7 +255,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
        # Potential Temperature equation (transport only)
                                   
-       return DqDt, PqPx, DqDz
+       return DqDt
 
 def computeRayleighTendency(REFG, fields):
        

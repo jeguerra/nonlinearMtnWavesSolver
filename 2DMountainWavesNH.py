@@ -698,20 +698,17 @@ def runModel(TestName):
                             plt.show()
                      
                      # Ramp up the background wind to decrease transients
-                     if not isRestart:
-                            if thisTime <= TOPT[2]:
-                                   uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
-                                   UT = uRamp * INIT[udex]
-                            else:
-                                   UT = INIT[udex]
-                                   
-                            # Set current boundary condition
-                            sol[ubdex,1,0] = dHdX * (UT[ubdex] + sol[ubdex,0,0])
+                     if thisTime <= TOPT[2]:
+                            uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
                      else:
-                            UT = INIT[udex]
+                            uRamp = 1.0
+                            
+                     # Set current boundary condition
+                     #sol[ubdex,1,0] = dHdX * (UT[ubdex] + sol[ubdex,0,0])
                                    
                      # Compute the solution within a time step
-                     sol[:,:,0], rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol[:,:,0], INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
+                     thisSol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol[:,:,0], INIT, uRamp, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
+                     sol[:,:,0] = thisSol
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
