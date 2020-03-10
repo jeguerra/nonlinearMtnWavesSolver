@@ -26,7 +26,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        
        def computeRHSUpdate(fields, Dynamics, DynSGS, FlowDiff2):
               if Dynamics:
-                     U = fields[:,0] + INIT[udex]
+                     # Scale background wind and shear with ramp up factor
+                     U = fields[:,0] + uRamp * INIT[udex]
+                     (REFG[4])[:,1] *= uRamp
+                     # Compute dynamical tendencies
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendencies at essential boundary DOF
@@ -59,8 +62,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               #Apply updates
               dsol = coeff * DT * rhs
               sol += dsol
-              #sol[botDex,1] += dHdX * dsol[botDex,0]
-              sol[botDex,1] = np.array(dHdX * (sol[botDex,0] + (uRamp * INIT[udex])[botDex]))
+              U = sol[:,0] + uRamp * INIT[udex]
+              sol[botDex,1] = np.array(dHdX * U[botDex])
               
               return sol
        
