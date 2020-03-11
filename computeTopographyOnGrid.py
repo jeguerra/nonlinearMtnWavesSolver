@@ -50,29 +50,18 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               # Take the derivative
               dhdx = DDX.dot(ht)
        elif profile == 2:
-              # Schar mountain (windowed with Kaiser bell)
-              # Compute the height field
-              ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
-              ht2 = np.power(np.cos(mt.pi / lC * xh), 2.0)
-              ht3 = np.reciprocal((1.0 / aC)**2.0 * np.power(xh, 2.0) + 1.0)
-              if withWindow:
-                     ht = kaiserDom * (ht1 * ht2 * ht3)
-              else:
-                     ht = 1.0 * (ht1 * ht2 * ht3)
-              # Compute the slope field perfectly
+              # Schar mountain with analytical slope
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * xh), 2.0);
               ht = ht1 * ht2
-              dht1 = -ht1
-              dht2 = (2.0 / aC**2.0) * xh
-              dht3 = ht2
-              dht4 = (mt.pi / lC) * np.sin(2.0 * mt.pi / lC * xh)
-              dhdx = dht2 * dht3
-              dhdx = np.add(dhdx, dht4)
-              dhdx = dht1 * dhdx
+              dhdx = -2.0 * ht
+              dhdx *= (1.0 / aC**2.0) * xh + (mt.pi / lC) * np.tan(mt.pi / lC * xh)
        elif profile == 3:
-              # General even power exponential times a cosine series
-              ht = np.zeros(len(xh))
+              # General Kaiser window times a cosine series
+              ht2 = np.power(np.cos(mt.pi / lC * xh), 2.0);
+              ht = h0 * kaiserDom * ht2
+              # Take the derivative
+              dhdx = DDX.dot(ht)
        elif profile == 4:
               # General even power exponential times a polynomial series
               ht = np.zeros(len(xh))
