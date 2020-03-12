@@ -15,7 +15,8 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ):
        QRESX = 0.0 * RES
        QRESZ = 0.0 * RES
        
-       for vv in range(4):
+       notP = (0, 1, 3)
+       for vv in notP: #range(4):
               
               if QM[vv] > 0.0:
                      # Compute the anisotropic coefficients
