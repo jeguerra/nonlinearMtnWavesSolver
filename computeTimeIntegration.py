@@ -32,22 +32,18 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      # Compute dynamical tendencies
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
-                     # Null tendencies at essential boundary DOF
                      rhs[zeroDex[0],0] *= 0.0
                      rhs[zeroDex[1],1] *= 0.0
                      rhs[zeroDex[2],2] *= 0.0
                      rhs[zeroDex[3],3] *= 0.0
-                     return rhs
               if DynSGS:
                      #rhsSGS = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
-                     # Null tendency at all boundary DOF
                      rhs[extDex[0],0] *= 0.0
                      rhs[extDex[1],1] *= 0.0
                      rhs[extDex[2],2] *= 0.0
                      rhs[extDex[3],3] *= 0.0
-                     return rhs
               if FlowDiff2:
                      rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
@@ -56,16 +52,24 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      rhs[extDex[1],1] *= 0.0
                      rhs[extDex[2],2] *= 0.0
                      rhs[extDex[3],3] *= 0.0
-                     return rhs
+                     
+              return rhs
        
-       def computeUpdate(coeff, sol, rhs):
+       def computeUpdate(coeff, sol0, rhs):
               #Apply updates
               dsol = coeff * DT * rhs
-              sol += dsol
-              U = sol[:,0] + uRamp * INIT[udex]
-              sol[botDex,1] = np.array(dHdX * U[botDex])
-              
-              return sol
+              sol1 = sol0 + dsol
+              U = sol1[:,0] + uRamp * INIT[udex]
+              sol1[botDex,1] = np.array(dHdX * U[botDex])
+              # Enforce BC's
+              #'''
+              topDex = sorted(set.difference(set(zeroDex[1]), set(botDex)))
+              sol1[zeroDex[0],0] *= 0.0
+              sol1[topDex,1] *= 0.0
+              sol1[zeroDex[2],2] *= 0.0
+              sol1[zeroDex[3],3] *= 0.0
+              #'''
+              return sol1
        
        def ssprk22(sol, Dynamics, DynSGS, FlowDiff):
               # Stage 1
