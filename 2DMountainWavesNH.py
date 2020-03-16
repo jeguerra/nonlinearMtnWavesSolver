@@ -625,7 +625,7 @@ def runModel(TestName):
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U, neuDex)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               RHS[zeroDex_stat] *= 0.0
