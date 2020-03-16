@@ -32,7 +32,7 @@ from computeColumnInterp import computeColumnInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
-from computeStretchedDomain2D import computeStretchedDomain2D
+#from computeStretchedDomain2D import computeStretchedDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
@@ -126,17 +126,17 @@ def computeSchurBlock(dbName, blockName):
        if blockName == 'AS':
               SB = sps.bmat([[bdb['LDIA'], bdb['LNA'], bdb['LOA']], \
                              [bdb['LDA'], bdb['A'], bdb['B']], \
-                             [bdb['LHA'], bdb['E'], bdb['F']]], format='csc')
+                             [bdb['LHA'], bdb['E'], bdb['F']]], format='csr')
        elif blockName == 'BS':
               SB = sps.bmat([[bdb['LPA'], bdb['LQAR']], \
                              [bdb['C'], bdb['D']], \
-                             [bdb['G'], bdb['H']]], format='csc')
+                             [bdb['G'], bdb['H']]], format='csr')
        elif blockName == 'CS':
               SB = sps.bmat([[bdb['LMA'], bdb['I'], bdb['J']], \
-                             [bdb['LQAC'], bdb['N'], bdb['O']]], format='csc')
+                             [bdb['LQAC'], bdb['N'], bdb['O']]], format='csr')
        elif blockName == 'DS':
               SB = sps.bmat([[bdb['K'], bdb['M']], \
-                             [bdb['P'], bdb['Q']]], format='csc')
+                             [bdb['P'], bdb['Q']]], format='csr')
        else:
               print('INVALID SCHUR BLOCK NAME!')
               
@@ -239,7 +239,7 @@ def runModel(TestName):
        #% Compute the BC index vector
        ubdex, utdex, wbdex, pbdex, tbdex, \
               ubcDex, wbcDex, pbcDex, tbcDex, \
-              zeroDex_stat, zeroDex_tran, sysDex, extDex = \
+              zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -410,17 +410,13 @@ def runModel(TestName):
               DOPS = []
               for dd in range(len(DOPS_NL)):
                      if (DOPS_NL[dd]) is not None:
-                            # Check against linear blocks
-                            #DOPS_DEL = np.reshape((DOPS_NL[dd] - DOPS_LN[dd]).toarray(), (OPS*OPS,), order='F')
-                            #print(dd, np.linalg.norm(DOPS_DEL))
-                            
                             DOPS.append(DOPS_NL[dd].tolil())
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
               #'''
-              # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
+              # Compute the RHS for this iteration
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F')
@@ -429,11 +425,7 @@ def runModel(TestName):
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
-              # Compute forcing vector adding boundary forcing to the end
-              LMRHS = -dWBC
-              bN = np.concatenate((RHS, LMRHS))
-              
-              # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
+              # Compute Lagrange Multiplier column augmentation matrices
               C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX+1, format='csr')
               
@@ -446,7 +438,7 @@ def runModel(TestName):
               LM = sps.lil_matrix(colShape)
               LQ = sps.lil_matrix(colShape)
               
-              # Apply BC adjustments  and indexing block-wise (Lagrange blocks)
+              # Apply BC adjustments and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
               LMA = LM[pbcDex,:]
@@ -509,13 +501,12 @@ def runModel(TestName):
                      opdb.close()
                       
                      # Compute the partitions for Schur Complement solution
-                     fu = bN[udex]
-                     fw = bN[wdex]
-                     f1 = np.concatenate((LMRHS, fu[ubcDex], fw[wbcDex]))
-                     fp = bN[pdex]
-                     ft = bN[tdex]
+                     fu = RHS[udex]
+                     fw = RHS[wdex]
+                     f1 = np.concatenate((-dWBC, fu[ubcDex], fw[wbcDex]))
+                     fp = RHS[pdex]
+                     ft = RHS[tdex]
                      f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))
-                     del(bN)
                      
               if (StaticSolve and SolveFull):
                      # Add Rayleigh damping terms
@@ -532,7 +523,7 @@ def runModel(TestName):
                               [LNA, LOA, LPA, LQAR, LDIA]], format='csc')
               
                      # Compute the global linear force vector
-                     bN = np.concatenate((bN[sysDex], LMRHS))
+                     bN = np.concatenate((RHS[sysDex], -dWBC))
               
               # Get memory back
               del(A); del(B); del(C); del(D)
@@ -549,7 +540,6 @@ def runModel(TestName):
               if SolveFull and not SolveSchur:
                      print('Solving linear system by full operator SuperLU...')
                      # Direct solution over the entire operator (better for testing BC's)
-                     #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
                      opts = dict(Equil=True, IterRefine='DOUBLE')
                      factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
                      del(AN)
@@ -704,7 +694,10 @@ def runModel(TestName):
                             uRamp = 1.0
                                    
                      # Compute the solution within a time step
-                     thisSol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], sol[:,:,0], INIT, uRamp, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
+                     thisSol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
+                                                             TOPT[0], sol[:,:,0], INIT, uRamp, \
+                                                             zeroDex_tran, extDex, neuDex, ubdex, \
+                                                             udex, ResDiff, TOPT[3])
                      sol[:,:,0] = thisSol
                      
               # Reshape back to a column vector after time loop

@@ -219,7 +219,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U, neuDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -236,6 +236,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
        PqPx = DqDx - DZDX.dot(DqDz)
+       
+       # Apply Neumann condition on pressure gradients
+       PqPx[neuDex[0],2] *= 0.0
+       DqDz[neuDex[1],2] *= 0.0
        
        # Compute advection
        UPqPx = UM.dot(PqPx)
@@ -271,7 +275,7 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
+def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -297,7 +301,7 @@ def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tde
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
+def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]

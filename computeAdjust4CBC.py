@@ -44,13 +44,17 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        ttdex = np.add(utdex, iT * OPS)
        
        # Index all boundary DOF that can be diffused on
-       vDex = np.concatenate((uldex,urdex,ubdex,utdex))
+       vDex = np.unique(np.concatenate((uldex,urdex,ubdex,utdex)))
        extDex = (vDex, vDex, vDex, vDex)
+       # Tuple of lateral and vertical indices for Neumann conditions (pressure)
+       latDex = np.unique(np.concatenate((uldex,urdex)))
+       verDex = np.unique(utdex)
+       neuDex = (latDex, verDex)
        
        # BC indices for static solution (per variable)
        rowsOutU = set(np.concatenate((uldex,urdex,utdex)))
        rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
-       rowsOutP = set(np.concatenate((uldex,urdex)))
+       #rowsOutP = set(np.concatenate((uldex,urdex)))
        rowsOutP = set([]) # Totally free boundary for pressure...
        rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
        
@@ -62,10 +66,11 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC indices for transient solution (per variable)
        rowsOutW_trans = set(np.concatenate((ubdex,uldex,urdex,utdex)))
        
-       left = np.concatenate((uldex, wldex, pldex, tldex))
-       right = np.concatenate((urdex, wrdex, prdex, trdex))
+       left = np.concatenate((uldex, wldex, tldex))
+       right = np.concatenate((urdex, wrdex, trdex))
        top = np.concatenate((utdex, wtdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
+       #rowsOutBC_static = set(np.concatenate((left, right, top)))
        rowsOutBC_static = set(np.concatenate((left, right, top)))
        
        # W is treated as an essential BC at terrain in solution by direct substitution
@@ -83,4 +88,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # DOF's not dynamically updated in transient solution (use direct BC substitution)
        zeroDex_tran = rowsOutBC_transient
        
-       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex
+       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex
