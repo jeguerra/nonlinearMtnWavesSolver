@@ -37,8 +37,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      rhs[zeroDex[2],2] *= 0.0
                      rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
-                     #rhsSGS = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
-                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
+                     rhs = tendency.computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
+                     #rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      rhs[extDex[0],0] *= 0.0
                      rhs[extDex[1],1] *= 0.0
@@ -145,12 +145,13 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        # Compute adaptive diffusion coefficients
        if DynSGS:
               # DynSGS compute coefficients
-              total_sol = sol0 + np.reshape(INIT, (len(udex), 4), order='F')
-              total_sol -= bn.nanmean(total_sol, axis=0)
-              QM = bn.nanmax(np.abs(total_sol), axis=0)
+              #total_sol = sol + np.reshape(INIT, (len(udex), 4), order='F')
+              #total_sol -= bn.nanmean(total_sol, axis=0)
+              #QM = bn.nanmax(np.abs(total_sol), axis=0)
+              QM = bn.nanmax(np.abs(sol), axis=0)
               # Estimate the residual
               RES = 1.0 / DT * (sol - sol0)
-              RES -= computeRHSUpdate(sol, True, False, False)
+              RES -= rhsDyn
               # Flow weighted diffusion (Guerra, 2016)
               U = np.abs(INIT[udex] + sol[:,0])
               W = np.abs(sol[:,1])

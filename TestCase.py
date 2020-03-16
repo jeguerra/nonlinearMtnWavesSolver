@@ -73,7 +73,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(183, 90, 82.0, 26.0, 300.0, 6000.0, 12000.0, 1000.0, 0.01, 1, 1.0E+4)
+                     self.setData(199, 90, 82.0, 26.0, 300.0, 6000.0, 12000.0, 1000.0, 0.01, 1, 1.0E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -134,13 +134,13 @@ class TestCase:
               self.HOPT = [h0, aC, lC, kC, withWindow, Mountain]
               
               #% Transient solve parameters
-              DT = 0.05 # seconds
-              HR = 1.0 # hours
+              DT = 0.025 # seconds
+              HR = 2.0 # hours
               rampTime = 900  # 10 minutes to ramp up U_bar
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 400 # Stride for diagnostic output
-              ITI = 4000 # Stride for image output
+              ITI = 1200 # Stride for image output
               RTI = 1 # Stride for residual visc update
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]
        
