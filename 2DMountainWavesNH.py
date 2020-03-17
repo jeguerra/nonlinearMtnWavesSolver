@@ -425,10 +425,15 @@ def runModel(TestName):
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
-              # Compute Lagrange Multiplier column augmentation matrices
+              # Compute Lagrange Multiplier column augmentation matrices (terrain equation)
               C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX+1, format='csr')
-              
+              # Compute LM column matrices (vertical PGF = 0)
+              '''
+              PPXM = (REFS[12] - REFS[16].dot(REFS[13])).tolil()
+              PPZM = (REFS[13]).tolil()
+              C3 = PPZM[np.ix_(topDex,topDex)]
+              '''
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
               if ExactBC:

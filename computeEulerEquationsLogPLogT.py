@@ -275,7 +275,7 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields):
+def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -286,6 +286,10 @@ def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields):
        DDz = DDZM.dot(fields)
        PPx = DDx - DZDX.dot(DDz)
        
+       # Apply Neumann condition on pressure gradients
+       PPx[neuDex[0],2] *= 0.0
+       DDz[neuDex[1],2] *= 0.0
+       
        # Compute diffusive fluxes
        xflux = RESCFX * PPx
        zflux = RESCFZ * DDz
@@ -295,6 +299,10 @@ def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields):
        DDxz = DDZM.dot(xflux)
        DDz = DDZM.dot(zflux)
        PPx = DDxx - DZDX.dot(DDxz)
+       
+       # Apply Neumann condition on diffusive flux of pressure
+       PPx[neuDex[0],2] *= 0.0
+       DDz[neuDex[1],2] *= 0.0
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        DqDt = PPx + DDz
