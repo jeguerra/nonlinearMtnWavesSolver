@@ -48,8 +48,9 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        extDex = (vDex, vDex, vDex, vDex)
        # Tuple of lateral and vertical indices for Neumann conditions (pressure)
        latDex = np.unique(np.concatenate((uldex,urdex)))
-       verDex = np.unique(utdex)
-       neuDex = (latDex, verDex)
+       verDex1 = np.unique(utdex)
+       verDex2 = np.unique(np.concatenate((ubdex,utdex)))
+       neuDex = (latDex, verDex1, verDex2)
        
        # BC indices for static solution (per variable)
        rowsOutU = set(np.concatenate((uldex,urdex,utdex)))

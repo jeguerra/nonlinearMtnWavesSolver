@@ -38,29 +38,29 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
                      rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
-                     #rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex)
+                     #rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      #rhs[extDex[0],0] *= 0.0
                      #rhs[extDex[1],1] *= 0.0
                      #rhs[extDex[2],2] *= 0.0
                      #rhs[extDex[3],3] *= 0.0
-                     rhs[zeroDex[0],0] *= 0.0
-                     rhs[zeroDex[1],1] *= 0.0
-                     rhs[zeroDex[2],2] *= 0.0
-                     rhs[zeroDex[3],3] *= 0.0
+                     #rhs[zeroDex[0],0] *= 0.0
+                     #rhs[zeroDex[1],1] *= 0.0
+                     #rhs[extDex[2],2] *= 0.0
+                     #rhs[zeroDex[3],3] *= 0.0
               if FlowDiff2:
                      rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
-                     #rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields)
+                     #rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
-                     rhs[extDex[0],0] *= 0.0
-                     rhs[extDex[1],1] *= 0.0
-                     rhs[extDex[2],2] *= 0.0
-                     rhs[extDex[3],3] *= 0.0
-                     rhs[zeroDex[0],0] *= 0.0
-                     rhs[zeroDex[1],1] *= 0.0
-                     rhs[zeroDex[2],2] *= 0.0
-                     rhs[zeroDex[3],3] *= 0.0
+                     #rhs[extDex[0],0] *= 0.0
+                     #rhs[extDex[1],1] *= 0.0
+                     #rhs[extDex[2],2] *= 0.0
+                     #rhs[extDex[3],3] *= 0.0
+                     #rhs[zeroDex[0],0] *= 0.0
+                     #rhs[zeroDex[1],1] *= 0.0
+                     #rhs[zeroDex[2],2] *= 0.0
+                     #rhs[zeroDex[3],3] *= 0.0
                      
               return rhs
        
