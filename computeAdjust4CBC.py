@@ -45,7 +45,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        
        # Index all boundary DOF that can be diffused on
        vDex = np.unique(np.concatenate((uldex,urdex,ubdex,utdex)))
-       extDex = (vDex, vDex, vDex, vDex)
+       #extDex = (vDex, vDex, vDex, vDex)
+       extDex = vDex
        # Tuple of lateral and vertical indices for Neumann conditions (pressure)
        latDex = np.unique(np.concatenate((uldex,urdex)))
        verDex1 = np.unique(utdex)
@@ -55,8 +56,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC indices for static solution (per variable)
        rowsOutU = set(np.concatenate((uldex,urdex,utdex)))
        rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
-       #rowsOutP = set(np.concatenate((uldex,urdex)))
-       rowsOutP = set([]) # Totally free boundary for pressure...
+       rowsOutP = set(np.concatenate((uldex,urdex)))
+       #rowsOutP = set([]) # Totally free boundary for pressure...
        rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)

@@ -209,6 +209,14 @@ def runModel(TestName):
        # Compute DX and DZ grid length scales
        DX = np.max(np.abs(np.diff(REFS[0])))
        DZ = np.max(np.abs(np.diff(REFS[1])))
+       print('Nominal grid lengths:',DX,DZ)
+       
+       # Handle grid anisotropy
+       if DX > DZ:
+              DZ *= DX / DZ # Over-diffuse in the vertical
+       elif DZ > DX:
+              DX *= DZ / DX
+       print('Adjusted grid lengths by aspect ratio:',DX,DZ)
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)

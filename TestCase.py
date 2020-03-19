@@ -134,8 +134,8 @@ class TestCase:
               self.HOPT = [h0, aC, lC, kC, withWindow, Mountain]
               
               #% Transient solve parameters
-              DT = 0.025 # seconds
-              HR = 2.0 # hours
+              DT = 0.05 # seconds
+              HR = 1.0 # hours
               rampTime = 900  # 10 minutes to ramp up U_bar
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

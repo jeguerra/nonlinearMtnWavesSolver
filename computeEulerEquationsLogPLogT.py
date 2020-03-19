@@ -286,10 +286,6 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        DDz = DDZM.dot(fields)
        PPx = DDx - DZDX.dot(DDz)
        
-       # Apply Neumann condition on pressure gradients
-       PPx[neuDex[0],:] *= 0.0
-       DDz[neuDex[2],:] *= 0.0
-       
        # Compute diffusive fluxes
        xflux = RESCFX * PPx
        zflux = RESCFZ * DDz
@@ -299,10 +295,6 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        DDxz = DDZM.dot(xflux)
        DDz = DDZM.dot(zflux)
        PPx = DDxx - DZDX.dot(DDxz)
-       
-       # Apply Neumann condition on diffusive flux of pressure
-       #PPx[neuDex[0],:] *= 0.0
-       #DDz[neuDex[2],:] *= 0.0
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        DqDt = PPx + DDz
@@ -320,25 +312,17 @@ def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        DDz = DDZM.dot(fields)
        PPx = DDx - DZDX.dot(DDz)
        
-       # Apply Neumann condition on pressure gradients
-       PPx[neuDex[0],:] *= 0.0
-       DDz[neuDex[2],:] *= 0.0
-       
        # Compute 2nd partials of perturbations
        DDx2 = DDXM.dot(PPx)
        DDz2 = DDZM.dot(PPx)
        PPx2 = DDx2 - DZDX.dot(DDz2)
        DDz2 = DDZM.dot(DDz)
        
-       # Apply Neumann condition on diffusive flux of pressure
-       #PPx2[neuDex[0],:] *= 0.0
-       #DDz2[neuDex[2],:] *= 0.0
-       
        # Compute diffusive fluxes
        xflux = RESCFX * PPx2
        zflux = RESCFZ * DDz2
        
-       # Compute the tendencies (divergence of diffusive flux... discontinuous)
+       # Compute the tendencies
        DqDt = xflux + zflux
        
        return DqDt
