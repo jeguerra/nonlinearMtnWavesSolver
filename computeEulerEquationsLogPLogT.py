@@ -237,7 +237,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DqDz = DDZM.dot(fields)
        PqPx = DqDx - DZDX.dot(DqDz)
        
-       # Apply Neumann condition on pressure gradients
+       # Apply Neumann condition on pressure gradients (on flow boundaries)
        PqPx[neuDex[0],2] *= 0.0
        DqDz[neuDex[1],2] *= 0.0
        

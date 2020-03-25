@@ -49,7 +49,7 @@ import faulthandler; faulthandler.enable()
 # Disk settings
 #localDir = '/media/jeguerra/scratch/'
 #localDir = '/Users/TempestGuerra/scratch/'
-localDir = '/scratch/jorge/'
+#localDir = '/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
@@ -210,14 +210,7 @@ def runModel(TestName):
        DX = np.max(np.abs(np.diff(REFS[0])))
        DZ = np.max(np.abs(np.diff(REFS[1])))
        print('Nominal grid lengths:',DX,DZ)
-       
-       # Handle grid anisotropy
-       if DX > DZ:
-              DZ *= DX / DZ # Over-diffuse in the vertical
-       elif DZ > DX:
-              DX *= DZ / DX
-       print('Adjusted grid lengths by aspect ratio:',DX,DZ)
-       
+      
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)

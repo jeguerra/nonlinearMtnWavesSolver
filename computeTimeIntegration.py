@@ -34,7 +34,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      rhs[zeroDex[0],0] *= 0.0
                      rhs[zeroDex[1],1] *= 0.0
-                     rhs[zeroDex[2],2] *= 0.0
+                     #rhs[zeroDex[2],2] *= 0.0
                      rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
                      rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
@@ -42,8 +42,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      rhs[extDex,:] *= 0.0
               if FlowDiff2:
-                     rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
-                     #rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
+                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
                      rhs[extDex,:] *= 0.0
@@ -140,8 +139,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               #QM = bn.nanmax(np.abs(total_sol), axis=0)
               QM = bn.nanmax(np.abs(sol), axis=0)
               # Estimate the residual
-              RES = 1.0 / DT * (sol - sol0)
-              RES -= rhsDyn
+              #RES = 1.0 / DT * (sol - sol0)
+              RES = rhsDyn
               # Compute diffusion coefficients
               RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
               sol, rhsDiff = ssprk34(sol, False, True, False)
