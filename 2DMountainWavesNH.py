@@ -165,6 +165,10 @@ def runModel(TestName):
        
        # Set residual diffusion switch
        ResDiff = thisTest.solType['DynSGS']
+       if ResDiff:
+              print('DynSGS Diffusion Model.')
+       else:
+              print('Flow-Dependent Diffusion Model.')
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = thisTest.solType['SolveFull']
