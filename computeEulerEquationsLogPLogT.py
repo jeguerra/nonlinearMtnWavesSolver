@@ -7,6 +7,14 @@ Created on Mon Jul 22 13:11:11 2019
 """
 import numpy as np
 import scipy.sparse as sps
+from rsb import rsb_matrix
+
+def computeFieldDerivatives(q, DDX, DDZ, DZDX):
+       DqDx = DDX.dot(q)
+       DqDz = DDZ.dot(q)
+       PqPx = DqDx - (DZDX * DqDz)
+       
+       return DqDx, PqPx, DqDz
 
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -229,26 +237,24 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DQDZ = REFG[4]
        
        # Compute advective (multiplicative) operators
-       UM = sps.diags(U, offsets=0, format='csr')
-       wxz = sps.diags(fields[:,1], offsets=0, format='csr')
+       UM = np.expand_dims(U,1)
+       wxz = np.expand_dims(fields[:,1],1)
+       
+       # Compute pressure gradient force scaling (buoyancy)
+       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
+       RdT = RdT_bar * (1.0 + T_ratio)
               
        # Compute derivative of perturbations
-       DqDx = DDXM.dot(fields)
-       DqDz = DDZM.dot(fields)
-       PqPx = DqDx - DZDX.dot(DqDz)
+       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
        # Apply Neumann condition on pressure gradients (on flow boundaries)
        PqPx[neuDex[0],2] *= 0.0
        DqDz[neuDex[1],2] *= 0.0
        
        # Compute advection
-       UPqPx = UM.dot(PqPx)
-       wDQqDz = wxz.dot(DqDz + DQDZ)
+       UPqPx = UM * PqPx
+       wDQqDz = wxz * (DqDz + DQDZ)
        transport = UPqPx + wDQqDz
-       
-       # Compute pressure gradient forces
-       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
-       RdT = RdT_bar * (1.0 + T_ratio)
 
        DqDt = -transport
        # Horizontal momentum equation
@@ -282,22 +288,20 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        RESCFZ = RESCF[1]
        
        # Compute derivatives of perturbations
-       DDx = DDXM.dot(fields)
-       DDz = DDZM.dot(fields)
-       PPx = DDx - DZDX.dot(DDz)
+       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
        # Compute diffusive fluxes
-       xflux = RESCFX * PPx
-       zflux = RESCFZ * DDz
+       xflux = RESCFX * PqPx
+       zflux = RESCFZ * DqDz
        
        # Compute derivatives of fluxes
        DDxx = DDXM.dot(xflux)
        DDxz = DDZM.dot(xflux)
-       DDz = DDZM.dot(zflux)
-       PPx = DDxx - DZDX.dot(DDxz)
+       PPx2 = DDxx - (DZDX * DDxz)
+       DDz2 = DDZM.dot(zflux)
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
-       DqDt = PPx + DDz
+       DqDt = PPx2 + DDz2
        
        return DqDt
 
@@ -308,15 +312,13 @@ def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        RESCFZ = RESCF[1]
        
        # Compute 1st partials of perturbations
-       DDx = DDXM.dot(fields)
-       DDz = DDZM.dot(fields)
-       PPx = DDx - DZDX.dot(DDz)
+       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
        # Compute 2nd partials of perturbations
-       DDx2 = DDXM.dot(PPx)
-       DDz2 = DDZM.dot(PPx)
-       PPx2 = DDx2 - DZDX.dot(DDz2)
-       DDz2 = DDZM.dot(DDz)
+       DDxx = DDXM.dot(PqPx)
+       DDxz = DDZM.dot(PqPx)
+       PPx2 = DDxx - (DZDX * DDxz)
+       DDz2 = DDZM.dot(DqDz)
        
        # Compute diffusive fluxes
        xflux = RESCFX * PPx2

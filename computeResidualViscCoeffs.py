@@ -27,12 +27,6 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ):
               QRESX[fdex, vv] = (0.5 * DX) * U[fdex]
               fdex = QRESZ[:,vv] > (0.5 * DZ) * W
               QRESZ[fdex, vv] = (0.5 * DZ) * W[fdex]
-              '''
-              updex = np.argwhere(QRESX[:,vv] >= 0.5 * DX)
-              QRESX[updex,vv] = 0.5 * DX * U[updex]
-              updex = np.argwhere(QRESZ[:,vv] >= 0.5 * DZ)
-              QRESZ[updex,vv] = 0.5 * DZ * W[updex]
-              '''
        
        return (QRESX, QRESZ)
 

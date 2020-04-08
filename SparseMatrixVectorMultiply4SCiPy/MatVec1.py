@@ -12,6 +12,8 @@ import time
 import numpy as np
 import scipy.sparse as sps
 from joblib import Parallel, delayed
+from oct2py import Oct2Py
+from rsb import rsb_matrix
                      
 def computeMatVecDotParfor(aCSRmat, aDenseVec, runParFor):
        
@@ -43,29 +45,44 @@ def computeMatVecDotParfor(aCSRmat, aDenseVec, runParFor):
 if __name__ == '__main__':
        
        # Set up problem
-       N = 2048
+       N = 4096
        
        # Make a test sparse matrix
        A = sps.random(N, N, density=0.5, format='csr')
        
-       # Make a dense teste vector
-       V = np.ones(N)
+       # Make a dense teste vector (MUST be NX1 for Octave to work)
+       V = np.ones((N,1))
        
        # Test native dot product
        start = time.time()
        R1 = A.dot(V)
        end = time.time()
-       print('Native SpNV: ', end - start, ' sec')
+       print('Native SpMV: ', end - start, ' sec')
        
-       # Test SpNV serial implementation
+       # Test native rsb dot product
+       AR = rsb_matrix(A)
+       #AR.autotune()
        start = time.time()
-       R2 = computeMatVecDotParfor(A, V, False)
+       R2 = AR.dot(V)
        end = time.time()
-       print('Serial SpNV: ', end - start, ' sec')
+       print('PyRSB SpMV: ', end - start, ' sec')
        
-       # Test SpNV parallel implementation
+       # Test SpMV serial implementation
        start = time.time()
-       R3 = computeMatVecDotParfor(A, V, True)
+       R3 = computeMatVecDotParfor(A, V, False)
        end = time.time()
-       print('Parallel SpNV: ', end - start, ' sec')
+       print('Serial SpMV: ', end - start, ' sec')
+       
+       # Test SpMV parallel implementation
+       start = time.time()
+       R4 = computeMatVecDotParfor(A, V, True)
+       end = time.time()
+       print('Parallel SpMV: ', end - start, ' sec')
+       
+       # Test SpMV from Octave bridge
+       oc = Oct2Py(temp_dir='/dev/shm/')
+       start = time.time()
+       R5 = oc.mtimes(A,V)
+       end = time.time()
+       print('Octave SpMV: ', end - start, ' sec')
        

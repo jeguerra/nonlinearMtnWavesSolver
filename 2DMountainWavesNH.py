@@ -40,6 +40,7 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
+from rsb import rsb_matrix
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 from computeTimeIntegration import computeTimeIntegrationNL
@@ -47,9 +48,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 import faulthandler; faulthandler.enable()
 
 # Disk settings
-#localDir = '/media/jeguerra/scratch/'
+localDir = '/home/jeg/scratch/'
 #localDir = '/Users/TempestGuerra/scratch/'
-#localDir = '/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
@@ -340,26 +340,33 @@ def runModel(TestName):
               DDXM_GML = GMLOP.dot(DDXM)
               DDZM_GML = GMLOP.dot(DDZM)
               
-       REFS.append(DDXM_GML.tocsr())
-       REFS.append(DDZM_GML.tocsr())
+       REFS.append(DDXM_GML)
+       REFS.append(DDZM_GML)
+       #REFS.append(rsb_matrix(DDXM_GML))
+       #REFS.append(rsb_matrix(DDZM_GML))
        # Store derivative operators without GML damping
        if SparseDerivativesDynSGS:
-              REFS.append(DDXM_SP.tocsr())
-              REFS.append(DDZM_SP.tocsr())
+              DMX = rsb_matrix(DDXM_SP)
+              DMZ = rsb_matrix(DDZM_SP)
        else:
-              REFS.append(DDXM.tocsr())
-              REFS.append(DDZM.tocsr())
+              DMX = rsb_matrix(DDXM)
+              DMZ = rsb_matrix(DDZM)
+              
+       DMX.autotune()
+       REFS.append(DMX)
+       DMZ.autotune()
+       REFS.append(DMZ)
        
        # Store the terrain profile in 3 ways
        REFS.append(DZT)
-       DZDX = np.reshape(DZT, (OPS,), order='F')
+       DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
-       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
-       REFS.append(DZDXM)
+       #DZDXM = sps.diags(DZDX, offsets=0, format='csr')
+       #REFS.append(DZDXM)
        
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
-       del(DZDX); del(DZDXM)
+       del(DZDX); #del(DZDXM)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
@@ -660,6 +667,7 @@ def runModel(TestName):
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
               sgs = np.reshape(SGS, (OPS, numVar), order='F')
               
+              ff = 1
               for tt in range(len(TI)):
                      thisTime = TOPT[0] * tt
                      # Put previous solution into index 1 storage
@@ -693,9 +701,30 @@ def runModel(TestName):
                                           clim = np.abs(dqdt.min())
                                    else:
                                           clim = np.abs(dqdt.max())
+                                  
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                   #plt.gca().set_facecolor('k')
+                                   
+                                   if pp < (numVar - 1):
+                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                   else:
+                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                          
                                    plt.colorbar(ccheck, format='%.3e')
+                                   
+                                   if pp == 0:
+                                          plt.title('u (m/s)')
+                                   elif pp == 1:
+                                          plt.title('w (m/s)')
+                                   elif pp == 2:
+                                          plt.title('ln-p (Pa)')
+                                   else:
+                                          plt.title('ln-theta (K)')
+       
+                            plt.savefig('transient' + str(ff).zfill(3) + '.png', dpi=600, format='png', bbox_inches='tight', pad_inches=0.005)
                             plt.show()
+                            ff += 1
                      
                      # Ramp up the background wind to decrease transients
                      if thisTime <= TOPT[2]:

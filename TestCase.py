@@ -10,7 +10,7 @@ import numpy as np
 class TestCase:
        
        '''
-       setData ARGS:
+       setUserData ARGS:
               NX: Odd number specifying horizontal grid size
               NZ: Integer specifying vertical grid size
               XF: Factor in kilometers for X domain length
@@ -33,7 +33,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
@@ -43,7 +43,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -53,7 +53,7 @@ class TestCase:
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(167, 96, 75.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 96, 75.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
@@ -63,7 +63,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     self.setData(167, 96, 75.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 96, 75.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
@@ -73,12 +73,12 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setData(199, 90, 82.0, 26.0, 300.0, 6000.0, 12000.0, 1000.0, 0.01, 1, 1.0E+4)
+                     self.setUserData(255, 92, 82.0, 26.0, 300.0, 6000.0, 12000.0, 1000.0, 0.01, 1, 1.0E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
-       def setData(self, NX, NZ, XF, ZF, T0, depth, width, h0, NBVF, Mountain, kC):
+       def setUserData(self, NX, NZ, XF, ZF, T0, depth, width, h0, NBVF, Mountain, kC):
               
               # Set physical constants (dry air)
               gc = 9.80601
@@ -135,7 +135,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 1.0 # hours
+              HR = 5.0 # hours
               rampTime = 900  # 10 minutes to ramp up U_bar
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
