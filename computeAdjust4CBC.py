@@ -56,8 +56,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC indices for static solution (per variable)
        rowsOutU = set(np.concatenate((uldex,urdex,utdex)))
        rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
-       #rowsOutP = set(np.concatenate((uldex,urdex)))
-       rowsOutP = set([]) # Totally free boundary for pressure...
+       rowsOutP = set(np.concatenate((uldex,urdex)))
+       #rowsOutP = set([]) # Totally free boundary for pressure...
        rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)

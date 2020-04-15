@@ -361,16 +361,13 @@ def runModel(TestName):
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
-       #DZDXM = sps.diags(DZDX, offsets=0, format='csr')
-       #REFS.append(DZDXM)
        
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
-       del(DZDX); #del(DZDXM)
+       del(DZDX);
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
-       #totalDOF = physDOF + NX
        
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
@@ -429,7 +426,7 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U, neuDex)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
@@ -440,11 +437,12 @@ def runModel(TestName):
               # Compute Lagrange Multiplier column augmentation matrices (terrain equation)
               C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX+1, format='csr')
-              # Compute LM column matrices (vertical PGF = 0)
               '''
+              # Compute LM column matrices (top vertical PGF = 0 and lateral horizontal PGF = 0)
               PPXM = (REFS[12] - REFS[16].dot(REFS[13])).tolil()
               PPZM = (REFS[13]).tolil()
-              C3 = PPZM[np.ix_(topDex,topDex)]
+              C3 = PPXM[np.ix_(neuDex[0],neuDex[0])]
+              C4 = PPZM[np.ix_(neuDex[1],neuDex[1])]
               '''
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
@@ -642,7 +640,7 @@ def runModel(TestName):
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U, neuDex)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               RHS[zeroDex_stat] *= 0.0

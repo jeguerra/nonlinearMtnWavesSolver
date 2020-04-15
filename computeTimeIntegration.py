@@ -38,8 +38,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
                      rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
-                     #rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
+                     # Null tendency at all boundary DOF
                      rhs[extDex,:] *= 0.0
               if FlowDiff2:
                      rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
@@ -53,7 +53,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               #Apply updates
               dsol = coeff * DT * rhs
               sol1 = sol0 + dsol
-              U = sol1[:,0] + uRamp * INIT[udex]
+              U = sol1[:,0] + (uRamp * INIT[udex])
               sol1[botDex,1] = np.array(dHdX * U[botDex])
               
               return sol1
@@ -143,10 +143,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               RES = rhsDyn
               # Compute diffusion coefficients
               RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
-              sol, rhsDiff = ssprk22(sol, False, True, False)
+              sol, rhsDiff = ssprk34(sol, False, True, False)
        else: 
               # Flow weighted diffusion (Guerra, 2016)
               RESCF = dcoeffs.computeFlowVelocityCoeffs(U, W, DX, DZ)
-              sol, rhsDiff = ssprk22(sol, False, False, True)
+              sol, rhsDiff = ssprk34(sol, False, False, True)
        
        return sol, (rhsDyn + rhsDiff)

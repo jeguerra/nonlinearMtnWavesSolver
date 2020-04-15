@@ -248,8 +248,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
        # Apply Neumann condition on pressure gradients (on flow boundaries)
-       PqPx[neuDex[0],2] *= 0.0
-       DqDz[neuDex[1],2] *= 0.0
+       #PqPx[neuDex[0],2] *= 0.0
+       #DqDz[neuDex[1],2] *= 0.0
        
        # Compute advection
        UPqPx = UM * PqPx

@@ -29,8 +29,8 @@ class TestCase:
                      # Reproduction of the Classical Schar case (one solve)
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
-                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
+                                'ToRestart': False, 'IsRestart': False, 'NewtonLin': False, \
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
                      self.setUserData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
@@ -70,10 +70,10 @@ class TestCase:
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
-                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
+                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(255, 92, 82.0, 26.0, 300.0, 6000.0, 12000.0, 1000.0, 0.01, 1, 1.0E+4)
+                     self.setUserData(323, 96, 82.0, 36.0, 300.0, 6000.0, 12000.0, 2000.0, 0.01, 1, 1.5E+4)
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -116,7 +116,7 @@ class TestCase:
               # Set the Rayleigh options
               applyTop = True
               applyLateral = True
-              mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
+              mu = np.array([1.0E-2, 1.0E-2, 1.0E-1, 1.0E-2])
               mu *= 1.0
               self.RLOPT = (depth, width, applyTop, applyLateral, mu)
               
