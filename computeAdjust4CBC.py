@@ -68,8 +68,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC indices for transient solution (per variable)
        rowsOutW_trans = set(np.concatenate((ubdex,uldex,urdex,utdex)))
        
-       left = np.concatenate((uldex, wldex, tldex))
-       right = np.concatenate((urdex, wrdex, trdex))
+       left = np.concatenate((uldex, wldex, pldex, tldex))
+       right = np.concatenate((urdex, wrdex, prdex, trdex))
        top = np.concatenate((utdex, wtdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
        #rowsOutBC_static = set(np.concatenate((left, right, top)))

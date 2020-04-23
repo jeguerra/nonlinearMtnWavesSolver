@@ -47,9 +47,8 @@ from computeTimeIntegration import computeTimeIntegrationNL
 import faulthandler; faulthandler.enable()
 
 # Disk settings
-#localDir = '/media/jeguerra/scratch/'
+localDir = '/home/jeg/scratch/'
 #localDir = '/Users/TempestGuerra/scratch/'
-localDir = '/scratch/jorge/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
@@ -903,9 +902,9 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       #TestName = 'SmoothStratScharIter'
+       TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       TestName = 'CustomTest'
+       #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
        for ii in range(1):
