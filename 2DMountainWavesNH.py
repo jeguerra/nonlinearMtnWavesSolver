@@ -215,12 +215,17 @@ def runModel(TestName):
        DZ = np.max(np.abs(np.diff(REFS[1])))
        print('Nominal grid lengths:',DX,DZ)
       
-       #% Compute the raw derivative matrix operators in alpha-xi computational space
+       # Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+       
+       # Neumann condition on PGF at top boundary
+       import computeNeumannAdjusted as nma
+       DDX_NM = nma.computeNeumannAdjusted(DDX_1D, True, True)
+       DDZ_NM = nma.computeNeumannAdjusted(DDZ_1D, False, True)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -329,6 +334,9 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
+        #%% Get the 2D linear operators in Hermite-Chebyshev space (Neumman BC)
+       DDXM_NM, DDZM_NM = computePartialDerivativesXZ(DIMS, REFS, DDX_NM, DDZ_NM)
+       
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
@@ -344,20 +352,25 @@ def runModel(TestName):
        REFS.append(DDZM_GML)
        #REFS.append(rsb_matrix(DDXM_GML))
        #REFS.append(rsb_matrix(DDZM_GML))
-       # Store derivative operators without GML damping
-       if SparseDerivativesDynSGS:
-              DMX = rsb_matrix(DDXM_SP)
-              DMZ = rsb_matrix(DDZM_SP)
-       else:
-              DMX = rsb_matrix(DDXM)
-              DMZ = rsb_matrix(DDZM)
-              
-       DMX.autotune()
-       REFS.append(DMX)
-       DMZ.autotune()
-       REFS.append(DMZ)
        
-       # Store the terrain profile in 3 ways
+       if StaticSolve:
+              REFS.append(DDXM)
+              REFS.append(DDZM)
+       else:
+              # Store derivative operators without GML damping
+              if SparseDerivativesDynSGS:
+                     DMX = rsb_matrix(DDXM_SP)
+                     DMZ = rsb_matrix(DDZM_SP)
+              else:
+                     DMX = rsb_matrix(DDXM)
+                     DMZ = rsb_matrix(DDZM)
+                     
+              DMX.autotune()
+              REFS.append(DMX)
+              DMZ.autotune()
+              REFS.append(DMZ)
+       
+       # Store the terrain profile
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
@@ -368,6 +381,7 @@ def runModel(TestName):
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
+       lmsDOF = (NX + 1)
        
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
@@ -391,7 +405,7 @@ def runModel(TestName):
               SOLT = np.zeros((physDOF, 2))
               
               # Initialize Lagrange Multiplier storage
-              LMS = np.zeros(NX+1)
+              LMS = np.zeros(lmsDOF)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
@@ -434,16 +448,10 @@ def runModel(TestName):
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
-              # Compute Lagrange Multiplier column augmentation matrices (terrain equation)
+              #%% Compute Lagrange Multiplier column augmentation matrices (terrain equation)
               C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX+1, format='csr')
-              '''
-              # Compute LM column matrices (top vertical PGF = 0 and lateral horizontal PGF = 0)
-              PPXM = (REFS[12] - REFS[16].dot(REFS[13])).tolil()
-              PPZM = (REFS[13]).tolil()
-              C3 = PPXM[np.ix_(neuDex[0],neuDex[0])]
-              C4 = PPZM[np.ix_(neuDex[1],neuDex[1])]
-              '''
+       
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
               if ExactBC:
@@ -453,7 +461,7 @@ def runModel(TestName):
               LM = sps.lil_matrix(colShape)
               LQ = sps.lil_matrix(colShape)
               
-              # Apply BC adjustments and indexing block-wise (Lagrange blocks)
+              #%% Apply BC adjustments and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
               LMA = LM[pbcDex,:]
@@ -464,7 +472,7 @@ def runModel(TestName):
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((NX+1,NX+1))
+              LDIA = sps.lil_matrix((lmsDOF,lmsDOF))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -624,13 +632,12 @@ def runModel(TestName):
                      
               #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
-              LMS += dsol[0:NX+1]
-              dsolQ = dsol[NX+1:]
+              LMS += dsol[0:lmsDOF]
+              dsolQ = dsol[lmsDOF:]
               
-              alpha = 1.0
-              SOLT[sysDex,0] += alpha * dsolQ
+              SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
-              SOLT[sysDex,1] = alpha * dsolQ
+              SOLT[sysDex,1] = dsolQ
               
               print('Recover full linear solution vector... DONE!')
               
@@ -927,10 +934,10 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       #TestName = 'SmoothStratScharIter'
+       TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       TestName = 'CustomTest'
+       #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(1):
+       for ii in range(4):
               runModel(TestName)

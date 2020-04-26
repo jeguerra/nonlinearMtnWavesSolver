@@ -59,7 +59,7 @@ class TestCase:
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             

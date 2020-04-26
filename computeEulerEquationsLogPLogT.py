@@ -41,7 +41,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Get the derivative operators
        DDXM = REFS[10]
        DDZM = REFS[11]
-       DZDX = REFS[15]
+       DZDX = REFS[15].flatten()
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
@@ -76,10 +76,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
        DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
        
-       # Compute advective (multiplicative) diagonal operators
-       UM = sps.diags(U, offsets=0, format='csr')
-       WXZM = sps.diags(WXZ, offsets=0, format='csr')
-       
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
        T_bar = (1.0 / Rd) * RdT_bar
@@ -96,14 +92,18 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        RdTM = sps.diags(RdT, offsets=0, format='csr')
        bfM = sps.diags(bf, offsets=0, format='csr')
        
-       PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
+       # Compute partial in X terrain following block
+       PPXM = DDXM - DZDXM.dot(DDZM)
+       # Compute derivatives of temperature perturbation
+       #PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
+       PtPx = PPXM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
        PtPxM = sps.diags(PtPx, offsets=0, format='csr')
        DtDzM = sps.diags(DtDz, offsets=0, format='csr')
        
-       # Compute partial in X terrain following block
-       PPXM = DDXM - DZDXM.dot(DDZM)
-       
+       # Compute advective (multiplicative) diagonal operators
+       UM = sps.diags(U, offsets=0, format='csr')
+       WXZM = sps.diags(WXZ, offsets=0, format='csr')
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
        

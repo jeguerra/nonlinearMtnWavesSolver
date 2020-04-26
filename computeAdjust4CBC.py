@@ -36,7 +36,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        pldex = np.add(uldex, iP * OPS)
        prdex = np.add(urdex, iP * OPS)
        pbdex = np.add(ubdex, iP * OPS)
-       #ptdex = np.add(utdex, iP * OPS)
+       ptdex = np.add(utdex, iP * OPS)
        
        tldex = np.add(uldex, iT * OPS)
        trdex = np.add(urdex, iT * OPS)
