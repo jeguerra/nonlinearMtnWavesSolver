@@ -40,6 +40,7 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
+from rsb import rsb_matrix
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 from computeTimeIntegration import computeTimeIntegrationNL
@@ -164,6 +165,10 @@ def runModel(TestName):
        
        # Set residual diffusion switch
        ResDiff = thisTest.solType['DynSGS']
+       if ResDiff:
+              print('DynSGS Diffusion Model.')
+       else:
+              print('Flow-Dependent Diffusion Model.')
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = thisTest.solType['SolveFull']
@@ -209,20 +214,18 @@ def runModel(TestName):
        DX = np.max(np.abs(np.diff(REFS[0])))
        DZ = np.max(np.abs(np.diff(REFS[1])))
        print('Nominal grid lengths:',DX,DZ)
-       
-       # Handle grid anisotropy
-       if DX > DZ:
-              DZ *= DX / DZ # Over-diffuse in the vertical
-       elif DZ > DX:
-              DX *= DZ / DX
-       print('Adjusted grid lengths by aspect ratio:',DX,DZ)
-       
-       #% Compute the raw derivative matrix operators in alpha-xi computational space
+      
+       # Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+       
+       # Neumann condition on PGF at top boundary
+       import computeNeumannAdjusted as nma
+       DDX_NM = nma.computeNeumannAdjusted(DDX_1D, True, True)
+       DDZ_NM = nma.computeNeumannAdjusted(DDZ_1D, False, True)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -331,6 +334,9 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
+        #%% Get the 2D linear operators in Hermite-Chebyshev space (Neumman BC)
+       DDXM_NM, DDZM_NM = computePartialDerivativesXZ(DIMS, REFS, DDX_NM, DDZ_NM)
+       
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
@@ -342,30 +348,40 @@ def runModel(TestName):
               DDXM_GML = GMLOP.dot(DDXM)
               DDZM_GML = GMLOP.dot(DDZM)
               
-       REFS.append(DDXM_GML.tocsr())
-       REFS.append(DDZM_GML.tocsr())
-       # Store derivative operators without GML damping
-       if SparseDerivativesDynSGS:
-              REFS.append(DDXM_SP.tocsr())
-              REFS.append(DDZM_SP.tocsr())
-       else:
-              REFS.append(DDXM.tocsr())
-              REFS.append(DDZM.tocsr())
+       REFS.append(DDXM_GML)
+       REFS.append(DDZM_GML)
+       #REFS.append(rsb_matrix(DDXM_GML))
+       #REFS.append(rsb_matrix(DDZM_GML))
        
-       # Store the terrain profile in 3 ways
+       if StaticSolve:
+              REFS.append(DDXM)
+              REFS.append(DDZM)
+       else:
+              # Store derivative operators without GML damping
+              if SparseDerivativesDynSGS:
+                     DMX = rsb_matrix(DDXM_SP)
+                     DMZ = rsb_matrix(DDZM_SP)
+              else:
+                     DMX = rsb_matrix(DDXM)
+                     DMZ = rsb_matrix(DDZM)
+                     
+              DMX.autotune()
+              REFS.append(DMX)
+              DMZ.autotune()
+              REFS.append(DMZ)
+       
+       # Store the terrain profile
        REFS.append(DZT)
-       DZDX = np.reshape(DZT, (OPS,), order='F')
+       DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
-       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
-       REFS.append(DZDXM)
        
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
-       del(DZDX); del(DZDXM)
+       del(DZDX);
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
-       #totalDOF = physDOF + NX
+       lmsDOF = (NX + 1)
        
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
@@ -389,7 +405,7 @@ def runModel(TestName):
               SOLT = np.zeros((physDOF, 2))
               
               # Initialize Lagrange Multiplier storage
-              LMS = np.zeros(NX+1)
+              LMS = np.zeros(lmsDOF)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
@@ -424,7 +440,7 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U, neuDex)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
@@ -432,15 +448,10 @@ def runModel(TestName):
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
-              # Compute Lagrange Multiplier column augmentation matrices (terrain equation)
+              #%% Compute Lagrange Multiplier column augmentation matrices (terrain equation)
               C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX+1, format='csr')
-              # Compute LM column matrices (vertical PGF = 0)
-              '''
-              PPXM = (REFS[12] - REFS[16].dot(REFS[13])).tolil()
-              PPZM = (REFS[13]).tolil()
-              C3 = PPZM[np.ix_(topDex,topDex)]
-              '''
+       
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
               if ExactBC:
@@ -450,7 +461,7 @@ def runModel(TestName):
               LM = sps.lil_matrix(colShape)
               LQ = sps.lil_matrix(colShape)
               
-              # Apply BC adjustments and indexing block-wise (Lagrange blocks)
+              #%% Apply BC adjustments and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
               LMA = LM[pbcDex,:]
@@ -461,7 +472,7 @@ def runModel(TestName):
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((NX+1,NX+1))
+              LDIA = sps.lil_matrix((lmsDOF,lmsDOF))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -621,13 +632,12 @@ def runModel(TestName):
                      
               #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
-              LMS += dsol[0:NX+1]
-              dsolQ = dsol[NX+1:]
+              LMS += dsol[0:lmsDOF]
+              dsolQ = dsol[lmsDOF:]
               
-              alpha = 1.0
-              SOLT[sysDex,0] += alpha * dsolQ
+              SOLT[sysDex,0] += dsolQ
               # Store solution change to instance 1
-              SOLT[sysDex,1] = alpha * dsolQ
+              SOLT[sysDex,1] = dsolQ
               
               print('Recover full linear solution vector... DONE!')
               
@@ -637,7 +647,7 @@ def runModel(TestName):
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U, neuDex)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               RHS[zeroDex_stat] *= 0.0
@@ -662,6 +672,7 @@ def runModel(TestName):
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
               sgs = np.reshape(SGS, (OPS, numVar), order='F')
               
+              ff = 1
               for tt in range(len(TI)):
                      thisTime = TOPT[0] * tt
                      # Put previous solution into index 1 storage
@@ -695,9 +706,30 @@ def runModel(TestName):
                                           clim = np.abs(dqdt.min())
                                    else:
                                           clim = np.abs(dqdt.max())
+                                  
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                   #plt.gca().set_facecolor('k')
+                                   
+                                   if pp < (numVar - 1):
+                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                   else:
+                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                          
                                    plt.colorbar(ccheck, format='%.3e')
+                                   
+                                   if pp == 0:
+                                          plt.title('u (m/s)')
+                                   elif pp == 1:
+                                          plt.title('w (m/s)')
+                                   elif pp == 2:
+                                          plt.title('ln-p (Pa)')
+                                   else:
+                                          plt.title('ln-theta (K)')
+       
+                            plt.savefig('transient' + str(ff).zfill(3) + '.png', dpi=600, format='png', bbox_inches='tight', pad_inches=0.005)
                             plt.show()
+                            ff += 1
                      
                      # Ramp up the background wind to decrease transients
                      if thisTime <= TOPT[2]:
@@ -907,5 +939,5 @@ if __name__ == '__main__':
        #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(1):
+       for ii in range(4):
               runModel(TestName)
