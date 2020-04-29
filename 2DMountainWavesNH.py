@@ -247,7 +247,7 @@ def runModel(TestName):
        REFS.append(sigma)
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, pbdex, tbdex, \
+       ubdex, utdex, wbdex, ptdex, \
               ubcDex, wbcDex, pbcDex, tbcDex, \
               zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
@@ -378,6 +378,14 @@ def runModel(TestName):
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
        del(DZDX);
+       
+       # Adding Neumann boundary operators
+       DDXM_NM_GML = GMLOP.dot(DDXM_NM)
+       DDZM_NM_GML = GMLOP.dot(DDZM_NM)
+       REFS.append(DDXM_NM_GML)
+       REFS.append(DDZM_NM_GML)
+       del(DDXM_NM); del(DDXM_NM_GML)
+       del(DDZM_NM); del(DDZM_NM_GML)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
@@ -636,6 +644,9 @@ def runModel(TestName):
               dsolQ = dsol[lmsDOF:]
               
               SOLT[sysDex,0] += dsolQ
+              
+              # PGF Natural boundary
+              SOLT[ptdex,0] = SOLT[ptdex-1,0]
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ
               
@@ -896,6 +907,11 @@ def runModel(TestName):
                      plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
                      plt.tight_layout()
               plt.show()
+              
+              # Check W at the boundaries...
+              fig = plt.figure(figsize=(12.0, 6.0))
+              dwdt = np.reshape(RHS[wdex], (NZ, NX+1), order='F')
+              return (XL, ZTL, dwdt)
 
        #%% Check the boundary conditions
        '''
@@ -939,5 +955,15 @@ if __name__ == '__main__':
        #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(4):
-              runModel(TestName)
+       for ii in range(3):
+              diagOutput = runModel(TestName)
+              
+       #%% Spot check the vertical velocity residual
+       '''       
+       XL = diagOutput[0]
+       ZTL = diagOutput[1]
+       dwdt = diagOutput[2]       
+       ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dwdt, 201, cmap=cm.seismic)
+       plt.colorbar(ccheck, format='%+.3E')
+       plt.show()
+       '''
