@@ -44,8 +44,8 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DZDX = REFS[15].flatten()
        
        # Get the Neumann derivative operators
-       DDXM_NM = REFS[16]
-       DDZM_NM = REFS[17]
+       #DDXM_NM = REFS[16]
+       #DDZM_NM = REFS[17]
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
@@ -55,9 +55,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Compute (total) derivatives of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
-       
-       # Impose Natural boundary on PGF at top
-       DqDz[topdex,2] *= 0.0
        
        # Compute (partial) x derivatives of perturbations
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
@@ -95,15 +92,11 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        T_prime = T_ratio * T_bar
        
        RdT_barM = sps.diags(RdT_bar, offsets=0, format='csr')
-       #RdT_primeM = sps.diags(RdT_bar * T_ratio, offsets=0, format='csr')
        RdTM = sps.diags(RdT, offsets=0, format='csr')
        bfM = sps.diags(bf, offsets=0, format='csr')
        
        # Compute derivatives of temperature perturbation
        DtDz = DDZM.dot(T_prime)
-       
-       # Impose Natural boundary on PGF at top
-       DtDz[topdex] *= 0.0
        
        PtPx = DDXM.dot(T_prime) - DZDX * DtDz
        PtPxM = sps.diags(PtPx, offsets=0, format='csr')
@@ -114,26 +107,26 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
-       UPXM_NM = UM.dot(DDXM) + WXZM.dot(DDZM_NM)
+       #UPXM_NM = UM.dot(DDXM) + WXZM.dot(DDZM_NM)
        
        # Compute partial in X terrain following block
        PPXM = DDXM - DZDXM.dot(DDZM)
-       PPXM_NM = DDXM - DZDXM.dot(DDZM_NM) # NEUMANN BOUNDARY ON TOP EDGE
+       #PPXM_NM = DDXM - DZDXM.dot(DDZM_NM) # NEUMANN BOUNDARY ON TOP EDGE
        
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + PuPxM
        LD12 = DuDzM + DUDZM
-       LD13 = RdTM.dot(PPXM_NM) + (Rd * PtPxM)
+       LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
        LD21 = PwPxM
        LD22 = UPXM + DwDzM
-       LD23 = RdTM.dot(DDZM_NM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
+       LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bfM
        
        LD31 = gam * PPXM + PlpPxM
        LD32 = gam * DDZM + DlpDzM + DLPDZM
-       LD33 = UPXM_NM
+       LD33 = UPXM
        LD34 = None
        
        LD41 = PltPxM
@@ -256,14 +249,15 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        # Compute pressure gradient force scaling (buoyancy)
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        RdT = RdT_bar * (1.0 + T_ratio)
-       T_ratio[neuDex[1]] *= 0.0
+       #T_ratio[neuDex[1]] *= 0.0
               
        # Compute derivative of perturbations
-       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       DqDx = DDXM.dot(fields)
+       DqDz = DDZM.dot(fields)
        
        # Apply Neumann condition on pressure gradients (on flow boundaries)
-       #PqPx[neuDex[0],2] *= 0.0
-       DqDz[neuDex[1],2] *= 0.0
+       #DqDz[neuDex[1],2] *= 0.0
+       PqPx = DqDx - (DZDX * DqDz)
        
        # Compute advection
        UPqPx = UM * PqPx

@@ -247,7 +247,7 @@ def runModel(TestName):
        REFS.append(sigma)
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, ptdex, \
+       ubdex, utdex, wbdex, ptdex, pintDex, \
               ubcDex, wbcDex, pbcDex, tbcDex, \
               zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
@@ -645,8 +645,18 @@ def runModel(TestName):
               
               SOLT[sysDex,0] += dsolQ
               
-              # PGF Natural boundary
+              '''
+              # PGF Natural boundary (1st order adjustment)
               SOLT[ptdex,0] = SOLT[ptdex-1,0]
+              
+              # PGF Natural boundary (full order adjustment)
+              DDZM = REFS[11].tolil()
+              DDZM_interior = DDZM[np.ix_(utdex,pintDex)]
+              lpVar = SOLT[pdex,0]
+              DlpDz_interior = (DDZM_interior.tocsr()).dot(lpVar[pintDex])
+              SOLT[ptdex,0] = -(1.0 / DDZ_1D[NZ-1,NZ-1]) * DlpDz_interior
+              '''
+
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ
               
@@ -950,16 +960,15 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       TestName = 'SmoothStratScharIter'
+       #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       #TestName = 'CustomTest'
+       TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(3):
+       for ii in range(10):
               diagOutput = runModel(TestName)
-              
-       #%% Spot check the vertical velocity residual
        '''       
+       #%% Spot check the vertical velocity residual     
        XL = diagOutput[0]
        ZTL = diagOutput[1]
        dwdt = diagOutput[2]       
