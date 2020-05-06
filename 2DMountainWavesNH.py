@@ -222,11 +222,6 @@ def runModel(TestName):
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
-       # Neumann condition on PGF at top boundary
-       import computeNeumannAdjusted as nma
-       DDX_NM = nma.computeNeumannAdjusted(DDX_1D, True, True)
-       DDZ_NM = nma.computeNeumannAdjusted(DDZ_1D, False, True)
-       
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
@@ -334,9 +329,6 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
-        #%% Get the 2D linear operators in Hermite-Chebyshev space (Neumman BC)
-       DDXM_NM, DDZM_NM = computePartialDerivativesXZ(DIMS, REFS, DDX_NM, DDZ_NM)
-       
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
@@ -378,14 +370,6 @@ def runModel(TestName):
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
        del(DZDX);
-       
-       # Adding Neumann boundary operators
-       DDXM_NM_GML = GMLOP.dot(DDXM_NM)
-       DDZM_NM_GML = GMLOP.dot(DDZM_NM)
-       REFS.append(DDXM_NM_GML)
-       REFS.append(DDZM_NM_GML)
-       del(DDXM_NM); del(DDXM_NM_GML)
-       del(DDZM_NM); del(DDZM_NM_GML)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
@@ -644,18 +628,6 @@ def runModel(TestName):
               dsolQ = dsol[lmsDOF:]
               
               SOLT[sysDex,0] += dsolQ
-              
-              '''
-              # PGF Natural boundary (1st order adjustment)
-              SOLT[ptdex,0] = SOLT[ptdex-1,0]
-              
-              # PGF Natural boundary (full order adjustment)
-              DDZM = REFS[11].tolil()
-              DDZM_interior = DDZM[np.ix_(utdex,pintDex)]
-              lpVar = SOLT[pdex,0]
-              DlpDz_interior = (DDZM_interior.tocsr()).dot(lpVar[pintDex])
-              SOLT[ptdex,0] = -(1.0 / DDZ_1D[NZ-1,NZ-1]) * DlpDz_interior
-              '''
 
               # Store solution change to instance 1
               SOLT[sysDex,1] = dsolQ

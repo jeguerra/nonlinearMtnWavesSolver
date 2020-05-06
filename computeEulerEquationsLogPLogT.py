@@ -43,10 +43,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DDZM = REFS[11]
        DZDX = REFS[15].flatten()
        
-       # Get the Neumann derivative operators
-       #DDXM_NM = REFS[16]
-       #DDZM_NM = REFS[17]
-       
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
        UZX = U * DZDX
@@ -107,11 +103,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
-       #UPXM_NM = UM.dot(DDXM) + WXZM.dot(DDZM_NM)
        
        # Compute partial in X terrain following block
        PPXM = DDXM - DZDXM.dot(DDZM)
-       #PPXM_NM = DDXM - DZDXM.dot(DDZM_NM) # NEUMANN BOUNDARY ON TOP EDGE
        
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + PuPxM
@@ -178,12 +172,10 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        # Full spectral transform derivative matrices
        DDXM = REFS[10]
        DDZM = REFS[11]
-       #DZDX = REFS[15]
               
        #%% Compute the various blocks needed
        UM = sps.diags(UZ, offsets=0, format='csr')
        PORZM = sps.diags(PORZ, offsets=0, format='csr')
-       #DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
        DLTDZ = REFG[1]
@@ -196,8 +188,6 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
               
        #%% Compute the terms in the equations
        U0DDX = UM.dot(DDXM)
-       #PPXM = DDXM - DZDXM.dot(DDZM)
-       #U0PPX = UM.dot(PPXM)
        
        # Horizontal momentum
        LD11 = U0DDX
@@ -249,14 +239,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        # Compute pressure gradient force scaling (buoyancy)
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        RdT = RdT_bar * (1.0 + T_ratio)
-       #T_ratio[neuDex[1]] *= 0.0
               
        # Compute derivative of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
-       
-       # Apply Neumann condition on pressure gradients (on flow boundaries)
-       #DqDz[neuDex[1],2] *= 0.0
        PqPx = DqDx - (DZDX * DqDz)
        
        # Compute advection
