@@ -7,7 +7,14 @@ Created on Mon Jul 22 13:11:11 2019
 """
 import numpy as np
 import scipy.sparse as sps
-#import matplotlib.pyplot as plt
+from rsb import rsb_matrix
+
+def computeFieldDerivatives(q, DDX, DDZ, DZDX):
+       DqDx = DDX.dot(q)
+       DqDz = DDZ.dot(q)
+       PqPx = DqDx - (DZDX * DqDz)
+       
+       return DqDx, PqPx, DqDz
 
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -23,12 +30,6 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U
 
-def computeWeightFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
-       # Make the total quatities
-       U = SOLT[:,0] + INIT[udex]
-       
-       return U
-
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Get physical constants
@@ -40,7 +41,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Get the derivative operators
        DDXM = REFS[10]
        DDZM = REFS[11]
-       DZDX = REFS[15]
+       DZDX = REFS[15].flatten()
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
@@ -75,10 +76,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
        DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
        
-       # Compute advective (multiplicative) diagonal operators
-       UM = sps.diags(U, offsets=0, format='csr')
-       WXZM = sps.diags(WXZ, offsets=0, format='csr')
-       
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9]
        T_bar = (1.0 / Rd) * RdT_bar
@@ -91,20 +88,24 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        T_prime = T_ratio * T_bar
        
        RdT_barM = sps.diags(RdT_bar, offsets=0, format='csr')
-       #RdT_primeM = sps.diags(RdT_bar * T_ratio, offsets=0, format='csr')
        RdTM = sps.diags(RdT, offsets=0, format='csr')
        bfM = sps.diags(bf, offsets=0, format='csr')
        
-       PtPx = DDXM.dot(T_prime) - DZDX * DDZM.dot(T_prime)
+       # Compute derivatives of temperature perturbation
        DtDz = DDZM.dot(T_prime)
+       
+       PtPx = DDXM.dot(T_prime) - DZDX * DtDz
        PtPxM = sps.diags(PtPx, offsets=0, format='csr')
        DtDzM = sps.diags(DtDz, offsets=0, format='csr')
        
-       # Compute partial in X terrain following block
-       PPXM = DDXM - DZDXM.dot(DDZM)
-       
+       # Compute advective (multiplicative) diagonal operators
+       UM = sps.diags(U, offsets=0, format='csr')
+       WXZM = sps.diags(WXZ, offsets=0, format='csr')
        # Compute common horizontal transport block
        UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       
+       # Compute partial in X terrain following block
+       PPXM = DDXM - DZDXM.dot(DDZM)
        
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + PuPxM
@@ -171,12 +172,10 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        # Full spectral transform derivative matrices
        DDXM = REFS[10]
        DDZM = REFS[11]
-       #DZDX = REFS[15]
               
        #%% Compute the various blocks needed
        UM = sps.diags(UZ, offsets=0, format='csr')
        PORZM = sps.diags(PORZ, offsets=0, format='csr')
-       #DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
        DLTDZ = REFG[1]
@@ -189,8 +188,6 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
               
        #%% Compute the terms in the equations
        U0DDX = UM.dot(DDXM)
-       #PPXM = DDXM - DZDXM.dot(DDZM)
-       #U0PPX = UM.dot(PPXM)
        
        # Horizontal momentum
        LD11 = U0DDX
@@ -226,7 +223,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U, neuDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -236,22 +233,22 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DQDZ = REFG[4]
        
        # Compute advective (multiplicative) operators
-       UM = sps.diags(U, offsets=0, format='csr')
-       wxz = sps.diags(fields[:,1], offsets=0, format='csr')
+       UM = np.expand_dims(U,1)
+       wxz = np.expand_dims(fields[:,1],1)
+       
+       # Compute pressure gradient force scaling (buoyancy)
+       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
+       RdT = RdT_bar * (1.0 + T_ratio)
               
        # Compute derivative of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
-       PqPx = DqDx - DZDX.dot(DqDz)
+       PqPx = DqDx - (DZDX * DqDz)
        
        # Compute advection
-       UPqPx = UM.dot(PqPx)
-       wDQqDz = wxz.dot(DqDz + DQDZ)
+       UPqPx = UM * PqPx
+       wDQqDz = wxz * (DqDz + DQDZ)
        transport = UPqPx + wDQqDz
-       
-       # Compute pressure gradient forces
-       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
-       RdT = RdT_bar * (1.0 + T_ratio)
 
        DqDt = -transport
        # Horizontal momentum equation
@@ -260,7 +257,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
        # Pressure (mass) equation
        DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
-       # Potential Temperature equation
+       # Potential Temperature equation (transport only)
                                   
        return DqDt
 
@@ -278,28 +275,51 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDynSGSTendency(RESCF, DDXM, DDZM, DZDX, fields, udex, wdex, pdex, tdex):
+def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute derivatives of perturbations
-       DDx = DDXM.dot(fields)
-       DDz = DDZM.dot(fields)
-       PPx = DDx - DZDX.dot(DDz)
+       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
        # Compute diffusive fluxes
-       xflux = RESCFX * PPx
-       zflux = RESCFZ * DDz
+       xflux = RESCFX * PqPx
+       zflux = RESCFZ * DqDz
        
        # Compute derivatives of fluxes
-       DDx = DDXM.dot(xflux)
-       DDz = DDZM.dot(zflux)
-       PPx = DDx - DZDX.dot(DDz)
+       DDxx = DDXM.dot(xflux)
+       DDxz = DDZM.dot(xflux)
+       PPx2 = DDxx - (DZDX * DDxz)
+       DDz2 = DDZM.dot(zflux)
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
-       DqDt = PPx + DDz
+       DqDt = PPx2 + DDz2
+       
+       return DqDt
+
+def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
+       
+       # Get the anisotropic coefficients
+       RESCFX = RESCF[0]
+       RESCFZ = RESCF[1]
+       
+       # Compute 1st partials of perturbations
+       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       
+       # Compute 2nd partials of perturbations
+       DDxx = DDXM.dot(PqPx)
+       DDxz = DDZM.dot(PqPx)
+       PPx2 = DDxx - (DZDX * DDxz)
+       DDz2 = DDZM.dot(DqDz)
+       
+       # Compute diffusive fluxes
+       xflux = RESCFX * PPx2
+       zflux = RESCFZ * DDz2
+       
+       # Compute the tendencies
+       DqDt = xflux + zflux
        
        return DqDt
        

@@ -93,7 +93,7 @@ def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):
        
        return DDM1
 
-# Computes standard 4th order compact finite difference 1st derivative matrix
+# Computes standard 4th order compact finite difference 2nd derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix2(DIMS, dom):
        # Initialize the left and right derivative matrices
        N = len(dom)
@@ -199,6 +199,64 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Get data from DIMS
        ZH = DIMS[2]
        NZ = DIMS[4]
+       
+       # Initialize grid and make column vector
+       xi, wcp = cheblb(NZ)
+   
+       # Get the Chebyshev transformation matrix
+       CTD = chebpolym(NZ-1, -xi)
+   
+       # Make a diagonal matrix of weights
+       W = np.diag(wcp)
+   
+       # Compute scaling for the forward transform
+       S = np.eye(NZ)
+   
+       for ii in range(NZ - 1):
+              temp = W.dot(CTD[:,ii])
+              temp = ((CTD[:,ii]).T).dot(temp)
+              S[ii,ii] = temp ** (-1)
+
+       S[NZ-1,NZ-1] = 1.0 / mt.pi
+   
+       # Compute the spectral derivative coefficients
+       SDIFF = np.zeros((NZ,NZ))
+       SDIFF[NZ-2,NZ-1] = 2.0 * NZ
+   
+       for ii in reversed(range(NZ - 2)):
+              A = 2.0 * (ii + 1)
+              B = 1.0
+              if ii > 0:
+                     c = 1.0
+              else:
+                     c = 2.0
+            
+              SDIFF[ii,:] = B / c * SDIFF[ii+2,:]
+              SDIFF[ii,ii+1] = A / c
+    
+       # Chebyshev spectral transform in matrix form
+       temp = CTD.dot(W)
+       STR_C = S.dot(temp);
+       # Chebyshev spatial derivative based on spectral differentiation
+       # Domain scale factor included here
+       temp = (CTD).dot(SDIFF)
+       DDM = - (2.0 / ZH) * temp.dot(STR_C);
+       
+       return DDM, STR_C
+
+def computeChebyshevDerivativeMatrix_X(DIMS):
+       
+       # Get data from DIMS
+       #ZH = DIMS[2]
+       #NZ = DIMS[4]
+       
+       # Get data from DIMS
+       L1 = DIMS[0]
+       L2 = DIMS[1]
+       NX = DIMS[3]
+       
+       ZH = abs(L2 - L1)
+       NZ = NX + 1
        
        # Initialize grid and make column vector
        xi, wcp = cheblb(NZ)

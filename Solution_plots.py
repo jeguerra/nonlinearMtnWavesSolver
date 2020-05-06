@@ -18,7 +18,7 @@ import numpy as np
 # Make the parent figure
 fig = plt.figure(figsize=(12.0, 6.0))
 
-la_afs = shelve.open('/scratch/jorge/restartDB_smooth', 'r')
+la_afs = shelve.open('/home/jeg/scratch/restartDB', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']

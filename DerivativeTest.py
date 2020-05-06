@@ -29,6 +29,7 @@ REFS = computeGrid(DIMS, True, False)
 
 #% Compute the raw derivative matrix operators in alpha-xi computational space
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
 DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
 DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
 DDZ2A_CFD = DDZ_CFD.dot(DDZ_CFD)
@@ -98,14 +99,16 @@ h0 = 100.0
 aC = 5000.0
 lC = 4000.0
 kC = 6000.0
-HOPT = [h0, aC, lC, kC]
-HofX, dHdX = top.computeTopographyOnGrid(REFS, 2, HOPT)
+HOPT = [h0, aC, lC, kC, False, 2]
+HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT, DDX_1D)
     
 DYD = DDX_1D.dot(HofX)
+DYD_CFD = DDX_CFD.dot(HofX)
 plt.figure(figsize=(8, 6), tight_layout=True)
 #plt.plot(xv, HofX, label='Function')
 plt.plot(xv, dHdX, 'r-', label='Fourier Derivative')
 plt.plot(xv, DYD, 'k--', label='Hermite Derivative')
+plt.plot(xv, DYD_CFD, 'b--', label='Compact CFD Derivative')
 plt.xlim(-12500.0, 12500.0)
 plt.xlabel('Domain')
 plt.ylabel('Derivatives HF')

@@ -14,6 +14,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        NZ = DIMS[4]
        OPS = NX * NZ
        
+       # All DOF per variable
        rowsAll = set(np.array(range(0,OPS)))
        
        # Get prognostic ordering
@@ -36,7 +37,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        pldex = np.add(uldex, iP * OPS)
        prdex = np.add(urdex, iP * OPS)
        pbdex = np.add(ubdex, iP * OPS)
-       #ptdex = np.add(utdex, iP * OPS)
+       ptdex = np.add(utdex, iP * OPS)
        
        tldex = np.add(uldex, iT * OPS)
        trdex = np.add(urdex, iT * OPS)
@@ -44,14 +45,23 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        ttdex = np.add(utdex, iT * OPS)
        
        # Index all boundary DOF that can be diffused on
-       vDex = np.concatenate((uldex,urdex,ubdex,utdex))
-       extDex = (vDex, vDex, vDex, vDex)
+       vDex = np.unique(np.concatenate((uldex,urdex,ubdex,utdex)))
+       #extDex = (vDex, vDex, vDex, vDex)
+       extDex = vDex
+       # Tuple of lateral and vertical indices for Neumann conditions (pressure)
+       latDex = np.unique(np.concatenate((uldex,urdex)))
+       verDex1 = np.unique(utdex)
+       verDex2 = np.unique(np.concatenate((ubdex,utdex)))
+       neuDex = (latDex, verDex1, verDex2)
        
        # BC indices for static solution (per variable)
-       rowsOutU = set(np.concatenate((uldex,urdex,utdex)))
-       rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
-       rowsOutP = set(np.concatenate((uldex,urdex)))
-       rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
+       rowsOutU = set(np.concatenate((uldex,utdex)))
+       rowsOutW = set(np.concatenate((uldex,utdex)))
+       rowsOutP = set(uldex)
+       #rowsOutP = set(np.concatenate((uldex,utdex)))
+       #rowsOutP = set([]) # Totally free boundary for pressure...
+       rowsOutT = set(uldex)
+       #rowsOutT = set(np.concatenate((uldex)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
@@ -59,21 +69,22 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
        # BC indices for transient solution (per variable)
-       rowsOutW_trans = set(np.concatenate((ubdex,uldex,urdex,utdex)))
-       rowsOutT_trans = set(np.concatenate((uldex,urdex,utdex)))
+       rowsOutW_trans = set(np.concatenate((ubdex,uldex,utdex)))
        
        left = np.concatenate((uldex, wldex, pldex, tldex))
-       right = np.concatenate((urdex, wrdex, prdex, trdex))
-       top = np.concatenate((utdex, wtdex, ttdex))
+       #right = np.concatenate((urdex, wrdex, prdex, trdex))
+       top = np.concatenate((utdex, wtdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
-       rowsOutBC_static = set(np.concatenate((left, right, top)))
+       rowsOutBC_static = set(np.concatenate((left, top)))
        
        # W is treated as an essential BC at terrain in solution by direct substitution
        rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
-                              sorted(rowsOutP), sorted(rowsOutT_trans))
-       #rowsOutBC_transient = set(np.concatenate((left, wbdex, top)))
+                              sorted(rowsOutP), sorted(rowsOutT))
        
-       # All DOF
+       # Pressure DOF interior to the top boundary
+       pintDex = rowsAll.difference(utdex); pintDex = sorted(pintDex)
+              
+       # All DOF for all variables
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
        # Compute set difference from all rows to rows to be taken out LINEAR
@@ -84,4 +95,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # DOF's not dynamically updated in transient solution (use direct BC substitution)
        zeroDex_tran = rowsOutBC_transient
        
-       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex
+       return ubdex, utdex, wbdex, ptdex, pintDex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex

@@ -32,7 +32,7 @@ from computeColumnInterp import computeColumnInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
 from computeTopographyOnGrid import computeTopographyOnGrid
 from computeGuellrichDomain2D import computeGuellrichDomain2D
-from computeStretchedDomain2D import computeStretchedDomain2D
+#from computeStretchedDomain2D import computeStretchedDomain2D
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
@@ -40,19 +40,16 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
+from rsb import rsb_matrix
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
-#import computeIterativeSolveNL as itr
-from computeTimeIntegration import computeTimeIntegrationLN
 from computeTimeIntegration import computeTimeIntegrationNL
-#from computeIterativeSolveNL import computeIterativeSolveNL
 
 import faulthandler; faulthandler.enable()
 
 # Disk settings
-#localDir = '/media/jeguerra/scratch/'
+localDir = '/home/jeg/scratch/'
 #localDir = '/Users/TempestGuerra/scratch/'
-localDir = '/scratch/jorge/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
@@ -129,17 +126,17 @@ def computeSchurBlock(dbName, blockName):
        if blockName == 'AS':
               SB = sps.bmat([[bdb['LDIA'], bdb['LNA'], bdb['LOA']], \
                              [bdb['LDA'], bdb['A'], bdb['B']], \
-                             [bdb['LHA'], bdb['E'], bdb['F']]], format='csc')
+                             [bdb['LHA'], bdb['E'], bdb['F']]], format='csr')
        elif blockName == 'BS':
               SB = sps.bmat([[bdb['LPA'], bdb['LQAR']], \
                              [bdb['C'], bdb['D']], \
-                             [bdb['G'], bdb['H']]], format='csc')
+                             [bdb['G'], bdb['H']]], format='csr')
        elif blockName == 'CS':
               SB = sps.bmat([[bdb['LMA'], bdb['I'], bdb['J']], \
-                             [bdb['LQAC'], bdb['N'], bdb['O']]], format='csc')
+                             [bdb['LQAC'], bdb['N'], bdb['O']]], format='csr')
        elif blockName == 'DS':
               SB = sps.bmat([[bdb['K'], bdb['M']], \
-                             [bdb['P'], bdb['Q']]], format='csc')
+                             [bdb['P'], bdb['Q']]], format='csr')
        else:
               print('INVALID SCHUR BLOCK NAME!')
               
@@ -153,7 +150,6 @@ def runModel(TestName):
        thisTest = TestCase.TestCase(TestName)
        
        # Deprecated...
-       LinearSolve = False
        UniformDelta = False
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
@@ -169,6 +165,10 @@ def runModel(TestName):
        
        # Set residual diffusion switch
        ResDiff = thisTest.solType['DynSGS']
+       if ResDiff:
+              print('DynSGS Diffusion Model.')
+       else:
+              print('Flow-Dependent Diffusion Model.')
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = thisTest.solType['SolveFull']
@@ -198,7 +198,7 @@ def runModel(TestName):
        NX = DIMS[3]
        NZ = DIMS[4]
        OPS = DIMS[5]
-       udex = np.array(range(OPS))
+       udex = np.arange(OPS)
        wdex = np.add(udex, OPS)
        pdex = np.add(wdex, OPS)
        tdex = np.add(pdex, OPS)
@@ -211,20 +211,16 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 0.5 * DIMS[1] #/ (0.25 * NX) #4.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 0.25 * DIMS[2] #/ (0.25 * NZ) #4.0 * np.max(np.abs(np.diff(REFS[1])))
-       
-       #% Compute the raw derivative matrix operators in alpha-xi computational space
+       DX = np.max(np.abs(np.diff(REFS[0])))
+       DZ = np.max(np.abs(np.diff(REFS[1])))
+       print('Nominal grid lengths:',DX,DZ)
+      
+       # Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-       
-       # Adjust derivatives for Neumann condition in the static case
-       if StaticSolve:
-              DDZ_1D_NBC = derv.computeAdjustedOperatorNBC(DDZ_1D, DDZ_1D, DDZ_1D, NZ-1)
-              DDZ_SP_NBC = derv.computeAdjustedOperatorNBC(DDZ_SP, DDZ_SP, DDZ_SP, NZ-1)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -246,9 +242,9 @@ def runModel(TestName):
        REFS.append(sigma)
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, pbdex, tbdex, \
+       ubdex, utdex, wbdex, ptdex, pintDex, \
               ubcDex, wbcDex, pbcDex, tbcDex, \
-              zeroDex_stat, zeroDex_tran, sysDex, extDex = \
+              zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -344,30 +340,40 @@ def runModel(TestName):
               DDXM_GML = GMLOP.dot(DDXM)
               DDZM_GML = GMLOP.dot(DDZM)
               
-       REFS.append(DDXM_GML.tocsr())
-       REFS.append(DDZM_GML.tocsr())
-       # Store derivative operators without GML damping
-       if SparseDerivativesDynSGS:
-              REFS.append(DDXM_SP.tocsr())
-              REFS.append(DDZM_SP.tocsr())
-       else:
-              REFS.append(DDXM.tocsr())
-              REFS.append(DDZM.tocsr())
+       REFS.append(DDXM_GML)
+       REFS.append(DDZM_GML)
+       #REFS.append(rsb_matrix(DDXM_GML))
+       #REFS.append(rsb_matrix(DDZM_GML))
        
-       # Store the terrain profile in 3 ways
+       if StaticSolve:
+              REFS.append(DDXM)
+              REFS.append(DDZM)
+       else:
+              # Store derivative operators without GML damping
+              if SparseDerivativesDynSGS:
+                     DMX = rsb_matrix(DDXM_SP)
+                     DMZ = rsb_matrix(DDZM_SP)
+              else:
+                     DMX = rsb_matrix(DDXM)
+                     DMZ = rsb_matrix(DDZM)
+                     
+              DMX.autotune()
+              REFS.append(DMX)
+              DMZ.autotune()
+              REFS.append(DMZ)
+       
+       # Store the terrain profile
        REFS.append(DZT)
-       DZDX = np.reshape(DZT, (OPS,), order='F')
+       DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
-       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
-       REFS.append(DZDXM)
        
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
-       del(DZDX); del(DZDXM)
+       del(DZDX);
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
-       #totalDOF = physDOF + NX
+       lmsDOF = (NX + 1)
        
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
@@ -391,7 +397,7 @@ def runModel(TestName):
               SOLT = np.zeros((physDOF, 2))
               
               # Initialize Lagrange Multiplier storage
-              LMS = np.zeros(NX+1)
+              LMS = np.zeros(lmsDOF)
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
@@ -404,8 +410,7 @@ def runModel(TestName):
        fields, U = eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
        #% Compute the global LHS operator and RHS
-       if (StaticSolve or LinearSolve):
-              
+       if StaticSolve:
               if NewtonLin:
                      # Full Newton linearization with TF terms
                      DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
@@ -420,18 +425,14 @@ def runModel(TestName):
               DOPS = []
               for dd in range(len(DOPS_NL)):
                      if (DOPS_NL[dd]) is not None:
-                            # Check against linear blocks
-                            #DOPS_DEL = np.reshape((DOPS_NL[dd] - DOPS_LN[dd]).toarray(), (OPS*OPS,), order='F')
-                            #print(dd, np.linalg.norm(DOPS_DEL))
-                            
                             DOPS.append(DOPS_NL[dd].tolil())
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
               #'''
-              # USE THIS TO SET THE FORCING WITH DISCONTINUOUS BOUNDARY DATA
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U)
+              # Compute the RHS for this iteration
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
@@ -439,14 +440,10 @@ def runModel(TestName):
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
-              # Compute forcing vector adding boundary forcing to the end
-              LMRHS = -dWBC
-              bN = np.concatenate((RHS, LMRHS))
-              
-              # Compute Lagrange multiplier row augmentation matrices (exclude left corner node)
+              #%% Compute Lagrange Multiplier column augmentation matrices (terrain equation)
               C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
               C2 = +1.0 * sps.eye(NX+1, format='csr')
-              
+       
               colShape = (OPS,NX+1)
               LD = sps.lil_matrix(colShape)
               if ExactBC:
@@ -456,7 +453,7 @@ def runModel(TestName):
               LM = sps.lil_matrix(colShape)
               LQ = sps.lil_matrix(colShape)
               
-              # Apply BC adjustments  and indexing block-wise (Lagrange blocks)
+              #%% Apply BC adjustments and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
               LHA = LH[wbcDex,:]
               LMA = LM[pbcDex,:]
@@ -467,7 +464,7 @@ def runModel(TestName):
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((NX+1,NX+1))
+              LDIA = sps.lil_matrix((lmsDOF,lmsDOF))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -499,7 +496,7 @@ def runModel(TestName):
               del(DOPS)
               
               # Set up Schur blocks or full operator...
-              if (StaticSolve and SolveSchur) and not LinearSolve:
+              if (StaticSolve and SolveSchur):
                      # Add Rayleigh damping terms
                      A += R1
                      F += R2
@@ -519,15 +516,14 @@ def runModel(TestName):
                      opdb.close()
                       
                      # Compute the partitions for Schur Complement solution
-                     fu = bN[udex]
-                     fw = bN[wdex]
-                     f1 = np.concatenate((LMRHS, fu[ubcDex], fw[wbcDex]))
-                     fp = bN[pdex]
-                     ft = bN[tdex]
+                     fu = RHS[udex]
+                     fw = RHS[wdex]
+                     f1 = np.concatenate((-dWBC, fu[ubcDex], fw[wbcDex]))
+                     fp = RHS[pdex]
+                     ft = RHS[tdex]
                      f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))
-                     del(bN)
                      
-              if LinearSolve or (StaticSolve and SolveFull):
+              if (StaticSolve and SolveFull):
                      # Add Rayleigh damping terms
                      A += R1
                      F += R2
@@ -542,7 +538,7 @@ def runModel(TestName):
                               [LNA, LOA, LPA, LQAR, LDIA]], format='csc')
               
                      # Compute the global linear force vector
-                     bN = np.concatenate((bN[sysDex], LMRHS))
+                     bN = np.concatenate((RHS[sysDex], -dWBC))
               
               # Get memory back
               del(A); del(B); del(C); del(D)
@@ -559,7 +555,6 @@ def runModel(TestName):
               if SolveFull and not SolveSchur:
                      print('Solving linear system by full operator SuperLU...')
                      # Direct solution over the entire operator (better for testing BC's)
-                     #sol = spl.spsolve(AN, bN, permc_spec='MMD_ATA', use_umfpack=False)
                      opts = dict(Equil=True, IterRefine='DOUBLE')
                      factor = spl.splu(AN, permc_spec='MMD_ATA', options=opts)
                      del(AN)
@@ -629,13 +624,13 @@ def runModel(TestName):
                      
               #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
-              LMS += dsol[0:NX+1]
-              dsolQ = dsol[NX+1:]
+              LMS += dsol[0:lmsDOF]
+              dsolQ = dsol[lmsDOF:]
               
-              alpha = 1.0
-              SOLT[sysDex,0] += alpha * dsolQ
+              SOLT[sysDex,0] += dsolQ
+
               # Store solution change to instance 1
-              SOLT[sysDex,1] = alpha * dsolQ
+              SOLT[sysDex,1] = dsolQ
               
               print('Recover full linear solution vector... DONE!')
               
@@ -645,7 +640,7 @@ def runModel(TestName):
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[16], REFS[9], np.array(fields), U)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
               rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               RHS[zeroDex_stat] *= 0.0
@@ -657,15 +652,12 @@ def runModel(TestName):
               DSOL = np.array(SOLT[:,1])
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
-       elif LinearSolve:
-              RHS[sysDex] = bN
-              print('Starting Linear Transient Solver...')
        elif NonLinSolve:
               #sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
                                           
        #%% Start the time loop
-       if LinearSolve or NonLinSolve:
+       if NonLinSolve:
               error = [np.linalg.norm(RHS)]
               
               # Reshape main solution vectors
@@ -673,6 +665,7 @@ def runModel(TestName):
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
               sgs = np.reshape(SGS, (OPS, numVar), order='F')
               
+              ff = 1
               for tt in range(len(TI)):
                      thisTime = TOPT[0] * tt
                      # Put previous solution into index 1 storage
@@ -685,7 +678,7 @@ def runModel(TestName):
                             error.append(err)
                      
                      if tt % TOPT[6] == 0:
-                            fig = plt.figure(figsize=(10.0, 6.0))
+                            fig = plt.figure(figsize=(8.0, 10.0))
                             # Check the tendencies
                             '''
                             for pp in range(numVar):
@@ -697,32 +690,53 @@ def runModel(TestName):
                             '''
                             # Check the fields
                             for pp in range(numVar):
-                                   plt.subplot(2,2,pp+1)
+                                   plt.subplot(4,1,pp+1)
                                    dqdt = np.reshape(sol[:,pp,0], (NZ, NX+1), order='F')
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
+                                   
+                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.max())
+                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.min())
+                                   else:
+                                          clim = np.abs(dqdt.max())
+                                  
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                   #plt.gca().set_facecolor('k')
+                                   
+                                   if pp < (numVar - 1):
+                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                   else:
+                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                          
                                    plt.colorbar(ccheck, format='%.3e')
+                                   
+                                   if pp == 0:
+                                          plt.title('u (m/s)')
+                                   elif pp == 1:
+                                          plt.title('w (m/s)')
+                                   elif pp == 2:
+                                          plt.title('ln-p (Pa)')
+                                   else:
+                                          plt.title('ln-theta (K)')
+       
+                            plt.savefig('transient' + str(ff).zfill(3) + '.png', dpi=600, format='png', bbox_inches='tight', pad_inches=0.005)
                             plt.show()
+                            ff += 1
                      
                      # Ramp up the background wind to decrease transients
-                     if not isRestart:
-                            if thisTime <= TOPT[2]:
-                                   uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
-                                   UT = uRamp * INIT[udex]
-                            else:
-                                   UT = INIT[udex]
-                                   
-                            # Set current boundary condition
-                            sol[ubdex,1,0] = dHdX * (UT[ubdex] + sol[ubdex,0,0])
+                     if thisTime <= TOPT[2]:
+                            uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
                      else:
-                            UT = INIT[udex]
+                            uRamp = 1.0
                                    
-                     # Compute the SSPRK93 stages at this time step
-                     if LinearSolve:
-                            # MUST FIX THIS INTERFACE TO EITHER USE THE FULL OPERATOR OR MAKE A MORE EFFICIENT MULTIPLICATION FUNCTION FOR AN
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationLN(PHYS, REFS, REFG, bN, AN, DX, DZ, TOPT[0], rhs, sol, INIT, sysDex, udex, wdex, pdex, tdex, ubdex, utdex, ResDiff)
-                     elif NonLinSolve:
-                            sol[:,:,0], rhs, sgs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT[0], rhs, sgs, sol, INIT, zeroDex_tran, extDex, ubdex, udex, wdex, pdex, tdex, ResDiff, TOPT[3])
-                                          
+                     # Compute the solution within a time step
+                     thisSol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
+                                                             TOPT[0], sol[:,:,0], INIT, uRamp, \
+                                                             zeroDex_tran, extDex, neuDex, ubdex, \
+                                                             udex, ResDiff, TOPT[3])
+                     sol[:,:,0] = thisSol
+                     
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
               RHS = np.reshape(rhs, (OPS*numVar, ), order='F')
@@ -875,6 +889,11 @@ def runModel(TestName):
                      plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
                      plt.tight_layout()
               plt.show()
+              
+              # Check W at the boundaries...
+              fig = plt.figure(figsize=(12.0, 6.0))
+              dwdt = np.reshape(RHS[wdex], (NZ, NX+1), order='F')
+              return (XL, ZTL, dwdt)
 
        #%% Check the boundary conditions
        '''
@@ -918,5 +937,14 @@ if __name__ == '__main__':
        TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(7):
-              runModel(TestName)
+       for ii in range(10):
+              diagOutput = runModel(TestName)
+       '''       
+       #%% Spot check the vertical velocity residual     
+       XL = diagOutput[0]
+       ZTL = diagOutput[1]
+       dwdt = diagOutput[2]       
+       ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dwdt, 201, cmap=cm.seismic)
+       plt.colorbar(ccheck, format='%+.3E')
+       plt.show()
+       '''
