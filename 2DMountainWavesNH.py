@@ -249,7 +249,7 @@ def runModel(TestName):
        #% Compute the BC index vector
        ubdex, utdex, wbdex, pbdex, tbdex, \
               ubcDex, wbcDex, pbcDex, tbcDex, \
-              zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex = \
+              zeroDex_stat, zeroDex_tran, sysDex, extDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -740,7 +740,7 @@ def runModel(TestName):
                      # Compute the solution within a time step
                      thisSol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
                                                              TOPT[0], sol[:,:,0], INIT, uRamp, \
-                                                             zeroDex_tran, extDex, neuDex, ubdex, \
+                                                             zeroDex_tran, extDex, ubdex, \
                                                              udex, ResDiff, TOPT[3])
                      sol[:,:,0] = thisSol
                      
@@ -939,5 +939,5 @@ if __name__ == '__main__':
        #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(4):
-              runModel(TestName)
+       for ii in range(1):
+              diagOutput = runModel(TestName)

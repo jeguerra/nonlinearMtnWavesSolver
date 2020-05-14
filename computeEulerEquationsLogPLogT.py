@@ -227,7 +227,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U, neuDex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -281,7 +281,7 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
+def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -294,6 +294,9 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        xflux = RESCFX * PqPx
        zflux = RESCFZ * DqDz
        
+       xflux[extDex,:] *= 0.0
+       zflux[extDex,:] *= 0.0
+       
        # Compute derivatives of fluxes
        DDxx = DDXM.dot(xflux)
        DDxz = DDZM.dot(xflux)
@@ -305,7 +308,7 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
+def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -313,6 +316,9 @@ def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
        
        # Compute 1st partials of perturbations
        DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       
+       PqPx[extDex,:] *= 0.0
+       DqDz[extDex,:] *= 0.0
        
        # Compute 2nd partials of perturbations
        DDxx = DDXM.dot(PqPx)

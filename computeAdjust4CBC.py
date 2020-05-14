@@ -44,21 +44,17 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        ttdex = np.add(utdex, iT * OPS)
        
        # Index all boundary DOF that can be diffused on
-       vDex = np.unique(np.concatenate((uldex,urdex,ubdex,utdex)))
-       #extDex = (vDex, vDex, vDex, vDex)
-       extDex = vDex
-       # Tuple of lateral and vertical indices for Neumann conditions (pressure)
-       latDex = np.unique(np.concatenate((uldex,urdex)))
-       verDex1 = np.unique(utdex)
-       verDex2 = np.unique(np.concatenate((ubdex,utdex)))
-       neuDex = (latDex, verDex1, verDex2)
+       extDex = np.unique(np.concatenate((uldex,urdex,ubdex,utdex)))
        
        # BC indices for static solution (per variable)
-       rowsOutU = set(np.concatenate((uldex,urdex,utdex)))
-       rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
-       rowsOutP = set(np.concatenate((uldex,urdex)))
+       rowsOutU = set(uldex)
+       #rowsOutU = set(np.concatenate((uldex,utdex)))
+       rowsOutW = set(np.concatenate((uldex,utdex)))
+       rowsOutP = set(uldex)
+       #rowsOutP = set(np.concatenate((uldex,utdex)))
        #rowsOutP = set([]) # Totally free boundary for pressure...
-       rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
+       #rowsOutT = set(uldex)
+       rowsOutT = set(np.concatenate((uldex,utdex)))
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
@@ -69,8 +65,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        rowsOutW_trans = set(np.concatenate((ubdex,uldex,urdex,utdex)))
        
        left = np.concatenate((uldex, wldex, pldex, tldex))
-       right = np.concatenate((urdex, wrdex, prdex, trdex))
-       top = np.concatenate((utdex, wtdex, ttdex))
+       #right = np.concatenate((urdex, wrdex, prdex, trdex))
+       top = np.concatenate((wtdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
        rowsOutBC_static = set(np.concatenate((left, right, top)))
        
@@ -89,4 +85,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # DOF's not dynamically updated in transient solution (use direct BC substitution)
        zeroDex_tran = rowsOutBC_transient
        
-       return ubdex, utdex, wbdex, pbdex, tbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex
+       return ubdex, utdex, wbdex, ptdex, pintDex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex
