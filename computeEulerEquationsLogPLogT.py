@@ -247,16 +247,12 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        # Compute derivative of perturbations
        DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
-       # Apply Neumann condition on pressure gradients (on flow boundaries)
-       #PqPx[neuDex[0],2] *= 0.0
-       #DqDz[neuDex[1],2] *= 0.0
-       
        # Compute advection
        UPqPx = UM * PqPx
        wDQqDz = wxz * (DqDz + DQDZ)
-       transport = UPqPx + wDQqDz
+       #transport = UPqPx + wDQqDz
 
-       DqDt = -transport
+       DqDt = -(UPqPx + wDQqDz)
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
@@ -294,8 +290,8 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
        xflux = RESCFX * PqPx
        zflux = RESCFZ * DqDz
        
-       xflux[extDex,:] *= 0.0
-       zflux[extDex,:] *= 0.0
+       #xflux[extDex,:] *= 0.0
+       #zflux[extDex,:] *= 0.0
        
        # Compute derivatives of fluxes
        DDxx = DDXM.dot(xflux)
@@ -317,8 +313,8 @@ def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
        # Compute 1st partials of perturbations
        DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
-       PqPx[extDex,:] *= 0.0
-       DqDz[extDex,:] *= 0.0
+       #PqPx[extDex,:] *= 0.0
+       #DqDz[extDex,:] *= 0.0
        
        # Compute 2nd partials of perturbations
        DDxx = DDXM.dot(PqPx)

@@ -14,6 +14,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        NZ = DIMS[4]
        OPS = NX * NZ
        
+       # All DOF per variable
        rowsAll = set(np.array(range(0,OPS)))
        
        # Get prognostic ordering
@@ -62,19 +63,19 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
        # BC indices for transient solution (per variable)
-       rowsOutW_trans = set(np.concatenate((ubdex,uldex,urdex,utdex)))
+       rowsOutW_trans = set(np.concatenate((ubdex,uldex,utdex)))
        
        left = np.concatenate((uldex, wldex, pldex, tldex))
        #right = np.concatenate((urdex, wrdex, prdex, trdex))
        top = np.concatenate((wtdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
-       rowsOutBC_static = set(np.concatenate((left, right, top)))
+       rowsOutBC_static = set(np.concatenate((left, top)))
        
        # W is treated as an essential BC at terrain in solution by direct substitution
        rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
                               sorted(rowsOutP), sorted(rowsOutT))
-       
-       # All DOF
+              
+       # All DOF for all variables
        rowsAll = set(np.array(range(0,numVar*OPS)))
        
        # Compute set difference from all rows to rows to be taken out LINEAR
@@ -85,4 +86,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # DOF's not dynamically updated in transient solution (use direct BC substitution)
        zeroDex_tran = rowsOutBC_transient
        
-       return ubdex, utdex, wbdex, ptdex, pintDex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex
+       return ubdex, utdex, wbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex

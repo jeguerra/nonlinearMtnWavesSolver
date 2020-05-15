@@ -38,25 +38,20 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      # Compute dynamical tendencies
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
-                     #rhs[zeroDex[0],0] *= 0.0
-                     #rhs[zeroDex[1],1] *= 0.0
-                     #rhs[zeroDex[2],2] *= 0.0
-                     #rhs[zeroDex[3],3] *= 0.0
+                     rhs[zeroDex[0],0] *= 0.0
+                     rhs[zeroDex[1],1] *= 0.0
+                     rhs[zeroDex[2],2] *= 0.0
+                     rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
                      rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
-                     #rhs[extDex,:] *= 0.0
+                     rhs[extDex,:] *= 0.0
               if FlowDiff2:
                      rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
                      # Null tendency at all boundary DOF
-                     #rhs[extDex,:] *= 0.0
-                     
-              rhs[zeroDex[0],0] *= 0.0
-              rhs[zeroDex[1],1] *= 0.0
-              rhs[zeroDex[2],2] *= 0.0
-              rhs[zeroDex[3],3] *= 0.0
+                     rhs[extDex,:] *= 0.0
                      
               return rhs
        
@@ -88,12 +83,57 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
               sol2 = computeUpdate(0.5, sol1, rhs)
               # Stage 3
-              sol = np.array(2.0/3.0 * sol + 1.0 / 3.0 * sol2)
+              sol = np.array(2.0 / 3.0 * sol + 1.0 / 3.0 * sol2)
               rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              sol1 = computeUpdate(1.0/6.0, sol, rhs)
+              sol1 = computeUpdate(1.0 / 6.0, sol, rhs)
               # Stage 4
               rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
               sol = computeUpdate(0.5, sol1, rhs)
+              
+              return sol, rhs
+       
+       def ssprk53_1(sol, Dynamics, DynSGS, FlowDiff):
+              # Lowest error highest SSP coefficient method from Higueras, 2019
+              # Stage 1
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
+              sol1 = computeUpdate(0.377268915331368, sol, rhs)
+              # Stage 2
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(0.377268915331368, sol1, rhs)
+              # Stage 3
+              sol2 = np.array(0.568582304164742 * sol + 0.431417695835258 * sol2)
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(0.162760486162526, sol2, rhs)
+              # Stage 4
+              sol2 = np.array(0.088796463619276 * sol + 0.00005040714004 * sol1 + 0.911153129240700 * sol2)
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(0.465388589249323, sol2, rhs)
+              # Stage 5
+              sol2 = np.array(0.210401429751688 * sol1 + 0.789598570248313 * sol2)
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol = computeUpdate(0.297890996144780, sol2, rhs)
+              
+              return sol, rhs
+       
+       def ssprk53_2(sol, Dynamics, DynSGS, FlowDiff):
+              # Largest stability region method from Higueras, 2019
+              # Stage 1
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
+              sol1 = computeUpdate(0.465388589249323, sol, rhs)
+              # Stage 2
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+              sol1 = computeUpdate(0.465388589249323, sol1, rhs)
+              # Stage 3
+              sol1 = np.array(0.682342861037239 * sol + 0.317657138962761 * sol1)
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+              sol1 = computeUpdate(0.12474597313998, sol1, rhs)
+              # Stage 4
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+              sol1 = computeUpdate(0.465388589249323, sol1, rhs)
+              # Stage 5
+              sol1 = np.array(0.045230974482400 * sol + 0.954769025517600 * sol1)
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+              sol = computeUpdate(0.154263303748666, sol1, rhs)
               
               return sol, rhs
        
@@ -139,8 +179,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               return sol6, rhs6
        
        def kutta384(sol, Dynamics, DynSGS, FlowDiff):
-              rhs1 = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
               # Stage 1
+              rhs1 = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
               sol1 = computeUpdate(1.0 / 3.0, sol, rhs1)
               # Stage 2
               rhs2 = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
@@ -163,31 +203,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               return sol4, rhs4
        
-       def generic3(sol, Dynamics, DynSGS, FlowDiff):
-              alpha = 0.5
-              
-              rhs1 = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              # Stage 1
-              sol1 = computeUpdate(alpha, sol, rhs1)
-              # Stage 2
-              a1 = 1.0 + (1.0 - alpha) / (alpha * (3.0 * alpha - 2.0))
-              a2 = - (1.0 - alpha) / (alpha * (3.0 * alpha - 2.0))
-              rhs2 = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              del(sol1)
-              sol2 = computeUpdate(a1, sol, rhs1)
-              sol2 = computeUpdate(a2, sol2, rhs2)
-              # Stage 3
-              b1 = 0.5 - 1.0 / (6.0 * alpha)
-              b2 = 1.0 / (6.0 * alpha * (1.0 - alpha))
-              b3 = (2.0 - 3.0 * alpha) / (6.0 * (1.0 -alpha))
-              rhs3 = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              del(sol2)
-              sol3 = computeUpdate(b1, sol, rhs1)
-              sol3 = computeUpdate(b2, sol3, rhs2)
-              sol3 = computeUpdate(b3, sol3, rhs3)
-              
-              return sol3, rhs3
-       
        def ketchenson93(sol, Dynamics, DynSGS, FlowDiff):
               for ii in range(7):
                      rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
@@ -208,17 +223,18 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        
        def ketchenson104(sol, Dynamics, DynSGS, FlowDiff):
               sol1 = np.array(sol)
-              for ii in range(1,6):
+              for ii in range(5):
                      rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
                      sol = computeUpdate(c1, sol, rhs)
               
               sol1 = np.array(0.04 * sol1 + 0.36 * sol)
               sol = np.array(15.0 * sol1 - 5.0 * sol)
               
-              for ii in range(6,10):
+              for ii in range(4):
                      rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)                     
                      sol = computeUpdate(c1, sol, rhs)
                      
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)       
               sol = np.array(sol1 + 0.6 * sol + 0.1 * DT * rhs)
               
               return sol, rhs
@@ -243,7 +259,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
               
               # Compute a step of diffusion
-              solf, rhsDiff = generic3(solf, False, True, False)
+              solf, rhsDiff = ssprk53_1(solf, False, True, False)
               # Compute an adaptive step of diffusion
               '''
               from scipy.integrate import solve_ivp              
