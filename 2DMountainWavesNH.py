@@ -679,7 +679,8 @@ def runModel(TestName):
               ti = 1
               ff = 1
               thisTime = IT
-              DT = TOPT[0]
+              DT = [TOPT[0], TOPT[0]]
+              newDT = TOPT[0]
               while thisTime < TOPT[4]:
                             
                      # Print out diagnostics every TOPT[5] steps
@@ -735,7 +736,7 @@ def runModel(TestName):
                             plt.show()
                             ff += 1
                      
-                     thisTime += DT
+                     thisTime += DT[1]
                      # Put previous solution into index 1 storage
                      sol[:,:,1] = np.array(sol[:,:,0])
                      
@@ -747,17 +748,24 @@ def runModel(TestName):
                                    
                      # Compute the solution within a time step
                      thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             DT, sol[:,:,0], INIT, uRamp, \
+                                                             DT[1], sol[:,:,0], INIT, uRamp, \
                                                              zeroDex_tran, extDex, ubdex, \
                                                              udex, ResDiff, TOPT[3])
                      
                      # After the third time step...
                      if ti > 2:
-                            # Estimate from Adams-Bashford 3
-                            sol[:,:,1] += DT * (5.0 / 12.0 * RHS_MS[:,:,0] - \
-                                                     4.0 / 3.0 * RHS_MS[:,:,1] + \
-                                                    23.0 / 12.0 * rhsVec)
-                                   
+                            # Estimate from Adams-Bashford 3 (variable step version)
+                            h1 = newDT / (newDT + DT[1])
+                            h2 = newDT / DT[1]
+                            h3 = (newDT + DT[1]) / (DT[0] + DT[1])
+                            h4 = DT[1] / DT[0]
+                            sol[:,:,1] += 0.5 * (1.0 - 1.0 / 3.0 * h1) * h2 * h3 * \
+                                          (rhsVec - RHS_MS[:,:,1] - h4 * (RHS_MS[:,:,1] - RHS_MS[:,:,0]))
+                            '''
+                            sol[:,:,1] += DT[0] * 5.0 / 12.0 * RHS_MS[:,:,0] - \
+                                          DT[1] * 4.0 / 3.0 * RHS_MS[:,:,1] + \
+                                          newDT * 23.0 / 12.0 * rhsVec
+                            '''       
                             # Difference in solution candidates
                             errDelta1 = np.amax(np.abs(sol[:,:,1] - thisSol))
                             errDelta0 = errDelta1
@@ -778,7 +786,9 @@ def runModel(TestName):
                                    print('Restart current step...')
                                    print(thisTime, newDT, DT)
                                    
-                            DT = newDT
+                            # Update time steps       
+                            DT[0] = DT[1]
+                            DT[1] = newDT
                      else:
                             # Accept solution
                             sol[:,:,0] = thisSol
