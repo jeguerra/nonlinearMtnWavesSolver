@@ -678,7 +678,6 @@ def runModel(TestName):
               
               ti = 1
               ff = 1
-              sdex = 0
               thisTime = IT
               DT = TOPT[0]
               while thisTime < TOPT[4]:
@@ -686,7 +685,7 @@ def runModel(TestName):
                      # Print out diagnostics every TOPT[5] steps
                      if ti % TOPT[5] == 0:
                             message = ''
-                            err = displayResiduals(message, np.reshape(rhs, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
+                            err = displayResiduals(message, np.reshape(RHS_MS[:,:,1], (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
                      if ti % TOPT[6] == 0:
