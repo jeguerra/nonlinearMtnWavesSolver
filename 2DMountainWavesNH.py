@@ -85,11 +85,9 @@ def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
               print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
               sys.exit(2)
               
-       # Initialize the restart time array
-       TI = np.array(np.arange(IT + TOPT[0], TOPT[4], TOPT[0]))
        rdb.close()
        
-       return SOLT, LMS, RHS, NX_in, NZ_in, TI
+       return SOLT, LMS, RHS, NX_in, NZ_in, IT
 
 # Store a matrix to disk in column wise chucks
 def storeColumnChunks(MM, Mname, dbName):
@@ -386,7 +384,6 @@ def runModel(TestName):
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
        RHS = np.zeros((physDOF,))
-       SGS = np.zeros((physDOF,))
        
        # Initialize the Background fields
        INIT[udex] = np.reshape(UZ, (OPS,), order='F')
@@ -396,11 +393,14 @@ def runModel(TestName):
        
        if isRestart:
               print('Restarting from previous solution...')
-              SOLT, LMS, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
+              SOLT, LMS, RHS, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
               dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])
        else:
+              # Set the initial time
+              IT = 0.0
+              
               # Initialize solution storage
               SOLT = np.zeros((physDOF, 2))
               
@@ -409,9 +409,6 @@ def runModel(TestName):
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
-       
-              # Initialize time array
-              TI = np.array(np.arange(TOPT[0], TOPT[4], TOPT[0]))
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
@@ -663,28 +660,36 @@ def runModel(TestName):
               #sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
                                           
-       #%% Start the time loop
-       if NonLinSolve:
               error = [np.linalg.norm(RHS)]
               
               # Reshape main solution vectors
               sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
-              sgs = np.reshape(SGS, (OPS, numVar), order='F')
               
+              # Create 2 instances of the RHS
+              RHS_MS = np.zeros((OPS, numVar, 2), order='F')
+              
+              # Store the incoming RHS to the first instance
+              RHS_MS[:,:,0] = rhs
+              del(RHS);
+              
+              # Initialize error delta
+              errDelta0 = 1.0
+              
+              ti = 1
               ff = 1
-              for tt in range(len(TI)):
-                     thisTime = TOPT[0] * tt
-                     # Put previous solution into index 1 storage
-                     sol[:,:,1] = np.array(sol[:,:,0])
+              sdex = 0
+              thisTime = IT
+              DT = TOPT[0]
+              while thisTime < TOPT[4]:
                             
                      # Print out diagnostics every TOPT[5] steps
-                     if tt % TOPT[5] == 0:
+                     if ti % TOPT[5] == 0:
                             message = ''
                             err = displayResiduals(message, np.reshape(rhs, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
-                     if tt % TOPT[6] == 0:
+                     if ti % TOPT[6] == 0:
                             fig = plt.figure(figsize=(8.0, 10.0))
                             # Check the tendencies
                             '''
@@ -731,6 +736,10 @@ def runModel(TestName):
                             plt.show()
                             ff += 1
                      
+                     thisTime += DT
+                     # Put previous solution into index 1 storage
+                     sol[:,:,1] = np.array(sol[:,:,0])
+                     
                      # Ramp up the background wind to decrease transients
                      if thisTime <= TOPT[2]:
                             uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
@@ -738,16 +747,51 @@ def runModel(TestName):
                             uRamp = 1.0
                                    
                      # Compute the solution within a time step
-                     thisSol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             TOPT[0], sol[:,:,0], INIT, uRamp, \
+                     thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
+                                                             DT, sol[:,:,0], INIT, uRamp, \
                                                              zeroDex_tran, extDex, ubdex, \
                                                              udex, ResDiff, TOPT[3])
-                     sol[:,:,0] = thisSol
                      
+                     # After the third time step...
+                     if ti > 2:
+                            # Estimate from Adams-Bashford 3
+                            sol[:,:,1] += DT * (5.0 / 12.0 * RHS_MS[:,:,0] - \
+                                                     4.0 / 3.0 * RHS_MS[:,:,1] + \
+                                                    23.0 / 12.0 * rhsVec)
+                                   
+                            # Difference in solution candidates
+                            errDelta1 = np.amax(np.abs(sol[:,:,1] - thisSol))
+                            errDelta0 = errDelta1
+                            
+                            # Scale the time step...
+                            errRatio = errDelta1 / errDelta0
+                            newDT = 0.95 * TOPT[0] * np.power(errRatio, 1.0 / 3.0)
+                            
+                            if errDelta1 <= errDelta0:
+                                   # Accept solution
+                                   sol[:,:,0] = thisSol
+                                   # Store RHS instances
+                                   RHS_MS[:,:,0] = RHS_MS[:,:,1]
+                                   RHS_MS[:,:,1] = rhsVec
+                                   ti += 1
+                            elif errDelta1 > errDelta0:
+                                   # Reject solution and compute again with new DT
+                                   print('Restart current step...')
+                                   print(thisTime, newDT, DT)
+                                   
+                            DT = newDT
+                     else:
+                            # Accept solution
+                            sol[:,:,0] = thisSol
+                            # Store RHS instances
+                            RHS_MS[:,:,0] = RHS_MS[:,:,1]
+                            RHS_MS[:,:,1] = rhsVec
+                            ti += 1
+                            
+                            
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
               RHS = np.reshape(rhs, (OPS*numVar, ), order='F')
-              SGS = np.reshape(sgs, (OPS*numVar, ), order='F')
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])

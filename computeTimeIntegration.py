@@ -260,6 +260,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               # Compute a step of diffusion
               solf, rhsDiff = ssprk53_1(solf, False, True, False)
+
               # Compute an adaptive step of diffusion
               '''
               from scipy.integrate import solve_ivp              

@@ -135,8 +135,8 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 5.0 # hours
-              rampTime = 900  # 10 minutes to ramp up U_bar
+              HR = 1.0 # hours
+              rampTime = 300  # 10 minutes to ramp up U_bar
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 400 # Stride for diagnostic output
