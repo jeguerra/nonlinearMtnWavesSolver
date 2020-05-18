@@ -247,6 +247,18 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        # Compute derivative of perturbations
        DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
+       '''
+       # Check the computation of RSB dot products
+       DqDx2, PqPx2, DqDz2 = computeFieldDerivatives(fields, rsb_matrix(DDXM), rsb_matrix(DDZM), DZDX)
+       
+       rsbdiff1 = np.linalg.norm(DqDx - DqDx2)
+       rsbdiff2 = np.linalg.norm(DqDz - DqDz2)
+       
+       if rsbdiff1 > 1.0E-12 or rsbdiff2 > 1.0E-12:
+              print(rsbdiff1, rsbdiff2)
+              input()
+       '''
+       
        # Compute advection
        UPqPx = UM * PqPx
        wDQqDz = wxz * (DqDz + DQDZ)

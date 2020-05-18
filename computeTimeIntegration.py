@@ -93,7 +93,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               return sol, rhs
        
        def ssprk53_1(sol, Dynamics, DynSGS, FlowDiff):
-              # Lowest error highest SSP coefficient method from Higueras, 2019
+              # Lowest error coefficient method from Higueras, 2019
               # Stage 1
               rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
               sol1 = computeUpdate(0.377268915331368, sol, rhs)
@@ -101,17 +101,17 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
               sol2 = computeUpdate(0.377268915331368, sol1, rhs)
               # Stage 3
-              sol2 = np.array(0.568582304164742 * sol + 0.431417695835258 * sol2)
+              sol2 = np.array(0.568606169888847 * sol + 0.4313938301111528 * sol2)
               rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              sol2 = computeUpdate(0.162760486162526, sol2, rhs)
+              sol2 = computeUpdate(0.162751482366679, sol2, rhs)
               # Stage 4
-              sol2 = np.array(0.088796463619276 * sol + 0.00005040714004 * sol1 + 0.911153129240700 * sol2)
+              sol2 = np.array(0.088778858640267 * sol + 0.911221141359733 * sol2)
               rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              sol2 = computeUpdate(0.465388589249323, sol2, rhs)
+              sol2 = computeUpdate(0.343775411627798, sol2, rhs)
               # Stage 5
-              sol2 = np.array(0.210401429751688 * sol1 + 0.789598570248313 * sol2)
+              sol2 = np.array(0.210416684957724 * sol1 + 0.789583315042277 * sol2)
               rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              sol = computeUpdate(0.297890996144780, sol2, rhs)
+              sol = computeUpdate(0.297885240829746, sol2, rhs)
               
               return sol, rhs
        
@@ -134,6 +134,29 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               sol1 = np.array(0.045230974482400 * sol + 0.954769025517600 * sol1)
               rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
               sol = computeUpdate(0.154263303748666, sol1, rhs)
+              
+              return sol, rhs
+       
+       def ssprk53_Opt(sol, Dynamics, DynSGS, FlowDiff):
+              # Optimized truncation error to SSP coefficient method from Higueras, 2019
+              # Stage 1
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
+              sol1 = computeUpdate(0.377268915331368, sol, rhs)
+              # Stage 2
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(0.377268915331368, sol1, rhs)
+              # Stage 3
+              sol2 = np.array(0.426988976571684 * sol + 0.5730110234283154 * sol2)
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(0.216179247281718, sol2, rhs)
+              # Stage 4
+              sol2 = np.array(0.193245318771018 * sol + 0.199385926238509 * sol1 + 0.607368754990473 * sol2)
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(0.229141351401419, sol2, rhs)
+              # Stage 5
+              sol2 = np.array(0.108173740702208 * sol1 + 0.891826259297792 * sol2)
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol = computeUpdate(0.336458325509300, sol2, rhs)
               
               return sol, rhs
        
@@ -259,8 +282,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
               
               # Compute a step of diffusion
-              solf, rhsDiff = ssprk53_1(solf, False, True, False)
-
+              solf, rhsDiff = ssprk53_Opt(solf, False, True, False)
               # Compute an adaptive step of diffusion
               '''
               from scipy.integrate import solve_ivp              
