@@ -220,11 +220,6 @@ def runModel(TestName):
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
-       # Neumann condition on PGF at top boundary
-       import computeNeumannAdjusted as nma
-       DDX_NM = nma.computeNeumannAdjusted(DDX_1D, True, True)
-       DDZ_NM = nma.computeNeumannAdjusted(DDZ_1D, False, True)
-       
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
@@ -332,9 +327,6 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
-        #%% Get the 2D linear operators in Hermite-Chebyshev space (Neumman BC)
-       DDXM_NM, DDZM_NM = computePartialDerivativesXZ(DIMS, REFS, DDX_NM, DDZ_NM)
-       
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
@@ -348,9 +340,11 @@ def runModel(TestName):
               
        REFS.append(DDXM_GML)
        REFS.append(DDZM_GML)
+       REFS.append(DDXM)
+       REFS.append(DDZM)
        #REFS.append(rsb_matrix(DDXM_GML))
        #REFS.append(rsb_matrix(DDZM_GML))
-       
+       '''
        if StaticSolve:
               REFS.append(DDXM)
               REFS.append(DDZM)
@@ -367,12 +361,25 @@ def runModel(TestName):
               REFS.append(DMX)
               DMZ.autotune()
               REFS.append(DMZ)
-       
+       '''
        # Store the terrain profile
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
-       
+       '''
+       # Check derivatives for consistency
+       dcheck1 = DDXM.dot(np.ones((OPS,)))
+       dcheck2 = DMX.dot(np.ones((OPS,)))
+       plt.plot(dcheck1 - dcheck2, 'k-')
+       plt.title('Hermite Function Derivative: (SciPy - PyRSB) Dot')
+       plt.show()
+       dcheck1 = DDZM.dot(np.ones((OPS,)))
+       dcheck2 = DMZ.dot(np.ones((OPS,)))
+       plt.plot(dcheck1 - dcheck2, 'k-')
+       plt.title('Chebyshev Derivative: (SciPy - PyRSB) Dot')
+       plt.show()
+       input()
+       '''
        del(DDXM); del(DDXM_GML)
        del(DDZM); del(DDZM_GML)
        del(DZDX);
@@ -657,7 +664,7 @@ def runModel(TestName):
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
        elif NonLinSolve:
-              #sysDex = np.array(range(0, numVar * OPS))
+              AdaptiveTime = False
               print('Starting Nonlinear Transient Solver...')
                                           
               error = [np.linalg.norm(RHS)]
@@ -674,9 +681,9 @@ def runModel(TestName):
               del(RHS);
               
               # Initialize error delta
-              errDelta0 = 1.0
+              errDelta0 = 0.0
               
-              ti = 1
+              ti = 0
               ff = 1
               thisTime = IT
               DT = [TOPT[0], TOPT[0]]
@@ -736,11 +743,10 @@ def runModel(TestName):
                             plt.show()
                             ff += 1
                      
-                     thisTime += DT[1]
                      # Put previous solution into index 1 storage
                      sol[:,:,1] = np.array(sol[:,:,0])
                      
-                     # Ramp up the background wind to decrease transients
+                      # Ramp up the background wind to decrease transients
                      if thisTime <= TOPT[2]:
                             uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
                      else:
@@ -748,56 +754,82 @@ def runModel(TestName):
                                    
                      # Compute the solution within a time step
                      thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             DT[1], sol[:,:,0], INIT, uRamp, \
+                                                             DT[1], sol[:,:,0], INIT, uRamp,\
                                                              zeroDex_tran, extDex, ubdex, \
-                                                             udex, ResDiff, TOPT[3])
-                     
+                                                                    udex, ResDiff, TOPT[3])
+                             
                      # After the third time step...
-                     if ti > 2:
-                            # Estimate from Adams-Bashford 3 (variable step version)
-                            h1 = newDT / (newDT + DT[1])
-                            h2 = newDT / DT[1]
-                            h3 = (newDT + DT[1]) / (DT[0] + DT[1])
-                            h4 = DT[1] / DT[0]
-                            sol[:,:,1] += 0.5 * (1.0 - 1.0 / 3.0 * h1) * h2 * h3 * \
-                                          (rhsVec - RHS_MS[:,:,1] - h4 * (RHS_MS[:,:,1] - RHS_MS[:,:,0]))
+                     if ti >= 2 and AdaptiveTime:
+                            # Estimate from Adams-Bashforth 3 (variable step version)
+                            # Marciniak et. al. 2020 https://doi.org/10.1007/s11075-019-00774-y
+                            thatSol = np.array(sol[:,:,0]) + \
+                                   1.0 / 12.0 * DT[1] * (23.0 * rhsVec - \
+                                                         16.0 * RHS_MS[:,:,1] + \
+                                                          5.0 * RHS_MS[:,:,0])
+   
+                            # Difference in solution candidates (error estimate)
+                            #errDelta1 = np.amax(np.abs(thatSol - thisSol))
+                            errDelta1 = np.linalg.norm(thatSol - thisSol)
+                            
                             '''
-                            sol[:,:,1] += DT[0] * 5.0 / 12.0 * RHS_MS[:,:,0] - \
-                                          DT[1] * 4.0 / 3.0 * RHS_MS[:,:,1] + \
-                                          newDT * 23.0 / 12.0 * rhsVec
-                            '''       
-                            # Difference in solution candidates
-                            errDelta1 = np.amax(np.abs(sol[:,:,1] - thisSol))
-                            errDelta0 = errDelta1
-                            
-                            # Scale the time step...
-                            errRatio = errDelta1 / errDelta0
-                            newDT = 0.95 * TOPT[0] * np.power(errRatio, 1.0 / 3.0)
-                            
-                            if errDelta1 <= errDelta0:
+                            # Check the AB3 solution...
+                            sol[:,:,0] = np.array(thatSol)
+                            # Store RHS instances
+                            RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
+                            RHS_MS[:,:,1] = np.array(rhsVec)
+                            ti += 1
+                            thisTime += DT[1]
+                            '''
+                               
+                            #'''
+                            if ti == 2:
+                                   errRatio = 1.0
+                                   newDT = DT[1]
                                    # Accept solution
-                                   sol[:,:,0] = thisSol
+                                   sol[:,:,0] = np.array(thisSol)
                                    # Store RHS instances
-                                   RHS_MS[:,:,0] = RHS_MS[:,:,1]
-                                   RHS_MS[:,:,1] = rhsVec
+                                   RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
+                                   RHS_MS[:,:,1] = np.array(rhsVec)
                                    ti += 1
-                            elif errDelta1 > errDelta0:
-                                   # Reject solution and compute again with new DT
-                                   print('Restart current step...')
-                                   print(thisTime, newDT, DT)
-                                   
-                            # Update time steps       
+                                   thisTime += DT[1]
+                                   errDelta0 = errDelta1
+                            else:
+                                   if errDelta1 > 1.0E-14:
+                                          errRatio = errDelta0 / errDelta1
+                                          newDT = 0.975 * DT[1] * np.power(errRatio, 1.0 / 3.0)
+                                   else:
+                                          errRatio = 1.0
+                                          newDT = DT[1]
+                                                                      
+                                   if errDelta1 <= errDelta0:
+                                          # Accept solution
+                                          sol[:,:,0] = np.array(thisSol)
+                                          # Store RHS instances
+                                          RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
+                                          RHS_MS[:,:,1] = np.array(rhsVec)
+                                          ti += 1
+                                          thisTime += DT[1]
+                                          errDelta0 = errDelta1
+                                   elif errDelta1 > errDelta0:
+                                          # Reject solution and compute again with new DT
+                                          print('Restart current step...')
+                                          print(thisTime, DT[1], newDT, errDelta0, errDelta1)
+                                          ti = 0
+       
+                            # Update time steps and error     
                             DT[0] = DT[1]
                             DT[1] = newDT
+                            #'''
                      else:
                             # Accept solution
-                            sol[:,:,0] = thisSol
+                            sol[:,:,0] = np.array(thisSol)
                             # Store RHS instances
-                            RHS_MS[:,:,0] = RHS_MS[:,:,1]
-                            RHS_MS[:,:,1] = rhsVec
+                            RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
+                            RHS_MS[:,:,1] = np.array(rhsVec)
                             ti += 1
-                            
-                            
+                            thisTime += DT[1]
+                     
+                     
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
               RHS = np.reshape(rhs, (OPS*numVar, ), order='F')

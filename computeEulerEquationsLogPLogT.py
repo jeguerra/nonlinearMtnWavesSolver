@@ -12,7 +12,7 @@ from rsb import rsb_matrix
 def computeFieldDerivatives(q, DDX, DDZ, DZDX):
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
-       PqPx = DqDx - (DZDX * DqDz)
+       PqPx = DqDx - np.multiply(DZDX, DqDz)
        
        return DqDx, PqPx, DqDz
 
@@ -235,6 +235,32 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        
        # Get hydrostatic initial fields
        DQDZ = REFG[4]
+              
+       # Compute derivative of perturbations
+       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       
+       '''
+       # Check the computation of RSB dot products
+       DDXM_rsb = rsb_matrix(DDXM)
+       DDZM_rsb = rsb_matrix(DDZM)
+       DqDx2, PqPx2, DqDz2 = computeFieldDerivatives(fields, DDXM_rsb, DDZM_rsb, DZDX)
+       
+       rsbdiff1 = np.linalg.norm(DqDx - DqDx2)
+       rsbdiff2 = np.linalg.norm(DqDz - DqDz2)
+       
+       if rsbdiff1 > 1.0E-12 or rsbdiff2 > 1.0E-12:
+              print(type(fields))
+              print(type(DqDx), type(DqDx2))
+              import matplotlib.pyplot as plt
+              plt.plot(DqDx - DqDx2, 'k-')
+              plt.title('Hermite Function Derivative: (SciPy - PyRSB) Dot')
+              plt.show()
+              plt.plot(DqDz - DqDz2, 'k-')
+              plt.title('Chebyshev Derivative: (SciPy - PyRSB) Dot')
+              plt.show()
+              print(rsbdiff1, rsbdiff2)
+              input()
+       '''
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
@@ -243,21 +269,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        # Compute pressure gradient force scaling (buoyancy)
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        RdT = RdT_bar * (1.0 + T_ratio)
-              
-       # Compute derivative of perturbations
-       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
-       
-       '''
-       # Check the computation of RSB dot products
-       DqDx2, PqPx2, DqDz2 = computeFieldDerivatives(fields, rsb_matrix(DDXM), rsb_matrix(DDZM), DZDX)
-       
-       rsbdiff1 = np.linalg.norm(DqDx - DqDx2)
-       rsbdiff2 = np.linalg.norm(DqDz - DqDz2)
-       
-       if rsbdiff1 > 1.0E-12 or rsbdiff2 > 1.0E-12:
-              print(rsbdiff1, rsbdiff2)
-              input()
-       '''
        
        # Compute advection
        UPqPx = UM * PqPx

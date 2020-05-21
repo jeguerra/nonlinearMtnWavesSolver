@@ -5,6 +5,7 @@ Created on Tue Aug 13 10:09:52 2019
 
 @author: jorge.guerra
 """
+import math as mt
 import numpy as np
 import bottleneck as bn
 import computeEulerEquationsLogPLogT as tendency
@@ -24,17 +25,25 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        DDZM = REFS[13]
        DZDX = REFS[15]
        
-       def rhsEval(time, fields):
-              rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields)
-              rhs[extDex,:] *= 0.0
-              
-              return rhs
+       U = uRamp * INIT[udex]
+       #DUDZ = uRamp * (REFG[4])[:,0]
+       (REFG[4])[:,0] *= uRamp
        
-       def computeRHSUpdate(fields, Dynamics, DynSGS, FlowDiff2):
+       def computeUpdate(coeff, solA, rhs):
+              #Apply updates
+              dsol = coeff * DT * rhs
+              solB = solA + dsol
+              
+              # Update boundary
+              U = solB[:,0] + uRamp * INIT[udex]
+              solB[botDex,1] = np.array(dHdX * U[botDex])
+              
+              return solB
+       
+       def computeRHSUpdate(fields, Dynamics, DynSGS, FlowDiff2):              
               if Dynamics:
-                     # Scale background wind and shear with ramp up factor
+                     # Update advective U
                      U = fields[:,0] + uRamp * INIT[udex]
-                     (REFG[4])[:,1] *= uRamp
                      # Compute dynamical tendencies
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
@@ -54,15 +63,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      rhs[extDex,:] *= 0.0
                      
               return rhs
-       
-       def computeUpdate(coeff, solA, rhs):
-              #Apply updates
-              dsol = coeff * DT * rhs
-              solB = solA + dsol
-              U = solB[:,0] + (uRamp * INIT[udex])
-              solB[botDex,1] = np.array(dHdX * U[botDex])
-              
-              return solB
        
        def ssprk22(sol, Dynamics, DynSGS, FlowDiff):
               # Stage 1
@@ -227,6 +227,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               return sol4, rhs4
        
        def ketchenson93(sol, Dynamics, DynSGS, FlowDiff):
+              # Ketchenson, 2008 10.1137/07070485X
               for ii in range(7):
                      rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
                      sol = computeUpdate(c1, sol, rhs)
@@ -245,6 +246,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               return sol, rhs
        
        def ketchenson104(sol, Dynamics, DynSGS, FlowDiff):
+              # Ketchenson, 2008 10.1137/07070485X
               sol1 = np.array(sol)
               for ii in range(5):
                      rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
