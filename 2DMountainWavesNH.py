@@ -40,7 +40,7 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
-from rsb import rsb_matrix
+#from rsb import rsb_matrix
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 from computeTimeIntegration import computeTimeIntegrationNL
@@ -664,7 +664,7 @@ def runModel(TestName):
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
        elif NonLinSolve:
-              AdaptiveTime = False
+              AdaptiveTime = True
               print('Starting Nonlinear Transient Solver...')
                                           
               error = [np.linalg.norm(RHS)]
@@ -674,14 +674,14 @@ def runModel(TestName):
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
               
               # Create 2 instances of the RHS
-              RHS_MS = np.zeros((OPS, numVar, 2), order='F')
+              RHS_MS = np.zeros((OPS, numVar, 3), order='F')
               
               # Store the incoming RHS to the first instance
               RHS_MS[:,:,0] = rhs
               del(RHS);
               
-              # Initialize error delta
-              errDelta0 = 0.0
+              # Initialize error delta (error in the velocity fields)
+              errDelta0 = 1.0
               
               ti = 0
               ff = 1
@@ -759,17 +759,18 @@ def runModel(TestName):
                                                                     udex, ResDiff, TOPT[3])
                              
                      # After the third time step...
-                     if ti >= 2 and AdaptiveTime:
+                     if ti >= 3 and AdaptiveTime:
                             # Estimate from Adams-Bashforth 3 (variable step version)
                             # Marciniak et. al. 2020 https://doi.org/10.1007/s11075-019-00774-y
                             thatSol = np.array(sol[:,:,0]) + \
-                                   1.0 / 12.0 * DT[1] * (23.0 * rhsVec - \
+                                   1.0 / 12.0 * DT[1] * (23.0 * RHS_MS[:,:,2] - \
                                                          16.0 * RHS_MS[:,:,1] + \
                                                           5.0 * RHS_MS[:,:,0])
    
                             # Difference in solution candidates (error estimate)
-                            #errDelta1 = np.amax(np.abs(thatSol - thisSol))
-                            errDelta1 = np.linalg.norm(thatSol - thisSol)
+                            solDiff = thatSol - thisSol
+                            errDelta1 = np.amax(np.abs(solDiff[:,0:2]))
+                            #errDelta1 = np.linalg.norm(thatSol - thisSol)
                             
                             '''
                             # Check the AB3 solution...
@@ -782,39 +783,24 @@ def runModel(TestName):
                             '''
                                
                             #'''
-                            if ti == 2:
-                                   errRatio = 1.0
-                                   newDT = DT[1]
+                                                               
+                            if errDelta1 <= errDelta0:
                                    # Accept solution
                                    sol[:,:,0] = np.array(thisSol)
                                    # Store RHS instances
                                    RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
-                                   RHS_MS[:,:,1] = np.array(rhsVec)
+                                   RHS_MS[:,:,1] = np.array(RHS_MS[:,:,2])
+                                   RHS_MS[:,:,2] = np.array(rhsVec)
                                    ti += 1
                                    thisTime += DT[1]
-                                   errDelta0 = errDelta1
-                            else:
-                                   if errDelta1 > 1.0E-14:
-                                          errRatio = errDelta0 / errDelta1
-                                          newDT = 0.975 * DT[1] * np.power(errRatio, 1.0 / 3.0)
-                                   else:
-                                          errRatio = 1.0
-                                          newDT = DT[1]
-                                                                      
-                                   if errDelta1 <= errDelta0:
-                                          # Accept solution
-                                          sol[:,:,0] = np.array(thisSol)
-                                          # Store RHS instances
-                                          RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
-                                          RHS_MS[:,:,1] = np.array(rhsVec)
-                                          ti += 1
-                                          thisTime += DT[1]
-                                          errDelta0 = errDelta1
-                                   elif errDelta1 > errDelta0:
-                                          # Reject solution and compute again with new DT
-                                          print('Restart current step...')
-                                          print(thisTime, DT[1], newDT, errDelta0, errDelta1)
-                                          ti = 0
+                                   newDT = DT[1]
+                            elif errDelta1 > errDelta0:
+                                   # Reject solution and compute again with new DT
+                                   print('Restart current step...')
+                                   print(thisTime, DT[1], newDT, errDelta0, errDelta1)
+                                   errRatio = errDelta0 / errDelta1
+                                   newDT = 0.975 * DT[1] * np.power(errRatio, 1.0 / 3.0)
+                                   ti = 0
        
                             # Update time steps and error     
                             DT[0] = DT[1]
@@ -825,7 +811,8 @@ def runModel(TestName):
                             sol[:,:,0] = np.array(thisSol)
                             # Store RHS instances
                             RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
-                            RHS_MS[:,:,1] = np.array(rhsVec)
+                            RHS_MS[:,:,1] = np.array(RHS_MS[:,:,2])
+                            RHS_MS[:,:,2] = np.array(rhsVec)
                             ti += 1
                             thisTime += DT[1]
                      

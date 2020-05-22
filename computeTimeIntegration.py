@@ -5,7 +5,6 @@ Created on Tue Aug 13 10:09:52 2019
 
 @author: jorge.guerra
 """
-import math as mt
 import numpy as np
 import bottleneck as bn
 import computeEulerEquationsLogPLogT as tendency

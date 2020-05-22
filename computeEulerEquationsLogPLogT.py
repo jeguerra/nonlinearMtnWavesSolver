@@ -7,7 +7,6 @@ Created on Mon Jul 22 13:11:11 2019
 """
 import numpy as np
 import scipy.sparse as sps
-from rsb import rsb_matrix
 
 def computeFieldDerivatives(q, DDX, DDZ, DZDX):
        DqDx = DDX.dot(q)
