@@ -40,7 +40,7 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
-#from rsb import rsb_matrix
+from rsb import rsb_matrix
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 from computeTimeIntegration import computeTimeIntegrationNL
@@ -340,11 +340,11 @@ def runModel(TestName):
               
        REFS.append(DDXM_GML)
        REFS.append(DDZM_GML)
-       REFS.append(DDXM)
-       REFS.append(DDZM)
+       #REFS.append(DDXM)
+       #REFS.append(DDZM)
        #REFS.append(rsb_matrix(DDXM_GML))
        #REFS.append(rsb_matrix(DDZM_GML))
-       '''
+       #'''
        if StaticSolve:
               REFS.append(DDXM)
               REFS.append(DDZM)
@@ -361,7 +361,7 @@ def runModel(TestName):
               REFS.append(DMX)
               DMZ.autotune()
               REFS.append(DMZ)
-       '''
+       #'''
        # Store the terrain profile
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
@@ -681,6 +681,7 @@ def runModel(TestName):
               del(RHS);
               
               # Initialize error delta (error in the velocity fields)
+              # Look for a 1 m/s change between solutions
               errDelta0 = 1.0
               
               ti = 0
@@ -751,6 +752,10 @@ def runModel(TestName):
                             uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
                      else:
                             uRamp = 1.0
+                            
+                     # Ramp up the background shear       
+                     DUDZ = uRamp * (REFG[4])[:,0]
+                     (REFG[4])[:,0] = np.array(DUDZ)
                                    
                      # Compute the solution within a time step
                      thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
