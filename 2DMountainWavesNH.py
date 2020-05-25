@@ -664,6 +664,7 @@ def runModel(TestName):
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
        elif NonLinSolve:
+              InitialRamp = True
               AdaptiveTime = True
               print('Starting Nonlinear Transient Solver...')
                                           
@@ -681,8 +682,8 @@ def runModel(TestName):
               del(RHS);
               
               # Initialize error delta (error in the velocity fields)
-              # Look for a 1 m/s change between solutions
-              errDelta0 = 1.0
+              # Look for a 0.1 m/s change between solutions
+              errDelta0 = 0.1
               
               ti = 0
               ff = 1
@@ -748,7 +749,7 @@ def runModel(TestName):
                      sol[:,:,1] = np.array(sol[:,:,0])
                      
                       # Ramp up the background wind to decrease transients
-                     if thisTime <= TOPT[2]:
+                     if thisTime <= TOPT[2] and InitialRamp:
                             uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
                      else:
                             uRamp = 1.0
@@ -788,7 +789,6 @@ def runModel(TestName):
                             '''
                                
                             #'''
-                                                               
                             if errDelta1 <= errDelta0:
                                    # Accept solution
                                    sol[:,:,0] = np.array(thisSol)
@@ -844,7 +844,7 @@ def runModel(TestName):
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]
-              rdb['REFS'] = REFS
+              #rdb['REFS'] = REFS # PyRSB matrix objects do not store.
               rdb['PHYS'] = PHYS
               rdb['DIMS'] = DIMS
               rdb.close()
