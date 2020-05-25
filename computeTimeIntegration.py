@@ -89,6 +89,27 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               return sol, rhs
        
+       def kinGray53(sol, Dynamics, DynSGS, FlowDiff):
+              # Stage 1
+              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
+              sol1 = computeUpdate(0.2, sol, rhs)
+              # Stage 2
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(0.2, sol, rhs)
+              # Stage 3
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(1.0 / 3.0, sol, rhs)
+              # Stage 4
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol2 = computeUpdate(2.0 / 3.0, sol, rhs)
+              # Stage 5
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
+              sol2 = np.array(-0.25 * sol + 1.25 * sol1)
+              sol = computeUpdate(0.75, sol2, rhs)
+              
+              return sol, rhs
+              
+       
        def ssprk53_1(sol, Dynamics, DynSGS, FlowDiff):
               # Lowest error coefficient method from Higueras, 2019
               # Stage 1
