@@ -89,7 +89,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               return sol, rhs
        
-       def kinGray53(sol, Dynamics, DynSGS, FlowDiff):
+       def kinnGray53(sol, Dynamics, DynSGS, FlowDiff):
               # Stage 1
               rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
               sol1 = computeUpdate(0.2, sol, rhs)
@@ -178,47 +178,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               return sol, rhs
        
-       def dopri54(sol, Dynamics, DynSGS, FlowDiff):
-              rhs1 = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              # Stage 1
-              sol1 = computeUpdate(0.2, sol, rhs1)
-              # Stage 2
-              rhs2 = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              del(sol1)
-              sol2 = computeUpdate(3.0 / 40.0, sol, rhs1)
-              sol2 = computeUpdate(9.0 / 40.0, sol2, rhs2)
-              # Stage 3
-              rhs3 = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              del(sol2)
-              sol3 = computeUpdate(44.0 / 45.0, sol, rhs1)
-              sol3 = computeUpdate(-56.0 / 15.0, sol3, rhs2)
-              sol3 = computeUpdate(32.0 / 9.0, sol3, rhs3)
-              # Stage 4
-              rhs4 = computeRHSUpdate(sol3, Dynamics, DynSGS, FlowDiff)
-              del(sol3)
-              sol4 = computeUpdate(19372.0 / 6561.0, sol, rhs1)
-              sol4 = computeUpdate(-25360.0 / 2187.0, sol4, rhs2)
-              sol4 = computeUpdate(64448.0 / 6561.0, sol4, rhs3)
-              sol4 = computeUpdate(-212.0 / 729.0, sol4, rhs4)
-              # Stage 5
-              rhs5 = computeRHSUpdate(sol4, Dynamics, DynSGS, FlowDiff)
-              del(sol4)
-              sol5 = computeUpdate(-9017.0 / 3168.0, sol, rhs1)
-              sol5 = computeUpdate(-355.0 / 33.0, sol5, rhs2)
-              sol5 = computeUpdate(46732.0 / 5247.0, sol5, rhs3)
-              sol5 = computeUpdate(49.0 / 176.0, sol5, rhs4)
-              sol5 = computeUpdate(-5103.0 / 18656.0, sol5, rhs5)
-              # Stage 6
-              rhs6 = computeRHSUpdate(sol5, Dynamics, DynSGS, FlowDiff)
-              del(sol5)
-              sol6 = computeUpdate(35.0 / 384.0, sol, rhs1)
-              sol6 = computeUpdate(500.0 / 1113.0, sol6, rhs3)
-              sol6 = computeUpdate(125.0 / 192.0, sol6, rhs4)
-              sol6 = computeUpdate(-2187.0 / 6784.0, sol6, rhs5)
-              sol6 = computeUpdate(11.0 / 84.0, sol6, rhs6)
-              
-              return sol6, rhs6
-       
        def kutta384(sol, Dynamics, DynSGS, FlowDiff):
               # Stage 1
               rhs1 = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
@@ -286,7 +245,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        
        # Compute dynamics update
        if order == 3:
-              solf, rhsDyn = ketchenson93(sol0, True, False, False)
+              solf, rhsDyn = kinnGray53(sol0, True, False, False)
        elif order == 4:
               solf, rhsDyn = ketchenson104(sol0, True, False, False)
               
@@ -303,13 +262,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               # Compute a step of diffusion
               solf, rhsDiff = ssprk34(solf, False, True, False)
-              # Compute an adaptive step of diffusion
-              '''
-              from scipy.integrate import solve_ivp              
-              odeSol = solve_ivp(rhsEval, (0.0, DT), solf, method='RK23', t_eval=[0.0, DT], first_step=0.5*DT, max_step=DT, vectorized=True)
-              solf = odeSol.y
-              print(solf.shape)
-              '''
        else: 
               # Flow weighted diffusion (Guerra, 2016)
               RESCF = dcoeffs.computeFlowVelocityCoeffs(U, W, DX, DZ)
