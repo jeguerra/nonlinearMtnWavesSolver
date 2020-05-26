@@ -673,6 +673,7 @@ def runModel(TestName):
               # Reshape main solution vectors
               sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
               rhs = np.reshape(RHS, (OPS, numVar), order='F')
+              thisSol = sol[:,:,0]
               
               # Create 2 instances of the RHS
               RHS_MS = np.zeros((OPS, numVar, 3), order='F')
@@ -685,11 +686,13 @@ def runModel(TestName):
               # Look for a 0.1 m/s change between solutions
               errDelta0 = 0.1
               
+              # Initialize time constants
               ti = 0
               ff = 1
               thisTime = IT
               DT = [TOPT[0], TOPT[0]]
               newDT = TOPT[0]
+              
               while thisTime < TOPT[4]:
                             
                      # Print out diagnostics every TOPT[5] steps
@@ -760,9 +763,9 @@ def runModel(TestName):
                                    
                      # Compute the solution within a time step
                      thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             DT[1], sol[:,:,0], INIT, uRamp,\
+                                                             DT[1], thisSol, INIT, uRamp,\
                                                              zeroDex_tran, extDex, ubdex, \
-                                                                    udex, ResDiff, TOPT[3])
+                                                        udex, ResDiff, TOPT[3])
                              
                      # After the third time step...
                      if ti >= 3 and AdaptiveTime:
@@ -820,7 +823,6 @@ def runModel(TestName):
                             RHS_MS[:,:,2] = np.array(rhsVec)
                             ti += 1
                             thisTime += DT[1]
-                     
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')

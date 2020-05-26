@@ -81,7 +81,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               sol2 = computeUpdate(0.5, sol1, rhs)
               # Stage 3
               sol = np.array(2.0 / 3.0 * sol + 1.0 / 3.0 * sol2)
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
+              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
               sol1 = computeUpdate(1.0 / 6.0, sol, rhs)
               # Stage 4
               rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
@@ -245,7 +245,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        
        # Compute dynamics update
        if order == 3:
-              solf, rhsDyn = kinnGray53(sol0, True, False, False)
+              solf, rhsDyn = ketchenson93(sol0, True, False, False)
        elif order == 4:
               solf, rhsDyn = ketchenson104(sol0, True, False, False)
               
