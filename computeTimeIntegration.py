@@ -257,6 +257,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               QM = bn.nanmax(np.abs(solf), axis=0)
               # Estimate the residual
               RES = computeRHSUpdate(solf, True, False, False)
+              RES += tendency.computeRayleighTendency(REFG, solf)
               # Compute diffusion coefficients
               RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
               
@@ -269,4 +270,5 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        
        # Compute final RHS and return
        rhsOut = computeRHSUpdate(solf, True, False, False)
+       
        return solf, rhsOut

@@ -672,14 +672,14 @@ def runModel(TestName):
               
               # Reshape main solution vectors
               sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
-              rhs = np.reshape(RHS, (OPS, numVar), order='F')
+              rhsVec = np.reshape(RHS, (OPS, numVar), order='F')
               thisSol = sol[:,:,0]
               
               # Create 2 instances of the RHS
-              RHS_MS = np.zeros((OPS, numVar, 3), order='F')
+              rhs = np.zeros((OPS, numVar, 3), order='F')
               
               # Store the incoming RHS to the first instance
-              RHS_MS[:,:,0] = rhs
+              rhs[:,:,0] = np.array(rhsVec)
               del(RHS);
               
               # Initialize error delta (error in the velocity fields)
@@ -698,7 +698,7 @@ def runModel(TestName):
                      # Print out diagnostics every TOPT[5] steps
                      if ti % TOPT[5] == 0:
                             message = ''
-                            err = displayResiduals(message, np.reshape(RHS_MS[:,:,1], (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
+                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
                      if ti % TOPT[6] == 0:
@@ -715,7 +715,7 @@ def runModel(TestName):
                             # Check the fields
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
-                                   dqdt = np.reshape(sol[:,pp,0], (NZ, NX+1), order='F')
+                                   dqdt = np.reshape(thisSol[:,pp], (NZ, NX+1), order='F')
                                    
                                    if np.abs(dqdt.max()) > np.abs(dqdt.min()):
                                           clim = np.abs(dqdt.max())
@@ -748,9 +748,6 @@ def runModel(TestName):
                             plt.show()
                             ff += 1
                      
-                     # Put previous solution into index 1 storage
-                     sol[:,:,1] = np.array(sol[:,:,0])
-                     
                       # Ramp up the background wind to decrease transients
                      if thisTime <= TOPT[2] and InitialRamp:
                             uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
@@ -767,38 +764,27 @@ def runModel(TestName):
                                                              zeroDex_tran, extDex, ubdex, \
                                                         udex, ResDiff, TOPT[3])
                              
-                     # After the third time step...
-                     if ti >= 3 and AdaptiveTime:
-                            # Estimate from Adams-Bashforth 3 (variable step version)
-                            # Marciniak et. al. 2020 https://doi.org/10.1007/s11075-019-00774-y
-                            thatSol = np.array(sol[:,:,0]) + \
-                                   1.0 / 12.0 * DT[1] * (23.0 * RHS_MS[:,:,2] - \
-                                                         16.0 * RHS_MS[:,:,1] + \
-                                                          5.0 * RHS_MS[:,:,0])
+                     # After the fifth time step...
+                     if ti > 4 and AdaptiveTime:
+                            # Estimate from SSPMS53
+                            thatSol = 7.0 / 32.0 * np.array(sol[:,:,0]) + \
+                                      25.0 / 32.0 * np.array(sol[:,:,1]) + \
+                                      5.0 / 16.0 * DT[1] * np.array(rhs[:,:,0]) + \
+                                      25.0 / 16.0 * DT[1] * np.array(rhs[:,:,1])
    
                             # Difference in solution candidates (error estimate)
                             solDiff = thatSol - thisSol
                             errDelta1 = np.amax(np.abs(solDiff[:,0:2]))
                             #errDelta1 = np.linalg.norm(thatSol - thisSol)
-                            
-                            '''
-                            # Check the AB3 solution...
-                            sol[:,:,0] = np.array(thatSol)
-                            # Store RHS instances
-                            RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
-                            RHS_MS[:,:,1] = np.array(rhsVec)
-                            ti += 1
-                            thisTime += DT[1]
-                            '''
                                
                             #'''
                             if errDelta1 <= errDelta0:
-                                   # Accept solution
-                                   sol[:,:,0] = np.array(thisSol)
-                                   # Store RHS instances
-                                   RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
-                                   RHS_MS[:,:,1] = np.array(RHS_MS[:,:,2])
-                                   RHS_MS[:,:,2] = np.array(rhsVec)
+                                   # Store new solution instance
+                                   sol[:,:,0] = np.array(sol[:,:,1])
+                                   sol[:,:,1] = np.array(thisSol)
+                                   # Store new RHS instance
+                                   rhs[:,:,0] = np.array(rhs[:,:,1])
+                                   rhs[:,:,1] = np.array(rhsVec)
                                    ti += 1
                                    thisTime += DT[1]
                                    newDT = DT[1]
@@ -808,6 +794,7 @@ def runModel(TestName):
                                    print(thisTime, DT[1], newDT, errDelta0, errDelta1)
                                    errRatio = errDelta0 / errDelta1
                                    newDT = 0.975 * DT[1] * np.power(errRatio, 1.0 / 3.0)
+                                   # Starts a new sequence for the MS solver
                                    ti = 0
        
                             # Update time steps and error     
@@ -815,17 +802,18 @@ def runModel(TestName):
                             DT[1] = newDT
                             #'''
                      else:
-                            # Accept solution
-                            sol[:,:,0] = np.array(thisSol)
                             # Store RHS instances
-                            RHS_MS[:,:,0] = np.array(RHS_MS[:,:,1])
-                            RHS_MS[:,:,1] = np.array(RHS_MS[:,:,2])
-                            RHS_MS[:,:,2] = np.array(rhsVec)
+                            if ti == 0:
+                                   sol[:,:,0] = np.array(thisSol)
+                                   rhs[:,:,0] = np.array(rhsVec)
+                            elif ti == 4:
+                                   sol[:,:,1] = np.array(thisSol)
+                                   rhs[:,:,1] = np.array(rhsVec)
                             ti += 1
                             thisTime += DT[1]
                      
               # Reshape back to a column vector after time loop
-              SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
+              SOLT[:,0] = np.reshape(thisSol, (OPS*numVar, ), order='F')
               RHS = np.reshape(rhs, (OPS*numVar, ), order='F')
               
               # Copy state instance 0 to 1
