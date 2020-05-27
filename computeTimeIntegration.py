@@ -61,17 +61,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      
               return rhs
        
-       def ssprk22(sol, Dynamics, DynSGS, FlowDiff):
-              # Stage 1
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              sol1 = computeUpdate(1.0, sol, rhs)
-              # Stage 2
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              sol = computeUpdate(0.5, sol1, rhs)
-              sol = np.array(0.5 * (sol + sol1))
-              
-              return sol, rhs
-       
        def ssprk34(sol, Dynamics, DynSGS, FlowDiff):
               # Stage 1
               rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
@@ -178,7 +167,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               return sol, rhs
        
-       def ketchenson93(sol, Dynamics, DynSGS, FlowDiff):
+       def ketcheson93(sol, Dynamics, DynSGS, FlowDiff):
               # Ketchenson, 2008 10.1137/07070485X
               for ii in range(7):
                      rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
@@ -197,22 +186,23 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      
               return sol, rhs
        
-       def ketchenson104(sol, Dynamics, DynSGS, FlowDiff):
+       def ketcheson104(sol, Dynamics, DynSGS, FlowDiff):
               # Ketchenson, 2008 10.1137/07070485X
               sol1 = np.array(sol)
+              sol2 = np.array(sol)
               for ii in range(5):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-                     sol = computeUpdate(c1, sol, rhs)
+                     rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
+                     sol1 = computeUpdate(c1, sol1, rhs)
               
-              sol1 = np.array(0.04 * sol1 + 0.36 * sol)
-              sol = np.array(15.0 * sol1 - 5.0 * sol)
+              sol2 = np.array(0.04 * sol2 + 0.36 * sol1)
+              sol1 = np.array(15.0 * sol2 - 5.0 * sol1)
               
               for ii in range(4):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)                     
-                     sol = computeUpdate(c1, sol, rhs)
+                     rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)                     
+                     sol1 = computeUpdate(c1, sol1, rhs)
                      
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)       
-              sol = np.array(sol1 + 0.6 * sol)
+              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)       
+              sol = np.array(sol2 + 0.6 * sol1)
               sol = computeUpdate(0.1, sol, rhs)
               
               return sol, rhs
@@ -221,9 +211,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
        
        # Compute dynamics update
        if order == 3:
-              solf, rhsDyn = ketchenson93(sol0, True, False, False)
+              solf, rhsDyn = ketcheson93(sol0, True, False, False)
        elif order == 4:
-              solf, rhsDyn = ketchenson104(sol0, True, False, False)
+              solf, rhsDyn = ketcheson104(sol0, True, False, False)
               
        # Get advective flow velocity components
        U = np.abs(solf[:,0] + UB)
