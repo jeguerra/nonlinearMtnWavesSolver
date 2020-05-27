@@ -814,7 +814,7 @@ def runModel(TestName):
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(thisSol, (OPS*numVar, ), order='F')
-              RHS = np.reshape(rhs, (OPS*numVar, ), order='F')
+              RHS = np.reshape(rhsVec, (OPS*numVar, ), order='F')
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])

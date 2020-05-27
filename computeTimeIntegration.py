@@ -178,31 +178,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               
               return sol, rhs
        
-       def kutta384(sol, Dynamics, DynSGS, FlowDiff):
-              # Stage 1
-              rhs1 = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              sol1 = computeUpdate(1.0 / 3.0, sol, rhs1)
-              # Stage 2
-              rhs2 = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              del(sol1)
-              sol2 = computeUpdate(-1.0 / 3.0, sol, rhs1)
-              sol2 = computeUpdate(1.0, sol2, rhs2)
-              # Stage 3
-              rhs3 = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              del(sol2)
-              sol3 = computeUpdate(1.0, sol, rhs1)
-              sol3 = computeUpdate(-1.0, sol3, rhs2)
-              sol3 = computeUpdate(1.0, sol3, rhs3)
-              # Stage 4
-              rhs4 = computeRHSUpdate(sol3, Dynamics, DynSGS, FlowDiff)
-              del(sol3)
-              sol4 = computeUpdate(0.125, sol, rhs1)
-              sol4 = computeUpdate(0.375, sol4, rhs2)
-              sol4 = computeUpdate(0.375, sol4, rhs3)
-              sol4 = computeUpdate(0.125, sol4, rhs4)
-              
-              return sol4, rhs4
-       
        def ketchenson93(sol, Dynamics, DynSGS, FlowDiff):
               # Ketchenson, 2008 10.1137/07070485X
               for ii in range(7):
@@ -237,7 +212,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      sol = computeUpdate(c1, sol, rhs)
                      
               rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)       
-              sol = np.array(sol1 + 0.6 * sol + 0.1 * DT * rhs)
+              sol = np.array(sol1 + 0.6 * sol)
+              sol = computeUpdate(0.1, sol, rhs)
               
               return sol, rhs
        #'''
@@ -257,7 +233,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               QM = bn.nanmax(np.abs(solf), axis=0)
               # Estimate the residual
               RES = computeRHSUpdate(solf, True, False, False)
-              RES += tendency.computeRayleighTendency(REFG, solf)
               # Compute diffusion coefficients
               RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
               
