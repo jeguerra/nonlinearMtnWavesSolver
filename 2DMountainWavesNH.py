@@ -790,10 +790,10 @@ def runModel(TestName):
                                    newDT = DT[1]
                             elif errDelta1 > errDelta0:
                                    # Reject solution and compute again with new DT
-                                   print('Restart current step...')
-                                   print(thisTime, DT[1], newDT, errDelta0, errDelta1)
                                    errRatio = errDelta0 / errDelta1
                                    newDT = 0.975 * DT[1] * np.power(errRatio, 1.0 / 3.0)
+                                   print('Restart current step...')
+                                   print(thisTime, DT[1], newDT, errDelta0, errDelta1)
                                    # Starts a new sequence for the MS solver
                                    ti = 0
        
