@@ -276,7 +276,7 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
+def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -288,10 +288,7 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
        # Compute diffusive fluxes
        xflux = RESCFX * PqPx
        zflux = RESCFZ * DqDz
-       
-       #xflux[extDex,:] *= 0.0
-       #zflux[extDex,:] *= 0.0
-       
+              
        # Compute derivatives of fluxes
        DDxx = DDXM.dot(xflux)
        DDxz = DDZM.dot(xflux)
@@ -303,7 +300,7 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
+def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -311,10 +308,7 @@ def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex):
        
        # Compute 1st partials of perturbations
        DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
-       
-       #PqPx[extDex,:] *= 0.0
-       #DqDz[extDex,:] *= 0.0
-       
+              
        # Compute 2nd partials of perturbations
        DDxx = DDXM.dot(PqPx)
        DDxz = DDZM.dot(PqPx)

@@ -78,7 +78,6 @@ def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
               sys.exit(2)
        
        SOLT = rdb['SOLT']
-       LMS = rdb['LMS']
        RHS = rdb['RHS']
        IT = rdb['ET']
        if TOPT[4] <= IT and not StaticSolve:
@@ -87,7 +86,7 @@ def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
               
        rdb.close()
        
-       return SOLT, LMS, RHS, NX_in, NZ_in, IT
+       return SOLT, RHS, NX_in, NZ_in, IT
 
 # Store a matrix to disk in column wise chucks
 def storeColumnChunks(MM, Mname, dbName):
@@ -242,7 +241,7 @@ def runModel(TestName):
        #% Compute the BC index vector
        ubdex, utdex, wbdex, \
        ubcDex, wbcDex, pbcDex, tbcDex, \
-       zeroDex_stat, zeroDex_tran, sysDex, extDex = \
+       zeroDex_stat, zeroDex_tran, sysDex, extDex, latDex, vrtDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -400,7 +399,7 @@ def runModel(TestName):
        
        if isRestart:
               print('Restarting from previous solution...')
-              SOLT, LMS, RHS, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
+              SOLT, RHS, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
               dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])
@@ -665,22 +664,21 @@ def runModel(TestName):
        #%% Transient solutions       
        elif NonLinSolve:
               InitialRamp = True
-              AdaptiveTime = True
+              AdaptiveTime = False
               print('Starting Nonlinear Transient Solver...')
-                                          
-              error = [np.linalg.norm(RHS)]
               
               # Reshape main solution vectors
-              sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
+              thisSol = fields
               rhsVec = np.reshape(RHS, (OPS, numVar), order='F')
-              thisSol = sol[:,:,0]
+              error = [np.linalg.norm(rhsVec)]
               
-              # Create 2 instances of the RHS
-              rhs = np.zeros((OPS, numVar, 3), order='F')
+              # Create 2 instances of rhs and sol
+              sol = np.zeros((OPS, numVar, 2), order='F')
+              rhs = np.zeros((OPS, numVar, 2), order='F')
               
               # Store the incoming RHS to the first instance
+              sol[:,:,0] = np.array(thisSol)
               rhs[:,:,0] = np.array(rhsVec)
-              del(RHS);
               
               # Initialize error delta (error in the velocity fields)
               # Look for a 0.1 m/s change between solutions
@@ -703,16 +701,8 @@ def runModel(TestName):
                      
                      if ti % TOPT[6] == 0:
                             fig = plt.figure(figsize=(8.0, 10.0))
-                            # Check the tendencies
-                            '''
-                            for pp in range(numVar):
-                                   plt.subplot(2,2,pp+1)
-                                   dqdt = np.reshape(rhs[:,pp], (NZ, NX+1), order='F')
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
-                                   plt.colorbar(ccheck, format='%.3e')
-                            plt.show()
-                            '''
-                            # Check the fields
+                            
+                            # Check the fields or tendencies
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
                                    dqdt = np.reshape(thisSol[:,pp], (NZ, NX+1), order='F')
@@ -726,7 +716,8 @@ def runModel(TestName):
                                   
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
                                    plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                   #plt.gca().set_facecolor('k')
+                                   #plt.xlim(-25.0, 25.0)
+                                   #plt.ylim(0.0, 20.0)
                                    
                                    if pp < (numVar - 1):
                                           plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -762,7 +753,7 @@ def runModel(TestName):
                      thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
                                                              DT[1], thisSol, INIT, uRamp,\
                                                              zeroDex_tran, extDex, ubdex, \
-                                                        udex, ResDiff, TOPT[3])
+                                                        udex, ResDiff, TOPT[3], latDex, vrtDex)
                              
                      # After the fifth time step...
                      if ti > 4 and AdaptiveTime:
@@ -830,7 +821,7 @@ def runModel(TestName):
               rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
               rdb['LMS'] = LMS
-              rdb['RHS'] = RHS
+              #rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]

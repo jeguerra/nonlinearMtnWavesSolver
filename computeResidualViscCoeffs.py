@@ -27,7 +27,7 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ):
               QRESX[fdex, vv] = (0.5 * DX) * U[fdex]
               fdex = QRESZ[:,vv] > (0.5 * DZ) * W
               QRESZ[fdex, vv] = (0.5 * DZ) * W[fdex]
-       
+
        return (QRESX, QRESZ)
 
 def computeFlowVelocityCoeffs(U, W, DX, DZ):

@@ -10,7 +10,7 @@ import bottleneck as bn
 import computeEulerEquationsLogPLogT as tendency
 import computeResidualViscCoeffs as dcoeffs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, zeroDex, extDex, botDex, udex, DynSGS, order):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, zeroDex, extDex, botDex, udex, DynSGS, order, latDex, vrtDex):
        # Set the coefficients
        c1 = 1.0 / 6.0
        c2 = 1.0 / 5.0
@@ -30,7 +30,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               #Apply updates
               dsol = coeff * DT * rhs
               solB = solA + dsol
-              
               # Update boundary
               U = solB[:,0] + UB
               solB[botDex,1] = np.array(dHdX * U[botDex])
@@ -44,20 +43,20 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
                      # Compute dynamical tendencies
                      rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U)
                      rhs += tendency.computeRayleighTendency(REFG, fields)
-                     rhs[zeroDex[0],0] *= 0.0
-                     rhs[zeroDex[1],1] *= 0.0
-                     rhs[zeroDex[2],2] *= 0.0
-                     rhs[zeroDex[3],3] *= 0.0
               if DynSGS:
-                     rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex)
-                     rhs += tendency.computeRayleighTendency(REFG, fields)
-                     # Null tendency at all boundary DOF
+                     rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields)
+                     # Null tendency on Essential boundary
                      rhs[extDex,:] *= 0.0
               if FlowDiff2:
-                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, extDex)
-                     rhs += tendency.computeRayleighTendency(REFG, fields)
+                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields)
                      # Null tendency at all boundary DOF
                      rhs[extDex,:] *= 0.0
+              
+              # Fix Essential boundary conditions
+              rhs[zeroDex[0],0] *= 0.0
+              rhs[zeroDex[1],1] *= 0.0
+              rhs[zeroDex[2],2] *= 0.0
+              rhs[zeroDex[3],3] *= 0.0
                      
               return rhs
        
@@ -77,28 +76,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, ze
               sol = computeUpdate(0.5, sol1, rhs)
               
               return sol, rhs
-       
-       def kinnGray53(sol, Dynamics, DynSGS, FlowDiff):
-              # Stage 1
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              sol1 = computeUpdate(0.2, sol, rhs)
-              # Stage 2
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              sol2 = computeUpdate(0.2, sol, rhs)
-              # Stage 3
-              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              sol2 = computeUpdate(1.0 / 3.0, sol, rhs)
-              # Stage 4
-              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              sol2 = computeUpdate(2.0 / 3.0, sol, rhs)
-              # Stage 5
-              rhs = computeRHSUpdate(sol2, Dynamics, DynSGS, FlowDiff)
-              sol2 = np.array(-0.25 * sol + 1.25 * sol1)
-              sol = computeUpdate(0.75, sol2, rhs)
-              
-              return sol, rhs
-              
-       
+               
        def ssprk53_1(sol, Dynamics, DynSGS, FlowDiff):
               # Lowest error coefficient method from Higueras, 2019
               # Stage 1
