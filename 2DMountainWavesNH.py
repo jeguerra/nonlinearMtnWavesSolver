@@ -664,7 +664,6 @@ def runModel(TestName):
        #%% Transient solutions       
        elif NonLinSolve:
               InitialRamp = True
-              AdaptiveTime = False
               print('Starting Nonlinear Transient Solver...')
               
               # Reshape main solution vectors
@@ -672,24 +671,11 @@ def runModel(TestName):
               rhsVec = np.reshape(RHS, (OPS, numVar), order='F')
               error = [np.linalg.norm(rhsVec)]
               
-              # Create 2 instances of rhs and sol
-              sol = np.zeros((OPS, numVar, 2), order='F')
-              rhs = np.zeros((OPS, numVar, 2), order='F')
-              
-              # Store the incoming RHS to the first instance
-              sol[:,:,0] = np.array(thisSol)
-              rhs[:,:,0] = np.array(rhsVec)
-              
-              # Initialize error delta (error in the velocity fields)
-              # Look for a 0.1 m/s change between solutions
-              errDelta0 = 0.1
-              
               # Initialize time constants
               ti = 0
               ff = 1
               thisTime = IT
-              DT = [TOPT[0], TOPT[0]]
-              newDT = TOPT[0]
+              DT = TOPT[0]
               
               while thisTime < TOPT[4]:
                             
@@ -751,57 +737,12 @@ def runModel(TestName):
                                    
                      # Compute the solution within a time step
                      thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             DT[1], thisSol, INIT, uRamp,\
+                                                             DT, thisSol, INIT, uRamp,\
                                                              zeroDex_tran, extDex, ubdex, \
                                                         udex, ResDiff, TOPT[3], latDex, vrtDex)
                              
-                     # After the fifth time step...
-                     if ti > 4 and AdaptiveTime:
-                            # Estimate from SSPMS53
-                            thatSol = 7.0 / 32.0 * np.array(sol[:,:,0]) + \
-                                      25.0 / 32.0 * np.array(sol[:,:,1]) + \
-                                      5.0 / 16.0 * DT[1] * np.array(rhs[:,:,0]) + \
-                                      25.0 / 16.0 * DT[1] * np.array(rhs[:,:,1])
-   
-                            # Difference in solution candidates (error estimate)
-                            solDiff = thatSol - thisSol
-                            errDelta1 = np.amax(np.abs(solDiff[:,0:2]))
-                            #errDelta1 = np.linalg.norm(thatSol - thisSol)
-                               
-                            #'''
-                            if errDelta1 <= errDelta0:
-                                   # Store new solution instance
-                                   sol[:,:,0] = np.array(sol[:,:,1])
-                                   sol[:,:,1] = np.array(thisSol)
-                                   # Store new RHS instance
-                                   rhs[:,:,0] = np.array(rhs[:,:,1])
-                                   rhs[:,:,1] = np.array(rhsVec)
-                                   ti += 1
-                                   thisTime += DT[1]
-                                   newDT = DT[1]
-                            elif errDelta1 > errDelta0:
-                                   # Reject solution and compute again with new DT
-                                   errRatio = errDelta0 / errDelta1
-                                   newDT = 0.975 * DT[1] * np.power(errRatio, 1.0 / 3.0)
-                                   print('Restart current step...')
-                                   print(thisTime, DT[1], newDT, errDelta0, errDelta1)
-                                   # Starts a new sequence for the MS solver
-                                   ti = 0
-       
-                            # Update time steps and error     
-                            DT[0] = DT[1]
-                            DT[1] = newDT
-                            #'''
-                     else:
-                            # Store RHS instances
-                            if ti == 0:
-                                   sol[:,:,0] = np.array(thisSol)
-                                   rhs[:,:,0] = np.array(rhsVec)
-                            elif ti == 4:
-                                   sol[:,:,1] = np.array(thisSol)
-                                   rhs[:,:,1] = np.array(rhsVec)
-                            ti += 1
-                            thisTime += DT[1]
+                     ti += 1
+                     thisTime += DT
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(thisSol, (OPS*numVar, ), order='F')
@@ -821,7 +762,7 @@ def runModel(TestName):
               rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
               rdb['LMS'] = LMS
-              #rdb['RHS'] = RHS
+              rdb['RHS'] = RHS
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]
