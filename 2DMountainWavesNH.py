@@ -208,8 +208,8 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = np.max(np.abs(np.diff(REFS[0])))
-       DZ = np.max(np.abs(np.diff(REFS[1])))
+       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
        print('Nominal grid lengths:',DX,DZ)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
@@ -667,7 +667,7 @@ def runModel(TestName):
               print('Starting Nonlinear Transient Solver...')
               
               # Reshape main solution vectors
-              thisSol = fields
+              hydroState = np.reshape(INIT, (OPS, numVar), order='F')
               rhsVec = np.reshape(RHS, (OPS, numVar), order='F')
               error = [np.linalg.norm(rhsVec)]
               
@@ -691,7 +691,7 @@ def runModel(TestName):
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
-                                   dqdt = np.reshape(thisSol[:,pp], (NZ, NX+1), order='F')
+                                   dqdt = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
                                    
                                    if np.abs(dqdt.max()) > np.abs(dqdt.min()):
                                           clim = np.abs(dqdt.max())
@@ -702,8 +702,8 @@ def runModel(TestName):
                                   
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
                                    plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                   #plt.xlim(-25.0, 25.0)
-                                   #plt.ylim(0.0, 20.0)
+                                   plt.xlim(-30.0, 30.0)
+                                   plt.ylim(0.0, 20.0)
                                    
                                    if pp < (numVar - 1):
                                           plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -723,6 +723,24 @@ def runModel(TestName):
        
                             plt.savefig('transient' + str(ff).zfill(3) + '.png', dpi=600, format='png', bbox_inches='tight', pad_inches=0.005)
                             plt.show()
+                            '''
+                            # Check the terrain boundary
+                            fig = plt.figure(figsize=(10.0, 8.0))
+                            flowAngle = np.arctan((thisSol[:,1])[ubdex] * np.reciprocal(INIT[ubdex] + (thisSol[:,0])[ubdex]))
+                            slopeAngle = np.arctan(dHdX)
+                            
+                            plt.subplot(1,2,1)
+                            plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
+                            plt.xlim(-20.0, 20.0)
+                            plt.title('Flow vector angle and terrain angle')
+                            
+                            plt.subplot(1,2,2)
+                            plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
+                            plt.title('Boundary Constraint |Delta| - (m/s)')
+                            
+                            plt.tight_layout()
+                            plt.show()
+                            '''
                             ff += 1
                      
                       # Ramp up the background wind to decrease transients
@@ -736,16 +754,16 @@ def runModel(TestName):
                      (REFG[4])[:,0] = np.array(DUDZ)
                                    
                      # Compute the solution within a time step
-                     thisSol, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             DT, thisSol, INIT, uRamp,\
+                     fields, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
+                                                             DT, fields, hydroState, uRamp,\
                                                              zeroDex_tran, extDex, ubdex, \
-                                                        udex, ResDiff, TOPT[3], latDex, vrtDex)
+                                                             ResDiff, TOPT[3])
                              
                      ti += 1
                      thisTime += DT
                      
               # Reshape back to a column vector after time loop
-              SOLT[:,0] = np.reshape(thisSol, (OPS*numVar, ), order='F')
+              SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')
               RHS = np.reshape(rhsVec, (OPS*numVar, ), order='F')
               
               # Copy state instance 0 to 1

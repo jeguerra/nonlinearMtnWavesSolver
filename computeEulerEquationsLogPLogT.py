@@ -11,7 +11,7 @@ import scipy.sparse as sps
 def computeFieldDerivatives(q, DDX, DDZ, DZDX):
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
-       PqPx = DqDx - np.multiply(DZDX, DqDz)
+       PqPx = DqDx - DZDX * DqDz
        
        return DqDx, PqPx, DqDz
 
@@ -226,7 +226,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, PqPx, DqDz, RdT_bar, fields, U):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -236,7 +236,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        DQDZ = REFG[4]
               
        # Compute derivative of perturbations
-       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       #DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
@@ -276,14 +276,14 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields):
+def computeDiffusiveFluxTendency(RESCF, DqDx, PqPx, DqDz, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute derivatives of perturbations
-       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       #DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
        
        # Compute diffusive fluxes
        xflux = RESCFX * PqPx
@@ -300,14 +300,14 @@ def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields):
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields):
+def computeDiffusionTendency(RESCF, DqDx, PqPx, DqDz, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
        # Compute 1st partials of perturbations
-       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       #DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
               
        # Compute 2nd partials of perturbations
        DDxx = DDXM.dot(PqPx)
