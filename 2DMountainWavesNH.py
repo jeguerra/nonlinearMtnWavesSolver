@@ -147,6 +147,7 @@ def runModel(TestName):
        thisTest = TestCase.TestCase(TestName)
        
        # Deprecated...
+       RSBops = True
        UniformDelta = False
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
@@ -208,13 +209,20 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
+       DX = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
        print('Nominal grid lengths:',DX,DZ)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       
+       # Compute the spectral radii...
+       DX = 2.0 / np.amax(np.abs(dsl.eigvals(DDX_1D)))
+       DZ = 2.0 / np.amax(np.abs(dsl.eigvals(DDZ_1D)))
+       #DX = 1.0 / np.sort(np.abs(dsl.eigvals(DDX_1D)))[-2]
+       #DZ = 1.0 / np.sort(np.abs(dsl.eigvals(DDZ_1D)))[-2]
+       print('Spectral radii for 1st derivative matrices:',DX,DZ)
        
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
@@ -329,38 +337,19 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       # Store derivative operators with GML damping
-       if SparseDerivativesDynamics:
-              DDXM_GML = GMLOP.dot(DDXM_SP)
-              DDZM_GML = GMLOP.dot(DDZM_SP)
+       if RSBops and not StaticSolve:
+              # Operators in RSB format
+              REFS.append(rsb_matrix(GMLOP.dot(DDXM)))
+              REFS.append(rsb_matrix(GMLOP.dot(DDZM)))
+              REFS.append(rsb_matrix(DDXM))
+              REFS.append(rsb_matrix(DDZM))
        else:
-              DDXM_GML = GMLOP.dot(DDXM)
-              DDZM_GML = GMLOP.dot(DDZM)
-              
-       REFS.append(DDXM_GML)
-       REFS.append(DDZM_GML)
-       #REFS.append(DDXM)
-       #REFS.append(DDZM)
-       #REFS.append(rsb_matrix(DDXM_GML))
-       #REFS.append(rsb_matrix(DDZM_GML))
-       #'''
-       if StaticSolve:
+              # Operators in SciPy CSR format
+              REFS.append(GMLOP.dot(DDXM))
+              REFS.append(GMLOP.dot(DDZM))
               REFS.append(DDXM)
               REFS.append(DDZM)
-       else:
-              # Store derivative operators without GML damping
-              if SparseDerivativesDynSGS:
-                     DMX = rsb_matrix(DDXM_SP)
-                     DMZ = rsb_matrix(DDZM_SP)
-              else:
-                     DMX = rsb_matrix(DDXM)
-                     DMZ = rsb_matrix(DDZM)
-                     
-              DMX.autotune()
-              REFS.append(DMX)
-              DMZ.autotune()
-              REFS.append(DMZ)
-       #'''
+       
        # Store the terrain profile
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
@@ -379,8 +368,8 @@ def runModel(TestName):
        plt.show()
        input()
        '''
-       del(DDXM); del(DDXM_GML)
-       del(DDZM); del(DDZM_GML)
+       del(DDXM);
+       del(DDZM);
        del(DZDX);
        
        #%% SOLUTION INITIALIZATION
@@ -443,8 +432,9 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U)
-              rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
+              DqDx, DqDz = eqs.computeFieldDerivatives(fields, REFS[12], REFS[13])
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9], fields, U)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
               RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
@@ -650,8 +640,9 @@ def runModel(TestName):
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U)
-              rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
+              DqDx, DqDz = eqs.computeFieldDerivatives(fields, REFS[12], REFS[13])
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9], fields, U)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               RHS[zeroDex_stat] *= 0.0
               RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
@@ -663,19 +654,27 @@ def runModel(TestName):
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
        elif NonLinSolve:
-              InitialRamp = True
               print('Starting Nonlinear Transient Solver...')
-              
-              # Reshape main solution vectors
+                            
+              # Reshape main solution vectors and initialize
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
               rhsVec = np.reshape(RHS, (OPS, numVar), order='F')
+              resVec = np.zeros((OPS, numVar))
               error = [np.linalg.norm(rhsVec)]
               
               # Initialize time constants
               ti = 0
               ff = 1
               thisTime = IT
+              rampTime = TOPT[2]
               DT = TOPT[0]
+              
+              # Initialize diffusion coefficients
+              resCoeff = (np.zeros((OPS, numVar)), np.zeros((OPS, numVar)))
+              sgsCoeff = (np.zeros((OPS, 1)), np.zeros((OPS, 1)))
+              
+              # Get local sound speed
+              VSND = np.sqrt(PHYS[6] * REFS[9])
               
               while thisTime < TOPT[4]:
                             
@@ -687,10 +686,10 @@ def runModel(TestName):
                      
                      if ti % TOPT[6] == 0:
                             fig = plt.figure(figsize=(8.0, 10.0))
-                            
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
+                                   #zderivs = REFS[11].dot(fields)
                                    dqdt = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
                                    
                                    if np.abs(dqdt.max()) > np.abs(dqdt.min()):
@@ -724,43 +723,100 @@ def runModel(TestName):
                             plt.savefig('transient' + str(ff).zfill(3) + '.png', dpi=600, format='png', bbox_inches='tight', pad_inches=0.005)
                             plt.show()
                             '''
+                            fig = plt.figure(figsize=(8.0, 10.0))
+                            # Check the fields or tendencies
+                            for pp in range(numVar):
+                                   plt.subplot(4,1,pp+1)
+                                   dqdt = np.reshape(resVec[:,pp], (NZ, NX+1), order='F')
+                                   
+                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.max())
+                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.min())
+                                   else:
+                                          clim = np.abs(dqdt.max())
+                                  
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                   plt.xlim(-30.0, 30.0)
+                                   plt.ylim(0.0, 20.0)
+                                   
+                                   if pp < (numVar - 1):
+                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                   else:
+                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                          
+                                   plt.colorbar(ccheck, format='%.3e')
+                                   
+                                   if pp == 0:
+                                          plt.title('u (m/s)')
+                                   elif pp == 1:
+                                          plt.title('w (m/s)')
+                                   elif pp == 2:
+                                          plt.title('ln-p (Pa)')
+                                   else:
+                                          plt.title('ln-theta (K)')
+       
+                            plt.show()
+                            '''
+                            '''
+                            fig = plt.figure(figsize=(8.0, 10.0))
+                            # Check the fields or tendencies
+                            for pp in range(2):
+                                   plt.subplot(2,1,pp+1)
+                                   dqdt = np.reshape(sgsCoeff[pp][:,0], (NZ, NX+1), order='F')
+                                   
+                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.max())
+                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.min())
+                                   else:
+                                          clim = np.abs(dqdt.max())
+                                  
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                   plt.xlim(-30.0, 30.0)
+                                   plt.ylim(0.0, 20.0)
+                                   
+                                   if pp < (numVar - 1):
+                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                   else:
+                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                          
+                                   plt.colorbar(ccheck, format='%.3e')
+                                   
+                                   if pp == 0:
+                                          plt.title('X Coefficients')
+                                   elif pp == 1:
+                                          plt.title('Z Coefficients')
+       
+                            plt.show()
+                            '''
+                            '''
                             # Check the terrain boundary
-                            fig = plt.figure(figsize=(10.0, 8.0))
-                            flowAngle = np.arctan((thisSol[:,1])[ubdex] * np.reciprocal(INIT[ubdex] + (thisSol[:,0])[ubdex]))
-                            slopeAngle = np.arctan(dHdX)
+                            fig = plt.figure(figsize=(8.0, 10.0))
                             
-                            plt.subplot(1,2,1)
-                            plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
+                            plt.subplot(2,1,1)
+                            plt.plot(1.0E-3 * REFS[0], resVec[ubdex,0], 'k-', 1.0E-3 * REFS[0], resVec[ubdex+1,0], 'r-')
                             plt.xlim(-20.0, 20.0)
-                            plt.title('Flow vector angle and terrain angle')
+                            plt.title('Residual in U near Terrain')
                             
-                            plt.subplot(1,2,2)
-                            plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
-                            plt.title('Boundary Constraint |Delta| - (m/s)')
+                            plt.subplot(2,1,2)
+                            plt.plot(1.0E-3 * REFS[0], resVec[ubdex,1], 'k-', 1.0E-3 * REFS[0], resVec[ubdex+1,0], 'r-')              
+                            plt.title('Residual in W near Terrain')
                             
                             plt.tight_layout()
                             plt.show()
                             '''
                             ff += 1
-                     
-                      # Ramp up the background wind to decrease transients
-                     if thisTime <= TOPT[2] and InitialRamp:
-                            uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
-                     else:
-                            uRamp = 1.0
-                            
-                     # Ramp up the background shear       
-                     DUDZ = uRamp * (REFG[4])[:,0]
-                     (REFG[4])[:,0] = np.array(DUDZ)
-                                   
+
                      # Compute the solution within a time step
-                     fields, rhsVec = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             DT, fields, hydroState, uRamp,\
+                     fields, rhsVec, resVec, resCoeff, sgsCoeff, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
+                                                             DT, fields, hydroState, rhsVec, resVec, sgsCoeff, \
                                                              zeroDex_tran, extDex, ubdex, \
-                                                             ResDiff, TOPT[3])
+                                                             ResDiff, TOPT[3], VSND, thisTime, rampTime)
                              
                      ti += 1
-                     thisTime += DT
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')
@@ -784,7 +840,6 @@ def runModel(TestName):
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]
-              #rdb['REFS'] = REFS # PyRSB matrix objects do not store.
               rdb['PHYS'] = PHYS
               rdb['DIMS'] = DIMS
               rdb.close()

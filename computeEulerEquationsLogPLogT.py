@@ -8,12 +8,12 @@ Created on Mon Jul 22 13:11:11 2019
 import numpy as np
 import scipy.sparse as sps
 
-def computeFieldDerivatives(q, DDX, DDZ, DZDX):
+def computeFieldDerivatives(q, DDX, DDZ):
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
-       PqPx = DqDx - DZDX * DqDz
+       #PqPx = DqDx - DZDX * DqDz
        
-       return DqDx, PqPx, DqDz
+       return DqDx, DqDz
 
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -226,7 +226,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, PqPx, DqDz, RdT_bar, fields, U):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, bcDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -234,9 +234,9 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, PqPx, DqDz, RdT_bar, fiel
        
        # Get hydrostatic initial fields
        DQDZ = REFG[4]
-              
-       # Compute derivative of perturbations
-       #DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+
+       # Compute the partial derivative
+       PqPx = DqDx - DZDX * DqDz
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
@@ -249,15 +249,26 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, PqPx, DqDz, RdT_bar, fiel
        # Compute advection
        UPqPx = UM * PqPx
        wDQqDz = wxz * (DqDz + DQDZ)
-       #transport = UPqPx + wDQqDz
-
-       DqDt = -(UPqPx + wDQqDz)
+       transport = UPqPx + wDQqDz
+       divergence = (PqPx[:,0] + DqDz[:,1])
+       '''
+       # Compute transport at the terrain
+       dhdx = np.expand_dims(DZDX[bcDex,0],1)
+       ubc = np.expand_dims(UM[bcDex,0],1)
+       bctransport = ubc * (DqDx[bcDex,:] + dhdx * DQDZ[bcDex,:])
+       transport[bcDex,:] = bctransport
+       
+       # Compute divergence at the terrain
+       bcdivergence = DqDx[bcDex,0] + DZDX[bcDex,0] * DQDZ[bcDex,0]
+       divergence[bcDex] = bcdivergence
+       '''
+       DqDt = -transport
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
        DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
        # Pressure (mass) equation
-       DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
+       DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
                                   
        return DqDt
@@ -276,18 +287,20 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DqDx, PqPx, DqDz, DDXM, DDZM, DZDX, fields):
+def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
-       # Compute derivatives of perturbations
-       #DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       # Compute the partial derivative
+       PqPx = DqDx - DZDX * DqDz
        
        # Compute diffusive fluxes
        xflux = RESCFX * PqPx
+       xflux[:,0] *= 2.0
        zflux = RESCFZ * DqDz
+       zflux[:,1] *= 2.0
               
        # Compute derivatives of fluxes
        DDxx = DDXM.dot(xflux)
@@ -300,14 +313,14 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, PqPx, DqDz, DDXM, DDZM, DZDX, fiel
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DqDx, PqPx, DqDz, DDXM, DDZM, DZDX, fields):
+def computeDiffusionTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
-       # Compute 1st partials of perturbations
-       #DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       # Compute the partial derivative
+       PqPx = DqDx - DZDX * DqDz
               
        # Compute 2nd partials of perturbations
        DDxx = DDXM.dot(PqPx)
@@ -317,7 +330,9 @@ def computeDiffusionTendency(RESCF, DqDx, PqPx, DqDz, DDXM, DDZM, DZDX, fields):
        
        # Compute diffusive fluxes
        xflux = RESCFX * PPx2
+       xflux[:,0] *= 2.0
        zflux = RESCFZ * DDz2
+       zflux[:,1] *= 2.0
        
        # Compute the tendencies
        DqDt = xflux + zflux
