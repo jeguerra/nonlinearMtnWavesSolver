@@ -10,7 +10,7 @@ import numpy as np
 import bottleneck as bn
 
 # This approach blends by maximum residuals on each variable
-def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, VSND):
+def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, VSND, RLM):
        
        ARES = np.abs(RES)
        
@@ -35,18 +35,17 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, VSND):
        QRESX = DX**2 * QRES_MAX;
        QRESZ = DZ**2 * QRES_MAX;
        
-       #return (np.expand_dims(QRESX_MAX,1), np.expand_dims(QRESZ_MAX,1))
-       #'''
+       # Compute upwind flow dependent coefficients
        XMAX = (0.5 * DX) * U#(U + VSND)
        ZMAX = (0.5 * DZ) * W#(W + VSND)
        
        compare = np.stack((QRESX, XMAX),axis=1)
-       QRESX_CF = bn.nanmin(compare, axis=1)
+       QRESX_CF = RLM.dot(XMAX) + bn.nanmin(compare, axis=1)
        compare = np.stack((QRESZ, ZMAX),axis=1)
-       QRESZ_CF = bn.nanmin(compare, axis=1)
+       QRESZ_CF = RLM.dot(ZMAX) + bn.nanmin(compare, axis=1)
        
        return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
-      # '''
+
 
 # This approach keeps each corresponding residual on each variable
 def computeResidualViscCoeffs2(RES, QM, U, W, DX, DZ, VSND):
@@ -68,8 +67,8 @@ def computeResidualViscCoeffs2(RES, QM, U, W, DX, DZ, VSND):
                      ARES[:,vv] *= 0.0
        
        # Compute the anisotropic coefficients
-       QRESX = DX**2 * ARES; QRESX[:,0] *= 2.0
-       QRESZ = DZ**2 * ARES; QRESZ[:,1] *= 2.0
+       QRESX = DX**2 * ARES;
+       QRESZ = DZ**2 * ARES;
 
        XMAX = (0.5 * DX) * U#(U + VSND)
        ZMAX = (0.5 * DZ) * W#(W + VSND)

@@ -24,7 +24,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        NX = DIMS[3] + 1
        NZ = DIMS[4]
        
-       RP = 2
+       RP = 4
        GP = 2
        
        # Get REFS data
@@ -38,6 +38,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
        # Assemble the Rayleigh field
        RL = np.zeros((NZ, NX))
+       RLX = np.zeros((NZ, NX))
+       RLZ = np.zeros((NZ, NX))
        SBR = np.zeros((NZ, NX))
        
        for ii in range(NZ):
@@ -69,6 +71,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             RFZ = 0.0
                      
                      # Set the field to max(lateral, top) to handle corners
+                     RLX[ii,jj] = RFX
+                     RLZ[ii,jj] = RFZ
                      RL[ii,jj] = np.amax([RFX, RFZ])
                      # Set the binary matrix
                      if RL[ii,jj] != 0.0:
@@ -80,7 +84,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        input()
        '''                     
        # Assemble the Grid Matching Layer field X and Z directions
-       GML = np.zeros((NZ, NX))
+       GMLX = np.zeros((NZ, NX))
+       GMLZ = np.zeros((NZ, NX))
        for ii in range(NZ):
               for jj in range(NX):
                      # Get this X location
@@ -95,7 +100,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormX = 0.0
                             # Evaluate the GML factor
-                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**GP
+                            RFX = (mt.tan(0.5 * mt.pi * dNormX))**GP
                      else:
                             RFX = 0.0
                      if applyTop:
@@ -105,14 +110,16 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormZ = 0.0
                             # Evaluate the strength of the field
-                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**GP
+                            RFZ = (mt.tan(0.5 * mt.pi * dNormZ))**GP
                      else:
                             RFZ = 0.0
                      
+                     GMLX[ii,jj] = 1.0 / (1.0 + RFX)
+                     GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
                      # Set the field to max(lateral, top) to handle corners
-                     GML[ii,jj] = np.amax([RFX, RFZ])
+                     #GML[ii,jj] = np.amax([RFX, RFZ])
                             
-       return GML, RL, SBR
+       return GMLX, GMLZ, RL, RLX, RLZ, SBR
 
 def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        # Get options data
@@ -127,7 +134,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        OPS = NX * NZ
        
        # Set up the Rayleigh field
-       GML, RL, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
+       GMLX, GMLZ, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
        
        # Get the individual mu for each prognostic
        mu_U = mu[0]
@@ -135,14 +142,23 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        mu_P = mu[2]
        mu_T = mu[3]
        
-       # Compute the diagonal for Rayleigh field
+       # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
        # Compute the matrix operator
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       
+       # Compute the diagonal for full Rayleigh field
+       tempDiagonal = np.reshape(RLX, (OPS,), order='F')
+       # Compute the matrix operator
+       RLXM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
+       '''
+       # Compute the diagonal for full Rayleigh field
+       tempDiagonal = np.reshape(RLZ, (OPS,), order='F')
+       # Compute the matrix operator
+       RLZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
+       '''
        # Store the diagonal blocks corresponding to Rayleigh damping terms
-       ROPS = [mu_U * RLM, mu_W * RLM, mu_P * RLM, mu_T * RLM]
+       ROPS = [mu_U * RLXM, mu_W * RLM, mu_P * RLXM, mu_T * RLM]
        
-       return ROPS, GML
+       return ROPS, RLM, GMLX, GMLZ
        
                             

@@ -47,13 +47,13 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # Index all boundary DOF that can be diffused on
        latDex = np.unique(np.concatenate((uldex,urdex)))
        vrtDex = np.unique(np.concatenate((ubdex,utdex)))
-       extDex = np.unique(np.concatenate((uldex,ubdex,utdex)))
+       extDex = np.unique(np.concatenate((urdex,uldex,ubdex,utdex)))
        
        # BC indices for static solution (per variable)
        rowsOutU = set(uldex)
        rowsOutW = set(np.concatenate((uldex,utdex)))
-       rowsOutP = set(uldex)
-       rowsOutT = set(np.concatenate((uldex,utdex)))
+       rowsOutP = set()
+       rowsOutT = set(utdex)
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
@@ -63,7 +63,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC indices for transient solution (per variable)
        rowsOutW_trans = set(np.concatenate((ubdex,uldex,utdex)))
        
-       left = np.concatenate((uldex, wldex, pldex, tldex))
+       # CHANGE THESE TO MATCH WHAT YOU FOUND WITH THE TRANSIENT RUN
+       left = np.concatenate((uldex, wldex))
        top = np.concatenate((wtdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
        rowsOutBC_static = set(np.concatenate((left, top)))

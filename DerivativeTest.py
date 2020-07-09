@@ -20,7 +20,7 @@ import computeTopographyOnGrid as top
 L2 = 1.0E4 * 3.0 * mt.pi
 L1 = -L2
 ZH = 36000.0
-NX = 512
+NX = 514
 NZ = 128
 DIMS = [L1, L2, ZH, NX, NZ]
 
@@ -107,7 +107,7 @@ DYD_CFD = DDX_CFD.dot(HofX)
 plt.figure(figsize=(8, 6), tight_layout=True)
 #plt.plot(xv, HofX, label='Function')
 plt.plot(xv, dHdX, 'r-', label='Fourier Derivative')
-plt.plot(xv, DYD, 'k--', label='Hermite Derivative')
+plt.plot(xv, DYD, 'ks--', label='Hermite Derivative')
 plt.plot(xv, DYD_CFD, 'b--', label='Compact CFD Derivative')
 plt.xlim(-12500.0, 12500.0)
 plt.xlabel('Domain')
