@@ -18,7 +18,7 @@ import numpy as np
 # Make the parent figure
 fig = plt.figure(figsize=(12.0, 6.0))
 
-la_afs = shelve.open('/home/jeg/scratch/restartDB', 'r')
+la_afs = shelve.open('/home/jeg/scratch/restartDB_smooth010m', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']
@@ -78,7 +78,7 @@ plt.show()
 # Make the parent figure
 fig = plt.figure(figsize=(12.0, 6.0))
 
-la_afs = shelve.open('/scratch/jorge/restartDB_discrete', 'r')
+la_afs = shelve.open('/home/jeg/scratch/restartDB_discrete010m', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']
@@ -133,7 +133,7 @@ for pp in range(4):
 plt.tight_layout()
 plt.savefig('python results/SolutionFields_discrete010m.png')
 plt.show()
-
+'''
 #%% SCHAR CASE WITH 50 M MOUNTAIN
 # Make the parent figure
 fig = plt.figure(figsize=(12.0, 6.0))
@@ -193,3 +193,4 @@ for pp in range(4):
 plt.tight_layout()
 plt.savefig('python results/SolutionFields_schar050m.png')
 plt.show()
+'''

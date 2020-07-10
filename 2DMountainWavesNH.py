@@ -341,8 +341,12 @@ def runModel(TestName):
        
        REFS.append(DDXM)
        REFS.append(DDZM)
-       REFS.append(rsb_matrix(DDXM))
-       REFS.append(rsb_matrix(DDZM))
+       if StaticSolve:
+              REFS.append(DDXM)
+              REFS.append(DDZM)
+       else:
+              REFS.append(rsb_matrix(DDXM))
+              REFS.append(rsb_matrix(DDZM))
        
        # Store the terrain profile
        REFS.append(DZT)
@@ -846,6 +850,7 @@ def runModel(TestName):
               rdb['ET'] = TOPT[4]
               rdb['PHYS'] = PHYS
               rdb['DIMS'] = DIMS
+              rdb['REFS'] = REFS
               rdb.close()
        
        #%% Recover the solution (or check the residual)
@@ -1016,9 +1021,9 @@ if __name__ == '__main__':
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
        #TestName = 'SmoothStratScharIter'
-       #TestName = 'DiscreteStratScharIter'
-       TestName = 'CustomTest'
+       TestName = 'DiscreteStratScharIter'
+       #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(1):
+       for ii in range(10):
               diagOutput = runModel(TestName)
