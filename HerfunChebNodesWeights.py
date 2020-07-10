@@ -26,6 +26,15 @@ def hefunclb(NX):
        # Sort the eigenvalues in ascending order and store nodes
        xi = np.sort(np.real(ew))
        
+       ''' EXPERIMENTAL DOMAIN MAPPING
+       xcp = np.linspace(0.0,1.0,num=int((NX-1)/2))
+       xip = 0.5 * (1.0 - np.cos(mt.pi * xcp))
+       xcm = np.linspace(-1.0,0.0,num=int((NX-1)/2))
+       xim = -0.5 * (1.0 - np.cos(mt.pi * xcm))
+       xi = L * np.concatenate((xim[0:-1], xip[1:]))
+       print(xi, len(xi))
+       '''
+       
        # Compute the Hermite function weights
        hf = hefuncm(NX+1, xi, False)
        w = 1.0 / (NX + 1) * np.power(hf, -2.0)

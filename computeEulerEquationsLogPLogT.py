@@ -7,14 +7,16 @@ Created on Mon Jul 22 13:11:11 2019
 """
 import numpy as np
 import scipy.sparse as sps
-from rsb import rsb_matrix
 
-def computeFieldDerivatives(q, DDX, DDZ, DZDX):
+def computeFieldDerivatives(q, DDX, DDZ, GMLX, GMLZ):
+       
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
-       PqPx = DqDx - (DZDX * DqDz)
        
-       return DqDx, PqPx, DqDz
+       DqDx_GML = GMLX.dot(DqDx)
+       DqDz_GML = GMLZ.dot(DqDz)
+       
+       return DqDx, DqDz, DqDx_GML, DqDz_GML
 
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -43,6 +45,11 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DDZM = REFS[11]
        DZDX = REFS[15].flatten()
        
+       GMLX = REFG[0]
+       GMLZ = REFG[1]
+       DLTDZ = REFG[2]
+       DQDZ = REFG[3]
+       
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
        UZX = U * DZDX
@@ -69,9 +76,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        PltPxM = sps.diags(PqPx[:,3], offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
-       DLTDZ = REFG[1]
        DLTDZM = sps.diags(DLTDZ[:,0], offsets=0, format='csr')
-       DQDZ = REFG[4]
        DUDZM = sps.diags(DQDZ[:,0], offsets=0, format='csr')
        DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
        DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
@@ -92,6 +97,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        bfM = sps.diags(bf, offsets=0, format='csr')
        
        # Compute derivatives of temperature perturbation
+       PtPx = PPXM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
        
        PtPx = DDXM.dot(T_prime) - DZDX * DtDz
@@ -101,30 +107,32 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Compute advective (multiplicative) diagonal operators
        UM = sps.diags(U, offsets=0, format='csr')
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
+       
        # Compute common horizontal transport block
-       UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       #UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       UPXM = UM.dot(GMLX.dot(DDXM)) + WXZM.dot(GMLZ.dot(DDZM))
        
        # Compute partial in X terrain following block
        PPXM = DDXM - DZDXM.dot(DDZM)
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UPXM + PuPxM
-       LD12 = DuDzM + DUDZM
+       LD11 = UPXM + GMLX.dot(PuPxM)
+       LD12 = GMLZ.dot(DuDzM + DUDZM)
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = PwPxM
-       LD22 = UPXM + DwDzM
+       LD21 = GMLX.dot(PwPxM)
+       LD22 = UPXM + GMLZ.dot(DwDzM)
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bfM
        
-       LD31 = gam * PPXM + PlpPxM
-       LD32 = gam * DDZM + DlpDzM + DLPDZM
+       LD31 = gam * PPXM + GMLX.dot(PlpPxM)
+       LD32 = gam * DDZM + GMLZ.dot(DlpDzM + DLPDZM)
        LD33 = UPXM
        LD34 = None
        
-       LD41 = PltPxM
-       LD42 = DltDzM + DLPTDZM
+       LD41 = GMLX.dot(PltPxM)
+       LD42 = GMLZ.dot(DltDzM + DLPTDZM)
        LD43 = None
        LD44 = UPXM
        
@@ -178,9 +186,9 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        PORZM = sps.diags(PORZ, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
-       DLTDZ = REFG[1]
+       DLTDZ = REFG[2]
+       DQDZ = REFG[3]
        DLTDZM = sps.diags(DLTDZ[:,0], offsets=0, format='csr')
-       DQDZ = REFG[4]
        DUDZM = sps.diags(DQDZ[:,0], offsets=0, format='csr')
        DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
        DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
@@ -223,14 +231,19 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fields, U, neuDex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
        
        # Get hydrostatic initial fields
-       DQDZ = REFG[4]
+       DQDZ = REFG[3]
+       DQDZ_GML = REFG[1].dot(REFG[3])
+
+       # Compute the partial derivative
+       PqPx = DqDx - DZDX * DqDz
+       PqPx_GML = DqDx_GML - DZDX * DqDz_GML
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
@@ -239,24 +252,24 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
        # Compute pressure gradient force scaling (buoyancy)
        T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
        RdT = RdT_bar * (1.0 + T_ratio)
-              
-       # Compute derivative of perturbations
-       DqDx = DDXM.dot(fields)
-       DqDz = DDZM.dot(fields)
-       PqPx = DqDx - (DZDX * DqDz)
        
-       # Compute advection
-       UPqPx = UM * PqPx
-       wDQqDz = wxz * (DqDz + DQDZ)
+       # Compute transport and divergence terms
+       #UPqPx = UM * PqPx
+       #wDQqDz = wxz * (DqDz + DQDZ)
+       
+       UPqPx = UM * PqPx_GML
+       wDQqDz = wxz * (DqDz_GML + DQDZ_GML)
+       
        transport = UPqPx + wDQqDz
-
+       divergence = (PqPx[:,0] + DqDz[:,1])
+       
        DqDt = -transport
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
        DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
        # Pressure (mass) equation
-       DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
+       DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
                                   
        return DqDt
@@ -264,7 +277,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM, DDZM, DZDX, RdT_bar, fiel
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
-       ROPS = REFG[5]
+       ROPS = REFG[4]
        
        DqDt = 0.0 * np.array(fields)
        # Compute the tendencies
@@ -275,48 +288,61 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
+def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
-       # Compute derivatives of perturbations
-       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
+       # Compute the partial derivative
+       PqPx = DqDx - DZDX * DqDz
        
        # Compute diffusive fluxes
        xflux = RESCFX * PqPx
+       xflux[:,0] *= 2.0
        zflux = RESCFZ * DqDz
-       
+       zflux[:,1] *= 2.0
+              
        # Compute derivatives of fluxes
        DDxx = DDXM.dot(xflux)
        DDxz = DDZM.dot(xflux)
        PPx2 = DDxx - (DZDX * DDxz)
        DDz2 = DDZM.dot(zflux)
        
+       # Apply Neumann condition
+       PPx2[ebcDex[1],:] *= 0.0
+       DDz2[ebcDex[2],:] *= 0.0
+       
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        DqDt = PPx2 + DDz2
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex):
+def computeDiffusionTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
-       # Compute 1st partials of perturbations
-       DqDx, PqPx, DqDz = computeFieldDerivatives(fields, DDXM, DDZM, DZDX)
-       
+       # Compute the partial derivative
+       PqPx = DqDx - DZDX * DqDz
+              
        # Compute 2nd partials of perturbations
        DDxx = DDXM.dot(PqPx)
        DDxz = DDZM.dot(PqPx)
+       
        PPx2 = DDxx - (DZDX * DDxz)
        DDz2 = DDZM.dot(DqDz)
        
        # Compute diffusive fluxes
        xflux = RESCFX * PPx2
+       xflux[:,0] *= 2.0
        zflux = RESCFZ * DDz2
+       zflux[:,1] *= 2.0
+       
+       # Apply Neumann condition
+       xflux[ebcDex[1],:] *= 0.0
+       zflux[ebcDex[2],:] *= 0.0
        
        # Compute the tendencies
        DqDt = xflux + zflux

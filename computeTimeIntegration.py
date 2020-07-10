@@ -6,147 +6,216 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
+import math as mt
 import bottleneck as bn
 import computeEulerEquationsLogPLogT as tendency
 import computeResidualViscCoeffs as dcoeffs
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DT, sol0, INIT, uRamp, zeroDex, extDex, neuDex, botDex, udex, DynSGS, order):
-       # Set the coefficients
-       c1 = 1.0 / 6.0
-       c2 = 1.0 / 5.0
+def rampFactor(time, timeBound):
+       if time == 0.0:
+              uRamp = 0.0
+       elif time <= timeBound:
+              #uRamp = 0.5 * (1.0 - mt.cos(mt.pi / timeBound * time))
+              uRamp = mt.sin(0.5 * mt.pi / timeBound * time)
+              uRamp = uRamp**4
+       else:
+              uRamp = 1.0
+              
+       return uRamp
+
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, DynSGS, vsnd0, thisTime, isFirstStep):
+       
+       DT = TOPT[0]
+       rampTime = TOPT[2]
+       order = TOPT[3]
        dHdX = REFS[6]
        
        # Dereference operators
+       GMLX = REFG[0]
+       GMLZ = REFG[1]
+       RLM = REFG[5]
+       
        RdT_bar = REFS[9]
-       DDXM_GML = REFS[10]
-       DDZM_GML = REFS[11]
-       DDXM = REFS[12]
-       DDZM = REFS[13]
+       if isFirstStep:
+              DDXM = REFS[10]
+              DDZM = REFS[11]
+       else:
+              DDXM = REFS[12]
+              DDZM = REFS[13]
+              
        DZDX = REFS[15]
        
-       def computeRHSUpdate(fields, Dynamics, DynSGS, FlowDiff2):
-              if Dynamics:
-                     # Scale background wind and shear with ramp up factor
-                     U = fields[:,0] + uRamp * INIT[udex]
-                     (REFG[4])[:,1] *= uRamp
-                     # Compute dynamical tendencies
-                     rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DDXM_GML, DDZM_GML, DZDX, RdT_bar, fields, U, neuDex)
-                     rhs += tendency.computeRayleighTendency(REFG, fields)
-                     rhs[zeroDex[0],0] *= 0.0
-                     rhs[zeroDex[1],1] *= 0.0
-                     rhs[zeroDex[2],2] *= 0.0
-                     rhs[zeroDex[3],3] *= 0.0
+       #DDXM_SP = REFS[16]
+       #DDZM_SP = REFS[17]
+       
+       # Set the time dependent background quantities at the top of the step
+       uRamp = rampFactor(thisTime, rampTime)
+       
+       UZ = uRamp * init0[:,0]
+       DUDZ = uRamp * (REFG[3])[:,0]
+       time = thisTime
+       
+       def computeUpdate(coeff, time, solA, rhs, rhsInv0, rhsInv, u0, dudz0):
+              U = u0
+              DUDZ = dudz0
+              #Apply updates
+              dsol = coeff * DT * rhs
+              solB = solA + dsol
+              
+              # Update time dependent background wind field
+              time += coeff * DT
+              uRamp = rampFactor(time, rampTime)
+                     
+              U = uRamp * init0[:,0]
+              DUDZ = uRamp * (REFG[3])[:,0]
+              
+              # Update boundary
+              solB[botDex,1] = dHdX * (U[botDex] + solB[botDex,0])
+              
+              #'''
+              # Update diffusion coefficients
+              UD = np.abs(solB[:,0] + U)
+              WD = np.abs(solB[:,1])
+              QM = bn.nanmax(solB, axis=0)
+              resInv = 1.0 / DT * (solB - solA) - 0.5 * (rhsInv0 + rhsInv)
+              
+              #'''
               if DynSGS:
-                     rhs = tendency.computeDiffusiveFluxTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
-                     rhs += tendency.computeRayleighTendency(REFG, fields)
-                     # Null tendency at all boundary DOF
-                     rhs[extDex,:] *= 0.0
-              if FlowDiff2:
-                     rhs = tendency.computeDiffusionTendency(RESCF, DDXM, DDZM, DZDX, fields, neuDex)
-                     rhs += tendency.computeRayleighTendency(REFG, fields)
-                     # Null tendency at all boundary DOF
-                     rhs[extDex,:] *= 0.0
+                     dcoeff = dcoeffs.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, vsnd0, RLM)
+              else:
+                     dcoeff = dcoeffs.computeFlowVelocityCoeffs(UD, WD, DX, DZ, vsnd0)
+              #'''
+              return time, solB, resInv, dcoeff, U, DUDZ
+       
+       def computeRHSUpdate_inviscid(fields, U):
+              (REFG[3])[:,0] = DUDZ
+              # Compute first derivatives
+              DqDx, DqDz, DqDx_GML, DqDz_GML = \
+                     tendency.computeFieldDerivatives(fields, DDXM, DDZM, GMLX, GMLZ)
+              # Compute dynamical tendencies
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U)
+              rhs += tendency.computeRayleighTendency(REFG, fields)
+
+              # Fix Essential boundary conditions
+              rhs[zeroDex[0],0] *= 0.0
+              rhs[zeroDex[1],1] *= 0.0
+              rhs[zeroDex[2],2] *= 0.0
+              rhs[zeroDex[3],3] *= 0.0
                      
               return rhs
        
-       def computeUpdate(coeff, sol0, rhs):
-              #Apply updates
-              dsol = coeff * DT * rhs
-              sol1 = sol0 + dsol
-              U = sol1[:,0] + (uRamp * INIT[udex])
-              sol1[botDex,1] = np.array(dHdX * U[botDex])
+       def computeRHSUpdate(fields, dcoeff, U, DUDZ):
+              (REFG[3])[:,0] = DUDZ
+              # Compute first derivatives
+              DqDx, DqDz, DqDx_GML, DqDz_GML = \
+                     tendency.computeFieldDerivatives(fields, DDXM, DDZM, GMLX, GMLZ)
+              # Compute dynamical tendencies
+              rhsInv = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U)
+              rhsInv += tendency.computeRayleighTendency(REFG, fields)
               
-              return sol1
-       
-       def ssprk22(sol, Dynamics, DynSGS, FlowDiff):
-              # Stage 1
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              sol1 = computeUpdate(1.0, sol, rhs)
-              # Stage 2
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              sol = computeUpdate(0.5, sol1, rhs)
-              sol = np.array(0.5 * (sol + sol1))
+              # Compute diffusive tendencies
+              if DynSGS:
+                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
+                     #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM_GML, DDZM_GML, DZDX, fields)
+              else:
+                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
+                            
+              # Add inviscid and diffusion tendencies
+              rhs = rhsInv + rhsDiff
               
-              return sol, rhs
+              # Fix Essential boundary conditions
+              rhs[zeroDex[0],0] *= 0.0
+              rhs[zeroDex[1],1] *= 0.0
+              rhs[zeroDex[2],2] *= 0.0
+              rhs[zeroDex[3],3] *= 0.0
+
+              return rhs, rhsInv
        
-       def ssprk34(sol, Dynamics, DynSGS, FlowDiff):
-              # Stage 1
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              sol1 = computeUpdate(0.5, sol, rhs)
-              # Stage 2
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              sol2 = computeUpdate(0.5, sol1, rhs)
-              # Stage 3
-              sol = np.array(2.0/3.0 * sol + 1.0 / 3.0 * sol2)
-              rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-              sol1 = computeUpdate(1.0/6.0, sol, rhs)
-              # Stage 4
-              rhs = computeRHSUpdate(sol1, Dynamics, DynSGS, FlowDiff)
-              sol = computeUpdate(0.5, sol1, rhs)
-              
-              return sol, rhs
-       
-       def ketchenson93(sol, Dynamics, DynSGS, FlowDiff):
-              for ii in range(7):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-                     sol = computeUpdate(c1, sol, rhs)
+       def ketcheson93(time0, sol, rhsInv0, dcoeff0, u0, dudz0, getLocalError):
+              # Ketchenson, 2008 10.1137/07070485X
+              c1 = 1.0 / 6.0
+              c2 = 1.0 / 5.0
+              U = u0
+              DUDZ = dudz0
+              dc = dcoeff0
+              rhs0 = rhsInv0
+              time = time0
+              if getLocalError:
+                     # Set storage for 2nd order solution
+                     sol2 = np.array(sol)
                      
-                     if ii == 1:
+              for ii in range(6):
+                     rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
+                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     rhs0 = rhsInv
+                     
+                     if ii == 0:
                             sol1 = np.array(sol)
+                            
+              if getLocalError:
+                     # Compute the 2nd order update if requested
+                     rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
+                     sol2 = 1.0 / 7.0 * sol2 + 6.0 / 7.0 * sol
+                     time, sol2, res, dc, U, DUDZ = computeUpdate(1.0 / 42.0, time, sol2, rhs, rhs0, rhsInv, U, DUDZ)
                      
               # Compute stage 6 with linear combination
               sol = np.array(c2 * (3.0 * sol1 + 2.0 * sol))
               
-              # Compute stages 7 - 9 (diffusion applied here)
-              for ii in range(2):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-                     sol = computeUpdate(c1, sol, rhs)
-                     
-              return sol, rhs
+              # Compute stages 7 - 9
+              for ii in range(3):
+                     rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
+                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     rhs0 = rhsInv
+              
+              if getLocalError:
+                     # Output the local error estimate if requested
+                     err = sol - sol2
+                     return sol, time, U, dc, err
+              else:
+                     return sol, time, U, res, dc
        
-       def ketchenson104(sol, Dynamics, DynSGS, FlowDiff):
+       def ketcheson104(time0, sol, rhsInv0, dcoeff0, u0, dudz0):
+              # Ketchenson, 2008 10.1137/07070485X
+              c1 = 1.0 / 6.0
+              U = u0
+              DUDZ = dudz0
+              dc = dcoeff0
+              rhs0 = rhsInv0
+              time = time0
               sol1 = np.array(sol)
-              for ii in range(1,6):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)
-                     sol = computeUpdate(c1, sol, rhs)
+              sol2 = np.array(sol)
+              for ii in range(5):
+                     rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
+                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     rhs0 = rhsInv
               
-              sol1 = np.array(0.04 * sol1 + 0.36 * sol)
-              sol = np.array(15.0 * sol1 - 5.0 * sol)
+              sol2 = np.array(0.04 * sol2 + 0.36 * sol1)
+              sol1 = np.array(15.0 * sol2 - 5.0 * sol1)
               
-              for ii in range(6,10):
-                     rhs = computeRHSUpdate(sol, Dynamics, DynSGS, FlowDiff)                     
-                     sol = computeUpdate(c1, sol, rhs)
+              for ii in range(4):
+                     rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
+                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     rhs0 = rhsInv
                      
-              sol = np.array(sol1 + 0.6 * sol + 0.1 * DT * rhs)
+              rhs, rhsInv = computeRHSUpdate(sol1, dc, U, DUDZ)       
+              sol = np.array(sol2 + 0.6 * sol1)
+              time, sol, res, dc, U, DUDZ = computeUpdate(0.1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+              rhs0 = rhsInv
               
-              return sol, rhs
+              return sol, time, U, res, dc
        #'''
        #%% THE MAIN TIME INTEGRATION STAGES
+       U0 = np.abs(sol0[:,0] + UZ)
+       rhs0 = computeRHSUpdate_inviscid(sol0, U0)
        
        # Compute dynamics update
        if order == 3:
-              sol, rhsDyn = ketchenson93(sol0, True, False, False)
+              solf, time, UB, resOut, dcoeff1 = ketcheson93(time, sol0, rhs0, dcoeff0, UZ, DUDZ, False)
+              #solf, rhsDyn, errf = ketcheson93(sol0, True, True)
        elif order == 4:
-              sol, rhsDyn = ketchenson104(sol0, True, False, False)
-              
-       # Get advective flow velocity components
-       U = np.abs(uRamp * INIT[udex] + sol[:,0])
-       W = np.abs(sol[:,1])
-       if DynSGS:
-              # DynSGS compute coefficients
-              #total_sol = sol + np.reshape(INIT, (len(udex), 4), order='F')
-              #total_sol -= bn.nanmean(total_sol, axis=0)
-              #QM = bn.nanmax(np.abs(total_sol), axis=0)
-              QM = bn.nanmax(np.abs(sol), axis=0)
-              # Estimate the residual
-              #RES = 1.0 / DT * (sol - sol0)
-              RES = rhsDyn
-              # Compute diffusion coefficients
-              RESCF = dcoeffs.computeResidualViscCoeffs(RES, QM, U, W, DX, DZ)
-              sol, rhsDiff = ssprk34(sol, False, True, False)
-       else: 
-              # Flow weighted diffusion (Guerra, 2016)
-              RESCF = dcoeffs.computeFlowVelocityCoeffs(U, W, DX, DZ)
-              sol, rhsDiff = ssprk34(sol, False, False, True)
+              solf, time, UB, resOut, dcoeff1 = ketcheson104(time, sol0, rhs0, UZ, DUDZ, dcoeff0)
        
-       return sol, (rhsDyn + rhsDiff)
+       Uf = np.abs(sol0[:,0] + UB)
+       rhsf = computeRHSUpdate_inviscid(solf, Uf)
+       
+       return solf, rhsf, dcoeff1, time

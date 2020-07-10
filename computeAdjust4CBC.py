@@ -45,23 +45,15 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        ttdex = np.add(utdex, iT * OPS)
        
        # Index all boundary DOF that can be diffused on
-       vDex = np.unique(np.concatenate((uldex,urdex,ubdex,utdex)))
-       #extDex = (vDex, vDex, vDex, vDex)
-       extDex = vDex
-       # Tuple of lateral and vertical indices for Neumann conditions (pressure)
        latDex = np.unique(np.concatenate((uldex,urdex)))
-       verDex1 = np.unique(utdex)
-       verDex2 = np.unique(np.concatenate((ubdex,utdex)))
-       neuDex = (latDex, verDex1, verDex2)
+       vrtDex = np.unique(np.concatenate((ubdex,utdex)))
+       extDex = np.unique(np.concatenate((urdex,uldex,ubdex,utdex)))
        
        # BC indices for static solution (per variable)
-       rowsOutU = set(np.concatenate((uldex,utdex)))
+       rowsOutU = set(uldex)
        rowsOutW = set(np.concatenate((uldex,utdex)))
-       rowsOutP = set(uldex)
-       #rowsOutP = set(np.concatenate((uldex,utdex)))
-       #rowsOutP = set([]) # Totally free boundary for pressure...
-       rowsOutT = set(uldex)
-       #rowsOutT = set(np.concatenate((uldex)))
+       rowsOutP = set()
+       rowsOutT = set(utdex)
        
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
@@ -71,18 +63,15 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # BC indices for transient solution (per variable)
        rowsOutW_trans = set(np.concatenate((ubdex,uldex,utdex)))
        
-       left = np.concatenate((uldex, wldex, pldex, tldex))
-       #right = np.concatenate((urdex, wrdex, prdex, trdex))
-       top = np.concatenate((utdex, wtdex))
+       # CHANGE THESE TO MATCH WHAT YOU FOUND WITH THE TRANSIENT RUN
+       left = np.concatenate((uldex, wldex))
+       top = np.concatenate((wtdex, ttdex))
        # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
        rowsOutBC_static = set(np.concatenate((left, top)))
        
        # W is treated as an essential BC at terrain in solution by direct substitution
        rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
                               sorted(rowsOutP), sorted(rowsOutT))
-       
-       # Pressure DOF interior to the top boundary
-       pintDex = rowsAll.difference(utdex); pintDex = sorted(pintDex)
               
        # All DOF for all variables
        rowsAll = set(np.array(range(0,numVar*OPS)))
@@ -95,4 +84,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        # DOF's not dynamically updated in transient solution (use direct BC substitution)
        zeroDex_tran = rowsOutBC_transient
        
-       return ubdex, utdex, wbdex, ptdex, pintDex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex
+       return ubdex, utdex, wbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex, latDex, vrtDex

@@ -78,18 +78,16 @@ def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
               sys.exit(2)
        
        SOLT = rdb['SOLT']
-       LMS = rdb['LMS']
-       RHS = rdb['RHS']
+       DCF = rdb['DCF']
        IT = rdb['ET']
+       LMS = rdb['LMS']
        if TOPT[4] <= IT and not StaticSolve:
               print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
               sys.exit(2)
               
-       # Initialize the restart time array
-       TI = np.array(np.arange(IT + TOPT[0], TOPT[4], TOPT[0]))
        rdb.close()
        
-       return SOLT, LMS, RHS, NX_in, NZ_in, TI
+       return np.array(SOLT), LMS, DCF, NX_in, NZ_in, IT
 
 # Store a matrix to disk in column wise chucks
 def storeColumnChunks(MM, Mname, dbName):
@@ -150,6 +148,7 @@ def runModel(TestName):
        thisTest = TestCase.TestCase(TestName)
        
        # Deprecated...
+       RSBops = True
        UniformDelta = False
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
@@ -211,13 +210,20 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
        
        # Compute DX and DZ grid length scales
-       DX = np.max(np.abs(np.diff(REFS[0])))
-       DZ = np.max(np.abs(np.diff(REFS[1])))
+       DX = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
        print('Nominal grid lengths:',DX,DZ)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       
+       # Compute the spectral radii...
+       DX = 2.0 / np.amax(np.abs(dsl.eigvals(DDX_1D)))
+       DZ = 2.0 / np.amax(np.abs(dsl.eigvals(DDZ_1D)))
+       #DX = 1.0 / np.sort(np.abs(dsl.eigvals(DDX_1D)))[-4]
+       #DZ = 1.0 / np.sort(np.abs(dsl.eigvals(DDZ_1D)))[-4]
+       print('Spectral radii for 1st derivative matrices:',DX,DZ)
        
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
@@ -242,9 +248,9 @@ def runModel(TestName):
        REFS.append(sigma)
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, ptdex, pintDex, \
-              ubcDex, wbcDex, pbcDex, tbcDex, \
-              zeroDex_stat, zeroDex_tran, sysDex, extDex, neuDex = \
+       ubdex, utdex, wbdex, \
+       ubcDex, wbcDex, pbcDex, tbcDex, \
+       zeroDex_stat, zeroDex_tran, sysDex, extDex, latDex, vrtDex = \
               computeAdjust4CBC(DIMS, numVar, varDex)
        
        #% Read in sensible or potential temperature soundings (corner points)
@@ -298,7 +304,12 @@ def runModel(TestName):
        LPT = np.expand_dims(LPT, axis=1)
        LOGT = np.tile(LPT, NX+1)
        LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
-         
+       
+       #%% Rayleigh opearator and GML weight
+       ROPS, RLM, GMLX, GMLZ = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
+       GMLXOP = sps.diags(np.reshape(GMLX, (OPS,), order='F'), offsets=0, format='csr')
+       GMLZOP = sps.diags(np.reshape(GMLZ, (OPS,), order='F'), offsets=0, format='csr')
+       
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
        DLTDZ = np.reshape(DLTDZ, (OPS,1), order='F')
@@ -307,7 +318,7 @@ def runModel(TestName):
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
-       REFG = [DUDZ, DLTDZ, DLPDZ, DLPTDZ, DQDZ]
+       REFG = [GMLXOP, GMLZOP, DLTDZ, DQDZ, ROPS, RLM]
        
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F'))
@@ -319,12 +330,8 @@ def runModel(TestName):
        del(DLTDZ)
        del(DLPDZ)
        del(DLPTDZ)
-       
-       #%% Rayleigh opearator and GML weight
-       ROPS, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
-       REFG.append(ROPS)
-       GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
-       del(GML)
+       del(GMLX)
+       del(GMLZ)
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
@@ -332,53 +339,52 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       # Store derivative operators with GML damping
-       if SparseDerivativesDynamics:
-              DDXM_GML = GMLOP.dot(DDXM_SP)
-              DDZM_GML = GMLOP.dot(DDZM_SP)
-       else:
-              DDXM_GML = GMLOP.dot(DDXM)
-              DDZM_GML = GMLOP.dot(DDZM)
-              
-       REFS.append(DDXM_GML)
-       REFS.append(DDZM_GML)
-       #REFS.append(rsb_matrix(DDXM_GML))
-       #REFS.append(rsb_matrix(DDZM_GML))
-       
-       if StaticSolve:
-              REFS.append(DDXM)
-              REFS.append(DDZM)
-       else:
-              # Store derivative operators without GML damping
-              if SparseDerivativesDynSGS:
-                     DMX = rsb_matrix(DDXM_SP)
-                     DMZ = rsb_matrix(DDZM_SP)
-              else:
-                     DMX = rsb_matrix(DDXM)
-                     DMZ = rsb_matrix(DDZM)
-                     
-              DMX.autotune()
-              REFS.append(DMX)
-              DMZ.autotune()
-              REFS.append(DMZ)
+       REFS.append(DDXM)
+       REFS.append(DDZM)
+       REFS.append(rsb_matrix(DDXM))
+       REFS.append(rsb_matrix(DDZM))
        
        # Store the terrain profile
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
        
-       del(DDXM); del(DDXM_GML)
-       del(DDZM); del(DDZM_GML)
+       # Store the more sparse FD matrices
+       #REFS.append(rsb_matrix(DDXM_SP))
+       #REFS.append(rsb_matrix(DDZM_SP))
+       '''
+       # Check derivatives for consistency
+       dcheck1 = DDXM.dot(np.ones((OPS,)))
+       dcheck2 = DMX.dot(np.ones((OPS,)))
+       plt.plot(dcheck1 - dcheck2, 'k-')
+       plt.title('Hermite Function Derivative: (SciPy - PyRSB) Dot')
+       plt.show()
+       dcheck1 = DDZM.dot(np.ones((OPS,)))
+       dcheck2 = DMZ.dot(np.ones((OPS,)))
+       plt.plot(dcheck1 - dcheck2, 'k-')
+       plt.title('Chebyshev Derivative: (SciPy - PyRSB) Dot')
+       plt.show()
+       input()
+       '''
+       del(DDXM);
+       del(DDZM);
        del(DZDX);
+       del(GMLXOP)
+       del(GMLZOP)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
        lmsDOF = (NX + 1)
        
+       # Initialize solution storage
+       SOLT = np.zeros((physDOF, 2))
+       
+       # Initialize Lagrange Multiplier storage
+       LMS = np.zeros(lmsDOF)
+       
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
        RHS = np.zeros((physDOF,))
-       SGS = np.zeros((physDOF,))
        
        # Initialize the Background fields
        INIT[udex] = np.reshape(UZ, (OPS,), order='F')
@@ -386,24 +392,21 @@ def runModel(TestName):
        INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
        INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
        
+       # Initialize diffusion coefficients
+       DCF = (np.zeros((OPS, 1)), np.zeros((OPS, 1)))
+       
        if isRestart:
               print('Restarting from previous solution...')
-              SOLT, LMS, RHS, NX_in, NZ_in, TI = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
+              SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
               dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])
        else:
-              # Initialize solution storage
-              SOLT = np.zeros((physDOF, 2))
-              
-              # Initialize Lagrange Multiplier storage
-              LMS = np.zeros(lmsDOF)
+              # Set the initial time
+              IT = 0.0
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX * INIT[ubdex]
-       
-              # Initialize time array
-              TI = np.array(np.arange(TOPT[0], TOPT[4], TOPT[0]))
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
@@ -432,8 +435,10 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
-              rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
+              DqDx, DqDz, DqDx_GML, DqDz_GML = \
+                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9], fields, U)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               RHS[zeroDex_stat] *= 0.0
               RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
@@ -640,8 +645,10 @@ def runModel(TestName):
               # Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, REFS[10], REFS[11], REFS[15], REFS[9], np.array(fields), U, neuDex)
-              rhs += eqs.computeRayleighTendency(REFG, np.array(fields))
+              DqDx, DqDz, DqDx_GML, DqDz_GML = \
+                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9], fields, U)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
               RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
               RHS[zeroDex_stat] *= 0.0
               RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
@@ -653,45 +660,36 @@ def runModel(TestName):
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
        elif NonLinSolve:
-              #sysDex = np.array(range(0, numVar * OPS))
               print('Starting Nonlinear Transient Solver...')
-                                          
-       #%% Start the time loop
-       if NonLinSolve:
-              error = [np.linalg.norm(RHS)]
-              
-              # Reshape main solution vectors
-              sol = np.reshape(SOLT, (OPS, numVar, 2), order='F')
-              rhs = np.reshape(RHS, (OPS, numVar), order='F')
-              sgs = np.reshape(SGS, (OPS, numVar), order='F')
-              
+                            
+              # Reshape main solution vectors and initialize
+              hydroState = np.reshape(INIT, (OPS, numVar), order='F')
+              rhsVec = np.zeros((OPS, numVar))
+              error = [np.linalg.norm(rhsVec)]
+                            
+              # Initialize time constants
+              ti = 0
               ff = 1
-              for tt in range(len(TI)):
-                     thisTime = TOPT[0] * tt
-                     # Put previous solution into index 1 storage
-                     sol[:,:,1] = np.array(sol[:,:,0])
+              thisTime = IT
+              
+              # Get local sound speed
+              VSND = np.sqrt(PHYS[6] * REFS[9])
+              
+              while thisTime <= TOPT[4]:
                             
                      # Print out diagnostics every TOPT[5] steps
-                     if tt % TOPT[5] == 0:
+                     if ti % TOPT[5] == 0:
                             message = ''
-                            err = displayResiduals(message, np.reshape(rhs, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
+                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
-                     if tt % TOPT[6] == 0:
+                     if ti % TOPT[6] == 0:
                             fig = plt.figure(figsize=(8.0, 10.0))
-                            # Check the tendencies
-                            '''
-                            for pp in range(numVar):
-                                   plt.subplot(2,2,pp+1)
-                                   dqdt = np.reshape(rhs[:,pp], (NZ, NX+1), order='F')
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic)
-                                   plt.colorbar(ccheck, format='%.3e')
-                            plt.show()
-                            '''
-                            # Check the fields
+                            # Check the fields or tendencies
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
-                                   dqdt = np.reshape(sol[:,pp,0], (NZ, NX+1), order='F')
+                                   #zderivs = REFS[11].dot(fields)
+                                   dqdt = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
                                    
                                    if np.abs(dqdt.max()) > np.abs(dqdt.min()):
                                           clim = np.abs(dqdt.max())
@@ -702,7 +700,8 @@ def runModel(TestName):
                                   
                                    ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
                                    plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                   #plt.gca().set_facecolor('k')
+                                   #plt.xlim(-30.0, 30.0)
+                                   #plt.ylim(0.0, 20.0)
                                    
                                    if pp < (numVar - 1):
                                           plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -722,25 +721,110 @@ def runModel(TestName):
        
                             plt.savefig('transient' + str(ff).zfill(3) + '.png', dpi=600, format='png', bbox_inches='tight', pad_inches=0.005)
                             plt.show()
-                            ff += 1
-                     
-                     # Ramp up the background wind to decrease transients
-                     if thisTime <= TOPT[2]:
-                            uRamp = 0.5 * (1.0 - mt.cos(mt.pi / TOPT[2] * thisTime))
-                     else:
-                            uRamp = 1.0
+                            '''
+                            fig = plt.figure(figsize=(8.0, 10.0))
+                            # Check the fields or tendencies
+                            for pp in range(numVar):
+                                   plt.subplot(4,1,pp+1)
+                                   dqdt = np.reshape(resVec[:,pp], (NZ, NX+1), order='F')
                                    
+                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.max())
+                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.min())
+                                   else:
+                                          clim = np.abs(dqdt.max())
+                                  
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                   plt.xlim(-30.0, 30.0)
+                                   plt.ylim(0.0, 20.0)
+                                   
+                                   if pp < (numVar - 1):
+                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                   else:
+                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                          
+                                   plt.colorbar(ccheck, format='%.3e')
+                                   
+                                   if pp == 0:
+                                          plt.title('u (m/s)')
+                                   elif pp == 1:
+                                          plt.title('w (m/s)')
+                                   elif pp == 2:
+                                          plt.title('ln-p (Pa)')
+                                   else:
+                                          plt.title('ln-theta (K)')
+       
+                            plt.show()
+                            '''
+                            '''
+                            fig = plt.figure(figsize=(8.0, 10.0))
+                            # Check the fields or tendencies
+                            for pp in range(2):
+                                   plt.subplot(2,1,pp+1)
+                                   dqdt = np.reshape(resCoeff[pp][:,0], (NZ, NX+1), order='F')
+                                   
+                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.max())
+                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
+                                          clim = np.abs(dqdt.min())
+                                   else:
+                                          clim = np.abs(dqdt.max())
+                                  
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                   #plt.xlim(-30.0, 30.0)
+                                   #plt.ylim(0.0, 20.0)
+                                   
+                                   if pp < (numVar - 1):
+                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                   else:
+                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                          
+                                   plt.colorbar(ccheck, format='%.3e')
+                                   
+                                   if pp == 0:
+                                          plt.title('X Coefficients')
+                                   elif pp == 1:
+                                          plt.title('Z Coefficients')
+       
+                            plt.show()
+                            '''
+                            '''
+                            # Check the terrain boundary
+                            fig = plt.figure(figsize=(8.0, 10.0))
+                            
+                            plt.subplot(2,1,1)
+                            plt.plot(1.0E-3 * REFS[0], resVec[ubdex,0], 'k-', 1.0E-3 * REFS[0], resVec[ubdex+1,0], 'r-')
+                            plt.xlim(-20.0, 20.0)
+                            plt.title('Residual in U near Terrain')
+                            
+                            plt.subplot(2,1,2)
+                            plt.plot(1.0E-3 * REFS[0], resVec[ubdex,1], 'k-', 1.0E-3 * REFS[0], resVec[ubdex+1,0], 'r-')              
+                            plt.title('Residual in W near Terrain')
+                            
+                            plt.tight_layout()
+                            plt.show()
+                            '''
+                            ff += 1
+
+                     if ti == 0:
+                            isFirstStep = True
+                     else:
+                            isFirstStep = False
+                            
                      # Compute the solution within a time step
-                     thisSol, rhs = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
-                                                             TOPT[0], sol[:,:,0], INIT, uRamp, \
-                                                             zeroDex_tran, extDex, neuDex, ubdex, \
-                                                             udex, ResDiff, TOPT[3])
-                     sol[:,:,0] = thisSol
+                     fields, rhsVec, DCF, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
+                                                             TOPT, fields, hydroState, DCF, \
+                                                             zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
+                                                             ResDiff, VSND, thisTime, isFirstStep)
+                             
+                     ti += 1
                      
               # Reshape back to a column vector after time loop
-              SOLT[:,0] = np.reshape(sol[:,:,0], (OPS*numVar, ), order='F')
-              RHS = np.reshape(rhs, (OPS*numVar, ), order='F')
-              SGS = np.reshape(sgs, (OPS*numVar, ), order='F')
+              SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')
+              RHS = np.reshape(rhsVec, (OPS*numVar, ), order='F')
               
               # Copy state instance 0 to 1
               SOLT[:,1] = np.array(SOLT[:,0])
@@ -756,11 +840,10 @@ def runModel(TestName):
               rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
               rdb['LMS'] = LMS
-              rdb['RHS'] = RHS
+              rdb['DCF'] = DCF
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]
-              rdb['REFS'] = REFS
               rdb['PHYS'] = PHYS
               rdb['DIMS'] = DIMS
               rdb.close()
@@ -937,14 +1020,5 @@ if __name__ == '__main__':
        TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(10):
+       for ii in range(1):
               diagOutput = runModel(TestName)
-       '''       
-       #%% Spot check the vertical velocity residual     
-       XL = diagOutput[0]
-       ZTL = diagOutput[1]
-       dwdt = diagOutput[2]       
-       ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dwdt, 201, cmap=cm.seismic)
-       plt.colorbar(ccheck, format='%+.3E')
-       plt.show()
-       '''
