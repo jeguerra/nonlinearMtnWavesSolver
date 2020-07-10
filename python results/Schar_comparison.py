@@ -34,7 +34,7 @@ plt.title('Classical Fourier - W (m/s)')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 
 #%% Load in the limited area reproduction with approximate free-slip
-la_afs = shelve.open('/scratch/ScharTest_Classical_FreeSlipExact_250m', 'r')
+la_afs = shelve.open('/home/jeg/scratch/ScharTest_Classical_FreeSlipApprox_250m', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']
@@ -60,11 +60,11 @@ ccheck = plt.contourf(1.0E-3 * X, 1.0E-3 * Z, W1, 44, cmap=cm.seismic, vmin=-2.2
 plt.xlim(-30.0, 30.0)
 plt.ylim(0.0, 15.0)
 plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-plt.title('Exact Free-Slip - W (m/s)')
+plt.title('Approximate Free-Slip - W (m/s)')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 
 #%% Load in the limited area reproduction with approximate free-slip
-la_afs = shelve.open('/scratch/ScharTest_Classical_FreeSlipApprox_250m', 'r')
+la_afs = shelve.open('/home/jeg/scratch/ScharTest_Classical_FreeSlipApprox_250m', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']
@@ -83,12 +83,11 @@ X = REFS[4]
 x2 = X[0,:]
 Z = REFS[5]
 U = np.reshape(SOL[udex,0], (NZ, NX+1), order='F')
-W2 = np.reshape(SOL[wdex,0], (NZ, NX+1), order='F')
 
 plt.subplot(2,3,4)
 ccheck = plt.contourf(1.0E-3 * X, 1.0E-3 * Z, U, 44, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
 #fig.colorbar(ccheck)
-plt.xlim(-30.0, 30.0)
+plt.xlim(-20.0, 20.0)
 plt.ylim(0.0, 15.0)
 plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
 plt.xlabel('Distance (km)')
@@ -96,7 +95,7 @@ plt.title('Approximate Free-Slip - U (m/s)')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 
 #%% Load in the limited area reproduction with approximate free-slip
-la_afs = shelve.open('/scratch/ScharTest_Classical_FreeSlipExact_250m', 'r')
+la_afs = shelve.open('/home/jeg/scratch/ScharTest_Classical_FreeSlipExact_250m', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']
@@ -114,11 +113,12 @@ tdex = np.add(pdex, OPS)
 X = REFS[4]
 Z = REFS[5]
 U = np.reshape(SOL[udex,0], (NZ, NX+1), order='F')
+W2 = np.reshape(SOL[wdex,0], (NZ, NX+1), order='F')
 
 plt.subplot(2,3,5)
 ccheck = plt.contourf(1.0E-3 * X, 1.0E-3 * Z, U, 44, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
 #fig.colorbar(ccheck)
-plt.xlim(-30.0, 30.0)
+plt.xlim(-20.0, 20.0)
 plt.ylim(0.0, 15.0)
 plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
 plt.xlabel('Distance (km)')
@@ -133,15 +133,16 @@ plt.tight_layout()
 plt.savefig('ScharTestComparison.png')
 
 #%% Compare lower boundary condition
-fig = plt.figure(figsize=(6.0, 12.0))
-plt.subplot(3,1,1)
+fig = plt.figure(figsize=(12.0, 6.0))
+plt.subplot(1,2,1)
 plt.plot(1.0E-3 * XM[0,:], WM.T[0,:], 'k')
 plt.plot(1.0E-3 * x1, W1[0,:], 'b--')
-plt.legend(['Classical Solution', 'Approximate Free-Slip'])
+plt.plot(1.0E-3 * x2, W2[0,:], 'g--')
+plt.legend(['Classical Solution', 'Approximate Free-Slip','Exact Free-Slip'])
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-plt.title('Boundary W (m/s) - Classical')
-plt.xlim(-20.0, 20.0)
-
+plt.title('Boundary W (m/s) - Comparison')
+plt.xlim(-10.0, 10.0)
+'''
 plt.subplot(3,1,2)
 plt.plot(1.0E-3 * x2, W2[0,:], 'k')
 plt.plot(1.0E-3 * x1, W1[0,:], 'b--')
@@ -149,12 +150,12 @@ plt.legend(['Exact Free-Slip', 'Approximate Free-Slip'])
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 plt.title('Boundary W (m/s) - Exact vs. Approximate')
 plt.xlim(-20.0, 20.0)
-
-plt.subplot(3,1,3)
+'''
+plt.subplot(1,2,2)
 plt.plot(1.0E-3 * x1, W2[0,:] - W1[0,:], 'k')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 plt.title('Boundary W (m/s) - Difference')
-plt.xlim(-20.0, 20.0)
+plt.xlim(-10.0, 10.0)
 plt.xlabel('Distance (km)')
 
 plt.tight_layout()

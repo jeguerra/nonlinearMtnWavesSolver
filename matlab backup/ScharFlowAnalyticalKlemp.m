@@ -107,5 +107,5 @@ ylabel('Elevation (m)');
 %
 close all;
 fileStore = 'AnalyticalSchar.mat';
-save(fileStore);
+save(fileStore,'-v7');
 %}

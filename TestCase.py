@@ -30,7 +30,7 @@ class TestCase:
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
-                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
                      self.setUserData(168, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
@@ -39,7 +39,7 @@ class TestCase:
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
@@ -49,27 +49,27 @@ class TestCase:
                      # Newton iteration with smooth stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True,\
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     self.setUserData(168, 96, 75.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(168, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     self.setUserData(168, 96, 75.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(168, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
