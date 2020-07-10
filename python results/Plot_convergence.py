@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 
 # Read in the text file
 #fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
-#name = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
-fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_discrete.txt'
+fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
+#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_discrete.txt'
 
 con_data = np.loadtxt(fname, delimiter=', ')
 

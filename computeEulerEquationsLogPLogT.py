@@ -63,6 +63,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        PqPx = DqDx - DZDXM.dot(DqDz)
        
+       # Compute partial in X terrain following block
+       PPXM = DDXM - DZDXM.dot(DDZM)
+       
        # Compute vertical gradient diagonal operators
        DuDzM = sps.diags(DqDz[:,0], offsets=0, format='csr')
        DwDzM = sps.diags(DqDz[:,1], offsets=0, format='csr')
@@ -111,9 +114,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Compute common horizontal transport block
        #UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
        UPXM = UM.dot(GMLX.dot(DDXM)) + WXZM.dot(GMLZ.dot(DDZM))
-       
-       # Compute partial in X terrain following block
-       PPXM = DDXM - DZDXM.dot(DDZM)
        
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + GMLX.dot(PuPxM)

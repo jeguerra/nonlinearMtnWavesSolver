@@ -37,7 +37,7 @@ def hefunclb(NX):
        
        # Compute the Hermite function weights
        hf = hefuncm(NX+1, xi, False)
-       w = 1.0 / (NX + 1) * np.power(hf, -2.0)
+       w = 1.0 / (NX+1) * np.power(hf, -2.0)
        
        return xi, w
        

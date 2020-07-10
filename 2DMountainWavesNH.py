@@ -1020,10 +1020,10 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       #TestName = 'SmoothStratScharIter'
-       TestName = 'DiscreteStratScharIter'
+       TestName = 'SmoothStratScharIter'
+       #TestName = 'DiscreteStratScharIter'
        #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(10):
+       for ii in range(1):
               diagOutput = runModel(TestName)
