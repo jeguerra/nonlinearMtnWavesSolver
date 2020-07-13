@@ -39,7 +39,6 @@ from computeRayleighEquations import computeRayleighEquations
 from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
-from rsb import rsb_matrix
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 from computeTimeIntegration import computeTimeIntegrationNL
@@ -338,10 +337,11 @@ def runModel(TestName):
        
        REFS.append(DDXM)
        REFS.append(DDZM)
-       if StaticSolve:
+       if StaticSolve or not RSBops:
               REFS.append(DDXM)
               REFS.append(DDZM)
        else:
+              from rsb import rsb_matrix
               REFS.append(rsb_matrix(DDXM))
               REFS.append(rsb_matrix(DDZM))
        
