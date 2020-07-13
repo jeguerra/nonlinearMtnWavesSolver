@@ -20,8 +20,8 @@ import computeTopographyOnGrid as top
 L2 = 1.0E4 * 3.0 * mt.pi
 L1 = -L2
 ZH = 36000.0
-NX = 514
-NZ = 128
+NX = 347
+NZ = 92
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
@@ -95,11 +95,11 @@ term2 = -np.sin(4.0 * mt.pi * xv2)
 DY = np.multiply(term1, term2);
 '''
 # Set the terrain options0
-h0 = 100.0
+h0 = 2000.0
 aC = 5000.0
 lC = 4000.0
 kC = 6000.0
-HOPT = [h0, aC, lC, kC, False, 2]
+HOPT = [h0, aC, lC, kC, False, 1]
 HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT, DDX_1D)
     
 DYD = DDX_1D.dot(HofX)

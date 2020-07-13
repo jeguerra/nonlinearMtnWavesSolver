@@ -15,9 +15,9 @@ def rampFactor(time, timeBound):
        if time == 0.0:
               uRamp = 0.0
        elif time <= timeBound:
-              #uRamp = 0.5 * (1.0 - mt.cos(mt.pi / timeBound * time))
-              uRamp = mt.sin(0.5 * mt.pi / timeBound * time)
-              uRamp = uRamp**4
+              uRamp = 0.5 * (1.0 - mt.cos(mt.pi / timeBound * time))
+              #uRamp = mt.sin(0.5 * mt.pi / timeBound * time)
+              #uRamp = uRamp**4
        else:
               uRamp = 1.0
               
@@ -182,23 +182,22 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               dc = dcoeff0
               rhs0 = rhsInv0
               time = time0
-              sol1 = np.array(sol)
               sol2 = np.array(sol)
               for ii in range(5):
                      rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
                      time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
                      rhs0 = rhsInv
               
-              sol2 = np.array(0.04 * sol2 + 0.36 * sol1)
-              sol1 = np.array(15.0 * sol2 - 5.0 * sol1)
+              sol2 = np.array(0.04 * sol2 + 0.36 * sol)
+              sol = np.array(15.0 * sol2 - 5.0 * sol)
               
               for ii in range(4):
                      rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
                      time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
                      rhs0 = rhsInv
                      
-              rhs, rhsInv = computeRHSUpdate(sol1, dc, U, DUDZ)       
-              sol = np.array(sol2 + 0.6 * sol1)
+              rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)       
+              sol = np.array(sol2 + 0.6 * sol)
               time, sol, res, dc, U, DUDZ = computeUpdate(0.1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
               rhs0 = rhsInv
               
@@ -213,7 +212,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               solf, time, UB, resOut, dcoeff1 = ketcheson93(time, sol0, rhs0, dcoeff0, UZ, DUDZ, False)
               #solf, rhsDyn, errf = ketcheson93(sol0, True, True)
        elif order == 4:
-              solf, time, UB, resOut, dcoeff1 = ketcheson104(time, sol0, rhs0, UZ, DUDZ, dcoeff0)
+              solf, time, UB, resOut, dcoeff1 = ketcheson104(time, sol0, rhs0, dcoeff0, UZ, DUDZ)
        
        Uf = np.abs(sol0[:,0] + UB)
        rhsf = computeRHSUpdate_inviscid(solf, Uf)

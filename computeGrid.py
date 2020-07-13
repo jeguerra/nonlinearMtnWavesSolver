@@ -21,7 +21,7 @@ def computeGrid(DIMS, HermCheb, UniformGrid):
        NZ = DIMS[4]
        
        # Compute the Hermite function and Chebyshev native grids
-       alpha, whf = hefunclb(NX+1) #(-inf inf)
+       alpha, whf = hefunclb(NX) #(-inf inf)
        xi, wcp = cheblb(NZ) #[-1 +1]
        
        # Map reference 1D domains to physical 1D domains

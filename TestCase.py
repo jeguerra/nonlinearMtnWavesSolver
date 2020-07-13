@@ -33,7 +33,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(168, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
@@ -43,7 +43,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(168, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 25.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 100.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -51,9 +51,9 @@ class TestCase:
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(168, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
@@ -63,7 +63,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     self.setUserData(168, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
@@ -71,10 +71,10 @@ class TestCase:
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(348, 92, 121.0, 33.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 1, 1.0E+4)
+                     self.setUserData(423, 92, 121.0, 33.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.5E+4)
                      # UNIFORM STRATIFICATION PARAMETERS
                      #self.setUserData(347, 96, 101.0, 33.0, 300.0, 8000.0, 21000.0, 2000.0, 0.0075, 1, 1.0E+4)
                      
@@ -138,11 +138,11 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 5.0 # hours
+              HR = 2.0 # hours
               rampTime = 300  # 5 minutes to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3 # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 400 # Stride for diagnostic output
+              OTI = 800 # Stride for diagnostic output
               ITI = 800 # Stride for image output
               RTI = 1 # Stride for residual visc update
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]

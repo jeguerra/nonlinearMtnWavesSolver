@@ -38,12 +38,19 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, VSND, RLM):
        # Compute upwind flow dependent coefficients
        XMAX = (0.5 * DX) * U#(U + VSND)
        ZMAX = (0.5 * DZ) * W#(W + VSND)
-       
+       #'''
+       # Continuous damping in the sponge layers
        compare = np.stack((QRESX, XMAX),axis=1)
        QRESX_CF = RLM.dot(XMAX) + bn.nanmin(compare, axis=1)
        compare = np.stack((QRESZ, ZMAX),axis=1)
        QRESZ_CF = RLM.dot(ZMAX) + bn.nanmin(compare, axis=1)
-       
+       '''
+       # Continuous upwind PLUS residual
+       compare = np.stack((QRESX, XMAX),axis=1)
+       QRESX_CF = 0.5 * (XMAX + bn.nanmin(compare, axis=1))
+       compare = np.stack((QRESZ, ZMAX),axis=1)
+       QRESZ_CF = 0.5 * (ZMAX + bn.nanmin(compare, axis=1))
+       '''
        return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
 
 

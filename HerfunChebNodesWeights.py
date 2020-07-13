@@ -13,7 +13,7 @@ import math as mt
 
 def hefunclb(NX):
        # Compute off-diagonals of 7.84 in Spectral Methods, Springer
-       b = range(1,NX)
+       b = range(1,NX+1)
        bd = 0.5 * np.array(b)
        
        # Assemble the matrix
@@ -26,24 +26,34 @@ def hefunclb(NX):
        # Sort the eigenvalues in ascending order and store nodes
        xi = np.sort(np.real(ew))
        
-       ''' EXPERIMENTAL DOMAIN MAPPING
-       xcp = np.linspace(0.0,1.0,num=int((NX-1)/2))
-       xip = 0.5 * (1.0 - np.cos(mt.pi * xcp))
-       xcm = np.linspace(-1.0,0.0,num=int((NX-1)/2))
-       xim = -0.5 * (1.0 - np.cos(mt.pi * xcm))
-       xi = L * np.concatenate((xim[0:-1], xip[1:]))
-       print(xi, len(xi))
+       # Force symmetry!
        '''
-       
+       print(xi)
+       print(NX)
+       if NX % 2 == 0:
+              symDex = int(NX/2)
+              xi_m = -xi[NX:symDex-1:-1]
+              xi_p = xi[symDex:]
+              print(xi_m)
+              print(xi_p)
+              xi = np.concatenate((xi_m, xi_p))
+       else:
+              symDex = int((NX-1)/2)
+              xi_m = -xi[NX:symDex:-1]
+              xi_p = xi[symDex+1:]
+              print(xi_m)
+              print(xi_p)
+              xi = np.concatenate((xi_m, xi_p))
+       '''
        # Compute the Hermite function weights
-       hf = hefuncm(NX+1, xi, False)
+       hf = hefuncm(NX, xi, False)
        w = 1.0 / (NX+1) * np.power(hf, -2.0)
        
        return xi, w
        
 def hefuncm(NX, xi, fullMat):
        # Initialize constant
-       cst = 1.0 / mt.sqrt(mt.sqrt(mt.pi));
+       cst = 1.0 / mt.pi**4;
        ND = len(xi)
        
        # Initialize the output matrix if needed
@@ -53,7 +63,7 @@ def hefuncm(NX, xi, fullMat):
        # Compute the first two modes of the recursion
        wfun = np.exp(-0.5 * np.power(xi, 2.0))
        poly0 = cst * wfun;
-       poly1 = cst * mt.sqrt(2.0) * mul(xi, wfun);
+       poly1 = cst * mt.sqrt(2.0) * (xi * wfun);
        
        # Put the first two functions in the matrix or return low order functions
        if fullMat:
@@ -64,14 +74,14 @@ def hefuncm(NX, xi, fullMat):
        elif NX == 1:
               return poly1
        
-       for ii in range(1,NX):
-              polyn = mt.sqrt(2.0 / (ii+1)) * mul(xi, poly1)
-              polyn = np.subtract(polyn, mt.sqrt(ii / (ii+1)) * poly0)
+       for nn in range(1,NX):
+              polyn = mt.sqrt(2.0 / (nn+1)) * (xi * poly1)
+              polyn -= mt.sqrt(nn / (nn+1)) * poly0
               poly0 = poly1; 
               poly1 = polyn;
               # Put the new function in its matrix place
               if fullMat:
-                     HFM[ii+1,:] = polyn
+                     HFM[nn+1,:] = polyn
               else:
                      HFM = polyn
        

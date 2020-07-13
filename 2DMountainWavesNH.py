@@ -31,8 +31,7 @@ from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
 from computePartialDerivativesXZ import computePartialDerivativesXZ
 from computeTopographyOnGrid import computeTopographyOnGrid
-from computeGuellrichDomain2D import computeGuellrichDomain2D
-#from computeStretchedDomain2D import computeStretchedDomain2D
+import computeGuellrichDomain2D as coords
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
@@ -208,22 +207,10 @@ def runModel(TestName):
        #%% SET UP THE GRID AND INITIAL STATE
        #% Define the computational and physical grids+
        REFS = computeGrid(DIMS, HermCheb, UniformDelta)
-       
-       # Compute DX and DZ grid length scales
-       DX = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
-       DZ = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
-       print('Nominal grid lengths:',DX,DZ)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-       
-       # Compute the spectral radii...
-       DX = 2.0 / np.amax(np.abs(dsl.eigvals(DDX_1D)))
-       DZ = 2.0 / np.amax(np.abs(dsl.eigvals(DDZ_1D)))
-       #DX = 1.0 / np.sort(np.abs(dsl.eigvals(DDX_1D)))[-4]
-       #DZ = 1.0 / np.sort(np.abs(dsl.eigvals(DDZ_1D)))[-4]
-       print('Spectral radii for 1st derivative matrices:',DX,DZ)
        
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
@@ -235,12 +222,22 @@ def runModel(TestName):
        #% Read in topography profile or compute from analytical function
        HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_SP)
        
+       # Compute DX and DZ grid length scales
+       DX = 1.0 * np.min(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.min(np.abs(np.diff(REFS[1])))
+       print('Minimum grid lengths:',DX,DZ)
+       
+       # Compute the spectral radii...
+       DX = 2.0 / np.amax(np.abs(dsl.eigvals(DDX_1D)))
+       DZ = 2.0 / np.amax(np.abs(dsl.eigvals(DDZ_1D)))
+       print('Spectral radii for 1st derivative matrices:',DX,DZ)
+       
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
        # USE THE GUELLRICH TERRAIN DECAY
-       XL, ZTL, DZT, sigma, ZRL = computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       XL, ZTL, DZT, sigma, ZRL = coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # USE UNIFORM STRETCHING
-       #XL, ZTL, DZT, sigma, ZRL = computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -850,7 +847,8 @@ def runModel(TestName):
               rdb['ET'] = TOPT[4]
               rdb['PHYS'] = PHYS
               rdb['DIMS'] = DIMS
-              rdb['REFS'] = REFS
+              if StaticSolve:
+                     rdb['REFS'] = REFS
               rdb.close()
        
        #%% Recover the solution (or check the residual)
@@ -890,7 +888,7 @@ def runModel(TestName):
        # Compute the new Guellrich domain
        NDIMS = [DIMS[0], DIMS[1], DIMS[2], NXI-1, NZI]
        NREFS = [xnew, znew]
-       XLI, ZTLI, DZTI, sigmaI, ZRLI = computeGuellrichDomain2D(NDIMS, NREFS, zRay, hnew, dhnewdx)
+       XLI, ZTLI, DZTI, sigmaI, ZRLI = coords.computeGuellrichDomain2D(NDIMS, NREFS, zRay, hnew, dhnewdx)
        
        #%% Make some plots for static or transient solutions
        if makePlots:
@@ -1019,8 +1017,8 @@ def runModel(TestName):
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       #TestName = 'ClassicalScharIter'
-       TestName = 'SmoothStratScharIter'
+       TestName = 'ClassicalScharIter'
+       #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
        #TestName = 'CustomTest'
        
