@@ -164,8 +164,6 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        NX = DIMS[3]
        
        alpha, whf = hefunclb(NX)
-       #print(alpha)
-       #print(whf)
        HT = hefuncm(NX, alpha, True)
        HTD = hefuncm(NX+1, alpha, True)
        

@@ -58,8 +58,11 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               dhdx *= (1.0 / aC**2.0) * xh + (mt.pi / lC) * np.tan(mt.pi / lC * xh)
        elif profile == 3:
               # General Kaiser window times a cosine series
-              ht2 = 1.0 + 0.5 * np.power(np.cos(mt.pi / lC * xh), 4.0);
-              ht = 2.0/3.0 * h0 * kaiserDom * ht2
+              ps = 2.0 # polynomial order of cosine factor
+              hs = 0.5 # relative height of cosine wave part
+              hf = 1.0 / (1.0 + hs) # scale for composite profile to have h = 1
+              ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps);
+              ht = hf * h0 * kaiserDom * ht2
               # Take the derivative
               dhdx = DDX.dot(ht)
        elif profile == 4:
