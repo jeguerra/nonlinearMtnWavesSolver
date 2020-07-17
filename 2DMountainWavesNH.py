@@ -145,8 +145,9 @@ def runModel(TestName):
        
        thisTest = TestCase.TestCase(TestName)
        
-       # Deprecated...
+       # Need to move this to TestCase.py
        RSBops = True
+       ApplyGML = True
        UniformDelta = False
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
@@ -226,11 +227,6 @@ def runModel(TestName):
        DZ = 1.0 * np.min(np.abs(np.diff(REFS[1])))
        print('Minimum grid lengths:',DX,DZ)
        
-       # Compute the spectral radii...
-       DX = 2.0 / np.amax(np.abs(dsl.eigvals(DDX_1D)))
-       DZ = 2.0 / np.amax(np.abs(dsl.eigvals(DDZ_1D)))
-       print('Spectral radii for 1st derivative matrices:',DX,DZ)
-       
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
        # USE THE GUELLRICH TERRAIN DECAY
@@ -264,7 +260,23 @@ def runModel(TestName):
        plt.ylabel('Height (km)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.subplot(1,2,2)
-       plt.plot(TZ, 1.0E-3*REFS[1], 'ks-')
+       plt.plot(TZ, 1.0E-3*ZTL, 'k-')
+       plt.title('Smooth Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.tight_layout()
+       plt.savefig('python results/Temperature_Background.png')
+       plt.show()
+       # Make a figure of the temperature lapse rates background
+       fig = plt.figure(figsize=(12.0, 6.0))
+       plt.subplot(1,2,1)
+       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
+       plt.title('Discrete Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.ylabel('Height (km)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(1,2,2)
+       plt.plot(DTDZ, 1.0E-3*ZTL, 'k-')
        plt.title('Smooth Temperature Profile (K)')
        plt.xlabel('Temperature (K)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
@@ -303,9 +315,13 @@ def runModel(TestName):
        
        #%% Rayleigh opearator and GML weight
        ROPS, RLM, GMLX, GMLZ = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
-       GMLXOP = sps.diags(np.reshape(GMLX, (OPS,), order='F'), offsets=0, format='csr')
-       GMLZOP = sps.diags(np.reshape(GMLZ, (OPS,), order='F'), offsets=0, format='csr')
-       
+       if ApplyGML:
+              GMLXOP = sps.diags(np.reshape(GMLX, (OPS,), order='F'), offsets=0, format='csr')
+              GMLZOP = sps.diags(np.reshape(GMLZ, (OPS,), order='F'), offsets=0, format='csr')
+       else:
+              GMLXOP = sps.identity(OPS, format='csr')
+              GMLZOP = sps.identity(OPS, format='csr')
+              
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
        DLTDZ = np.reshape(DLTDZ, (OPS,1), order='F')
@@ -367,9 +383,18 @@ def runModel(TestName):
        plt.show()
        input()
        '''
-       del(DDXM);
-       del(DDZM);
-       del(DZDX);
+       # Compute the spectral radii on partial derivative operators
+       DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
+       PPXM = DDXM - DZDXM.dot(DDZM)
+       DX = 2.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
+       DZ = 2.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
+       print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
+       
+       del(DDXM)
+       del(DDZM)
+       del(DZDX)
+       del(PPXM)
+       del(DZDXM)
        del(GMLXOP)
        del(GMLZOP)
        
@@ -1017,10 +1042,10 @@ def runModel(TestName):
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       TestName = 'ClassicalScharIter'
+       #TestName = 'ClassicalScharIter'
        #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       #TestName = 'CustomTest'
+       TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
        for ii in range(1):

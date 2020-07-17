@@ -74,9 +74,9 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(423, 92, 121.0, 33.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.5E+4)
+                     self.setUserData(447, 96, 141.0, 38.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.25E+4)
                      # UNIFORM STRATIFICATION PARAMETERS
-                     #self.setUserData(347, 96, 101.0, 33.0, 300.0, 8000.0, 21000.0, 2000.0, 0.0075, 1, 1.0E+4)
+                     #self.setUserData(423, 92, 121.0, 38.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.25E+4)
                      
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -106,8 +106,8 @@ class TestCase:
               self.DIMS = (L1, L2, ZH, NX, NZ, OPS)
               
               # Background temperature profile
-              self.Z_in = [0.0, 1.1E4, 1.6E4, ZH]
-              GAMS = 0.001 # Lapse rate in the stratosphere
+              self.Z_in = [0.0, 1.1E4, 2.5E4, ZH]
+              GAMS = 0.003 # Lapse rate in the stratosphere
               GAMT = 0.0065 # Lapse rate in the troposphere
               TTP = T0 - GAMT * (self.Z_in[1] - self.Z_in[0])
               TH = TTP + GAMS * (self.Z_in[3] - self.Z_in[2])
@@ -120,7 +120,7 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-              mu *= 5.0
+              mu *= [0.1, 2.0, 0.1, 0.1]
               self.RLOPT = (depth, width, applyTop, applyLateral, mu)
               
               # Set the terrain options
@@ -140,9 +140,10 @@ class TestCase:
               DT = 0.05 # seconds
               HR = 2.0 # hours
               rampTime = 300  # 5 minutes to ramp up U_bar, DUDZ_bar, and w_BC
-              intMethodOrder = 3 # 3rd or 4th order time integrator
+              intMethodOrder = 3
+              # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 800 # Stride for diagnostic output
+              OTI = 400 # Stride for diagnostic output
               ITI = 800 # Stride for image output
               RTI = 1 # Stride for residual visc update
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]
