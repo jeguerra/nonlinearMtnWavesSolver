@@ -46,8 +46,9 @@ from computeTimeIntegration import computeTimeIntegrationNL
 import faulthandler; faulthandler.enable()
 
 # Disk settings
-localDir = '/home/jeg/scratch/'
-#localDir = '/Users/TempestGuerra/scratch/'
+#localDir = '/scratch/opbuffer/' # NOAA laptop
+localDir = '/home/jeg/scratch/' # Home super desktop
+#localDir = '/Users/TempestGuerra/scratch/' # Davis Macbook Pro
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 

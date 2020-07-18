@@ -30,10 +30,10 @@ class TestCase:
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
-                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 84, 70.0, 21.0, 280.0, 6000.0, 10000.0, 250.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
@@ -43,7 +43,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(167, 90, 65.0, 25.0, 280.0, 10000.0, 15000.0, 100.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 90, 65.0, 21.0, 280.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -53,7 +53,7 @@ class TestCase:
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(167, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 10.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
@@ -63,7 +63,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     self.setUserData(167, 96, 72.0, 31.0, 300.0, 6000.0, 12000.0, 10.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 10.0, 0.01, 2, 1.2E+4)
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
@@ -107,7 +107,7 @@ class TestCase:
               
               # Background temperature profile
               self.Z_in = [0.0, 1.1E4, 2.5E4, ZH]
-              GAMS = 0.003 # Lapse rate in the stratosphere
+              GAMS = 0.0015 # Lapse rate in the stratosphere
               GAMT = 0.0065 # Lapse rate in the troposphere
               TTP = T0 - GAMT * (self.Z_in[1] - self.Z_in[0])
               TH = TTP + GAMS * (self.Z_in[3] - self.Z_in[2])
@@ -120,7 +120,7 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-              mu *= [0.1, 2.0, 0.1, 0.1]
+              mu *= [2.0, 2.0, 2.0, 2.0]
               self.RLOPT = (depth, width, applyTop, applyLateral, mu)
               
               # Set the terrain options
