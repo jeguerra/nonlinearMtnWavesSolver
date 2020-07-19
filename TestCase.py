@@ -33,7 +33,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(167, 84, 70.0, 21.0, 280.0, 6000.0, 10000.0, 250.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 84, 70.0, 22.0, 280.0, 7000.0, 10000.0, 250.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
@@ -43,7 +43,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(167, 90, 65.0, 21.0, 280.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4)
+                     self.setUserData(167, 84, 70.0, 22.0, 280.0, 7000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4)
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification

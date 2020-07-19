@@ -24,12 +24,13 @@ XM = clin['X']
 ZM = clin['Z']
 WM = clin['w']
 
-plt.subplot(2,3,1)
+plt.subplot(1,3,1)
 ccheck = plt.contourf(1.0E-3 * XM, 1.0E-3 * ZM, WM.T, 44, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
 #fig.colorbar(ccheck)
-plt.xlim(-30.0, 30.0)
+plt.xlim(-20.0, 20.0)
 plt.ylim(0.0, 15.0)
-plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+plt.xlabel('Distance (km)')
 plt.title('Classical Fourier - W (m/s)')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 
@@ -54,14 +55,25 @@ x1 = X[0,:]
 Z = REFS[5]
 W1 = np.reshape(SOL[wdex,0], (NZ, NX+1), order='F')
 
-plt.subplot(2,3,2)
+plt.subplot(1,3,2)
 ccheck = plt.contourf(1.0E-3 * X, 1.0E-3 * Z, W1, 44, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
 #fig.colorbar(ccheck)
-plt.xlim(-30.0, 30.0)
+plt.xlim(-20.0, 20.0)
 plt.ylim(0.0, 15.0)
-plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+plt.xlabel('Distance (km)')
 plt.title('Approximate Free-Slip - W (m/s)')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+
+#%% Make common colorbar
+axc = plt.subplot(1,3,3)
+axc.set_axis_off()
+fig.colorbar(ccheck, fraction=1.0)
+plt.tight_layout()
+plt.savefig('ScharTestComparisonW.png')
+
+# Make the parent figure
+fig = plt.figure(figsize=(12.0, 6.0))
 
 #%% Load in the limited area reproduction with approximate free-slip
 la_afs = shelve.open('/home/jeg/scratch/ScharTest_Classical_FreeSlipApprox_250m', 'r')
@@ -84,7 +96,7 @@ x2 = X[0,:]
 Z = REFS[5]
 U = np.reshape(SOL[udex,0], (NZ, NX+1), order='F')
 
-plt.subplot(2,3,4)
+plt.subplot(1,3,1)
 ccheck = plt.contourf(1.0E-3 * X, 1.0E-3 * Z, U, 44, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
 #fig.colorbar(ccheck)
 plt.xlim(-20.0, 20.0)
@@ -115,7 +127,7 @@ Z = REFS[5]
 U = np.reshape(SOL[udex,0], (NZ, NX+1), order='F')
 W2 = np.reshape(SOL[wdex,0], (NZ, NX+1), order='F')
 
-plt.subplot(2,3,5)
+plt.subplot(1,3,2)
 ccheck = plt.contourf(1.0E-3 * X, 1.0E-3 * Z, U, 44, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
 #fig.colorbar(ccheck)
 plt.xlim(-20.0, 20.0)
@@ -130,7 +142,7 @@ axc = plt.subplot(1,3,3)
 axc.set_axis_off()
 fig.colorbar(ccheck, fraction=1.0)
 plt.tight_layout()
-plt.savefig('ScharTestComparison.png')
+plt.savefig('FreeSlipComparisonU.png')
 
 #%% Compare lower boundary condition
 fig = plt.figure(figsize=(12.0, 6.0))

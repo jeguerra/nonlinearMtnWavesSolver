@@ -384,18 +384,19 @@ def runModel(TestName):
        plt.show()
        input()
        '''
-       # Compute the spectral radii on partial derivative operators
-       DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
-       PPXM = DDXM - DZDXM.dot(DDZM)
-       DX = 2.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
-       DZ = 2.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
-       print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
+       if not StaticSolve:
+              # Compute the spectral radii on partial derivative operators
+              DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
+              PPXM = DDXM - DZDXM.dot(DDZM)
+              DX = 2.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
+              DZ = 2.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
+              print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
+              del(PPXM)
+              del(DZDXM)
        
        del(DDXM)
        del(DDZM)
        del(DZDX)
-       del(PPXM)
-       del(DZDXM)
        del(GMLXOP)
        del(GMLZOP)
        
