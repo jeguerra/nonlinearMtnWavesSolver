@@ -227,6 +227,12 @@ def runModel(TestName):
        DX = 1.0 * np.min(np.abs(np.diff(REFS[0])))
        DZ = 1.0 * np.min(np.abs(np.diff(REFS[1])))
        print('Minimum grid lengths:',DX,DZ)
+       DX = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
+       print('Average grid lengths:',DX,DZ)
+       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
+       print('Maximum  grid lengths:',DX,DZ)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
@@ -388,8 +394,8 @@ def runModel(TestName):
               # Compute the spectral radii on partial derivative operators
               DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
               PPXM = DDXM - DZDXM.dot(DDZM)
-              DX = 2.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
-              DZ = 2.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
+              DX = 4.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
+              DZ = 4.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
               print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
               del(PPXM)
               del(DZDXM)

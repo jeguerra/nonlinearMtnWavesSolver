@@ -120,7 +120,7 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-              mu *= [2.0, 2.0, 2.0, 2.0]
+              mu *= 1.0 * np.array([1.0, 1.0, 1.0, 1.0])
               self.RLOPT = (depth, width, applyTop, applyLateral, mu)
               
               # Set the terrain options
