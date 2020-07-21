@@ -24,7 +24,7 @@ def computeTerrainDecayFunctions(xi, ang):
        
        dfdxi1 = -p * (expdec * cosvard)
        dfdxi2 = (1.0/q * np.cos(ang) + 0.5 * mt.pi * np.sin(ang))
-       dfdxi3 = -AR * (1.0 - 2.0 * xi);
+       dfdxi3 = AR * (1.0 - 2.0 * xi);
        d_dzdh_dxi = (dfdxi1 * dfdxi2) + dfdxi3
        
        return dzdh, d_dzdh_dxi

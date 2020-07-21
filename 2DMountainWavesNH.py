@@ -147,8 +147,6 @@ def runModel(TestName):
        thisTest = TestCase.TestCase(TestName)
        
        # Need to move this to TestCase.py
-       RSBops = True
-       ApplyGML = True
        UniformDelta = False
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
@@ -158,6 +156,13 @@ def runModel(TestName):
        NonLinSolve = thisTest.solType['NLTranSolve']
        NewtonLin = thisTest.solType['NewtonLin']
        ExactBC = thisTest.solType['ExactBC']
+       
+       if StaticSolve:
+              RSBops = False
+              ApplyGML = False
+       else:
+              RSBops = True
+              ApplyGML = True
        
        # Set the grid type (NOT IMPLEMENTED)
        HermCheb = thisTest.solType['HermChebGrid']      
@@ -709,6 +714,36 @@ def runModel(TestName):
               # Get local sound speed
               VSND = np.sqrt(PHYS[6] * REFS[9])
               
+              # Initialize netcdf output
+              from netCDF4 import Dataset
+              fname = 'transientNL' + str(thisTime)
+              m_fid = Dataset(fname , 'w')
+                     
+              # Make dimensions
+              taxis = m_fid.CreateDimension('time', None)
+              xaxis = m_fid.CreateDimension('xlon', NX+1)
+              zaxis = m_fid.CreateDimension('zlev', NZ)
+              # Create variables (time and grid)
+              tmvar = m_fid.CreateVariable('t', 'f8', (taxis,))
+              xgvar = m_fid.CreateVariable('XL', 'f8', (zaxis, xaxis))
+              zgvar = m_fid.CreateVariable('ZTL', 'f8', (zaxis, xaxis))
+              # Store variables
+              xgvar[:] = XL
+              zgvar[:] = ZTL
+              # Create variables (background static fields)
+              UVAR = m_fid.CreateVariable('U', 'f8', (time, zaxis, xaxis))
+              PVAR = m_fid.CreateVariable('LNP', 'f8', (time, zaxis, xaxis))
+              TVAR = m_fid.CreateVariable('LNT', 'f8', (time, zaxis, xaxis))
+              # Store variables
+              UVAR[:] = np.reshape(hydroState[:,0], (NZ,NX+1), order='F')
+              PVAR[:] = np.reshape(hydroState[:,2], (NZ,NX+1), order='F')
+              TVAR[:] = np.reshape(hydroState[:,3], (NZ,NX+1), order='F')
+              # Create variables (transient fields)
+              uvar = m_fid.CreateVariable('u', 'f8', (time, zaxis, xaxis))
+              wvar = m_fid.CreateVariable('w', 'f8', (time, zaxis, xaxis))
+              pvar = m_fid.CreateVariable('ln_p', 'f8', (time, zaxis, xaxis))
+              tvar = m_fid.CreateVariable('ln_t', 'f8', (time, zaxis, xaxis))
+              
               while thisTime <= TOPT[4]:
                             
                      # Print out diagnostics every TOPT[5] steps
@@ -718,11 +753,12 @@ def runModel(TestName):
                             error.append(err)
                      
                      if ti % TOPT[6] == 0:
-                            fig = plt.figure(figsize=(8.0, 10.0))
+                            # Store current time
+                            tmvar[ff-1] = thisTime
+                            fig = plt.figure(figsize=(8.0, 12.0))
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
-                                   #zderivs = REFS[11].dot(fields)
                                    dqdt = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
                                    
                                    if np.abs(dqdt.max()) > np.abs(dqdt.min()):
@@ -742,105 +778,22 @@ def runModel(TestName):
                                    else:
                                           plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
                                           
-                                   plt.colorbar(ccheck, format='%.3e')
+                                   plt.colorbar(ccheck, format='%.2e')
                                    
                                    if pp == 0:
                                           plt.title('u (m/s)')
+                                          uvar[ff-1,:,:] = dqdt
                                    elif pp == 1:
                                           plt.title('w (m/s)')
+                                          wvar[ff-1,:,:] = dqdt
                                    elif pp == 2:
                                           plt.title('ln-p (Pa)')
+                                          pvar[ff-1,:,:] = dqdt
                                    else:
                                           plt.title('ln-theta (K)')
-       
-                            plt.savefig('transient' + str(ff).zfill(3) + '.png', dpi=600, format='png', bbox_inches='tight', pad_inches=0.005)
-                            plt.show()
-                            '''
-                            fig = plt.figure(figsize=(8.0, 10.0))
-                            # Check the fields or tendencies
-                            for pp in range(numVar):
-                                   plt.subplot(4,1,pp+1)
-                                   dqdt = np.reshape(resVec[:,pp], (NZ, NX+1), order='F')
-                                   
-                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
-                                          clim = np.abs(dqdt.max())
-                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
-                                          clim = np.abs(dqdt.min())
-                                   else:
-                                          clim = np.abs(dqdt.max())
-                                  
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                   plt.xlim(-30.0, 30.0)
-                                   plt.ylim(0.0, 20.0)
-                                   
-                                   if pp < (numVar - 1):
-                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-                                   else:
-                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-                                          
-                                   plt.colorbar(ccheck, format='%.3e')
-                                   
-                                   if pp == 0:
-                                          plt.title('u (m/s)')
-                                   elif pp == 1:
-                                          plt.title('w (m/s)')
-                                   elif pp == 2:
-                                          plt.title('ln-p (Pa)')
-                                   else:
-                                          plt.title('ln-theta (K)')
+                                          tvar[ff-1,:,:] = dqdt
        
                             plt.show()
-                            '''
-                            '''
-                            fig = plt.figure(figsize=(8.0, 10.0))
-                            # Check the fields or tendencies
-                            for pp in range(2):
-                                   plt.subplot(2,1,pp+1)
-                                   dqdt = np.reshape(resCoeff[pp][:,0], (NZ, NX+1), order='F')
-                                   
-                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
-                                          clim = np.abs(dqdt.max())
-                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
-                                          clim = np.abs(dqdt.min())
-                                   else:
-                                          clim = np.abs(dqdt.max())
-                                  
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                   #plt.xlim(-30.0, 30.0)
-                                   #plt.ylim(0.0, 20.0)
-                                   
-                                   if pp < (numVar - 1):
-                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-                                   else:
-                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-                                          
-                                   plt.colorbar(ccheck, format='%.3e')
-                                   
-                                   if pp == 0:
-                                          plt.title('X Coefficients')
-                                   elif pp == 1:
-                                          plt.title('Z Coefficients')
-       
-                            plt.show()
-                            '''
-                            '''
-                            # Check the terrain boundary
-                            fig = plt.figure(figsize=(8.0, 10.0))
-                            
-                            plt.subplot(2,1,1)
-                            plt.plot(1.0E-3 * REFS[0], resVec[ubdex,0], 'k-', 1.0E-3 * REFS[0], resVec[ubdex+1,0], 'r-')
-                            plt.xlim(-20.0, 20.0)
-                            plt.title('Residual in U near Terrain')
-                            
-                            plt.subplot(2,1,2)
-                            plt.plot(1.0E-3 * REFS[0], resVec[ubdex,1], 'k-', 1.0E-3 * REFS[0], resVec[ubdex+1,0], 'r-')              
-                            plt.title('Residual in W near Terrain')
-                            
-                            plt.tight_layout()
-                            plt.show()
-                            '''
                             ff += 1
 
                      if ti == 0:
@@ -853,8 +806,10 @@ def runModel(TestName):
                                                              TOPT, fields, hydroState, DCF, \
                                                              zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
                                                              ResDiff, VSND, thisTime, isFirstStep)
-                             
                      ti += 1
+                     
+              # Close the output data file
+              m_fid.close()
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')
@@ -885,43 +840,10 @@ def runModel(TestName):
               rdb.close()
        
        #%% Recover the solution (or check the residual)
-       NXI = 2500
-       NZI = 200
-       nativeLN, interpLN = computeInterpolatedFields(DIMS, ZTL, np.array(SOLT[:,0]), NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-       nativeNL, interpNL = computeInterpolatedFields(DIMS, ZTL, np.array(SOLT[:,1]), NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-       nativeDF, interpDF = computeInterpolatedFields(DIMS, ZTL, DSOL, NX, NZ, NXI, NZI, udex, wdex, pdex, tdex, CH_TRANS, HF_TRANS)
-       
-       uxz = nativeLN[0]; 
-       wxz = nativeLN[1]; 
-       pxz = nativeLN[2]; 
-       txz = nativeLN[3]
-       uxzint = interpLN[0]; 
-       wxzint = interpLN[1]; 
-       pxzint = interpLN[2]; 
-       txzint = interpLN[3]
-       
-       #% Make the new grid XLI, ZTLI
-       import HerfunChebNodesWeights as hcnw
-       xnew, dummy = hcnw.hefunclb(NX)
-       xmax = np.amax(xnew)
-       xmin = np.amin(xnew)
-       # Make new reference domain grid vectors
-       xnew = np.linspace(xmin, xmax, num=NXI, endpoint=True)
-       znew = np.linspace(0.0, DIMS[2], num=NZI, endpoint=True)
-       
-       # Interpolate the terrain profile
-       hcf = HF_TRANS.dot(ZTL[0,:])
-       dhcf = HF_TRANS.dot(dHdX)
-       IHF_TRANS = hcnw.hefuncm(NX, xnew, True)
-       hnew = (IHF_TRANS).dot(hcf)
-       dhnewdx = (IHF_TRANS).dot(dhcf)
-       
-       # Scale znew to physical domain and make the new grid
-       xnew *= DIMS[1] / xmax
-       # Compute the new Guellrich domain
-       NDIMS = [DIMS[0], DIMS[1], DIMS[2], NXI-1, NZI]
-       NREFS = [xnew, znew]
-       XLI, ZTLI, DZTI, sigmaI, ZRLI = coords.computeGuellrichDomain2D(NDIMS, NREFS, zRay, hnew, dhnewdx)
+       uxz = np.reshape(SOLT[udex,0], (NZ,NX+1), order='F') 
+       wxz = np.reshape(SOLT[wdex,0], (NZ,NX+1), order='F')
+       pxz = np.reshape(SOLT[pdex,0], (NZ,NX+1), order='F') 
+       txz = np.reshape(SOLT[tdex,0], (NZ,NX+1), order='F')
        
        #%% Make some plots for static or transient solutions
        if makePlots:
@@ -930,7 +852,7 @@ def runModel(TestName):
                      # 1 X 3 subplot of W for linear, nonlinear, and difference
                      
                      plt.subplot(2,2,1)
-                     ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[0], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+                     ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, uxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
                      fig.colorbar(ccheck)
                      plt.xlim(-30.0, 50.0)
                      plt.ylim(0.0, 1.0E-3*DIMS[2])
@@ -938,7 +860,7 @@ def runModel(TestName):
                      plt.title('Change U - (m/s)')
                      
                      plt.subplot(2,2,3)
-                     ccheck = plt.contourf(1.0E-3 * XLI, 1.0E-3 * ZTLI, interpDF[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+                     ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, wxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
                      fig.colorbar(ccheck)
                      plt.xlim(-30.0, 50.0)
                      plt.ylim(0.0, 1.0E-3*DIMS[2])
@@ -966,19 +888,19 @@ def runModel(TestName):
                      plt.subplot(2,2,pp+1)
                      
                      if pp == 0:
-                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-0.25, vmax=0.25)
+                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, uxz, 51, cmap=cm.seismic)#, vmin=-0.25, vmax=0.25)
                             plt.title('U (m/s)')
                             plt.ylabel('Height (km)')
                      elif pp == 1:
-                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-0.08, vmax=0.08)
+                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, wxz, 51, cmap=cm.seismic)#, vmin=-0.08, vmax=0.08)
                             plt.title('W (m/s)')
                      elif pp == 2:
-                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-4.5E-5, vmax=4.5E-5)
+                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, pxz, 51, cmap=cm.seismic)#, vmin=-4.5E-5, vmax=4.5E-5)
                             plt.title('log-P (Pa)')
                             plt.xlabel('Distance (km)')
                             plt.ylabel('Height (km)')
                      elif pp == 3:
-                            ccheck = plt.contourf(1.0E-3*XLI, 1.0E-3*ZTLI, interpLN[pp], 50, cmap=cm.seismic)#, vmin=-6.0E-4, vmax=6.0E-4)
+                            ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, txz, 51, cmap=cm.seismic)#, vmin=-6.0E-4, vmax=6.0E-4)
                             plt.title('log-Theta (K)')
                             plt.xlabel('Distance (km)')
                             
@@ -1010,51 +932,17 @@ def runModel(TestName):
               plt.show()
               
               # Check W at the boundaries...
-              fig = plt.figure(figsize=(12.0, 6.0))
               dwdt = np.reshape(RHS[wdex], (NZ, NX+1), order='F')
               return (XL, ZTL, dwdt)
-
-       #%% Check the boundary conditions
-       '''
-       plt.figure()
-       plt.plot(REFS[0],nativeLN[0][0,:])
-       plt.plot(REFS[0],nativeNL[0][0,:])
-       plt.title('Horizontal Velocity - Terrain Boundary')
-       plt.xlim(-15000, 15000)
-       plt.figure()
-       plt.plot(REFS[0],nativeLN[1][0,:])
-       plt.plot(REFS[0],nativeNL[1][0,:])
-       plt.title('Vertical Velocity - Terrain Boundary')
-       plt.xlim(-15000, 15000)
-       '''
-       #%% #Spot check the solution on both grids
-       '''
-       fig = plt.figure()
-       ccheck = plt.contourf(XL, ZTL, nativeLN[1], 101, cmap=cm.seismic)
-       cbar = fig.colorbar(ccheck)
-       #plt.xlim(-25000.0, 25000.0)
-       #plt.ylim(0.0, 5000.0)
-       #
-       fig = plt.figure()
-       ccheck = plt.contourf(XLI, ZTLI, interpLN[1], 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-       cbar = fig.colorbar(ccheck)
-       #plt.xlim(-20000.0, 20000.0)
-       #plt.ylim(0.0, 1000.0)
-       #plt.yscale('symlog')
-       #
-       fig = plt.figure()
-       plt.plot(XLI[0,:], (interpLN[1])[0:2,:].T, XL[0,:], (nativeLN[1])[0:2,:].T)
-       plt.xlim(-15000.0, 15000.0)
-       '''
        
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       #TestName = 'ClassicalScharIter'
+       TestName = 'ClassicalScharIter'
        #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       TestName = 'CustomTest'
+       #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(1):
+       for ii in range(4):
               diagOutput = runModel(TestName)
