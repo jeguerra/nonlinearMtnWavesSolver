@@ -99,6 +99,12 @@ for rr in hresl:
        WREFint = computeColumnInterp(NX, NZ, NZI, ZTL, WREF, CH_TRANS)
        WREFint = computeHorizontalInterp(NX, x, WREFint, HF_TRANS)
        
+       # Make the difference
+       WDIFF = WMOD - WREFint
+       # Take the norm and print
+       werr = np.linalg.norm(WDIFF[0,:])
+       print(werr)
+       
        # Plot the difference
        fig = plt.figure(figsize=(20.0, 6.0))
        plt.subplot(1,3,1)
