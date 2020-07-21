@@ -59,7 +59,8 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               
        return FLDI
 
-tdir = '/media/jeg/TransferDATA/Schar025m_tempest/'
+#tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
+tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
 hresl = [1000, 500, 250, 125]
 # Loop over the 4 data files
 for rr in hresl:
