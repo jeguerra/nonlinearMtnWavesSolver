@@ -59,10 +59,12 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               
        return FLDI
 
-#tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
-tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
+tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
+#tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
 hresl = [1000, 500, 250, 125]
 # Loop over the 4 data files
+wbcerr = []
+wflerr = []
 for rr in hresl:
        fname = tdir + 'outNHGW_VO3_BSLN-SCHAR_H25m_' + str(rr) + 'm.0000-01-01-00000.nc'
        m_fid = Dataset(fname, 'r')
@@ -102,8 +104,9 @@ for rr in hresl:
        # Make the difference
        WDIFF = WMOD - WREFint
        # Take the norm and print
-       werr = np.linalg.norm(WDIFF[0,:])
-       print(werr)
+       wbcerr.append(1.0 / NXI * np.linalg.norm(WDIFF[0,:]))
+       DOPS = NXI * NZI
+       wflerr.append(1.0 / DOPS * np.linalg.norm(np.reshape(WDIFF, (DOPS,), order='F')))
        
        # Plot the difference
        fig = plt.figure(figsize=(20.0, 6.0))
@@ -119,5 +122,15 @@ for rr in hresl:
        #plt.xlim(-50.0, 50.0)
        #plt.ylim(0.0, 1.0E-3*DIMS[2])
        
+print(wbcerr)
+print(wflerr)
+       
+fig = plt.figure(figsize=(12.0, 6.0))
+plt.subplot(1,2,1)
+plt.plot(hresl, wbcerr)
+plt.xscale('log'); plt.yscale('log')
+plt.subplot(1,2,2)
+plt.plot(hresl, wflerr)
+plt.xscale('log'); plt.yscale('log')
        
        

@@ -716,33 +716,34 @@ def runModel(TestName):
               
               # Initialize netcdf output
               from netCDF4 import Dataset
-              fname = 'transientNL' + str(thisTime)
-              m_fid = Dataset(fname , 'w')
+              fname = 'transientNL' + str(int(thisTime)) + '.nc'
+              
+              m_fid = Dataset(fname, 'w', format="NETCDF4")
                      
               # Make dimensions
-              taxis = m_fid.CreateDimension('time', None)
-              xaxis = m_fid.CreateDimension('xlon', NX+1)
-              zaxis = m_fid.CreateDimension('zlev', NZ)
+              taxis = m_fid.createDimension('time', None)
+              xaxis = m_fid.createDimension('xlon', NX+1)
+              zaxis = m_fid.createDimension('zlev', NZ)
               # Create variables (time and grid)
-              tmvar = m_fid.CreateVariable('t', 'f8', (taxis,))
-              xgvar = m_fid.CreateVariable('XL', 'f8', (zaxis, xaxis))
-              zgvar = m_fid.CreateVariable('ZTL', 'f8', (zaxis, xaxis))
+              tmvar = m_fid.createVariable('t', 'f8', ('time',))
+              xgvar = m_fid.createVariable('XL', 'f8', ('time', 'xlon'))
+              zgvar = m_fid.createVariable('ZTL', 'f8', ('time', 'xlon'))
               # Store variables
               xgvar[:] = XL
               zgvar[:] = ZTL
               # Create variables (background static fields)
-              UVAR = m_fid.CreateVariable('U', 'f8', (time, zaxis, xaxis))
-              PVAR = m_fid.CreateVariable('LNP', 'f8', (time, zaxis, xaxis))
-              TVAR = m_fid.CreateVariable('LNT', 'f8', (time, zaxis, xaxis))
+              UVAR = m_fid.createVariable('U', 'f8', ('time', 'zlev', 'xlon'))
+              PVAR = m_fid.createVariable('LNP', 'f8', ('time', 'zlev', 'xlon'))
+              TVAR = m_fid.createVariable('LNT', 'f8', ('time', 'zlev', 'xlon'))
               # Store variables
               UVAR[:] = np.reshape(hydroState[:,0], (NZ,NX+1), order='F')
               PVAR[:] = np.reshape(hydroState[:,2], (NZ,NX+1), order='F')
               TVAR[:] = np.reshape(hydroState[:,3], (NZ,NX+1), order='F')
               # Create variables (transient fields)
-              uvar = m_fid.CreateVariable('u', 'f8', (time, zaxis, xaxis))
-              wvar = m_fid.CreateVariable('w', 'f8', (time, zaxis, xaxis))
-              pvar = m_fid.CreateVariable('ln_p', 'f8', (time, zaxis, xaxis))
-              tvar = m_fid.CreateVariable('ln_t', 'f8', (time, zaxis, xaxis))
+              uvar = m_fid.createVariable('u', 'f8', ('time', 'zlev', 'xlon'))
+              wvar = m_fid.createVariable('w', 'f8', ('time', 'zlev', 'xlon'))
+              pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
+              tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
               
               while thisTime <= TOPT[4]:
                             
