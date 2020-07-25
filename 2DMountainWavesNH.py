@@ -399,8 +399,8 @@ def runModel(TestName):
               # Compute the spectral radii on partial derivative operators
               DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
               PPXM = DDXM - DZDXM.dot(DDZM)
-              DX = 4.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
-              DZ = 4.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
+              DX = 1.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
+              DZ = 1.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
               print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
               del(PPXM)
               del(DZDXM)
@@ -711,14 +711,16 @@ def runModel(TestName):
               ff = 1
               thisTime = IT
               
-              # Get local sound speed
-              VSND = np.sqrt(PHYS[6] * REFS[9])
-              
               # Initialize netcdf output
               from netCDF4 import Dataset
               fname = 'transientNL' + str(int(thisTime)) + '.nc'
-              
-              m_fid = Dataset(fname, 'w', format="NETCDF4")
+              try:
+                     m_fid = Dataset(fname, 'w', format="NETCDF4")
+              except PermissionError:
+                     print('Deleting corrupt NC file... from failed run.')
+                     import os
+                     os.remove(fname)
+                     m_fid = Dataset(fname, 'w', format="NETCDF4")
                      
               # Make dimensions
               taxis = m_fid.createDimension('time', None)
@@ -732,9 +734,9 @@ def runModel(TestName):
               xgvar[:] = XL
               zgvar[:] = ZTL
               # Create variables (background static fields)
-              UVAR = m_fid.createVariable('U', 'f8', ('time', 'zlev', 'xlon'))
-              PVAR = m_fid.createVariable('LNP', 'f8', ('time', 'zlev', 'xlon'))
-              TVAR = m_fid.createVariable('LNT', 'f8', ('time', 'zlev', 'xlon'))
+              UVAR = m_fid.createVariable('U', 'f8', ('zlev', 'xlon'))
+              PVAR = m_fid.createVariable('LNP', 'f8', ('zlev', 'xlon'))
+              TVAR = m_fid.createVariable('LNT', 'f8', ('zlev', 'xlon'))
               # Store variables
               UVAR[:] = np.reshape(hydroState[:,0], (NZ,NX+1), order='F')
               PVAR[:] = np.reshape(hydroState[:,2], (NZ,NX+1), order='F')
@@ -745,15 +747,34 @@ def runModel(TestName):
               pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
               tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
               
+              # Initialize local sound speed
+              VSND = np.sqrt(PHYS[6] * REFS[9])
+              VSND_max = np.amax(VSND)
+              DT0 = min(DX / np.amax(VSND), DZ / np.amax(VSND))
+              
+              OTI = TOPT[5]
+              ITI = TOPT[6]
+              
               while thisTime <= TOPT[4]:
                             
                      # Print out diagnostics every TOPT[5] steps
-                     if ti % TOPT[5] == 0:
+                     if ti % OTI == 0:
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
+                            
+                            # Compute the maximum speed of sound
+                            T_ratio = np.exp(PHYS[4] * fields[:,2] + fields[:,3]) - 1.0
+                            gamRdT = PHYS[6] * REFS[9] * (1.0 + T_ratio)
+                            VSND_max = np.amax(np.sqrt(gamRdT))
+                            DTN = min(DX / np.amax(VSND_max), DZ / np.amax(VSND_max))
+                            DT_factor = DTN / DT0
+                            TOPT[0] *= DT_factor
+                            DT0 = DTN
+                            #print('Maximum sound speed (m/s): ', VSND_max)
+                            #print('NEW time step estimate (CFL = 1): ', TOPT[0])
                      
-                     if ti % TOPT[6] == 0:
+                     if ti % ITI == 0:
                             # Store current time
                             tmvar[ff-1] = thisTime
                             fig = plt.figure(figsize=(8.0, 12.0))
@@ -782,10 +803,10 @@ def runModel(TestName):
                                    plt.colorbar(ccheck, format='%.2e')
                                    
                                    if pp == 0:
-                                          plt.title('u (m/s)')
+                                          plt.title('u (m/s): ' + 'Time = {:.5f} (sec)'.format(thisTime))
                                           uvar[ff-1,:,:] = dqdt
                                    elif pp == 1:
-                                          plt.title('w (m/s)')
+                                          plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
                                           wvar[ff-1,:,:] = dqdt
                                    elif pp == 2:
                                           plt.title('ln-p (Pa)')
@@ -806,7 +827,7 @@ def runModel(TestName):
                      fields, rhsVec, DCF, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
                                                              TOPT, fields, hydroState, DCF, \
                                                              zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
-                                                             ResDiff, VSND, thisTime, isFirstStep)
+                                                             ResDiff, thisTime, isFirstStep)
                      ti += 1
                      
               # Close the output data file
@@ -945,5 +966,5 @@ if __name__ == '__main__':
        #TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
-       for ii in range(4):
+       for ii in range(1):
               diagOutput = runModel(TestName)

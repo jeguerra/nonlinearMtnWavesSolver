@@ -259,9 +259,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        
        UPqPx = UM * PqPx_GML
        wDQqDz = wxz * (DqDz_GML + DQDZ_GML)
-       
        transport = UPqPx + wDQqDz
+       
        divergence = (PqPx[:,0] + DqDz[:,1])
+       #divergence = (PqPx_GML[:,0] + DqDz_GML[:,1])
        
        DqDt = -transport
        # Horizontal momentum equation

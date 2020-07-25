@@ -85,6 +85,10 @@ for rr in hresl:
        PHYS = rdb['PHYS']
        DIMS = rdb['DIMS']
        
+       from BoussinesqSolSchar import ScharBoussinesqKlemp
+       z *= max(REFS[1]) # convert to meters
+       WBK = ScharBoussinesqKlemp(PHYS, x, z)
+       
        # Get the Hermite and Chebyshev transforms
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
@@ -103,22 +107,43 @@ for rr in hresl:
        
        # Make the difference
        WDIFF = WMOD - WREFint
-       # Take the norm and print
-       wbcerr.append(1.0 / NXI * np.linalg.norm(WDIFF[0,:]))
+       
+       # Compute norms
        DOPS = NXI * NZI
-       wflerr.append(1.0 / DOPS * np.linalg.norm(np.reshape(WDIFF, (DOPS,), order='F')))
+       ndiff_wbc = np.linalg.norm(WDIFF[0,:])
+       ndiff_fld = np.linalg.norm(np.reshape(WDIFF, (DOPS,), order='F'))
+       nref_wbc = np.linalg.norm(WREFint[0,:])
+       nref_fld = np.linalg.norm(np.reshape(WREFint, (DOPS,), order='F'))
+       
+       # Take the norm and print
+       wbcerr.append(ndiff_wbc / nref_wbc)
+       wflerr.append(ndiff_fld / nref_fld)
        
        # Plot the difference
        fig = plt.figure(figsize=(20.0, 6.0))
        plt.subplot(1,3,1)
        ccheck = plt.contourf(WMOD, 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+       plt.title('Tempest W (m/s): ' + str(rr) + ' (m)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        fig.colorbar(ccheck)
        plt.subplot(1,3,2)
        ccheck = plt.contourf(WREFint, 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+       plt.title('Spectral Reference W (m/s): ' + str(rr) + ' (m)')
        fig.colorbar(ccheck)
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.subplot(1,3,3)
        ccheck = plt.contourf(WMOD - WREFint, 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+       plt.title('Difference (m/s): ' + str(rr) + ' (m)')
        fig.colorbar(ccheck)
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       
+       # Make the analytical solution
+       fig = plt.figure(figsize=(6.0, 6.0))
+       ccheck = plt.contourf(WBK, 201, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+       plt.title('Classical W (m/s): ' + str(rr) + ' (m)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       fig.colorbar(ccheck)
+       
        #plt.xlim(-50.0, 50.0)
        #plt.ylim(0.0, 1.0E-3*DIMS[2])
        
@@ -128,9 +153,15 @@ print(wflerr)
 fig = plt.figure(figsize=(12.0, 6.0))
 plt.subplot(1,2,1)
 plt.plot(hresl, wbcerr)
-plt.xscale('log'); plt.yscale('log')
+plt.title('Convergence at Terrain Boundary')
+plt.xscale('linear'); plt.yscale('log')
+plt.xlabel('Resolution (m)')
+plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 plt.subplot(1,2,2)
 plt.plot(hresl, wflerr)
-plt.xscale('log'); plt.yscale('log')
+plt.title('Global Convergence')
+plt.xscale('linear'); plt.yscale('log')
+plt.xlabel('Resolution (m)')
+plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
        
        

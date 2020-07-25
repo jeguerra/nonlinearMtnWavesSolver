@@ -23,7 +23,7 @@ def rampFactor(time, timeBound):
               
        return uRamp
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, DynSGS, vsnd0, thisTime, isFirstStep):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, DynSGS, thisTime, isFirstStep):
        
        DT = TOPT[0]
        rampTime = TOPT[2]
@@ -55,19 +55,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
        DUDZ = uRamp * (REFG[3])[:,0]
        time = thisTime
        
-       def computeUpdate(coeff, time, solA, rhs, rhsInv0, rhsInv, u0, dudz0):
+       def computeUpdate(coeff, solA, rhs, rhsInv0, rhsInv, u0, dudz0):
               U = u0
               DUDZ = dudz0
               #Apply updates
               dsol = coeff * DT * rhs
               solB = solA + dsol
-              
-              # Update time dependent background wind field
-              time += coeff * DT
-              uRamp = rampFactor(time, rampTime)
-                     
-              U = uRamp * init0[:,0]
-              DUDZ = uRamp * (REFG[3])[:,0]
               
               # Update boundary
               solB[botDex,1] = dHdX * (U[botDex] + solB[botDex,0])
@@ -77,15 +70,15 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               UD = np.abs(solB[:,0] + U)
               WD = np.abs(solB[:,1])
               QM = bn.nanmax(solB, axis=0)
-              resInv = 1.0 / DT * (solB - solA) - 0.5 * (rhsInv0 + rhsInv)
+              resInv = (1.0 / (coeff * DT)) * (solB - solA) - 0.5 * (rhsInv0 + rhsInv)
               
               #'''
               if DynSGS:
-                     dcoeff = dcoeffs.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, vsnd0, RLM)
+                     dcoeff = dcoeffs.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, RLM)
               else:
-                     dcoeff = dcoeffs.computeFlowVelocityCoeffs(UD, WD, DX, DZ, vsnd0)
+                     dcoeff = dcoeffs.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
               #'''
-              return time, solB, resInv, dcoeff, U, DUDZ
+              return solB, resInv, dcoeff, U, DUDZ
        
        def computeRHSUpdate_inviscid(fields, U):
               (REFG[3])[:,0] = DUDZ
@@ -131,7 +124,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
 
               return rhs, rhsInv
        
-       def ketcheson93(time0, sol, rhsInv0, dcoeff0, u0, dudz0, getLocalError):
+       def ketcheson93(sol, rhsInv0, dcoeff0, u0, dudz0, getLocalError):
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               c2 = 1.0 / 5.0
@@ -139,14 +132,13 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               DUDZ = dudz0
               dc = dcoeff0
               rhs0 = rhsInv0
-              time = time0
               if getLocalError:
                      # Set storage for 2nd order solution
                      sol2 = np.array(sol)
                      
               for ii in range(6):
                      rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
-                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     sol, res, dc, U, DUDZ = computeUpdate(c1, sol, rhs, rhs0, rhsInv, U, DUDZ)
                      rhs0 = rhsInv
                      
                      if ii == 0:
@@ -156,7 +148,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
                      # Compute the 2nd order update if requested
                      rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
                      sol2 = 1.0 / 7.0 * sol2 + 6.0 / 7.0 * sol
-                     time, sol2, res, dc, U, DUDZ = computeUpdate(1.0 / 42.0, time, sol2, rhs, rhs0, rhsInv, U, DUDZ)
+                     sol2, res, dc, U, DUDZ = computeUpdate(1.0 / 42.0, sol2, rhs, rhs0, rhsInv, U, DUDZ)
                      
               # Compute stage 6 with linear combination
               sol = np.array(c2 * (3.0 * sol1 + 2.0 * sol))
@@ -164,28 +156,27 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               # Compute stages 7 - 9
               for ii in range(3):
                      rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
-                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     sol, res, dc, U, DUDZ = computeUpdate(c1, sol, rhs, rhs0, rhsInv, U, DUDZ)
                      rhs0 = rhsInv
               
               if getLocalError:
                      # Output the local error estimate if requested
                      err = sol - sol2
-                     return sol, time, U, dc, err
+                     return sol, U, dc, err
               else:
-                     return sol, time, U, res, dc
+                     return sol, U, res, dc
        
-       def ketcheson104(time0, sol, rhsInv0, dcoeff0, u0, dudz0):
+       def ketcheson104(sol, rhsInv0, dcoeff0, u0, dudz0):
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               U = u0
               DUDZ = dudz0
               dc = dcoeff0
               rhs0 = rhsInv0
-              time = time0
               sol2 = np.array(sol)
               for ii in range(5):
                      rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
-                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     sol, res, dc, U, DUDZ = computeUpdate(c1, sol, rhs, rhs0, rhsInv, U, DUDZ)
                      rhs0 = rhsInv
               
               sol2 = np.array(0.04 * sol2 + 0.36 * sol)
@@ -193,12 +184,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               
               for ii in range(4):
                      rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)
-                     time, sol, res, dc, U, DUDZ = computeUpdate(c1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+                     sol, res, dc, U, DUDZ = computeUpdate(c1, sol, rhs, rhs0, rhsInv, U, DUDZ)
                      rhs0 = rhsInv
                      
               rhs, rhsInv = computeRHSUpdate(sol, dc, U, DUDZ)       
               sol = np.array(sol2 + 0.6 * sol)
-              time, sol, res, dc, U, DUDZ = computeUpdate(0.1, time, sol, rhs, rhs0, rhsInv, U, DUDZ)
+              sol, res, dc, U, DUDZ = computeUpdate(0.1, sol, rhs, rhs0, rhsInv, U, DUDZ)
               rhs0 = rhsInv
               
               return sol, time, U, res, dc
@@ -209,12 +200,13 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
        
        # Compute dynamics update
        if order == 3:
-              solf, time, UB, resOut, dcoeff1 = ketcheson93(time, sol0, rhs0, dcoeff0, UZ, DUDZ, False)
+              solf, UB, resOut, dcoeff1 = ketcheson93(sol0, rhs0, dcoeff0, UZ, DUDZ, False)
               #solf, rhsDyn, errf = ketcheson93(sol0, True, True)
        elif order == 4:
-              solf, time, UB, resOut, dcoeff1 = ketcheson104(time, sol0, rhs0, dcoeff0, UZ, DUDZ)
+              solf, UB, resOut, dcoeff1 = ketcheson104(sol0, rhs0, dcoeff0, UZ, DUDZ)
        
        Uf = np.abs(sol0[:,0] + UB)
        rhsf = computeRHSUpdate_inviscid(solf, Uf)
+       time += DT
        
        return solf, rhsf, dcoeff1, time

@@ -12,19 +12,19 @@ import math as mt
 
 def computeTerrainDecayFunctions(xi, ang):
        AR = 1.0E-3
-       p = 20
-       q = 5
+       p = 10
+       q = 2
        
        expdec = np.exp(-p/q * xi)
        cosvar = np.power(np.cos(ang), p)
-       cosvard = np.power(np.cos(ang), p-1)
+       #cosvard = np.power(np.cos(ang), p-1)
        fxi1 = expdec * cosvar
        fxi2 = AR * (xi * (1.0 - xi));
        dzdh = np.add(fxi1, fxi2)
        
-       dfdxi1 = -p * (expdec * cosvard)
-       dfdxi2 = (1.0/q * np.cos(ang) + 0.5 * mt.pi * np.sin(ang))
-       dfdxi3 = AR * (1.0 - 2.0 * xi);
+       dfdxi1 = -p/q * (expdec * cosvar)
+       dfdxi2 = (1.0 + 0.5 * q * mt.pi * np.tan(ang))
+       dfdxi3 = AR * (1.0 - 2.0 * xi)
        d_dzdh_dxi = (dfdxi1 * dfdxi2) + dfdxi3
        
        return dzdh, d_dzdh_dxi

@@ -74,7 +74,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(447, 96, 141.0, 38.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.25E+4)
+                     self.setUserData(447, 92, 136.0, 40.0, 300.0, 8000.0, 16000.0, 2000.0, 0.01, 3, 1.25E+4)
                      # UNIFORM STRATIFICATION PARAMETERS
                      #self.setUserData(423, 92, 121.0, 38.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.25E+4)
                      
@@ -107,7 +107,7 @@ class TestCase:
               
               # Background temperature profile
               self.Z_in = [0.0, 1.1E4, 2.5E4, ZH]
-              GAMS = 0.0015 # Lapse rate in the stratosphere
+              GAMS = 0.003 # Lapse rate in the stratosphere
               GAMT = 0.0065 # Lapse rate in the troposphere
               TTP = T0 - GAMT * (self.Z_in[1] - self.Z_in[0])
               TH = TTP + GAMS * (self.Z_in[3] - self.Z_in[2])
