@@ -61,7 +61,7 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
 
 tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
 #tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
-hresl = [1000, 500, 250, 125]
+hresl = [1000, 500]#, 250, 125]
 # Loop over the 4 data files
 wbcerr = []
 wflerr = []
@@ -87,7 +87,7 @@ for rr in hresl:
        
        from BoussinesqSolSchar import ScharBoussinesqKlemp
        z *= max(REFS[1]) # convert to meters
-       WBK = ScharBoussinesqKlemp(PHYS, x, z)
+       WBK, ETA, WFFT = ScharBoussinesqKlemp(PHYS, x, z)
        
        # Get the Hermite and Chebyshev transforms
        DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -102,6 +102,7 @@ for rr in hresl:
        ZTL = REFS[5]
        NXI = len(x)
        NZI = len(z)
+       print(NXI, NZI)
        WREFint = computeColumnInterp(NX, NZ, NZI, ZTL, WREF, CH_TRANS)
        WREFint = computeHorizontalInterp(NX, x, WREFint, HF_TRANS)
        

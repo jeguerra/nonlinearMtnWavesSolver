@@ -11,6 +11,7 @@ import math as mt
 #import matplotlib.pyplot as plt
 
 def computeTerrainDecayFunctions(xi, ang):
+       '''
        AR = 1.0E-3
        p = 10
        q = 2
@@ -26,6 +27,11 @@ def computeTerrainDecayFunctions(xi, ang):
        dfdxi2 = (1.0 + 0.5 * q * mt.pi * np.tan(ang))
        dfdxi3 = AR * (1.0 - 2.0 * xi)
        d_dzdh_dxi = (dfdxi1 * dfdxi2) + dfdxi3
+       '''
+       m = 0.2
+       mi = 1.0 / m
+       dzdh = np.sinh(mi * (1.0 - xi)) / np.sinh(mi)
+       d_dzdh_dxi = -np.cosh(mi * (1.0 - xi)) / np.sinh(mi)
        
        return dzdh, d_dzdh_dxi
 

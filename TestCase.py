@@ -143,8 +143,8 @@ class TestCase:
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 400 # Stride for diagnostic output
-              ITI = 800 # Stride for image output
+              OTI = 30.0 # Time for diagnostic output
+              ITI = 60.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]
        

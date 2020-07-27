@@ -13,8 +13,8 @@ import bottleneck as bn
 def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, RLM):
        
        ARES = np.abs(RES)
-       DX *= 2.0
-       DZ *= 2.0
+       DX *= 1.0
+       DZ *= 1.0
        
        # Normalize the residuals
        #'''
@@ -47,15 +47,16 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, RLM):
        compare = np.stack((QRESZ, QZMAX),axis=1)
        QRESZ_CF = bn.nanmin(compare, axis=1)
        #'''
-       '''
+       #'''
+       # Upwind diffusion in the sponge layers
        QRESX_CF += RLM.dot(QXMAX)
        QRESZ_CF += RLM.dot(QZMAX)
-       '''
        #'''
+       '''
        # Continuous upwind PLUS residual
        QRESX_CF = 0.5 * (QXMAX + QRESX_CF)
        QRESZ_CF = 0.5 * (QZMAX + QRESZ_CF)
-       #'''
+       '''
        return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
 
 

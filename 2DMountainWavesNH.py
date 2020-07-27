@@ -229,15 +229,15 @@ def runModel(TestName):
        HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_SP)
        
        # Compute DX and DZ grid length scales
-       DX = 1.0 * np.min(np.abs(np.diff(REFS[0])))
-       DZ = 1.0 * np.min(np.abs(np.diff(REFS[1])))
-       print('Minimum grid lengths:',DX,DZ)
-       DX = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
-       DZ = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
-       print('Average grid lengths:',DX,DZ)
-       DX = 1.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ = 1.0 * np.max(np.abs(np.diff(REFS[1])))
-       print('Maximum  grid lengths:',DX,DZ)
+       DX_min = 1.0 * np.min(np.abs(np.diff(REFS[0])))
+       DZ_min = 1.0 * np.min(np.abs(np.diff(REFS[1])))
+       print('Minimum grid lengths:',DX_min,DZ_min)
+       DX_avg = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
+       DZ_avg = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
+       print('Average grid lengths:',DX_avg,DZ_avg)
+       DX_max = 1.0 * np.max(np.abs(np.diff(REFS[0])))
+       DZ_max = 1.0 * np.max(np.abs(np.diff(REFS[1])))
+       print('Maximum  grid lengths:',DX_max,DZ_max)
        
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
@@ -396,15 +396,20 @@ def runModel(TestName):
        input()
        '''
        if not StaticSolve:
+              '''
               # Compute the spectral radii on partial derivative operators
               DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
               PPXM = DDXM - DZDXM.dot(DDZM)
-              DX = 1.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
-              DZ = 1.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
+              DX = 1.0 / np.amax(np.abs(spl.eigs(PPXM, k=2, which='LM', return_eigenvectors=False)))
+              DZ = 1.0 / np.amax(np.abs(spl.eigs(DDZM, k=2, which='LM', return_eigenvectors=False)))
               print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
               del(PPXM)
               del(DZDXM)
-       
+              '''
+              #'''
+              DX = 0.5 * DX_avg
+              DZ = 0.5 * DZ_avg
+              #'''
        del(DDXM)
        del(DDZM)
        del(DZDX)
@@ -747,13 +752,15 @@ def runModel(TestName):
               pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
               tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
               
-              # Initialize local sound speed
+              # Initialize local sound speed and time step
               VSND = np.sqrt(PHYS[6] * REFS[9])
               VSND_max = np.amax(VSND)
-              DT0 = min(DX / np.amax(VSND), DZ / np.amax(VSND))
+              DT0 = min(DX_min / np.amax(VSND), DZ_min / np.amax(VSND))
+              TOPT[0] = DT0
+              print('Initial time step: ', str(DT0) + ' (sec)')
               
-              OTI = TOPT[5]
-              ITI = TOPT[6]
+              OTI = int(TOPT[5] / DT0)
+              ITI = int(TOPT[6] / DT0)
               
               while thisTime <= TOPT[4]:
                             
@@ -767,7 +774,7 @@ def runModel(TestName):
                             T_ratio = np.exp(PHYS[4] * fields[:,2] + fields[:,3]) - 1.0
                             gamRdT = PHYS[6] * REFS[9] * (1.0 + T_ratio)
                             VSND_max = np.amax(np.sqrt(gamRdT))
-                            DTN = min(DX / np.amax(VSND_max), DZ / np.amax(VSND_max))
+                            DTN = min(DX_min / np.amax(VSND_max), DZ_min / np.amax(VSND_max))
                             DT_factor = DTN / DT0
                             TOPT[0] *= DT_factor
                             DT0 = DTN
@@ -824,7 +831,7 @@ def runModel(TestName):
                             isFirstStep = False
                             
                      # Compute the solution within a time step
-                     fields, rhsVec, DCF, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, \
+                     fields, rhsVec, DCF, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, DX_avg, DZ_avg, \
                                                              TOPT, fields, hydroState, DCF, \
                                                              zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
                                                              ResDiff, thisTime, isFirstStep)

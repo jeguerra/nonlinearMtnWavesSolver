@@ -34,8 +34,8 @@ def ScharBoussinesqKlemp(PHYS, xout, zout):
        # Assume that xout and zout are uniformly spaced
        X,Z = np.meshgrid(xout,zout)
        # Initialize the transforms of solutions
-       ETA = np.zeros(X.shape, dtype=complex)
-       W = np.zeros(X.shape, dtype=complex)
+       ETA = np.zeros((nx,nz), dtype=complex)
+       W = np.zeros((nx,nz), dtype=complex)
        
        # Define the Fourier space for ONE SIDED TRANSFORMS (Smith, 1979)
        #kxf = (2*mt.pi/LX) * np.concatenate((np.arange(0, nx/2), np.arange(-nx/2, 0)))
@@ -70,14 +70,14 @@ def ScharBoussinesqKlemp(PHYS, xout, zout):
                
                # One sided transforms double the energy for the inversion
                thisEta = mt.sqrt(rho0/rho) * hk[ii] * np.exp(arge * xid)
-               ETA[jj,ii] = thisEta
-               W[jj,ii] = 1j * kxf[ii] * U * ETA[jj,ii]
+               ETA[ii,jj] = thisEta
+               W[ii,jj] = 1j * kxf[ii] * U * ETA[ii,jj]
                
        # Recover the solution
-       eta = np.real(np.fft.ifft(ETA, axis=1))
-       w = 2 * np.real(np.fft.ifft(W, axis=1))
+       eta = np.real(np.fft.ifft(ETA, axis=0))
+       w = 2 * np.real(np.fft.ifft(W, axis=0))
        
-       return w
+       return w.T, ETA, W
        
        
        
