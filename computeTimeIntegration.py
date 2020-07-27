@@ -108,10 +108,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               
               # Compute diffusive tendencies
               if DynSGS:
-                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
+                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx_GML, DqDz_GML, DDXM, DDZM, DZDX, fields, ebcDex)
                      #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
               else:
-                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
+                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx_GML, DqDz_GML, DDXM, DDZM, DZDX, fields, ebcDex)
                             
               # Add inviscid and diffusion tendencies
               rhs = rhsInv + rhsDiff

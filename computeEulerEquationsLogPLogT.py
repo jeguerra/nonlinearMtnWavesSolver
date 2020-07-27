@@ -278,14 +278,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
-       ROPS = REFG[4]
+       mu = np.expand_dims(REFG[4],0)
+       ROP = REFG[5]
        
-       DqDt = 0.0 * np.array(fields)
-       # Compute the tendencies
-       DqDt[:,0] = - ROPS[0].dot(fields[:,0])
-       DqDt[:,1] = - ROPS[1].dot(fields[:,1])
-       DqDt[:,2] = - ROPS[2].dot(fields[:,2])
-       DqDt[:,3] = - ROPS[3].dot(fields[:,3])
+       DqDt = -mu * ROP.dot(fields)
        
        return DqDt
 

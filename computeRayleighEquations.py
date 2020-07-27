@@ -146,18 +146,18 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
        # Compute the matrix operator
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
+       '''
        # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RLX, (OPS,), order='F')
        # Compute the matrix operator
        RLXM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       '''
        # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RLZ, (OPS,), order='F')
        # Compute the matrix operator
        RLZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        '''
        # Store the diagonal blocks corresponding to Rayleigh damping terms
-       ROPS = [mu_U * RLXM, mu_W * RLM, mu_P * RLXM, mu_T * RLM]
+       ROPS = [mu_U * RLM, mu_W * RLM, mu_P * RLM, mu_T * RLM]
        
        return ROPS, RLM, GMLX, GMLZ
        

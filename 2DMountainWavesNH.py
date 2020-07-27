@@ -342,7 +342,7 @@ def runModel(TestName):
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
-       REFG = [GMLXOP, GMLZOP, DLTDZ, DQDZ, ROPS, RLM]
+       REFG = [GMLXOP, GMLZOP, DLTDZ, DQDZ, RLOPT[4], RLM]
        
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F'))
@@ -407,8 +407,8 @@ def runModel(TestName):
               del(DZDXM)
               '''
               #'''
-              DX = 0.5 * DX_avg
-              DZ = 0.5 * DZ_avg
+              DX = 0.25 * DX_avg
+              DZ = 0.25 * DZ_avg
               #'''
        del(DDXM)
        del(DDZM)
