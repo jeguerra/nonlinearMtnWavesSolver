@@ -242,9 +242,16 @@ def runModel(TestName):
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
        # USE THE GUELLRICH TERRAIN DECAY
-       XL, ZTL, DZT, sigma, ZRL = coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
+              coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        # USE UNIFORM STRETCHING
        #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       
+       DX_local = np.reshape(DXM, (OPS,), order='F')
+       DZ_local = np.reshape(DZM, (OPS,), order='F')
+       DX2_local = np.power(DX_local,2)
+       DZ2_local = np.power(DZ_local,2)
+       
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -261,7 +268,8 @@ def runModel(TestName):
        SENSIBLE = 1
        #POTENTIAL = 2
        # Map the sounding to the computational vertical 2D grid [0 H]
-       TZ, DTDZ = computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
+       TZ, DTDZ = \
+              computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
        '''
        # Make a figure of the temperature background
        fig = plt.figure(figsize=(12.0, 6.0))
@@ -762,6 +770,11 @@ def runModel(TestName):
               OTI = int(TOPT[5] / DT0)
               ITI = int(TOPT[6] / DT0)
               
+              import bottleneck as bn
+              import computeResidualViscCoeffs as rescf
+              import computeTimeIntegrationDynamics as dynint
+              import computeTimeIntegrationDiffusion as difint
+              
               while thisTime <= TOPT[4]:
                             
                      # Print out diagnostics every TOPT[5] steps
@@ -831,10 +844,68 @@ def runModel(TestName):
                             isFirstStep = False
                             
                      # Compute the solution within a time step
-                     fields, rhsVec, DCF, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, DX_avg, DZ_avg, \
+                     #'''
+                     fields, rhsVec, DCF, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, \
+                                                             DX_avg, DZ_avg, DX_avg**2, DZ_avg**2,\
                                                              TOPT, fields, hydroState, DCF, \
                                                              zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
                                                              ResDiff, thisTime, isFirstStep)
+                     #'''       
+                     '''
+                     #%% Time integration by applying diffusion AFTER dynamics update
+                     # Dynamics step
+                     fields_new, rhsVec_new = dynint.computeTimeIntegrationDYNCS(PHYS, REFS, REFG, \
+                                                             TOPT, fields, hydroState, \
+                                                             zeroDex_tran, ubdex, isFirstStep)
+                            
+                     # Compute residual and normalizations
+                     UD = np.abs(fields_new[:,0] + hydroState[:,0])
+                     WD = np.abs(fields_new[:,1])
+                     
+                     # Compute DynSGS or Flow Dependent diffusion coefficients
+                     if ResDiff:
+                            QM = bn.nanmax(fields_new, axis=0)
+                            if isFirstStep:
+                                   # Backward Euler estimate of residual
+                                   resInv = (1.0 / TOPT[0]) * (fields_new - fields) - rhsVec_new
+                            else:
+                                   # Trapezoidal Rule estimate of residual
+                                   resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
+                            dcoeff = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX_local, DZ_local, REFG[5])
+                     else:
+                            dcoeff = rescf.computeFlowVelocityCoeffs(UD, WD, DX_local, DZ_local)
+                            
+                     # Diffusion step
+                     fields_new = difint.computeTimeIntegrationVISC(PHYS, REFS, REFG, \
+                                                             TOPT, fields_new, hydroState, dcoeff, \
+                                                             zeroDex_tran, ubdex, \
+                                                             (extDex, latDex, vrtDex), isFirstStep)
+                     fields = np.array(fields_new)
+                     del(fields_new)
+                     del(rhsVec_new)
+                     
+                     # Compute first derivatives
+                     if isFirstStep:
+                            DDXM = REFS[10]
+                            DDZM = REFS[11]
+                     else:
+                            DDXM = REFS[12]
+                            DDZM = REFS[13]
+                         
+                     U = fields[:,0] + hydroState[:,0]
+                     DqDx, DqDz, DqDx_GML, DqDz_GML = \
+                            eqs.computeFieldDerivatives(fields, DDXM, DDZM, REFG[0], REFG[1])
+                     # Compute dynamical tendencies
+                     rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9], fields, U)
+                     rhsVec += eqs.computeRayleighTendency(REFG, fields)
+                     
+                     # Fix Essential boundary conditions
+                     rhsVec[zeroDex_tran[0],0] *= 0.0
+                     rhsVec[zeroDex_tran[1],1] *= 0.0
+                     rhsVec[zeroDex_tran[2],2] *= 0.0
+                     rhsVec[zeroDex_tran[3],3] *= 0.0
+                     thisTime += TOPT[0]
+                     '''
                      ti += 1
                      
               # Close the output data file

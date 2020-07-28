@@ -23,7 +23,7 @@ def rampFactor(time, timeBound):
               
        return uRamp
 
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, DynSGS, thisTime, isFirstStep):
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, DynSGS, thisTime, isFirstStep):
        
        DT = TOPT[0]
        rampTime = TOPT[2]
@@ -74,7 +74,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               
               #'''
               if DynSGS:
-                     dcoeff = dcoeffs.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, RLM)
+                     dcoeff = dcoeffs.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX2, DZ2, RLM)
               else:
                      dcoeff = dcoeffs.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
               #'''
@@ -108,10 +108,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
               
               # Compute diffusive tendencies
               if DynSGS:
-                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx_GML, DqDz_GML, DDXM, DDZM, DZDX, fields, ebcDex)
+                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
                      #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
               else:
-                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx_GML, DqDz_GML, DDXM, DDZM, DZDX, fields, ebcDex)
+                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
                             
               # Add inviscid and diffusion tendencies
               rhs = rhsInv + rhsDiff
@@ -205,7 +205,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DX, DZ, TOPT, sol0, init0, dcoeff
        elif order == 4:
               solf, UB, resOut, dcoeff1 = ketcheson104(sol0, rhs0, dcoeff0, UZ, DUDZ)
        
-       Uf = np.abs(sol0[:,0] + UB)
+       Uf = np.abs(solf[:,0] + UB)
        rhsf = computeRHSUpdate_inviscid(solf, Uf)
        time += DT
        

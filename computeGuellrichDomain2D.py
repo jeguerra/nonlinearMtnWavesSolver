@@ -74,7 +74,19 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx):
        
        ZRL = (dzdh * hx) + zRay
        
-       return XL, ZTL, DZT, sigma, ZRL
+       # Compute the local grid lengths at each node
+       DXM = np.zeros((NZ,NX))
+       DZM = np.zeros((NZ,NX))
+       
+       for ii in range(NZ):
+              xdiff = np.diff(XL[ii,:])
+              DXM[ii,:] = np.concatenate((np.expand_dims(xdiff[0],0), xdiff)) 
+       
+       for jj in range(NX):
+              zdiff = np.diff(ZTL[:,jj])
+              DZM[:,jj] = np.concatenate((np.expand_dims(zdiff[0],0), zdiff)) 
+       
+       return XL, ZTL, DZT, sigma, ZRL, DXM, DZM
 
 def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
        # Get data from DIMS and REFS
