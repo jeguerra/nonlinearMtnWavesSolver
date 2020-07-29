@@ -31,7 +31,7 @@ def computeTerrainDecayFunctions(xi, ang):
        m = 0.2
        mi = 1.0 / m
        dzdh = np.sinh(mi * (1.0 - xi)) / np.sinh(mi)
-       d_dzdh_dxi = -np.cosh(mi * (1.0 - xi)) / np.sinh(mi)
+       d_dzdh_dxi = -mi * np.cosh(mi * (1.0 - xi)) / np.sinh(mi)
        
        return dzdh, d_dzdh_dxi
 

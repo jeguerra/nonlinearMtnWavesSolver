@@ -41,7 +41,7 @@ from computeInterpolatedFields import computeInterpolatedFields
 # Numerical stuff
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
-from computeTimeIntegration import computeTimeIntegrationNL
+import computeTimeIntegration as tint
 
 import faulthandler; faulthandler.enable()
 
@@ -403,21 +403,20 @@ def runModel(TestName):
        plt.show()
        input()
        '''
+       
        if not StaticSolve:
+              DX = DX_avg
+              DZ = DZ_avg
               '''
               # Compute the spectral radii on partial derivative operators
               DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
               PPXM = DDXM - DZDXM.dot(DDZM)
-              DX = 1.0 / np.amax(np.abs(spl.eigs(PPXM, k=2, which='LM', return_eigenvectors=False)))
-              DZ = 1.0 / np.amax(np.abs(spl.eigs(DDZM, k=2, which='LM', return_eigenvectors=False)))
+              DX = 1.0 / np.amax(np.abs(np.linalg.eigvals(PPXM.toarray())))
+              DZ = 1.0 / np.amax(np.abs(np.linalg.eigvals(DDZM.tiarray())))
               print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
               del(PPXM)
-              del(DZDXM)
+              del(DZDXM)   
               '''
-              #'''
-              DX = 0.25 * DX_avg
-              DZ = 0.25 * DZ_avg
-              #'''
        del(DDXM)
        del(DDZM)
        del(DZDX)
@@ -844,13 +843,38 @@ def runModel(TestName):
                             isFirstStep = False
                             
                      # Compute the solution within a time step
-                     #'''
-                     fields, rhsVec, DCF, thisTime = computeTimeIntegrationNL(PHYS, REFS, REFG, \
+                     '''
+                     fields, rhsVec, DCF, thisTime = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
                                                              DX_avg, DZ_avg, DX_avg**2, DZ_avg**2,\
                                                              TOPT, fields, hydroState, DCF, \
                                                              zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
                                                              ResDiff, thisTime, isFirstStep)
-                     #'''       
+                     '''
+                     #'''
+                     fields_new, rhsVec_new, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
+                                                             DX_avg, DZ_avg, DX_avg**2, DZ_avg**2,\
+                                                             TOPT, fields, hydroState, DCF, \
+                                                             zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
+                                                             ResDiff, thisTime, isFirstStep)
+                     
+                     # Compute residual and normalizations
+                     UD = np.abs(fields_new[:,0] + hydroState[:,0])
+                     WD = np.abs(fields_new[:,1])
+                     # Compute DynSGS or Flow Dependent diffusion coefficients
+                     if ResDiff:
+                            QM = bn.nanmax(fields_new, axis=0)
+                            # Trapezoidal Rule estimate of residual
+                            resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
+                            
+                            DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[5])
+                     else:
+                            DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
+                            
+                     fields = np.array(fields_new)
+                     rhsVec = np.array(rhsVec_new)
+                     del(fields_new)
+                     del(rhsVec_new)
+                     #'''
                      '''
                      #%% Time integration by applying diffusion AFTER dynamics update
                      # Dynamics step

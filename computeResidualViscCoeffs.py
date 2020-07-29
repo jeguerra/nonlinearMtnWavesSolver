@@ -13,8 +13,6 @@ import bottleneck as bn
 def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM):
        
        ARES = np.abs(RES)
-       DX *= 1.0
-       DZ *= 1.0
        
        # Normalize the residuals
        #'''
@@ -96,13 +94,12 @@ def computeResidualViscCoeffs2(RES, QM, U, W, DX, DZ):
 
 def computeFlowVelocityCoeffs(U, W, DX, DZ):
                      
-       QRESX = np.zeros((len(U), 4))
-       QRESZ = np.zeros((len(W), 4))
+       QRESX = np.zeros((len(U), 1))
+       QRESZ = np.zeros((len(W), 1))
        
-       for vv in range(4):
-              # Compute the anisotropic coefficients
-              QRESX[:,vv] = (0.5 * DX) * U
-              QRESZ[:,vv] = (0.5 * DZ) * W
+       # Compute the anisotropic coefficients
+       QRESX[:,0] = (0.5 * DX) * U
+       QRESZ[:,0] = (0.5 * DZ) * W
        
        return (QRESX, QRESZ)
 

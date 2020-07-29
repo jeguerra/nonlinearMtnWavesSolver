@@ -239,11 +239,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        
        # Get hydrostatic initial fields
        DQDZ = REFG[3]
-       DQDZ_GML = REFG[1].dot(REFG[3])
+       #DQDZ_GML = REFG[1].dot(REFG[3])
 
        # Compute the partial derivative
        PqPx = DqDx - DZDX * DqDz
-       PqPx_GML = DqDx_GML - DZDX * DqDz_GML
+       #PqPx_GML = DqDx_GML - DZDX * DqDz_GML
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
@@ -254,11 +254,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        RdT = RdT_bar * (1.0 + T_ratio)
        
        # Compute transport and divergence terms
-       #UPqPx = UM * PqPx
-       #wDQqDz = wxz * (DqDz + DQDZ)
+       UPqPx = UM * PqPx
+       wDQqDz = wxz * (DqDz + DQDZ)
        
-       UPqPx = UM * PqPx_GML
-       wDQqDz = wxz * (DqDz_GML + DQDZ_GML)
+       #UPqPx = UM * PqPx_GML
+       #wDQqDz = wxz * (DqDz_GML + DQDZ_GML)
        transport = UPqPx + wDQqDz
        
        divergence = (PqPx[:,0] + DqDz[:,1])
