@@ -35,6 +35,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        dLayerZ = height
        dLayerR = L2 - width
        dLayerL = L1 + width
+       depth = ZH - height
        
        # Assemble the Rayleigh field
        RL = np.zeros((NZ, NX))
@@ -62,11 +63,13 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
-                                   dNormZ = (ZRL - dLayerZ[jj]) / (ZH - height[jj])
+                                   #dNormZ = (ZRL - dLayerZ[jj]) / (ZH - dLayerZ[jj])
+                                   dNormZ = (ZH - ZRL) / depth[jj]
                             else:
-                                   dNormZ = 0.0
+                                   dNormZ = 1.0
                             # Evaluate the strength of the field
-                            RFZ = 1.0 - (mt.cos(0.5 * mt.pi * dNormZ))**RP
+                            #RFZ = 1.0 - (mt.cos(0.5 * mt.pi * dNormZ))**RP
+                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**RP
                      else:
                             RFZ = 0.0
                      
