@@ -38,10 +38,9 @@ def ScharBoussinesqKlemp(PHYS, xout, zout):
        W = np.zeros((nx,nz), dtype=complex)
        
        # Define the Fourier space for ONE SIDED TRANSFORMS (Smith, 1979)
-       #kxf = (2*mt.pi/LX) * np.concatenate((np.arange(0, nx/2), np.arange(-nx/2, 0)))
-       kxf = (2*mt.pi/LX) * np.fft.fftfreq(nx)
+       kxf = (2*mt.pi/LX) * np.fft.fftfreq(nx) * nx
        kxh = kxf[0:int(nx/2)]
-       kx2 = np.power(kxf, 2)
+       kx2 = np.power(kxh, 2)
        
        # Define the topography function (Schar Moutnain)
        xsq = np.power(xout, 2)
@@ -61,6 +60,7 @@ def ScharBoussinesqKlemp(PHYS, xout, zout):
                beta = mt.sqrt(beta2)
                arge = 1j * beta
            
+           #print(beta2)
            for jj in range(0, nz):
                xid = zout[jj]
                # Compute the smooth, stratified reference fields
@@ -69,7 +69,8 @@ def ScharBoussinesqKlemp(PHYS, xout, zout):
                rho = p0/(Rd*TZ) * EXP**(cv/Rd)
                
                # One sided transforms double the energy for the inversion
-               thisEta = mt.sqrt(rho0/rho) * hk[ii] * np.exp(arge * xid)
+               thisExp = np.exp(arge * xid)
+               thisEta = mt.sqrt(rho0/rho) * hk[ii] * thisExp
                ETA[ii,jj] = thisEta
                W[ii,jj] = 1j * kxf[ii] * U * ETA[ii,jj]
                
