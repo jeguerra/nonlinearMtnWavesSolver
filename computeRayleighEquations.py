@@ -49,21 +49,21 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      XRL = X[ii,jj]
                      ZRL = Z[ii,jj]
                      if applyLateral:
-                            # Left layer or right layer or not? [0 1]
+                            # Left layer or right layer or not? [1 0]
                             if XRL >= dLayerR:
                                    dNormX = (XRL - dLayerR) / width
                             elif XRL <= dLayerL:
                                    dNormX = (dLayerL - XRL) / width
                             else:
-                                   dNormX = 0.0
+                                   dNormX = 1.0
                             # Evaluate the Rayleigh factor
-                            RFX = 1.0 - (mt.cos(0.5 * mt.pi * dNormX))**RP
+                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**RP
                      else:
                             RFX = 0.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
-                                   #dNormZ = (ZRL - dLayerZ[jj]) / (ZH - dLayerZ[jj])
+                                   # This maps [depth ZH] to [1 0]
                                    dNormZ = (ZH - ZRL) / depth[jj]
                             else:
                                    dNormZ = 1.0

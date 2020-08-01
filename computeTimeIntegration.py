@@ -23,7 +23,9 @@ def rampFactor(time, timeBound):
               
        return uRamp
 
-def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, DynSGS, thisTime, isFirstStep):
+def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
+                              sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, lftDex, rgtDex, \
+                              DynSGS, thisTime, isFirstStep, latPeriodic):
        
        DT = TOPT[0]
        rampTime = TOPT[2]
@@ -59,6 +61,10 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, sol0, in
               # Update boundary
               U = solB[:,0] + init0[:,0]
               solB[botDex,1] = dHdX * U[botDex]
+              
+              # Update periodic boundary if necessary
+              if latPeriodic:
+                     solB[rgtDex,:] += dsol[lftDex,:]
               
               #'''
               # Update diffusion coefficients

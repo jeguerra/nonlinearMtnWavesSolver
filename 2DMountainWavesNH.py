@@ -197,6 +197,19 @@ def runModel(TestName):
        HOPT = thisTest.HOPT # Terrain profile options
        TOPT = thisTest.TOPT # Time integration options
        
+       if RLOPT[5] == 'periodic':
+              latPeriodic = True
+              latInflow = False
+       elif RLOPT[5] == 'inflow':
+              latPeriodic = False
+              latInflow = True
+       elif RLOPT[5] == 'periodic_inflow':
+              latPeriodic = True
+              latInflow = True
+       else:
+              latPeriodic = False
+              latInflow = True
+       
        # Make the equation index vectors for all DOF
        numVar = 4
        NX = DIMS[3]
@@ -221,6 +234,11 @@ def runModel(TestName):
        DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
+       # Adjust for periodic BC (right end set to left end)
+       if latPeriodic:
+              DDXp_1D = np.array(DDX_1D)
+              DDXp_1D[:,0] += DDX_1D[:,-1]
+       
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
@@ -243,7 +261,7 @@ def runModel(TestName):
        zRay = DIMS[2] - RLOPT[0]
        # USE THE GUELLRICH TERRAIN DECAY
        XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
-              coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+              coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX, StaticSolve)
        # USE UNIFORM STRETCHING
        #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        
@@ -259,10 +277,15 @@ def runModel(TestName):
        REFS.append(sigma)
        
        #% Compute the BC index vector
-       ubdex, utdex, wbdex, \
+       uldex, urdex, ubdex, utdex, wbdex, \
        ubcDex, wbcDex, pbcDex, tbcDex, \
-       zeroDex_stat, zeroDex_tran, sysDex, extDex, latDex, vrtDex = \
-              computeAdjust4CBC(DIMS, numVar, varDex)
+       zeroDex_tran, sysDex, diffDex = \
+              computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow)
+              
+       # Index to interior of terrain boundary
+       hdex = range(0,NX+1)
+       # Index to the entire bottom boundary on U
+       uBotDex = np.array(range(0, OPS, NZ))
        
        #% Read in sensible or potential temperature soundings (corner points)
        SENSIBLE = 1
@@ -368,15 +391,28 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
+       if latPeriodic:
+              DDXMp, dummy = computePartialDerivativesXZ(DIMS, REFS, DDXp_1D, DDZ_1D)
+              del(dummy)
+       
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       REFS.append(DDXM)
-       REFS.append(DDZM)
+       # For use with transient run in CSR format and RHS evaluations
+       REFS.append(DDXM) # index 10
+       REFS.append(DDZM) # index 11
+       
        if StaticSolve or not RSBops:
-              REFS.append(DDXM)
+              # Matrix operators for Jacobian assembly
+              if latPeriodic:
+                     REFS.append(DDXMp)
+                     del(DDXMp)
+              else:
+                     REFS.append(DDXM)
+                     
               REFS.append(DDZM)
        else:
+              # Multithreaded enabled for transient solution
               from rsb import rsb_matrix
               REFS.append(rsb_matrix(DDXM))
               REFS.append(rsb_matrix(DDZM))
@@ -411,9 +447,22 @@ def runModel(TestName):
               # Compute the spectral radii on partial derivative operators
               DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
               PPXM = DDXM - DZDXM.dot(DDZM)
-              DX = 1.0 / np.amax(np.abs(np.linalg.eigvals(PPXM.toarray())))
-              DZ = 1.0 / np.amax(np.abs(np.linalg.eigvals(DDZM.tiarray())))
-              print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
+              # Estimate SR by Gelfand's Formula
+              for k in range(1, 11):
+                     PPXM = np.linalg.matrix_power(PPXM.toarray(), k)
+                     mnorm = np.linalg.norm(PPXM, 2)
+                     DX = 1.0 / (mnorm**(1.0/k))
+                     
+                     DDZM = np.linalg.matrix_power(DDZM.toarray(), k)
+                     mnorm = np.linalg.norm(DDZM, 2)
+                     DZ = 1.0 / (mnorm**(1.0/k))
+                     
+                     print('Spectral radii for 1st partial derivative matrices: ',k,DX,DZ)
+              DX = 1.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
+              DZ = 1.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
+              #DX = 1.0 / np.amax(np.abs(np.linalg.eigvals(PPXM.toarray())))
+              #DZ = 1.0 / np.amax(np.abs(np.linalg.eigvals(DDZM.tiarray())))
+              #print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
               del(PPXM)
               del(DZDXM)   
               '''
@@ -425,7 +474,7 @@ def runModel(TestName):
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
-       lmsDOF = (NX + 1)
+       lmsDOF = len(ubdex)
        
        # Initialize solution storage
        SOLT = np.zeros((physDOF, 2))
@@ -451,13 +500,13 @@ def runModel(TestName):
               SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
               
               # Updates nolinear boundary condition to next Newton iteration
-              dWBC = SOLT[wbdex,0] - dHdX * (INIT[ubdex] + SOLT[ubdex,0])
+              dWBC = SOLT[wbdex,0] - dHdX[hdex] * (INIT[ubdex] + SOLT[ubdex,0])  
        else:
               # Set the initial time
               IT = 0.0
               
               # Initial change in vertical velocity at boundary
-              dWBC = -dHdX * INIT[ubdex]
+              dWBC = -dHdX[hdex] * INIT[ubdex]
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
@@ -490,17 +539,20 @@ def runModel(TestName):
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9], fields, U)
               rhs += eqs.computeRayleighTendency(REFG, fields)
+              # Fix essential BC
+              rhs[zeroDex_tran[0],0] *= 0.0
+              rhs[zeroDex_tran[1],1] *= 0.0
+              rhs[zeroDex_tran[2],2] *= 0.0
+              rhs[zeroDex_tran[3],3] *= 0.0
               RHS = np.reshape(rhs, (physDOF,), order='F')
-              RHS[zeroDex_stat] *= 0.0
-              RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
               #%% Compute Lagrange Multiplier column augmentation matrices (terrain equation)
-              C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
-              C2 = +1.0 * sps.eye(NX+1, format='csr')
+              C1 = -1.0 * sps.diags(dHdX[hdex], offsets=0, format='csr')
+              C2 = +1.0 * sps.eye(len(ubdex), format='csr')
        
-              colShape = (OPS,NX+1)
+              colShape = (OPS,len(ubdex))
               LD = sps.lil_matrix(colShape)
               if ExactBC:
                      LD[ubdex,:] = C1
@@ -690,21 +742,37 @@ def runModel(TestName):
               
               print('Recover full linear solution vector... DONE!')
               
-              #%% Check the output residual
-              fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
-              
-              # Set the output residual and check
+              # Update according to the periodic condition or not
+              #'''
+              if latPeriodic and not latInflow:
+                     sol0 = np.reshape(np.array(SOLT[:,0]), (OPS,numVar), order='F')
+                     dsol0 = np.reshape(np.array(SOLT[:,0]), (OPS,numVar), order='F')
+                     # Update the right boundary
+                     sol0[urdex,:] += np.array(dsol0[uldex,:])
+                     SOLT[:,0] = np.reshape(sol0, (physDOF,), order='F')
+                     fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+                     del(sol0)
+                     del(dsol0)
+              else:
+                     fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+                     
+              #'''
+              #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               DqDx, DqDz, DqDx_GML, DqDz_GML = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9], fields, U)
               rhs += eqs.computeRayleighTendency(REFG, fields)
-              RHS = np.reshape(rhs, (physDOF,), order='F'); del(rhs)
-              RHS[zeroDex_stat] *= 0.0
-              RHS[wbdex] *= 0.0 # No vertical acceleration at terrain boundary
+              # Fix essential BC
+              rhs[zeroDex_tran[0],0] *= 0.0
+              rhs[zeroDex_tran[1],1] *= 0.0
+              rhs[zeroDex_tran[2],2] *= 0.0
+              rhs[zeroDex_tran[3],3] *= 0.0
+              RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
+              del(rhs)
               
               # Check the change in the solution
               DSOL = np.array(SOLT[:,1])
@@ -852,10 +920,14 @@ def runModel(TestName):
                      '''
                      #'''
                      fields_new, rhsVec_new, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
-                                                             DX_avg, DZ_avg, DX_avg**2, DZ_avg**2,\
+                                                             DX, DZ, DX**2, DZ**2,\
                                                              TOPT, fields, hydroState, DCF, \
-                                                             zeroDex_tran, (extDex, latDex, vrtDex), ubdex, \
-                                                             ResDiff, thisTime, isFirstStep)
+                                                             zeroDex_tran, diffDex, ubdex, uldex, urdex, \
+                                                             ResDiff, thisTime, isFirstStep, latPeriodic)
+                            
+                     # Update according to the periodic condition
+                     if latPeriodic:
+                            fields_new[urdex,:] = np.array(fields_new[uldex,:])
                      
                      # Compute residual and normalizations
                      UD = np.abs(fields_new[:,0] + hydroState[:,0])
@@ -990,7 +1062,7 @@ def runModel(TestName):
                      plt.ylim(0.0, 1.0E-3*DIMS[2])
                      plt.title('Change W - (m/s)')
                      
-                     flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[ubdex] + uxz[0,:]))
+                     flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[uBotDex] + uxz[0,:]))
                      slopeAngle = np.arctan(dHdX)
                      
                      plt.subplot(2,2,2)

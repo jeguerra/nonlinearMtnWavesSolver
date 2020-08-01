@@ -10,32 +10,36 @@ import numpy as np
 import math as mt
 #import matplotlib.pyplot as plt
 
-def computeTerrainDecayFunctions(xi, ang):
-       '''
-       AR = 1.0E-3
-       p = 10
-       q = 2
+def computeTerrainDecayFunctions(xi, ang, StaticSolve):
        
-       expdec = np.exp(-p/q * xi)
-       cosvar = np.power(np.cos(ang), p)
-       #cosvard = np.power(np.cos(ang), p-1)
-       fxi1 = expdec * cosvar
-       fxi2 = AR * (xi * (1.0 - xi));
-       dzdh = np.add(fxi1, fxi2)
-       
-       dfdxi1 = -p/q * (expdec * cosvar)
-       dfdxi2 = (1.0 + 0.5 * q * mt.pi * np.tan(ang))
-       dfdxi3 = AR * (1.0 - 2.0 * xi)
-       d_dzdh_dxi = (dfdxi1 * dfdxi2) + dfdxi3
-       '''
-       m = 0.2
-       mi = 1.0 / m
-       dzdh = np.sinh(mi * (1.0 - xi)) / np.sinh(mi)
-       d_dzdh_dxi = -mi * np.cosh(mi * (1.0 - xi)) / np.sinh(mi)
+       if StaticSolve:
+              # Nominal Hybrid coordinate
+              m = 0.2
+              mi = 1.0 / m
+              dzdh = np.sinh(mi * (1.0 - xi)) / np.sinh(mi)
+              d_dzdh_dxi = -mi * np.cosh(mi * (1.0 - xi)) / np.sinh(mi)
+       else:
+              # First pass [A=0.3, p=20, m=0.2]
+              # Second pass [A=0.4, p=10, m=0.25]
+              # Third pass [A=0.25, p=25, m=0.25]
+              A = 0.25
+              p = 25
+              
+              # Guellrich improvement to hybrid coordinate
+              cosvar = np.power(np.cos(A * ang), p)
+              tanvard = A * mt.pi * np.tan(A * ang)
+              
+              # Guellrich Hybrid coordinate
+              m = 0.25
+              mi = 1.0 / m
+              hybrid = np.sinh(mi * (1.0 - xi)) / np.sinh(mi)
+              dhybrid = -mi * np.cosh(mi * (1.0 - xi)) / np.sinh(mi)
+              dzdh = cosvar * np.sinh(mi * (1.0 - xi)) / np.sinh(mi)
+              d_dzdh_dxi = cosvar * (dhybrid - p * hybrid * tanvard) 
        
        return dzdh, d_dzdh_dxi
 
-def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx):
+def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
        NX = DIMS[3] + 1
@@ -51,7 +55,7 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx):
        
        # High Order Improved Guellrich coordinate 3 parameter function
        xi = 1.0 / ZH * ZL
-       ang = 0.5 * mt.pi * xi
+       ang = 1.0/3.0 * mt.pi * xi
        dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang)
        
        dxidz = ZH + (HTZL * d_dzdh_dxi)
@@ -69,7 +73,7 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx):
        
        # Compute the coordinate surface at edge of Rayleigh layer
        xi = 1.0 / ZH * zRay
-       ang = 0.5 * mt.pi * zRay
+       ang = mt.pi * zRay
        dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang)
        
        ZRL = (dzdh * hx) + zRay

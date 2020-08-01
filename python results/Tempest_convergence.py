@@ -60,14 +60,18 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               
        return FLDI
 
-#tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
-tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
+tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
+#tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
 hresl = [1000, 500, 250, 125]
 # Loop over the 4 data files
+# Error norms between Tempest and Spectral Reference
 wbcerr1 = []
 wflerr1 = []
+wnterr1 = []
+# Error norms between Tempest and Classical Reference
 wbcerr2 = []
 wflerr2 = []
+wnterr2 = []
 for rr in hresl:
        fname = tdir + 'outNHGW_VO3_BSLN-SCHAR_H25m_' + str(rr) + 'm.0000-01-01-00000.nc'
        m_fid = Dataset(fname, 'r')
@@ -75,6 +79,7 @@ for rr in hresl:
        x = m_fid.variables['lon'][:]
        z = m_fid.variables['lev'][:]
        hz = m_fid.variables['Zs']
+       
        # Read in the W data from Tempest
        WMOD = np.mean(m_fid.variables['W'][-20:-10,:,0,:], axis=0)
        
@@ -105,10 +110,16 @@ for rr in hresl:
        ZTL = REFS[5]
        NXI = len(x)
        NZI = len(z)
-       print(NXI, NZI)
        WREFint = computeColumnInterp(NX, NZ, NZI, ZTL, WREF, CH_TRANS)
        WREFint = computeHorizontalInterp(NX, x, WREFint, HF_TRANS)
        
+       # Sample the interior flow
+       lxi = int(0.25*len(x))
+       lzi1 = 0#int(0.23*len(z))
+       lzi2 = int(0.35*len(z))
+       
+       xint = x[lxi-1:-lxi]
+       zint = z[lzi1:-lzi2]
        # Make the differences
        WDIFF1 = WMOD - WREFint
        WDIFF2 = WMOD - WBK
@@ -118,25 +129,34 @@ for rr in hresl:
        wdmin = -0.125
        wdmax = 0.125
        
+       DOPS = len(x) * len(z)
+       DOPSint = len(xint) * len(zint)
+       
        # Compute norms (TEMPEST TO SPECTRAL REFERENCE)
-       DOPS = NXI * NZI
        ndiff_wbc = np.linalg.norm(WDIFF1[0,:])
        ndiff_fld = np.linalg.norm(np.reshape(WDIFF1, (DOPS,), order='F'))
+       ndiff_int = np.linalg.norm(np.reshape(WDIFF1[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
+       
        nref_wbc = np.linalg.norm(WREFint[0,:])
        nref_fld = np.linalg.norm(np.reshape(WREFint, (DOPS,), order='F'))
+       nref_int = np.linalg.norm(np.reshape(WREFint[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
        # Take the norm and print
        wbcerr1.append(ndiff_wbc / nref_wbc)
        wflerr1.append(ndiff_fld / nref_fld)
+       wnterr1.append(ndiff_int / nref_int)
        
        # Compute norms (TEMPEST TO CLASSICAL REFERENCE)
-       DOPS = NXI * NZI
        ndiff_wbc = np.linalg.norm(WDIFF2[0,:])
        ndiff_fld = np.linalg.norm(np.reshape(WDIFF2, (DOPS,), order='F'))
+       ndiff_int = np.linalg.norm(np.reshape(WDIFF2[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
+       
        nref_wbc = np.linalg.norm(WBK[0,:])
        nref_fld = np.linalg.norm(np.reshape(WBK, (DOPS,), order='F'))
+       nref_int = np.linalg.norm(np.reshape(WBK[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
        # Take the norm and print
        wbcerr2.append(ndiff_wbc / nref_wbc)
        wflerr2.append(ndiff_fld / nref_fld)
+       wnterr2.append(ndiff_int / nref_int)
        
        ccount = 51
        # Plot the difference (Tempest to Spectral Reference)
@@ -201,19 +221,31 @@ for rr in hresl:
        
 print(wbcerr1)
 print(wflerr1)
-       
-fig = plt.figure(figsize=(12.0, 6.0))
-plt.subplot(1,2,1)
-plt.plot(hresl, wbcerr1, hresl, wbcerr2)
+#%%       
+fig = plt.figure(figsize=(15.0, 5.0))
+plt.subplot(1,3,1)
+plt.plot(hresl, wbcerr1, hresl, wbcerr2); plt.ylim(5.0E-3, 1.0)
 plt.title('Convergence at Terrain Boundary')
-plt.xscale('linear'); plt.yscale('log')
+plt.xscale('log'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
+plt.ylabel('L-2 Norm (m/s)')
+plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
-plt.subplot(1,2,2)
-plt.plot(hresl, wflerr1, hresl, wflerr2)
-plt.title('Global Convergence')
-plt.xscale('linear'); plt.yscale('log')
+plt.subplot(1,3,2)
+plt.plot(hresl, wnterr1, hresl, wnterr2); plt.ylim(5.0E-3, 1.0)
+plt.title('Interior Domain Convergence')
+plt.xscale('log'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
+#plt.ylabel('L-2 Norm (m/s)')
+plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
+plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
+plt.subplot(1,3,3)
+plt.plot(hresl, wflerr1, hresl, wflerr2); plt.ylim(5.0E-3, 1.0)
+plt.title('Entire Domain Convergence')
+plt.xscale('log'); plt.yscale('log')
+plt.xlabel('Resolution (m)')
+#plt.ylabel('L-2 Norm (m/s)')
+plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
        
        

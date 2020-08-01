@@ -104,6 +104,10 @@ def computeTopographyOnGrid(REFS, opt, DDX):
        ht = np.dot(FIM, HF)
        dhdx = np.dot(FIM, DHDX)
        '''
+       
+       # Fix h and dhdx to be zero at both ends
+       ht[0] = 0.0; dhdx[0] = 0.0
+       ht[-1] = 0.0; dhdx[-1] = 0.0
        #return np.real(ht), np.real(dhdx)
        return ht, dhdx
               

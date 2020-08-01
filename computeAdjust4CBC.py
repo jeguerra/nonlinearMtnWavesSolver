@@ -8,7 +8,7 @@ Created on Tue Jul 23 10:49:24 2019
 
 import numpy as np
 
-def computeAdjust4CBC(DIMS, numVar, varDex):
+def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        # Get DIMS data
        NX = DIMS[3] + 1
        NZ = DIMS[4]
@@ -24,11 +24,21 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
-       uldex = np.array(range(1, NZ)) # include the corner node
-       urdex = np.array(range(OPS-NZ+1, OPS))
-       ubdex = np.array(range(0, (OPS - NZ + 1), NZ))
-       utdex = np.array(range(NZ-1, OPS, NZ))
        
+       # including corners
+       #uldex = np.array(range(0, NZ))
+       #urdex = np.array(range((OPS-NZ)-1, OPS))
+       # excluding bottom corners
+       uldex = np.array(range(1, NZ))
+       urdex = np.array(range((OPS-NZ)+1, OPS))
+       
+       # including corners
+       ubdex = np.array(range(0, OPS, NZ))
+       utdex = np.array(range(NZ-1, OPS, NZ))
+       # excluding corners
+       #ubdex = np.array(range(1, OPS-2*NZ, NZ))
+       #utdex = np.array(range(2*NZ-1, OPS-NZ, NZ))
+              
        wldex = np.add(uldex, iW * OPS)
        wrdex = np.add(urdex, iW * OPS)
        wbdex = np.add(ubdex, iW * OPS)
@@ -48,26 +58,49 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
        latDex = np.unique(np.concatenate((uldex,urdex)))
        vrtDex = np.unique(np.concatenate((ubdex,utdex)))
        extDex = np.unique(np.concatenate((urdex,uldex,ubdex,utdex)))
+       diffDex = (latDex, vrtDex, extDex)
        
        # BC indices for static solution (per variable)
-       rowsOutU = set(uldex)
-       rowsOutW = set(np.concatenate((uldex,utdex)))
-       rowsOutP = set()
-       rowsOutT = set(utdex)
+       if latPeriodic and not latInflow:
+              # Periodic with no inflow condition
+              rowsOutU = set(urdex)
+              rowsOutW_statc = set(np.concatenate((urdex,utdex)))
+              rowsOutW_trans = set(np.concatenate((ubdex,urdex,utdex)))
+              rowsOutP = set(urdex)
+              rowsOutT = set(urdex)
+              # Indexing for static solver
+              right = np.concatenate((urdex, wrdex, prdex, trdex))
+              top = wtdex
+              rowsOutBC_static = set(np.concatenate((right, top)))
+       elif not latPeriodic and latInflow:
+              # Only inflow condition specified
+              rowsOutU = set(uldex)
+              rowsOutW_statc = set(np.concatenate((uldex,utdex)))
+              rowsOutW_trans = set(np.concatenate((uldex,ubdex,utdex)))
+              rowsOutP = set(uldex)
+              rowsOutT = set(uldex)
+              # Indexing for static solver
+              left = np.concatenate((uldex, wldex, pldex, tldex))
+              top = wtdex
+              rowsOutBC_static = set(np.concatenate((left, top)))
+       elif latPeriodic and latInflow:
+              # Periodic with inflow condition (pinned boundary)
+              rowsOutU = set(np.concatenate((uldex, urdex)))
+              rowsOutW_statc = set(np.concatenate((uldex,urdex,utdex)))
+              rowsOutW_trans = set(np.concatenate((uldex,urdex,ubdex,utdex)))
+              rowsOutP = set(np.concatenate((uldex, urdex)))
+              rowsOutT = set(np.concatenate((uldex, urdex)))
+               # Indexing for static solver
+              left = np.concatenate((uldex, wldex, pldex, tldex))
+              right = np.concatenate((urdex, wrdex, prdex, trdex))
+              top = wtdex
+              rowsOutBC_static = set(np.concatenate((left, right, top)))
        
+       # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
-       wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
+       wbcDex = rowsAll.difference(rowsOutW_statc); wbcDex = sorted(wbcDex)
        pbcDex = rowsAll.difference(rowsOutP); pbcDex = sorted(pbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
-       
-       # BC indices for transient solution (per variable)
-       rowsOutW_trans = set(np.concatenate((ubdex,uldex,utdex)))
-       
-       # CHANGE THESE TO MATCH WHAT YOU FOUND WITH THE TRANSIENT RUN
-       left = np.concatenate((uldex, wldex))
-       top = np.concatenate((wtdex, ttdex))
-       # U and W at terrain boundary are NOT treated as essential BC in solution by Lagrange Multipliers
-       rowsOutBC_static = set(np.concatenate((left, top)))
        
        # W is treated as an essential BC at terrain in solution by direct substitution
        rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
@@ -75,13 +108,8 @@ def computeAdjust4CBC(DIMS, numVar, varDex):
               
        # All DOF for all variables
        rowsAll = set(np.array(range(0,numVar*OPS)))
-       
        # Compute set difference from all rows to rows to be taken out LINEAR
        sysDex = rowsAll.difference(rowsOutBC_static)
        sysDex = sorted(sysDex)
-       # DOF's not dynamically updated in static solution (use Lagrange Multiplier)
-       zeroDex_stat = sorted(rowsOutBC_static)
-       # DOF's not dynamically updated in transient solution (use direct BC substitution)
-       zeroDex_tran = rowsOutBC_transient
        
-       return ubdex, utdex, wbdex, ubcDex, wbcDex, pbcDex, tbcDex, zeroDex_stat, zeroDex_tran, sysDex, extDex, latDex, vrtDex
+       return uldex, urdex, ubdex, utdex, wbdex, ubcDex, wbcDex, pbcDex, tbcDex, rowsOutBC_transient, sysDex, diffDex
