@@ -808,8 +808,8 @@ def runModel(TestName):
               zaxis = m_fid.createDimension('zlev', NZ)
               # Create variables (time and grid)
               tmvar = m_fid.createVariable('t', 'f8', ('time',))
-              xgvar = m_fid.createVariable('XL', 'f8', ('time', 'xlon'))
-              zgvar = m_fid.createVariable('ZTL', 'f8', ('time', 'xlon'))
+              xgvar = m_fid.createVariable('XL', 'f8', ('zlev', 'xlon'))
+              zgvar = m_fid.createVariable('ZTL', 'f8', ('zlev', 'xlon'))
               # Store variables
               xgvar[:] = XL
               zgvar[:] = ZTL
