@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 
 # Read in the text file
 #fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
-fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
-#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_discrete.txt'
+#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
+fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence025m_discrete.txt'
 
 con_data = np.loadtxt(fname, delimiter=', ')
 
@@ -24,7 +24,7 @@ con_data = np.loadtxt(fname, delimiter=', ')
 def func(x, a, b):
        return -b * x + a
 
-lp = 11
+lp = 10
 xdata = np.arange(0,lp)
 ydata = np.log(con_data[0:lp,4])
 popt, pcov = curve_fit(func, xdata, ydata, p0=[1.0E-3, 2.0], method='lm')

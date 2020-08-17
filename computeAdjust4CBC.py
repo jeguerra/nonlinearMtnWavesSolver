@@ -58,20 +58,21 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        latDex = np.unique(np.concatenate((uldex,urdex)))
        vrtDex = np.unique(np.concatenate((ubdex,utdex)))
        extDex = np.unique(np.concatenate((urdex,uldex,ubdex,utdex)))
-       diffDex = (latDex, vrtDex, extDex)
+       diffDex = (latDex, ubdex, utdex, extDex)
        
        # BC indices for static solution (per variable)
        if latPeriodic and not latInflow:
               # Periodic with no inflow condition
-              rowsOutU = set(urdex)
-              rowsOutW_statc = set(np.concatenate((urdex,utdex)))
-              rowsOutW_trans = set(np.concatenate((ubdex,urdex,utdex)))
-              rowsOutP = set(urdex)
-              rowsOutT = set(urdex)
+              rowsOutU = set()
+              rowsOutW_statc = set(utdex)
+              rowsOutW_trans = set(np.concatenate((ubdex,utdex)))
+              rowsOutP = set()
+              rowsOutT = set()
               # Indexing for static solver
-              right = np.concatenate((urdex, wrdex, prdex, trdex))
+              #right = np.concatenate((urdex, wrdex, prdex, trdex))
               top = wtdex
-              rowsOutBC_static = set(np.concatenate((right, top)))
+              #rowsOutBC_static = set(np.concatenate((right, top)))
+              rowsOutBC_static = set(top)
        elif not latPeriodic and latInflow:
               # Only inflow condition specified
               rowsOutU = set(uldex)

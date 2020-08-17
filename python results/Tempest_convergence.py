@@ -7,6 +7,7 @@ Created on Mon Jul 20 11:47:04 2020
 """
 
 import shelve
+import scipy as scp
 import numpy as np
 import math as mt
 import matplotlib as mpl
@@ -15,17 +16,17 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset  # http://code.google.com/p/netcdf4-python/
 import computeDerivativeMatrix as derv
 
-def computeHorizontalInterp(NX, xint, FLD, HF_TRANS):
+def computeHorizontalInterpHermite(NX, xint, FLD, HF_TRANS):
        import HerfunChebNodesWeights as hcnw
        
        # Compute coefficients for the variable field
-       fcoeffs = np.matmul(HF_TRANS, FLD.T)
+       fcoeffs = HF_TRANS.dot(FLD.T)
        
        xh, dummy = hcnw.hefunclb(NX)
        xint *= max(xh) / max(xint)
        
        # Compute backward transform to new grid
-       HFM = hcnw.hefuncm(NX, xint, True)
+       HFM, DHFM = hcnw.hefuncm(NX, xint, True)
 
        #plt.figure()
        #plt.plot(xh, HFM_native[0,:])
@@ -33,9 +34,35 @@ def computeHorizontalInterp(NX, xint, FLD, HF_TRANS):
        #plt.plot(xi, HFM[0,:])
        
        # Apply the backward transforms
-       FLDI = np.matmul(HFM, fcoeffs)
+       FLDI = HFM.dot(fcoeffs)
        
        return FLDI.T
+
+def computeHorizontalInterpFourier(x0, xint, FLD, HF_TRANS):
+       #'''
+       NP = len(x0)
+       LX = abs(max(x0) - min(x0))
+       # Compute forward transform
+       k = np.fft.fftfreq(NP)
+       ks = 2.0*mt.pi/LX * k * NP
+              
+       # Compute interpolation by FFT
+       HF = np.fft.fft(FLD, axis=1)
+       # Compute the orthogonal projection to the xh grid
+       NPI = len(xint)
+       FIM = np.zeros((NPI, NP), dtype=complex)
+       # Apply the spatial shift due to different grid
+       dx = max(xint)
+       HF *= np.exp(-1j * ks * dx / NP)
+       # Compute the Fourier basis on the desired grid
+       for cc in range(NP):
+              arg = 1j * ks[cc] * xint#[0:-1]# * cc / NP
+              FIM[:,cc] = 1.0 / NP * np.exp(arg)
+                     
+       # Compute the inverse Fourier interpolation
+       FLDI = FIM.dot(HF.T)
+       #'''
+       return np.real(np.fft.fftshift(FLDI.T, axes=1))
 
 def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
        import HerfunChebNodesWeights as hcnw
@@ -62,7 +89,8 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
 
 tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
 #tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
-hresl = [1000, 500, 250, 125]
+hresl = [500, 250, 125, 62]
+#hresl = [250]
 # Loop over the 4 data files
 # Error norms between Tempest and Spectral Reference
 wbcerr1 = []
@@ -83,8 +111,13 @@ for rr in hresl:
        # Read in the W data from Tempest
        WMOD = np.mean(m_fid.variables['W'][-20:-10,:,0,:], axis=0)
        
+       HermCheb = True
        # Get the reference solution data
-       refname = tdir + 'restartDB_exactBCSchar_025m'
+       if HermCheb:
+              refname = tdir + 'restartDB_exactBCSchar_025m'
+       else:
+              refname = tdir + 'restartDB_exactBCSchar_025mP'
+              
        rdb = shelve.open(refname, flag='r')
        NX = rdb['NX']
        NZ = rdb['NZ']
@@ -98,8 +131,11 @@ for rr in hresl:
        WBK, ETA, WFFT = ScharBoussinesqKlemp(PHYS, x, z)
        
        # Get the Hermite and Chebyshev transforms
-       DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
-       DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       if HermCheb:
+              DDX_1D, HF_TRANS, dummy = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       else:
+              DDX_1D, HF_TRANS, dummy = derv.computeFourierDerivativeMatrix(DIMS)
+       DDZ_1D, CH_TRANS, dummy = derv.computeChebyshevDerivativeMatrix(DIMS)
        
        # Get the reference vertical velocity (on the native HermCheb grid)
        OPS = DIMS[5]
@@ -110,12 +146,20 @@ for rr in hresl:
        ZTL = REFS[5]
        NXI = len(x)
        NZI = len(z)
+
        WREFint = computeColumnInterp(NX, NZ, NZI, ZTL, WREF, CH_TRANS)
-       WREFint = computeHorizontalInterp(NX, x, WREFint, HF_TRANS)
+       if HermCheb:
+              WREFint = computeHorizontalInterpHermite(NX, np.array(x), WREFint, HF_TRANS)
+       else:
+              WREFint = computeHorizontalInterpFourier(np.array(REFS[0]), np.array(x), WREFint, HF_TRANS)
+
+       #plt.figure()
+       #plt.plot(REFS[0], WREF[0,:], 'k--', x, WREFint[0,:], 'b', x, WMOD[0,:], 'g')
+       #plt.xlim(-15000.0, 15000.0)
        
        # Sample the interior flow
        lxi = int(0.25*len(x))
-       lzi1 = 0#int(0.23*len(z))
+       lzi1 = int(0.23*len(z))
        lzi2 = int(0.35*len(z))
        
        xint = x[lxi-1:-lxi]
@@ -124,10 +168,6 @@ for rr in hresl:
        WDIFF1 = WMOD - WREFint
        WDIFF2 = WMOD - WBK
        WDIFF3 = WREFint - WBK
-       
-       fig = plt.figure(figsize=(24.0, 9.0))
-       wdmin = -0.125
-       wdmax = 0.125
        
        DOPS = len(x) * len(z)
        DOPSint = len(xint) * len(zint)
@@ -158,94 +198,108 @@ for rr in hresl:
        wflerr2.append(ndiff_fld / nref_fld)
        wnterr2.append(ndiff_int / nref_int)
        
-       ccount = 51
+       X, Z = np.meshgrid(1.0E-3 * x, 1.0E-3 * z)
+       
+       ccount = 40
+       wfbound = 0.2
        # Plot the difference (Tempest to Spectral Reference)
-       plt.subplot(3,3,1)
-       ccheck = plt.contourf(WMOD, ccount, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-       plt.title('Tempest W (m/s): ' + str(rr) + ' (m)')
+       fig = plt.figure(figsize=(18.0, 3.0))
+       plt.subplot(1,3,1)
+       ccheck = plt.contourf(X, Z, WMOD, ccount, cmap=cm.seismic)
+       plt.xlim(-30.0, 30.0)
+       plt.clim(-wfbound, wfbound)
+       norm = mpl.colors.Normalize(vmin=-wfbound, vmax=wfbound)
+       plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
+       plt.title('Tempest Model W @ 20 Hours (m/s)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       fig.colorbar(ccheck)
-       plt.subplot(3,3,2)
-       ccheck = plt.contourf(WREFint, ccount, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-       plt.title('Spectral Reference W (m/s): ' + str(rr) + ' (m)')
-       fig.colorbar(ccheck)
+       plt.subplot(1,3,2)
+       ccheck = plt.contourf(X, Z, WREFint, ccount, cmap=cm.seismic)
+       plt.xlim(-30.0, 30.0)
+       plt.clim(-wfbound, wfbound)
+       norm = mpl.colors.Normalize(vmin=-wfbound, vmax=wfbound)
+       plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
+       plt.title('Steady Spectral Reference W (m/s)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(3,3,3)
-       ccheck = plt.contourf(WDIFF1, ccount, cmap=cm.seismic)#, vmin=-0.1, vmax=0.1)
+       plt.subplot(1,3,3)
+       ccheck = plt.contourf(X, Z, WDIFF1, ccount, cmap=cm.seismic)
        plt.title('Difference (m/s): ' + str(rr) + ' (m)')
-       plt.clim(wdmin, wdmax)
-       norm = mpl.colors.Normalize(vmin=wdmin, vmax=wdmax)
+       wdbound = 0.025
+       plt.clim(-wdbound, wdbound)
+       norm = mpl.colors.Normalize(vmin=-wdbound, vmax=wdbound)
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       
+       '''
        # Plot the difference (Tempest to Classical Reference)
-       plt.subplot(3,3,4)
+       fig = plt.figure(figsize=(18.0, 3.0))
+       plt.subplot(1,3,1)
        ccheck = plt.contourf(WMOD, ccount, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        #plt.title('Tempest W (m/s): ' + str(rr) + ' (m)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        fig.colorbar(ccheck)
-       plt.subplot(3,3,5)
+       plt.subplot(1,3,2)
        ccheck = plt.contourf(WBK, ccount, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        plt.title('Classical Reference W (m/s): ' + str(rr) + ' (m)')
        fig.colorbar(ccheck)
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(3,3,6)
+       plt.subplot(1,3,3)
        ccheck = plt.contourf(WDIFF2, ccount, cmap=cm.seismic)#, vmin=-0.1, vmax=0.1)
        plt.title('Difference (m/s): ' + str(rr) + ' (m)')
        plt.clim(wdmin, wdmax)
        norm = mpl.colors.Normalize(vmin=wdmin, vmax=wdmax)
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       
+       '''
+       '''
        # Plot the difference (Spectral to Classical Reference)
-       plt.subplot(3,3,7)
+       fig = plt.figure(figsize=(18.0, 3.0))
+       plt.subplot(1,3,1)
        ccheck = plt.contourf(WREFint, ccount, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        plt.title('Spectral Reference W (m/s): ' + str(rr) + ' (m)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        fig.colorbar(ccheck)
-       plt.subplot(3,3,8)
+       plt.subplot(1,3,2)
        ccheck = plt.contourf(WBK, ccount, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
        plt.title('Classical Reference W (m/s): ' + str(rr) + ' (m)')
        fig.colorbar(ccheck)
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(3,3,9)
+       plt.subplot(1,3,3)
        ccheck = plt.contourf(WDIFF3, ccount, cmap=cm.seismic)#, vmin=-0.1, vmax=0.1)
        plt.title('Difference (m/s): ' + str(rr) + ' (m)')
        plt.clim(wdmin, wdmax)
        norm = mpl.colors.Normalize(vmin=wdmin, vmax=wdmax)
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       
+       '''
        #plt.xlim(-50.0, 50.0)
        #plt.ylim(0.0, 1.0E-3*DIMS[2])
        
 print(wbcerr1)
 print(wflerr1)
 #%%       
-fig = plt.figure(figsize=(15.0, 5.0))
-plt.subplot(1,3,1)
-plt.plot(hresl, wbcerr1, hresl, wbcerr2); plt.ylim(5.0E-3, 1.0)
-plt.title('Convergence at Terrain Boundary')
-plt.xscale('log'); plt.yscale('log')
+fig = plt.figure(figsize=(5.0, 5.0))
+plt.plot(hresl, wbcerr1, 'C0s-', hresl, wbcerr2, 'C1s-'); plt.ylim(1.0E-3, 1.0E-1)
+plt.title('Terrain Boundary Response')
+plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
-plt.ylabel('L-2 Norm (m/s)')
+plt.ylabel('L-2 Norm W (m/s)')
 plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
-plt.subplot(1,3,2)
-plt.plot(hresl, wnterr1, hresl, wnterr2); plt.ylim(5.0E-3, 1.0)
-plt.title('Interior Domain Convergence')
-plt.xscale('log'); plt.yscale('log')
+fig = plt.figure(figsize=(10.0, 5.0))
+plt.subplot(1,2,1)
+plt.plot(hresl, wnterr1, 'C0s-', hresl, wnterr2, 'C1s-'); plt.ylim(1.0E-3, 1.0)
+plt.title('Interior Domain Response')
+plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
-#plt.ylabel('L-2 Norm (m/s)')
+plt.ylabel('L-2 Norm W (m/s)')
 plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
-plt.subplot(1,3,3)
-plt.plot(hresl, wflerr1, hresl, wflerr2); plt.ylim(5.0E-3, 1.0)
-plt.title('Entire Domain Convergence')
-plt.xscale('log'); plt.yscale('log')
+plt.subplot(1,2,2)
+plt.plot(hresl, wflerr1, 'C0s-'); plt.ylim(1.0E-3, 1.0E0)
+plt.title('Entire Domain Response')
+plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 #plt.ylabel('L-2 Norm (m/s)')
-plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
+#plt.legend(('Spectral Reference'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
        
        

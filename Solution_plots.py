@@ -13,12 +13,12 @@ import scipy.io as sio
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import numpy as np
-
+'''
 #%% SMOOTH STRATIFICATION
 # Make the parent figure
 fig = plt.figure(figsize=(12.0, 6.0))
 
-la_afs = shelve.open('/home/jeg/scratch/restartDB_smooth010m', 'r')
+la_afs = shelve.open('/home/jeg/scratch/restartDB_smooth025m', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']
@@ -73,12 +73,12 @@ for pp in range(4):
 plt.tight_layout()
 plt.savefig('python results/SolutionFields_smooth010m.png')
 plt.show()
-
+'''
 #%% DISCRETE STRATIFICATION
 # Make the parent figure
 fig = plt.figure(figsize=(12.0, 6.0))
 
-la_afs = shelve.open('/home/jeg/scratch/restartDB_discrete010m', 'r')
+la_afs = shelve.open('/home/jeg/scratch/restartDB_discrete025m', 'r')
 DIMS = la_afs['DIMS']
 REFS = la_afs['REFS']
 SOL = la_afs['SOLT']
@@ -102,26 +102,26 @@ for pp in range(4):
        
        if pp == 0:
               Q = np.reshape(SOL[udex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-0.25, vmax=0.25)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-0.85, vmax=0.85)
               plt.title('U (m/s)')
               plt.ylabel('Height (km)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
        elif pp == 1:
               Q = np.reshape(SOL[wdex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-0.08, vmax=0.08)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-0.2, vmax=0.2)
               plt.title('W (m/s)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
        elif pp == 2:
               Q = np.reshape(SOL[pdex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-4.5E-5, vmax=4.5E-5)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-1.25E-4, vmax=1.25E-4)
               plt.title('log-P (Pa)')
               plt.xlabel('Distance (km)')
               plt.ylabel('Height (km)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
        elif pp == 3:
               Q = np.reshape(SOL[tdex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-6.0E-4, vmax=6.0E-4)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-2.0E-3, vmax=2.0E-3)
               plt.title('log-Theta (K)')
               plt.xlabel('Distance (km)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
@@ -131,9 +131,9 @@ for pp in range(4):
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 
 plt.tight_layout()
-plt.savefig('python results/SolutionFields_discrete010m.png')
+plt.savefig('python results/SolutionFields_discrete025m.png')
 plt.show()
-#'''
+'''
 #%% SCHAR CASE WITH 50 M MOUNTAIN
 # Make the parent figure
 fig = plt.figure(figsize=(12.0, 6.0))
@@ -193,4 +193,4 @@ for pp in range(4):
 plt.tight_layout()
 plt.savefig('python results/SolutionFields_schar025m.png')
 plt.show()
-#'''
+'''

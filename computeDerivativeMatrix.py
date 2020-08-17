@@ -184,12 +184,16 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
               SDIFF[rr,rr-1] = -mt.sqrt(rr * 0.5);
               
        # Hermite function spectral transform in matrix form
-       STR_H = (HT.T).dot(W);
+       STR_H = (HT.T).dot(W)
        # Hermite function spatial derivative based on spectral differentiation
        temp = (HTD).dot(SDIFF)
        temp = temp.dot(STR_H)
        DDM = b * temp
-       
+       '''
+       # Compute block for viscous operator
+       FXH = DDM.dot(HT)
+       FXH = -(FXH.T).dot(W)
+       '''
        return DDM, STR_H
 
 def computeChebyshevDerivativeMatrix(DIMS):
@@ -202,7 +206,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        xi, wcp = cheblb(NZ)
    
        # Get the Chebyshev transformation matrix
-       CTD = chebpolym(NZ-1, -xi)
+       CT = chebpolym(NZ-1, -xi)
    
        # Make a diagonal matrix of weights
        W = np.diag(wcp)
@@ -211,8 +215,8 @@ def computeChebyshevDerivativeMatrix(DIMS):
        S = np.eye(NZ)
    
        for ii in range(NZ - 1):
-              temp = W.dot(CTD[:,ii])
-              temp = ((CTD[:,ii]).T).dot(temp)
+              temp = W.dot(CT[:,ii])
+              temp = ((CT[:,ii]).T).dot(temp)
               S[ii,ii] = temp ** (-1)
 
        S[NZ-1,NZ-1] = 1.0 / mt.pi
@@ -233,14 +237,33 @@ def computeChebyshevDerivativeMatrix(DIMS):
               SDIFF[ii,ii+1] = A / c
     
        # Chebyshev spectral transform in matrix form
-       temp = CTD.dot(W)
+       temp = CT.dot(W)
        STR_C = S.dot(temp);
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       temp = (CTD).dot(SDIFF)
-       DDM = - (2.0 / ZH) * temp.dot(STR_C);
-       
+       temp = (CT).dot(SDIFF)
+       DDM = -(2.0 / ZH) * temp.dot(STR_C);
+       '''
+       # Compute blocks for viscous operator (must be scaled by sigma later...)
+       FZC = DDM.dot(CT)
+       FZC = FZC.dot(W) # RHS discretization of diffusion operator
+       FZC = -S.dot(FZC)
+       '''
        return DDM, STR_C
+
+def computeFourierDerivativeMatrix(DIMS):
+       
+       # Get data from DIMS
+       L1 = DIMS[0]
+       L2 = DIMS[1]
+       NX = DIMS[3]
+       
+       kxf = (2*mt.pi/abs(L2 - L1)) * np.fft.fftfreq(NX+1) * (NX+1)
+       KDM = np.diag(kxf, k=0)
+       DFT = np.fft.fft(np.eye(NX+1), axis=0)
+       DDM = np.fft.ifft(1j * KDM.dot(DFT), axis=0)
+       
+       return DDM, DFT
 
 def computeChebyshevDerivativeMatrix_X(DIMS):
        

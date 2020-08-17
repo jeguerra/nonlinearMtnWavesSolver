@@ -47,8 +47,7 @@ def hefunclb(NX):
        '''
        # Compute the Hermite function weights
        hf = hefuncm(NX, xi, False)
-       w = 1.0 / (NX+1) * np.power(hf, -2.0)
-       
+       w = 1.0 / (NX+1) * np.power(hf, -2.0)       
        return xi, w
        
 def hefuncm(NX, xi, fullMat):
@@ -108,7 +107,7 @@ def chebpolym(NM, xi):
        CTM[:,0] = np.ones(NX)
        CTM[:,1] = xi
        
-       # 3 Term recursion
+       # 3 Term recursion for functions
        for ii in range(2, NM+1):
               CTM[:,ii] = 2.0 * \
               mul(xi, CTM[:,ii-1]) - \

@@ -147,7 +147,6 @@ def runModel(TestName):
        thisTest = TestCase.TestCase(TestName)
        
        # Need to move this to TestCase.py
-       UniformDelta = False
        SparseDerivativesDynamics = False
        SparseDerivativesDynSGS = False
        
@@ -164,8 +163,14 @@ def runModel(TestName):
               RSBops = True
               ApplyGML = True
        
-       # Set the grid type (NOT IMPLEMENTED)
-       HermCheb = thisTest.solType['HermChebGrid']      
+       # Set the grid type
+       HermCheb = thisTest.solType['HermChebGrid']
+       # Use the uniform grid fourier solution if not Hermite Functions
+       if not HermCheb:
+              FourCheb = True
+       else:
+              FourCheb = False
+       #FourCheb = thisTest.solType['FourChebGrid']
        
        # Set residual diffusion switch
        ResDiff = thisTest.solType['DynSGS']
@@ -225,26 +230,27 @@ def runModel(TestName):
        
        #%% SET UP THE GRID AND INITIAL STATE
        #% Define the computational and physical grids+
-       REFS = computeGrid(DIMS, HermCheb, UniformDelta)
+       REFS = computeGrid(DIMS, HermCheb, FourCheb)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
-       DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       if HermCheb and not FourCheb:
+              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       elif FourCheb and not HermCheb:
+              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
+       else:
+              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+              
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        
-       DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-       
-       # Adjust for periodic BC (right end set to left end)
-       if latPeriodic:
-              DDXp_1D = np.array(DDX_1D)
-              DDXp_1D[:,0] += DDX_1D[:,-1]
+       #DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+       #DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
        # Update the REFS collection
        REFS.append(DDX_1D)
        REFS.append(DDZ_1D)
        
        #% Read in topography profile or compute from analytical function
-       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_SP)
+       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_1D)
        
        # Compute DX and DZ grid length scales
        DX_min = 1.0 * np.min(np.abs(np.diff(REFS[0])))
@@ -267,8 +273,6 @@ def runModel(TestName):
        
        DX_local = np.reshape(DXM, (OPS,), order='F')
        DZ_local = np.reshape(DZM, (OPS,), order='F')
-       DX2_local = np.power(DX_local,2)
-       DZ2_local = np.power(DZ_local,2)
        
        # Update the REFS collection
        REFS.append(XL)
@@ -391,12 +395,8 @@ def runModel(TestName):
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
-       if latPeriodic:
-              DDXMp, dummy = computePartialDerivativesXZ(DIMS, REFS, DDXp_1D, DDZ_1D)
-              del(dummy)
-       
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
-       DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       #DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
        # For use with transient run in CSR format and RHS evaluations
        REFS.append(DDXM) # index 10
@@ -404,12 +404,7 @@ def runModel(TestName):
        
        if StaticSolve or not RSBops:
               # Matrix operators for Jacobian assembly
-              if latPeriodic:
-                     REFS.append(DDXMp)
-                     del(DDXMp)
-              else:
-                     REFS.append(DDXM)
-                     
+              REFS.append(DDXM)
               REFS.append(DDZM)
        else:
               # Multithreaded enabled for transient solution
@@ -441,28 +436,29 @@ def runModel(TestName):
        '''
        
        if not StaticSolve:
-              DX = DX_avg
-              DZ = DZ_avg
+              #'''
+              DX = 2.0 * DX_local
+              DZ = 2.0 * DZ_local
+              DX2 = np.power(DX,2.0)
+              DZ2 = np.power(DZ,2.0)
+              #'''
+              '''
+              DX = 1.0 * DX_avg
+              DZ = 1.0 * DZ_avg
+              DX2 = DX**2
+              DZ2 = DZ**2
+              '''
               '''
               # Compute the spectral radii on partial derivative operators
               DZDXM = sps.diags(DZDX[:,0], offsets=0, format='csr')
               PPXM = DDXM - DZDXM.dot(DDZM)
-              # Estimate SR by Gelfand's Formula
-              for k in range(1, 11):
-                     PPXM = np.linalg.matrix_power(PPXM.toarray(), k)
-                     mnorm = np.linalg.norm(PPXM, 2)
-                     DX = 1.0 / (mnorm**(1.0/k))
-                     
-                     DDZM = np.linalg.matrix_power(DDZM.toarray(), k)
-                     mnorm = np.linalg.norm(DDZM, 2)
-                     DZ = 1.0 / (mnorm**(1.0/k))
-                     
-                     print('Spectral radii for 1st partial derivative matrices: ',k,DX,DZ)
-              DX = 1.0 / np.amax(np.abs(spl.eigs(PPXM, k=4, which='LM', return_eigenvectors=False)))
-              DZ = 1.0 / np.amax(np.abs(spl.eigs(DDZM, k=4, which='LM', return_eigenvectors=False)))
-              #DX = 1.0 / np.amax(np.abs(np.linalg.eigvals(PPXM.toarray())))
-              #DZ = 1.0 / np.amax(np.abs(np.linalg.eigvals(DDZM.tiarray())))
-              #print('Spectral radii for 1st partial derivative matrices:',DX,DZ)
+              DX_spr = 1.0 / np.amax(np.abs(spl.eigs(PPXM[1:-2,1:-2], k=2, which='LM', return_eigenvectors=False)))
+              DZ_spr = 1.0 / np.amax(np.abs(spl.eigs(DDZM[1:-2,1:-2], k=2, which='LM', return_eigenvectors=False)))
+              print('Spectral radii for 1st partial derivative matrices:',DX_spr,DZ_spr)
+              DX = 1.0 * DX_spr
+              DZ = 1.0 * DZ_spr
+              DX2 = DX**2
+              DZ2 = DZ**2
               del(PPXM)
               del(DZDXM)   
               '''
@@ -617,7 +613,6 @@ def runModel(TestName):
                      opdb['E'] = E; opdb['F'] = F; opdb['G'] = G; opdb['H'] = H
                      opdb['I'] = I; opdb['J'] = J; opdb['K'] = K; opdb['M'] = M
                      opdb['N'] = N; opdb['O'] = O; opdb['P'] = P; opdb['Q'] = Q
-                     opdb['N'] = N; opdb['O'] = O; opdb['P'] = P; opdb['Q'] = Q
                      opdb['LDA'] = LDA; opdb['LHA'] = LHA; opdb['LMA'] = LMA; opdb['LQAC'] = LQAC
                      opdb['LNA'] = LNA; opdb['LOA'] = LOA; opdb['LPA'] = LPA; opdb['LQAR'] = LQAR
                      opdb['LDIA'] = LDIA
@@ -742,21 +737,9 @@ def runModel(TestName):
               
               print('Recover full linear solution vector... DONE!')
               
-              # Update according to the periodic condition or not
-              #'''
-              if latPeriodic and not latInflow:
-                     sol0 = np.reshape(np.array(SOLT[:,0]), (OPS,numVar), order='F')
-                     dsol0 = np.reshape(np.array(SOLT[:,0]), (OPS,numVar), order='F')
-                     # Update the right boundary
-                     sol0[urdex,:] += np.array(dsol0[uldex,:])
-                     SOLT[:,0] = np.reshape(sol0, (physDOF,), order='F')
-                     fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
-                     del(sol0)
-                     del(dsol0)
-              else:
-                     fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
-                     
-              #'''
+              # Prepare the fields
+              fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+              
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
@@ -785,6 +768,9 @@ def runModel(TestName):
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
               rhsVec = np.zeros((OPS, numVar))
               error = [np.linalg.norm(rhsVec)]
+              
+              # Initialize boundary solution
+              fields[ubdex,1] = -dWBC
                             
               # Initialize time constants
               ti = 0
@@ -920,26 +906,23 @@ def runModel(TestName):
                      '''
                      #'''
                      fields_new, rhsVec_new, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
-                                                             DX, DZ, DX**2, DZ**2,\
+                                                             DX, DZ, DX2, DZ2,\
                                                              TOPT, fields, hydroState, DCF, \
-                                                             zeroDex_tran, diffDex, ubdex, uldex, urdex, \
-                                                             ResDiff, thisTime, isFirstStep, latPeriodic)
-                            
-                     # Update according to the periodic condition
-                     if latPeriodic:
-                            fields_new[urdex,:] = np.array(fields_new[uldex,:])
+                                                             zeroDex_tran, diffDex, ubdex, \
+                                                             ResDiff, thisTime, isFirstStep)
                      
                      # Compute residual and normalizations
-                     UD = np.abs(fields_new[:,0] + hydroState[:,0])
                      WD = np.abs(fields_new[:,1])
                      # Compute DynSGS or Flow Dependent diffusion coefficients
                      if ResDiff:
+                            UD = np.abs(fields_new[:,0] + hydroState[:,0])
                             QM = bn.nanmax(fields_new, axis=0)
                             # Trapezoidal Rule estimate of residual
                             resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
                             
                             DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[5])
                      else:
+                            UD = np.abs(fields_new[:,0] + hydroState[:,0])
                             DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
                             
                      fields = np.array(fields_new)

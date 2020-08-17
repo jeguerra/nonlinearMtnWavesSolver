@@ -285,7 +285,7 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex):
+def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -301,21 +301,26 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields, eb
        zflux[:,1] *= 2.0
               
        # Compute derivatives of fluxes
-       DDxx = DDXM.dot(xflux)
-       DDxz = DDZM.dot(xflux)
-       PPx2 = DDxx - (DZDX * DDxz)
-       DDz2 = DDZM.dot(zflux)
+       DdqDx = DDXM.dot(xflux)
+       DdqDz = DDZM.dot(xflux)
+       PqPz2 = DDZM.dot(zflux)
        
-       # Apply Neumann condition
-       PPx2[ebcDex[1],:] *= 0.0
-       DDz2[ebcDex[2],:] *= 0.0
+       # Compute the partial derivative
+       PqPx2 = DdqDx - DZDX * DdqDz
+       
+       # Adjust diffusion at the boundary
+       bxflux = xflux[ebcDex[1],:]
+       rflux = zflux[ebcDex[1],:] * np.reciprocal(bxflux, where=bxflux > 0.0)
+       dang = np.arctan(DZDX[ebcDex[1]]) - np.arctan(rflux)
+       xflux[ebcDex[1],:] *= 1.0 - np.abs(np.cos(dang))
+       zflux[ebcDex[1],:] *= 1.0 - np.abs(np.sin(dang))
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
-       DqDt = PPx2 + DDz2
+       DqDt = PqPx2 + PqPz2
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex):
+def computeDiffusionTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -323,26 +328,43 @@ def computeDiffusionTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex
        
        # Compute the partial derivative
        PqPx = DqDx - DZDX * DqDz
-              
-       # Compute 2nd partials of perturbations
-       DDxx = DDXM.dot(PqPx)
-       DDxz = DDZM.dot(PqPx)
        
-       PPx2 = DDxx - (DZDX * DDxz)
-       DDz2 = DDZM.dot(DqDz)
+       # Compute the Laplacian blocks
+       DdqDx = DDXM.dot(PqPx)
+       DdqDz = DDZM.dot(PqPx)
+       PqPz2 = DDZM.dot(DqDz)
+       
+       # Compute the partial derivative
+       PqPx2 = DdqDx - DZDX * DdqDz
        
        # Compute diffusive fluxes
-       xflux = RESCFX * PPx2
+       xflux = RESCFX * PqPx2
        xflux[:,0] *= 2.0
-       zflux = RESCFZ * DDz2
+       zflux = RESCFZ * PqPz2
        zflux[:,1] *= 2.0
        
-       # Apply Neumann condition
-       xflux[ebcDex[1],:] *= 0.0
+       #max0 = np.amax(xflux + zflux)
+       # Adjust diffusion at the boundary
+       DZDXbc = np.expand_dims(DZDX[ebcDex[1],0], 1)
+       scale = np.reciprocal(np.sqrt(1.0 + np.power(DZDXbc, 2.0)))
+       xflux[ebcDex[1],:] *= scale * DZDXbc
+       zflux[ebcDex[1],:] *= scale
+       
        zflux[ebcDex[2],:] *= 0.0
        
        # Compute the tendencies
        DqDt = xflux + zflux
+       #max1 = np.amax(DqDt)
+       #print(max0, max1)
+       '''
+       max0 = np.amax(DqDt)
        
+       import matplotlib.pyplot as plt
+       plt.plot(DqDt[ebcDex[1],0])
+       plt.show()
+       
+       DqDt[ebcDex[1],:] *= 0.0
+       max1 = np.amax(DqDt)
+       print(max0, max1)
+       '''
        return DqDt
-       

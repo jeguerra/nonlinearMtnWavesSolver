@@ -20,27 +20,48 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        
        # Unwrap the 1D derivative matrices into 2D operators
        
-       # Vertical derivative
+       #%% Vertical derivative and diffusion operators
        DDZ_OP = np.empty((OPS,OPS))
        for cc in range(NX):
-              ddex = np.array(range(NZ)) + cc * NZ
               # Advanced slicing used to get submatrix
-              # TF adjustment for Guellrich coordinate
+              ddex = np.array(range(NZ)) + cc * NZ
+              # TF adjustment for vertical coordinate transformation
               SIGMA = sps.diags(sigma[:,cc])
               DDZ_OP[np.ix_(ddex,ddex)] = SIGMA.dot(DDZ_1D)
-              # TF adjustment for vanilla stretching
-              #DDZ_OP[np.ix_(ddex,ddex)] = sigma[cc] * DDZ_1D
+              
+       # Make the operators sparse
+       DDZM = sps.csr_matrix(DDZ_OP); del(DDZ_OP)
        
-       
-       # Horizontal Derivative
+       '''#%% Vertical viscous operator
+       VSZ_OP = np.empty((OPS,OPS))
+       for cc in range(NX):
+              # Advanced slicing used to get submatrix
+              ddex = np.array(range(NZ)) + cc * NZ
+              # TF adjustment for vertical coordinate transformation
+              SIGMA = sps.diags(sigma[:,cc])
+              VSZ_OP[np.ix_(ddex,ddex)] = SIGMA.dot(VSZ_1D)
+              
+       # Make the operators sparse
+       VSZM = sps.csr_matrix(VSZ_OP); del(VSZ_OP)
+       '''              
+       #%% Horizontal Derivative
        DDX_OP = np.empty((OPS,OPS))
        for rr in range(NZ):
               ddex = np.array(range(0,OPS,NZ)) + rr
               # Advanced slicing used to get submatrix
               DDX_OP[np.ix_(ddex,ddex)] = DDX_1D
               
-       #%% Make the operators sparse
-       DDXM = sps.csr_matrix(DDX_OP)
-       DDZM = sps.csr_matrix(DDZ_OP)
-       
-       return DDXM, DDZM
+       # Make the operators sparse
+       DDXM = sps.csr_matrix(DDX_OP); del(DDX_OP)
+
+       '''#%% Horizontal viscous operators
+       VSX_OP = np.empty((OPS,OPS))
+       for rr in range(NZ):
+              ddex = np.array(range(0,OPS,NZ)) + rr
+              # Compute the viscous operator
+              VSX_OP[np.ix_(ddex,ddex)] = VSX_1D
+              
+       # Make the operators sparse
+       VSXM = sps.csr_matrix(VSX_OP); del(VSX_OP)
+       '''
+       return DDXM, DDZM#, VSXM, VSZM

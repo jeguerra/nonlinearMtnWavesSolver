@@ -39,7 +39,6 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM):
        QXMAX = (0.5 * DX) * U
        QZMAX = (0.5 * DZ) * W
        #'''
-       # Continuous damping in the sponge layers
        compare = np.stack((QRESX, QXMAX),axis=1)
        QRESX_CF = bn.nanmin(compare, axis=1)
        compare = np.stack((QRESZ, QZMAX),axis=1)

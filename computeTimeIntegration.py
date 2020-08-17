@@ -14,18 +14,21 @@ import computeResidualViscCoeffs as dcoeffs
 def rampFactor(time, timeBound):
        if time == 0.0:
               uRamp = 0.0
+              DuRamp = 0.0
        elif time <= timeBound:
               uRamp = 0.5 * (1.0 - mt.cos(mt.pi / timeBound * time))
+              DuRamp = 0.5 * mt.pi / timeBound * mt.sin(mt.pi / timeBound * time)
               #uRamp = mt.sin(0.5 * mt.pi / timeBound * time)
               #uRamp = uRamp**4
        else:
               uRamp = 1.0
+              DuRamp = 0.0
               
-       return uRamp
+       return uRamp, DuRamp
 
 def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
-                              sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, lftDex, rgtDex, \
-                              DynSGS, thisTime, isFirstStep, latPeriodic):
+                              sol0, init0, dcoeff0, zeroDex, ebcDex, botDex, \
+                              DynSGS, thisTime, isFirstStep):
        
        DT = TOPT[0]
        rampTime = TOPT[2]
@@ -50,39 +53,41 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        #DDXM_SP = REFS[16]
        #DDZM_SP = REFS[17]
        
-       dcoeff = dcoeff0
        time = thisTime
+       timeBound = 300.0
+       uf, duf = rampFactor(time, timeBound)
        
-       def computeUpdate(coeff, solA, rhs, rhsInv):
+       def computeUpdate_dynamics(coeff, solA, rhs):
               #Apply updates
               dsol = coeff * DT * rhs
               solB = solA + dsol
               
               # Update boundary
-              U = solB[:,0] + init0[:,0]
-              solB[botDex,1] = dHdX * U[botDex]
+              solB[botDex,1] += dHdX * dsol[botDex,0]
               
-              # Update periodic boundary if necessary
-              if latPeriodic:
-                     solB[rgtDex,:] += dsol[lftDex,:]
-              
-              #'''
-              # Update diffusion coefficients
-              UD = np.abs(solB[:,0] + U)
-              WD = np.abs(solB[:,1])
-              if DynSGS:
-                     QM = bn.nanmax(solB, axis=0)
-                     # Make a 1st order estimate of the residual
-                     resInv = 1.0 / (coeff * DT) * (solB - solA) - rhsInv
-                     dcoeff = dcoeffs.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX2, DZ2, RLM)
-              else:
-                     dcoeff = dcoeffs.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
-              
-              return solB, dcoeff
+              return solB
        
-       def computeRHSUpdate_inviscid(fields):
+       def computeUpdate_diffusion(coeff, solB, DqDx, DqDz):
+              
+              rhs = computeRHSUpdate_diffusion(solB, DqDx, DqDz)
+              # Fix Essential boundary conditions
+              rhs[zeroDex[0],0] *= 0.0
+              rhs[zeroDex[1],1] *= 0.0
+              rhs[zeroDex[2],2] *= 0.0
+              rhs[zeroDex[3],3] *= 0.0
+              
+              #Apply updates
+              dsol = coeff * DT * rhs
+              solC = solB + dsol
+              
+              # Update boundary
+              solC[botDex,1] += dHdX * dsol[botDex,0]
+              
+              return solC
+       
+       def computeRHSUpdate_dynamics(fields):
               U = fields[:,0] + init0[:,0]
-              # Compute first derivatives
+              # Compute first derivatives of the state
               DqDx, DqDz, DqDx_GML, DqDz_GML = \
                      tendency.computeFieldDerivatives(fields, DDXM, DDZM, GMLX, GMLZ)
               # Compute dynamical tendencies
@@ -95,27 +100,16 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               rhs[zeroDex[2],2] *= 0.0
               rhs[zeroDex[3],3] *= 0.0
                      
-              return rhs
+              return rhs, DqDx, DqDz
        
-       def computeRHSUpdate(fields):
-              U = fields[:,0] + init0[:,0]
-              # Compute first derivatives
-              DqDx, DqDz, DqDx_GML, DqDz_GML = \
-                     tendency.computeFieldDerivatives(fields, DDXM, DDZM, GMLX, GMLZ)
-              # Compute dynamical tendencies
-              rhsInv = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U)
-              rhsInv += tendency.computeRayleighTendency(REFG, fields)
-              
+       def computeRHSUpdate_diffusion(fields, DqDx, DqDz):
               # Compute diffusive tendencies
               if DynSGS:
-                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
-                     #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
+                     rhs = tendency.computeDiffusionTendency(dcoeff0, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
+                     #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
               else:
-                     rhsDiff = tendency.computeDiffusionTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
-                     #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, fields, ebcDex)
-                            
-              # Add inviscid and diffusion tendencies
-              rhs = rhsInv + rhsDiff
+                     rhs = tendency.computeDiffusionTendency(dcoeff0, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
+                     #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
               
               # Fix Essential boundary conditions
               rhs[zeroDex[0],0] *= 0.0
@@ -123,44 +117,31 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               rhs[zeroDex[2],2] *= 0.0
               rhs[zeroDex[3],3] *= 0.0
 
-              return rhs, rhsInv
+              return rhs
        
-       def ketcheson93(sol, getLocalError):
+       def ketcheson93(sol):
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               c2 = 1.0 / 5.0
-
-              if getLocalError:
-                     # Set storage for 2nd order solution
-                     sol2 = np.array(sol)
                      
               for ii in range(6):
-                     rhs, rhsInv = computeRHSUpdate(sol)
-                     sol, dcoeff = computeUpdate(c1, sol, rhs, rhsInv)
+                     rhs, DqDx, DqDz = computeRHSUpdate_dynamics(sol)
+                     sol = computeUpdate_dynamics(c1, sol, rhs)
+                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
                      
                      if ii == 0:
                             sol1 = np.array(sol)
-                            
-              if getLocalError:
-                     # Compute the 2nd order update if requested
-                     rhs, rhsInv = computeRHSUpdate(sol)
-                     sol2 = 1.0 / 7.0 * sol2 + 6.0 / 7.0 * sol
-                     sol2, dcoeff = computeUpdate(1.0 / 42.0, sol2, rhs, rhsInv)
                      
               # Compute stage 6 with linear combination
               sol = np.array(c2 * (3.0 * sol1 + 2.0 * sol))
               
               # Compute stages 7 - 9
               for ii in range(3):
-                     rhs, rhsInv = computeRHSUpdate(sol)
-                     sol, dcoeff = computeUpdate(c1, sol, rhs, rhsInv)
+                     rhs, DqDx, DqDz = computeRHSUpdate_dynamics(sol)
+                     sol = computeUpdate_dynamics(c1, sol, rhs)
+                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
                      
-              if getLocalError:
-                     # Output the local error estimate if requested
-                     err = sol - sol2
-                     return sol, err
-              else:
-                     return sol
+              return sol
        
        def ketcheson104(sol):
               # Ketchenson, 2008 10.1137/07070485X
@@ -168,19 +149,22 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        
               sol2 = np.array(sol)
               for ii in range(5):
-                     rhs, rhsInv = computeRHSUpdate(sol)
-                     sol , dcoeff= computeUpdate(c1, sol, rhs, rhsInv)
+                     rhs, DqDx, DqDz = computeRHSUpdate_dynamics(sol)
+                     sol, dcoeff = computeUpdate_dynamics(c1, sol, rhs)
+                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
               
               sol2 = np.array(0.04 * sol2 + 0.36 * sol)
               sol = np.array(15.0 * sol2 - 5.0 * sol)
               
               for ii in range(4):
-                     rhs, rhsInv = computeRHSUpdate(sol)
-                     sol, dcoeff = computeUpdate(c1, sol, rhs, rhsInv)
+                     rhs, DqDx, DqDz = computeRHSUpdate_dynamics(sol)
+                     sol = computeUpdate_dynamics(c1, sol, rhs)
+                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
                      
-              rhs, rhsInv = computeRHSUpdate(sol)       
+              rhs = computeRHSUpdate_dynamics(sol)       
               sol = np.array(sol2 + 0.6 * sol)
-              sol, dcoeff = computeUpdate(0.1, sol, rhs, rhsInv)
+              sol = computeUpdate_dynamics(0.1, sol, rhs)
+              sol = computeUpdate_diffusion(0.1, sol)
               
               return sol
        #'''
@@ -188,11 +172,11 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        
        # Compute dynamics update
        if order == 3:
-              solf = ketcheson93(sol0, False)
+              solf = ketcheson93(sol0)
        elif order == 4:
               solf = ketcheson104(sol0)
        
-       rhsf = computeRHSUpdate_inviscid(solf)
+       rhsf, DqDx, DqDz = computeRHSUpdate_dynamics(solf)
        time += DT
        
        return solf, rhsf, time
