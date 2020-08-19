@@ -26,7 +26,7 @@ def computeHorizontalInterpHermite(NX, xint, FLD, HF_TRANS):
        xint *= max(xh) / max(xint)
        
        # Compute backward transform to new grid
-       HFM, DHFM = hcnw.hefuncm(NX, xint, True)
+       HFM = hcnw.hefuncm(NX, xint, True)
 
        #plt.figure()
        #plt.plot(xh, HFM_native[0,:])
@@ -87,9 +87,9 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               
        return FLDI
 
-tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
-#tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
-hresl = [500, 250, 125, 62]
+#tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
+tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
+hresl = [1000, 500, 250, 125]
 #hresl = [250]
 # Loop over the 4 data files
 # Error norms between Tempest and Spectral Reference
@@ -108,8 +108,14 @@ for rr in hresl:
        z = m_fid.variables['lev'][:]
        hz = m_fid.variables['Zs']
        
+       # Get model run at 20, 40, and 60 hours
+       timeMin = 24 * 60 * m_fid.variables['time'][:]
+       ts2get = [(np.argwhere(timeMin == 20 * 60))[0,0], \
+                 (np.argwhere(timeMin == 40 * 60))[0,0], \
+                 (np.argwhere(timeMin == 60 * 60))[0,0]]       
+       
        # Read in the W data from Tempest
-       WMOD = np.mean(m_fid.variables['W'][-20:-10,:,0,:], axis=0)
+       WMOD = m_fid.variables['W'][ts2get,:,0,:]
        
        HermCheb = True
        # Get the reference solution data
@@ -132,10 +138,10 @@ for rr in hresl:
        
        # Get the Hermite and Chebyshev transforms
        if HermCheb:
-              DDX_1D, HF_TRANS, dummy = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        else:
-              DDX_1D, HF_TRANS, dummy = derv.computeFourierDerivativeMatrix(DIMS)
-       DDZ_1D, CH_TRANS, dummy = derv.computeChebyshevDerivativeMatrix(DIMS)
+              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
+       DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        
        # Get the reference vertical velocity (on the native HermCheb grid)
        OPS = DIMS[5]
@@ -158,41 +164,41 @@ for rr in hresl:
        #plt.xlim(-15000.0, 15000.0)
        
        # Sample the interior flow
-       lxi = int(0.25*len(x))
-       lzi1 = int(0.23*len(z))
-       lzi2 = int(0.35*len(z))
+       xintDex = (np.argwhere(abs(x) <= 15000.0))[:,0]
+       zintDex1 = set((np.argwhere(z <= 15000.0))[:,0])
+       zintDex2 = set((np.argwhere(z >= 5000.0))[:,0])
+       zintDex = sorted(zintDex1.intersection(zintDex2))
+       intDex = np.ix_(zintDex, xintDex)
        
-       xint = x[lxi-1:-lxi]
-       zint = z[lzi1:-lzi2]
        # Make the differences
-       WDIFF1 = WMOD - WREFint
-       WDIFF2 = WMOD - WBK
+       WDIFF1 = WMOD - np.expand_dims(WREFint, axis=0)
+       WDIFF2 = WMOD - np.expand_dims(WBK, axis=0)
        WDIFF3 = WREFint - WBK
        
        DOPS = len(x) * len(z)
-       DOPSint = len(xint) * len(zint)
+       DOPSint = len(xintDex) * len(zintDex)
        
        # Compute norms (TEMPEST TO SPECTRAL REFERENCE)
-       ndiff_wbc = np.linalg.norm(WDIFF1[0,:])
-       ndiff_fld = np.linalg.norm(np.reshape(WDIFF1, (DOPS,), order='F'))
-       ndiff_int = np.linalg.norm(np.reshape(WDIFF1[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
+       ndiff_wbc = np.linalg.norm(WDIFF1[:,0,:], axis=1)
+       ndiff_fld = np.linalg.norm(np.reshape(WDIFF1, (len(ts2get),DOPS), order='F'), axis=1)
+       ndiff_int = np.linalg.norm(np.reshape(WDIFF1[:,intDex[0],intDex[1]], (len(ts2get),DOPSint), order='F'), axis=1)
        
        nref_wbc = np.linalg.norm(WREFint[0,:])
        nref_fld = np.linalg.norm(np.reshape(WREFint, (DOPS,), order='F'))
-       nref_int = np.linalg.norm(np.reshape(WREFint[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
+       nref_int = np.linalg.norm(np.reshape(WREFint[intDex[0],intDex[1]], (DOPSint,), order='F'))
        # Take the norm and print
        wbcerr1.append(ndiff_wbc / nref_wbc)
        wflerr1.append(ndiff_fld / nref_fld)
        wnterr1.append(ndiff_int / nref_int)
        
        # Compute norms (TEMPEST TO CLASSICAL REFERENCE)
-       ndiff_wbc = np.linalg.norm(WDIFF2[0,:])
-       ndiff_fld = np.linalg.norm(np.reshape(WDIFF2, (DOPS,), order='F'))
-       ndiff_int = np.linalg.norm(np.reshape(WDIFF2[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
+       ndiff_wbc = np.linalg.norm(WDIFF2[:,0,:], axis=1)
+       ndiff_fld = np.linalg.norm(np.reshape(WDIFF2, (len(ts2get),DOPS), order='F'), axis=1)
+       ndiff_int = np.linalg.norm(np.reshape(WDIFF2[:,intDex[0],intDex[1]], (len(ts2get),DOPSint), order='F'), axis=1)
        
        nref_wbc = np.linalg.norm(WBK[0,:])
        nref_fld = np.linalg.norm(np.reshape(WBK, (DOPS,), order='F'))
-       nref_int = np.linalg.norm(np.reshape(WBK[lzi1:-lzi2,lxi-1:-lxi], (DOPSint,), order='F'))
+       nref_int = np.linalg.norm(np.reshape(WBK[intDex[0],intDex[1]], (DOPSint,), order='F'))
        # Take the norm and print
        wbcerr2.append(ndiff_wbc / nref_wbc)
        wflerr2.append(ndiff_fld / nref_fld)
@@ -205,12 +211,12 @@ for rr in hresl:
        # Plot the difference (Tempest to Spectral Reference)
        fig = plt.figure(figsize=(18.0, 3.0))
        plt.subplot(1,3,1)
-       ccheck = plt.contourf(X, Z, WMOD, ccount, cmap=cm.seismic)
+       ccheck = plt.contourf(X, Z, WMOD[-1,:,:], ccount, cmap=cm.seismic)
        plt.xlim(-30.0, 30.0)
        plt.clim(-wfbound, wfbound)
        norm = mpl.colors.Normalize(vmin=-wfbound, vmax=wfbound)
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
-       plt.title('Tempest Model W @ 20 Hours (m/s)')
+       plt.title('Tempest Model W @ 60 Hours (m/s)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.subplot(1,3,2)
        ccheck = plt.contourf(X, Z, WREFint, ccount, cmap=cm.seismic)
@@ -221,7 +227,7 @@ for rr in hresl:
        plt.title('Steady Spectral Reference W (m/s)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.subplot(1,3,3)
-       ccheck = plt.contourf(X, Z, WDIFF1, ccount, cmap=cm.seismic)
+       ccheck = plt.contourf(X, Z, WDIFF1[-1,:,:], ccount, cmap=cm.seismic)
        plt.title('Difference (m/s): ' + str(rr) + ' (m)')
        wdbound = 0.025
        plt.clim(-wdbound, wdbound)
@@ -273,33 +279,39 @@ for rr in hresl:
        #plt.xlim(-50.0, 50.0)
        #plt.ylim(0.0, 1.0E-3*DIMS[2])
        
+wbcerr1 = np.array(wbcerr1)
+wbcerr2 = np.array(wbcerr2)
+wflerr1 = np.array(wflerr1)
+wflerr2 = np.array(wflerr2)
+wnterr1 = np.array(wnterr1)
+wnterr2 = np.array(wnterr2)
 print(wbcerr1)
 print(wflerr1)
 #%%       
 fig = plt.figure(figsize=(5.0, 5.0))
-plt.plot(hresl, wbcerr1, 'C0s-', hresl, wbcerr2, 'C1s-'); plt.ylim(1.0E-3, 1.0E-1)
+plt.plot(hresl, wbcerr2[:,2], 's-', hresl, wbcerr1[:,2], 's-'); plt.ylim(1.0E-3, 1.0E0)
 plt.title('Terrain Boundary Response')
 plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 plt.ylabel('L-2 Norm W (m/s)')
-plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
+plt.legend(('Classical Reference','Spectral 60HR'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 fig = plt.figure(figsize=(10.0, 5.0))
 plt.subplot(1,2,1)
-plt.plot(hresl, wnterr1, 'C0s-', hresl, wnterr2, 'C1s-'); plt.ylim(1.0E-3, 1.0)
+plt.plot(hresl, wnterr2[:,2], 'ks-', hresl, wnterr1, 's-'); plt.ylim(1.0E-2, 5.0E-1)
 plt.title('Interior Domain Response')
 plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 plt.ylabel('L-2 Norm W (m/s)')
-plt.legend(('Spectral Reference','Classical Reference'), loc='lower right')
+plt.legend(('Classical Reference','Spectral 20HR','Spectral 40HR','Spectral 60HR'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 plt.subplot(1,2,2)
-plt.plot(hresl, wflerr1, 'C0s-'); plt.ylim(1.0E-3, 1.0E0)
+plt.plot(hresl, wflerr1, 's-'); plt.ylim(1.0E-2, 5.0E-1)
 plt.title('Entire Domain Response')
 plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 #plt.ylabel('L-2 Norm (m/s)')
-#plt.legend(('Spectral Reference'), loc='lower right')
+plt.legend(('Spectral 20HR','Spectral 40HR','Spectral 60HR'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
        
        

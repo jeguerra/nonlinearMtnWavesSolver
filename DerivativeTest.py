@@ -100,7 +100,7 @@ DY = np.multiply(term1, term2);
 h0 = 2000.0
 aC = 5000.0
 lC = 4000.0
-kC = 6000.0
+kC = 1.25E+4
 HOPT = [h0, aC, lC, kC, False, 3]
 HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT, DDX_1D)
     
@@ -109,7 +109,7 @@ plt.figure(figsize=(8, 6), tight_layout=True)
 #plt.plot(xv, HofX, label='Function')
 plt.plot(xv, dHdX, 'r-', label='Spectral Derivative')
 plt.plot(xv, DYD_CFD, 'b--', label='Compact CFD Derivative')
-plt.xlim(-12500.0, 12500.0)
+#plt.xlim(-12500.0, 12500.0)
 plt.xlabel('Domain')
 plt.ylabel('Derivatives HF')
 plt.title('Hermite Function Derivative Test')
