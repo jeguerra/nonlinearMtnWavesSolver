@@ -87,8 +87,8 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               
        return FLDI
 
-#tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
-tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
+tdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # home desktop
+#tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
 hresl = [1000, 500, 250, 125]
 #hresl = [250]
 # Loop over the 4 data files
@@ -209,15 +209,29 @@ for rr in hresl:
        ccount = 40
        wfbound = 0.2
        # Plot the difference (Tempest to Spectral Reference)
-       fig = plt.figure(figsize=(18.0, 3.0))
-       plt.subplot(1,3,1)
+       fig = plt.figure(figsize=(12.0, 4.0))
+       plt.subplot(1,2,1)
        ccheck = plt.contourf(X, Z, WMOD[-1,:,:], ccount, cmap=cm.seismic)
-       plt.xlim(-30.0, 30.0)
+       plt.contour(X, Z, WREFint, ccount, colors='k', linewidths=0.5)
+       plt.xlim(-20.0, 20.0)
        plt.clim(-wfbound, wfbound)
+       plt.xlabel('X (km)')
+       plt.ylabel('Z (km)')
        norm = mpl.colors.Normalize(vmin=-wfbound, vmax=wfbound)
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
-       plt.title('Tempest Model W @ 60 Hours (m/s)')
+       plt.title('Tempest vs. Reference W (m/s)')
+       #plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(1,2,2)
+       ccheck = plt.contourf(X, Z, WDIFF1[2,:,:], ccount, cmap=cm.seismic)
+       plt.title('Difference W (m/s) @ 60Hr: ' + str(rr) + ' (m)')
+       wdbound = 0.02
+       plt.clim(-wdbound, wdbound)
+       plt.xlabel('X (km)')
+       plt.ylabel('Z (km)')
+       norm = mpl.colors.Normalize(vmin=-wdbound, vmax=wdbound)
+       plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       '''
        plt.subplot(1,3,2)
        ccheck = plt.contourf(X, Z, WREFint, ccount, cmap=cm.seismic)
        plt.xlim(-30.0, 30.0)
@@ -226,14 +240,34 @@ for rr in hresl:
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
        plt.title('Steady Spectral Reference W (m/s)')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(1,3,3)
-       ccheck = plt.contourf(X, Z, WDIFF1[-1,:,:], ccount, cmap=cm.seismic)
-       plt.title('Difference (m/s): ' + str(rr) + ' (m)')
+       '''
+       '''
+       fig = plt.figure(figsize=(18.0, 3.0))
+       plt.subplot(1,3,1)
+       ccheck = plt.contourf(X, Z, WDIFF1[0,:,:], ccount, cmap=cm.seismic)
+       plt.title('Difference @ 20Hr (m/s): ' + str(rr) + ' (m)')
        wdbound = 0.025
        plt.clim(-wdbound, wdbound)
        norm = mpl.colors.Normalize(vmin=-wdbound, vmax=wdbound)
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(1,3,2)
+       ccheck = plt.contourf(X, Z, WDIFF1[1,:,:], ccount, cmap=cm.seismic)
+       plt.title('Difference @ 40Hr (m/s): ' + str(rr) + ' (m)')
+       wdbound = 0.025
+       plt.clim(-wdbound, wdbound)
+       norm = mpl.colors.Normalize(vmin=-wdbound, vmax=wdbound)
+       plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(1,3,3)
+       ccheck = plt.contourf(X, Z, WDIFF1[2,:,:], ccount, cmap=cm.seismic)
+       plt.title('Difference @ 60Hr (m/s): ' + str(rr) + ' (m)')
+       wdbound = 0.025
+       plt.clim(-wdbound, wdbound)
+       norm = mpl.colors.Normalize(vmin=-wdbound, vmax=wdbound)
+       plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       '''
        '''
        # Plot the difference (Tempest to Classical Reference)
        fig = plt.figure(figsize=(18.0, 3.0))
@@ -294,7 +328,7 @@ plt.title('Terrain Boundary Response')
 plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 plt.ylabel('L-2 Norm W (m/s)')
-plt.legend(('Classical Reference','Spectral 60HR'), loc='lower right')
+plt.legend(('Classical Reference','Spectral 60Hr'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 fig = plt.figure(figsize=(10.0, 5.0))
 plt.subplot(1,2,1)
@@ -303,7 +337,7 @@ plt.title('Interior Domain Response')
 plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 plt.ylabel('L-2 Norm W (m/s)')
-plt.legend(('Classical Reference','Spectral 20HR','Spectral 40HR','Spectral 60HR'), loc='lower right')
+plt.legend(('Classical Reference','Spectral 20Hr','Spectral 40Hr','Spectral 60Hr'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 plt.subplot(1,2,2)
 plt.plot(hresl, wflerr1, 's-'); plt.ylim(1.0E-2, 5.0E-1)
@@ -311,7 +345,7 @@ plt.title('Entire Domain Response')
 plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 #plt.ylabel('L-2 Norm (m/s)')
-plt.legend(('Spectral 20HR','Spectral 40HR','Spectral 60HR'), loc='lower right')
+plt.legend(('Spectral 20Hr','Spectral 40Hr','Spectral 60Hr'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
        
        

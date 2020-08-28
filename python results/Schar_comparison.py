@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Make the parent figure
-fig = plt.figure(figsize=(12.0, 6.0))
+fig = plt.figure(figsize=(12.0, 4.0))
 
 #%% Load in the classical linear solution from Matlab (approximate free-slip)
 clin = sio.loadmat('../matlab backup/AnalyticalSchar.mat', squeeze_me=True)
@@ -25,12 +25,13 @@ ZM = clin['Z']
 WM = clin['w']
 
 plt.subplot(1,3,1)
-ccheck = plt.contourf(1.0E-3 * XM, 1.0E-3 * ZM, WM.T, 44, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
+ccheck = plt.contourf(1.0E-3 * XM, 1.0E-3 * ZM, WM.T, 40, cmap=cm.seismic, vmin=-2.2, vmax=2.2)
 #fig.colorbar(ccheck)
 plt.xlim(-20.0, 20.0)
 plt.ylim(0.0, 15.0)
 plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-plt.xlabel('Distance (km)')
+plt.xlabel('X (km)')
+plt.xlabel('Z (km)')
 plt.title('Classical Fourier - W (m/s)')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 
@@ -61,7 +62,7 @@ ccheck = plt.contourf(1.0E-3 * X, 1.0E-3 * Z, W1, 44, cmap=cm.seismic, vmin=-2.2
 plt.xlim(-20.0, 20.0)
 plt.ylim(0.0, 15.0)
 plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-plt.xlabel('Distance (km)')
+plt.xlabel('X (km)')
 plt.title('Approximate Free-Slip - W (m/s)')
 plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 

@@ -6,6 +6,7 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
+import warnings
 import scipy.sparse as sps
 
 def computeFieldDerivatives(q, DDX, DDZ, GMLX, GMLZ):
@@ -231,7 +232,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U, botDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -248,17 +249,41 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
        wxz = np.expand_dims(fields[:,1],1)
+       # Compute normal compnent to terrain surfaces
+       velNorm = (wxz - UM * DZDX)
+       # Enforce No-Slip condition on transport
+       velNorm[botDex,0] *= 0.0
        
        # Compute pressure gradient force scaling (buoyancy)
-       T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
-       RdT = RdT_bar * (1.0 + T_ratio)
+       with warnings.catch_warnings():
+              np.seterr(all='raise')
+              try:
+                     RdT_hat = np.exp(kap * fields[:,2]) * np.exp(fields[:,3])
+                     RdT = RdT_bar * RdT_hat
+                     T_ratio = RdT_hat - 1.0
+                     #T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
+              except FloatingPointError:
+                     earg = kap * fields[:,2] + fields[:,3]
+                     earg_max = np.amax(earg)
+                     earg_min = np.amin(earg)
+                     print('In argument to local T ratio: ', earg_min, earg_max)
+                     pmax = np.amax(fields[:,2])
+                     pmin = np.amin(fields[:,2])
+                     print('Min/Max log pressures: ', pmin, pmax)
+                     tmax = np.amax(fields[:,3])
+                     tmin = np.amin(fields[:,3])
+                     print('Min/Max log potential temperature: ', tmin, tmax)
+                     # Save the state to a shelf
+                     
+              
+       #RdT = RdT_bar * (1.0 + T_ratio)
        
        # Compute transport and divergence terms
        #UPqPx = UM * PqPx
        #wDQqDz = wxz * (DqDz + DQDZ)
        
-       UPqPx = UM * PqPx_GML
-       wDQqDz = wxz * (DqDz_GML + DQDZ_GML)
+       UPqPx = UM * DqDx_GML
+       wDQqDz = velNorm * DqDz_GML + wxz * DQDZ_GML
        transport = UPqPx + wDQqDz
        
        divergence = (PqPx[:,0] + DqDz[:,1])
@@ -296,75 +321,74 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
        
        # Compute diffusive fluxes
        xflux = RESCFX * PqPx
-       xflux[:,0] *= 2.0
        zflux = RESCFZ * DqDz
+       
+       # Scale kinematic fluxes
+       xflux[:,0] *= 2.0
        zflux[:,1] *= 2.0
               
-       # Compute derivatives of fluxes
-       DdqDx = DDXM.dot(xflux)
-       DdqDz = DDZM.dot(xflux)
+       # Compute the Laplacian blocks
        PqPz2 = DDZM.dot(zflux)
-       
-       # Compute the partial derivative
-       PqPx2 = DdqDx - DZDX * DdqDz
-       
-       # Adjust diffusion at the boundary
-       bxflux = xflux[ebcDex[1],:]
-       rflux = zflux[ebcDex[1],:] * np.reciprocal(bxflux, where=bxflux > 0.0)
-       dang = np.arctan(DZDX[ebcDex[1]]) - np.arctan(rflux)
-       xflux[ebcDex[1],:] *= 1.0 - np.abs(np.cos(dang))
-       zflux[ebcDex[1],:] *= 1.0 - np.abs(np.sin(dang))
+       DdqDx = DDZM.dot(xflux) - DZDX * PqPz2
+       PqPx2 = DDXM.dot(xflux) - DZDX * DdqDx
        
        # Compute the tendencies (divergence of diffusive flux... discontinuous)
        DqDt = PqPx2 + PqPz2
        
        return DqDt
 
-def computeDiffusionTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
+def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D2ZDX2, SVOL_bar, fields, ebcDex):
        
+       kap = PHYS[4]
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
        
-       # Compute the partial derivative
+       # Compute 1 / rho
+       SVOL = np.expand_dims(SVOL_bar * np.exp((kap - 1.0) * fields[:,2]) * np.exp(fields[:,3]), 1)
+       #RHO = np.reciprocal(SVOL)
+       
+       # Compute terrain projection scaling to local tangent
+       DZDXbc = DZDX[ebcDex[1],0]
+       DZDX2bc = DZDX2[ebcDex[1],0]
+       scale = np.reciprocal(np.sqrt(1.0 + DZDX2bc))
+       
+       # Compute partial derivative
        PqPx = DqDx - DZDX * DqDz
        
        # Compute the Laplacian blocks
-       DdqDx = DDXM.dot(PqPx)
-       DdqDz = DDZM.dot(PqPx)
-       PqPz2 = DDZM.dot(DqDz)
+       P2qPz2 = DDZM.dot(DqDz)
+       P2qPxz = DDZM.dot(PqPx)
+       D2qDx2 = DDXM.dot(PqPx)
        
-       # Compute the partial derivative
-       PqPx2 = DdqDx - DZDX * DdqDz
+       # Compute the 2nd partial derivative
+       P2qPx2 = D2qDx2 - DZDX * P2qPxz
        
-       # Compute diffusive fluxes
-       xflux = RESCFX * PqPx2
-       xflux[:,0] *= 2.0
-       zflux = RESCFZ * PqPz2
-       zflux[:,1] *= 2.0
+       xflux = RESCFX * P2qPx2 
+       zflux = RESCFZ * P2qPz2
+       xzflux = RESCFX * P2qPxz[:,0:2]
+       zxflux = RESCFZ * P2qPxz[:,0:2]
        
-       #max0 = np.amax(xflux + zflux)
-       # Adjust diffusion at the boundary
-       DZDXbc = np.expand_dims(DZDX[ebcDex[1],0], 1)
-       scale = np.reciprocal(np.sqrt(1.0 + np.power(DZDXbc, 2.0)))
-       xflux[ebcDex[1],:] *= scale * DZDXbc
-       zflux[ebcDex[1],:] *= scale
+       DqDt = np.zeros(DqDx.shape)
        
-       zflux[ebcDex[2],:] *= 0.0
+       # Diffusion of u-w vector
+       DqDt[:,0] = 2.0 * xflux[:,0] + zflux[:,0] + xzflux[:,1]
+       DqDt[:,1] = xflux[:,1] + 2.0 * zflux[:,1] + zxflux[:,0]
+       # Normal to top and lateral boundaries vanish
+       DqDt[ebcDex[3],0:2] *= 0.0
+       DqDt[ebcDex[2],0:2] *= 0.0
+       # Normal to terrain slope vanishes
+       DqDt[ebcDex[1],0] *= scale
+       DqDt[ebcDex[1],1] *= scale * DZDXbc
        
-       # Compute the tendencies
-       DqDt = xflux + zflux
-       #max1 = np.amax(DqDt)
-       #print(max0, max1)
-       '''
-       max0 = np.amax(DqDt)
-       
-       import matplotlib.pyplot as plt
-       plt.plot(DqDt[ebcDex[1],0])
-       plt.show()
-       
-       DqDt[ebcDex[1],:] *= 0.0
-       max1 = np.amax(DqDt)
-       print(max0, max1)
-       '''
-       return DqDt
+       # Diffusion of scalars (broken up into anisotropic components)
+       # Normal to top and lateral boundaries vanish
+       xflux[ebcDex[3],2:] *= 0.0
+       zflux[ebcDex[2],2:] *= 0.0
+       # Normal to terrain slope vanishes
+       #xflux[ebcDex[1],2:] *= np.expand_dims(scale, 1)
+       #zflux[ebcDex[1],2:] *= np.expand_dims(scale * DZDXbc, 1)
+       DqDt[:,2:] = xflux[:,2:] + zflux[:,2:]
+       DqDt[ebcDex[1],2:] *= 0.0 # NO SCALAR DIFFUSION AT THE TERRAIN...S
+
+       return DqDt * SVOL
