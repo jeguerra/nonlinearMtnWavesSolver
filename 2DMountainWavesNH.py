@@ -278,19 +278,19 @@ def runModel(TestName):
        DZ_local = np.reshape(DZM, (OPS,), order='F')
        
        if not StaticSolve:
-              '''
+              #'''
               DX = 1.0 * DX_avg
               DZ = 1.0 * DZ_avg
               DX2 = DX**2
               DZ2 = DZ**2
-              '''
+              #'''
               '''
               DX = 1.0 * DX_local
               DZ = 1.0 * DZ_local
               DX2 = np.power(DX, 2.0)
               DZ2 = np.power(DZ, 2.0)
               '''
-              #'''
+              '''
               DX_spr = 1.0 / np.abs(spl.eigs(DDX_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
               DZ_spr = 1.0 / np.abs(spl.eigs(DDZ_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
               DX = 2.0 * DX_spr
@@ -298,7 +298,7 @@ def runModel(TestName):
               DX2 = DX**2
               DZ2 = DZ**2
               print('Spectral radii of 1st derivative matrices: ', DX_spr, DZ_spr)
-              #'''
+              '''
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -543,7 +543,8 @@ def runModel(TestName):
               # Compute the RHS for this iteration
               DqDx, DqDz, DqDx_GML, DqDz_GML = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9][0], fields, U)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, \
+                                                         REFS[15], REFS[9][0], fields, U, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
@@ -755,7 +756,8 @@ def runModel(TestName):
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               DqDx, DqDz, DqDx_GML, DqDz_GML = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9][0], fields, U)
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, \
+                                                         REFS[15], REFS[9][0], fields, U, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0

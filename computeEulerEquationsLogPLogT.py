@@ -86,7 +86,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
        
        # Compute diagonal blocks related to sensible temperature
-       RdT_bar = REFS[9]
+       RdT_bar = REFS[9][0]
        T_bar = (1.0 / Rd) * RdT_bar
        
        bf = np.exp(kap * fields[:,2] + fields[:,3])
@@ -177,7 +177,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        
        # Get REFS data
        UZ = REFS[8]
-       PORZ = REFS[9]
+       PORZ = REFS[9][0]
        # Full spectral transform derivative matrices
        DDXM = REFS[12]
        DDZM = REFS[13]
@@ -239,8 +239,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        gam = PHYS[6]
        
        # Get hydrostatic initial fields
+       #GMLX = REFG[0]
+       GMLZ = REFG[1]
        DQDZ = REFG[3]
-       DQDZ_GML = REFG[1].dot(REFG[3])
+       DQDZ_GML = GMLZ.dot(DQDZ)
 
        # Compute the partial derivative
        PqPx = DqDx - DZDX * DqDz
@@ -252,7 +254,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        # Compute normal compnent to terrain surfaces
        velNorm = (wxz - UM * DZDX)
        # Enforce No-Slip condition on transport
-       velNorm[botDex,0] *= 0.0
+       velNorm[botDex,:] *= 0.0
        
        # Compute pressure gradient force scaling (buoyancy)
        with warnings.catch_warnings():
@@ -274,14 +276,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
                      tmin = np.amin(fields[:,3])
                      print('Min/Max log potential temperature: ', tmin, tmax)
                      # Save the state to a shelf
-                     
-              
-       #RdT = RdT_bar * (1.0 + T_ratio)
-       
+                            
        # Compute transport and divergence terms
-       #UPqPx = UM * PqPx
-       #wDQqDz = wxz * (DqDz + DQDZ)
-       
        UPqPx = UM * DqDx_GML
        wDQqDz = velNorm * DqDz_GML + wxz * DQDZ_GML
        transport = UPqPx + wDQqDz
@@ -291,9 +287,9 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        
        DqDt = -transport
        # Horizontal momentum equation
-       DqDt[:,0] -= RdT * PqPx[:,2]
+       DqDt[:,0] -= RdT * PqPx_GML[:,2]
        # Vertical momentum equation
-       DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
+       DqDt[:,1] -= RdT * DqDz_GML[:,2] - GMLZ.dot(gc * T_ratio)
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
@@ -345,7 +341,7 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D
        RESCFZ = RESCF[1]
        
        # Compute 1 / rho
-       SVOL = np.expand_dims(SVOL_bar * np.exp((kap - 1.0) * fields[:,2]) * np.exp(fields[:,3]), 1)
+       #SVOL = np.expand_dims(SVOL_bar * np.exp((kap - 1.0) * fields[:,2]) * np.exp(fields[:,3]), 1)
        #RHO = np.reciprocal(SVOL)
        
        # Compute terrain projection scaling to local tangent
@@ -378,8 +374,8 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D
        DqDt[ebcDex[3],0:2] *= 0.0
        DqDt[ebcDex[2],0:2] *= 0.0
        # Normal to terrain slope vanishes
-       DqDt[ebcDex[1],0] *= scale
-       DqDt[ebcDex[1],1] *= scale * DZDXbc
+       #DqDt[ebcDex[1],0] *= scale
+       #DqDt[ebcDex[1],1] *= scale * DZDXbc # NOT NEEDED SINCE THIS IS NULLED AS A BC
        
        # Diffusion of scalars (broken up into anisotropic components)
        # Normal to top and lateral boundaries vanish
@@ -389,6 +385,6 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D
        #xflux[ebcDex[1],2:] *= np.expand_dims(scale, 1)
        #zflux[ebcDex[1],2:] *= np.expand_dims(scale * DZDXbc, 1)
        DqDt[:,2:] = xflux[:,2:] + zflux[:,2:]
-       DqDt[ebcDex[1],2:] *= 0.0 # NO SCALAR DIFFUSION AT THE TERRAIN...S
+       DqDt[ebcDex[1],2:] *= 0.0 # NO SCALAR DIFFUSION AT THE TERRAIN...
 
-       return DqDt * SVOL
+       return DqDt# * SVOL

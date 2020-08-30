@@ -69,9 +69,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
               rowsOutP = set()
               rowsOutT = set()
               # Indexing for static solver
-              #right = np.concatenate((urdex, wrdex, prdex, trdex))
               top = wtdex
-              #rowsOutBC_static = set(np.concatenate((right, top)))
               rowsOutBC_static = set(top)
        elif not latPeriodic and latInflow:
               # Only inflow condition specified

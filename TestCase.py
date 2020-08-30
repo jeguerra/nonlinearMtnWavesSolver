@@ -43,7 +43,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(199, 84, 70.0, 22.0, 280.0, 7000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'periodic')
+                     self.setUserData(199, 84, 70.0, 22.0, 280.0, 7000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow')
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -63,7 +63,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(199, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'periodic')
+                     self.setUserData(199, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow')
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
