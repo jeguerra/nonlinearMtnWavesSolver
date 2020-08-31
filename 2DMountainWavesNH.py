@@ -867,50 +867,59 @@ def runModel(TestName):
                      if ti % ITI == 0:
                             # Store current time
                             tmvar[ff-1] = thisTime
-                            fig = plt.figure(figsize=(8.0, 12.0))
+                            if makePlots:
+                                   fig = plt.figure(figsize=(8.0, 12.0))
                             # Check the fields or tendencies
                             for pp in range(numVar):
-                                   plt.subplot(4,1,pp+1)
                                    q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
                                    dqdt = np.reshape(rhsVec[:,pp], (NZ, NX+1), order='F')
                                    
-                                   if np.abs(q.max()) > np.abs(q.min()):
-                                          clim = np.abs(q.max())
-                                   elif np.abs(q.max()) < np.abs(q.min()):
-                                          clim = np.abs(q.min())
-                                   else:
-                                          clim = np.abs(q.max())
-                                  
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-                                   plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                   #plt.xlim(-30.0, 30.0)
-                                   #plt.ylim(0.0, 20.0)
-                                   
-                                   if pp < (numVar - 1):
-                                          plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-                                   else:
-                                          plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-                                          
-                                   plt.colorbar(ccheck, format='%.2e')
-                                   
                                    if pp == 0:
-                                          plt.title('u (m/s): ' + 'Time = {:.5f} (sec)'.format(thisTime))
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
                                    elif pp == 1:
-                                          plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
                                           wvar[ff-1,:,:] = q
                                           dwvar[ff-1,:,:] = dqdt
                                    elif pp == 2:
-                                          plt.title('ln-p (Pa)')
                                           pvar[ff-1,:,:] = q
                                           dpvar[ff-1,:,:] = dqdt
                                    else:
-                                          plt.title('ln-theta (K)')
                                           tvar[ff-1,:,:] = q
                                           dtvar[ff-1,:,:] = dqdt
+                                   
+                                   if makePlots:
+                                          plt.subplot(4,1,pp+1)
+                                          
+                                          if np.abs(q.max()) > np.abs(q.min()):
+                                                 clim = np.abs(q.max())
+                                          elif np.abs(q.max()) < np.abs(q.min()):
+                                                 clim = np.abs(q.min())
+                                          else:
+                                                 clim = np.abs(q.max())
+                                         
+                                          ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                          plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                          #plt.xlim(-30.0, 30.0)
+                                          #plt.ylim(0.0, 20.0)
+                                          
+                                          if pp < (numVar - 1):
+                                                 plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+                                          else:
+                                                 plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                                                 
+                                          plt.colorbar(ccheck, format='%.2e')
+                                          
+                                          if pp == 0:
+                                                 plt.title('u (m/s): ' + 'Time = {:.5f} (sec)'.format(thisTime))
+                                          elif pp == 1:
+                                                 plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
+                                          elif pp == 2:
+                                                 plt.title('ln-p (Pa)')
+                                          else:
+                                                 plt.title('ln-theta (K)')
        
-                            plt.show()
+                            if makePlots:
+                                   plt.show()
                             ff += 1
 
                      if ti == 0:
