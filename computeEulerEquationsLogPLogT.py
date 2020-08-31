@@ -275,7 +275,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
                      tmax = np.amax(fields[:,3])
                      tmin = np.amin(fields[:,3])
                      print('Min/Max log potential temperature: ', tmin, tmax)
-                     # Save the state to a shelf
+                     # Close out the netcdf file
                             
        # Compute transport and divergence terms
        UPqPx = UM * DqDx_GML
@@ -335,7 +335,7 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
 
 def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D2ZDX2, SVOL_bar, fields, ebcDex):
        
-       kap = PHYS[4]
+       #kap = PHYS[4]
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
@@ -366,7 +366,6 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D
        zxflux = RESCFZ * P2qPxz[:,0:2]
        
        DqDt = np.zeros(DqDx.shape)
-       
        # Diffusion of u-w vector
        DqDt[:,0] = 2.0 * xflux[:,0] + zflux[:,0] + xzflux[:,1]
        DqDt[:,1] = xflux[:,1] + 2.0 * zflux[:,1] + zxflux[:,0]

@@ -33,7 +33,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(167, 84, 70.0, 22.0, 280.0, 7000.0, 10000.0, 250.0, 0.01, 2, 1.2E+4, 'inflow')
+                     self.setUserData(183, 92, 70.0, 22.0, 280.0, 7000.0, 10000.0, 250.0, 0.01, 2, 1.2E+4, 'inflow_periodic')
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
@@ -43,7 +43,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(199, 84, 70.0, 22.0, 280.0, 7000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow')
+                     self.setUserData(183, 84, 70.0, 22.0, 280.0, 7000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow_periodic')
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -53,7 +53,7 @@ class TestCase:
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(167, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow')
+                     self.setUserData(183, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow_periodic')
                      
               elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
@@ -63,7 +63,7 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(199, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow')
+                     self.setUserData(183, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow_periodic')
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
@@ -74,7 +74,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(447, 96, 136.0, 40.0, 300.0, 8000.0, 16000.0, 2000.0, 0.01, 3, 1.25E+4, 'inflow')
+                     self.setUserData(447, 96, 116.0, 40.0, 300.0, 8000.0, 16000.0, 2000.0, 0.01, 3, 1.25E+4, 'inflow_periodic')
                      # UNIFORM STRATIFICATION PARAMETERS
                      #self.setUserData(423, 92, 121.0, 38.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.25E+4)
                      

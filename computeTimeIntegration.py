@@ -71,11 +71,6 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        def computeUpdate_diffusion(coeff, solB, DqDx, DqDz):
               
               rhs = computeRHSUpdate_diffusion(solB, DqDx, DqDz)
-              # Fix Essential boundary conditions
-              rhs[zeroDex[0],0] *= 0.0
-              rhs[zeroDex[1],1] *= 0.0
-              rhs[zeroDex[2],2] *= 0.0
-              rhs[zeroDex[3],3] *= 0.0
               
               #Apply updates
               dsol = coeff * DT * rhs
@@ -111,13 +106,13 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               else:
                      rhs = tendency.computeDiffusionTendency(PHYS, dcoeff0, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D2ZDX2, SVOL_bar, fields, ebcDex)
                      #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
-              
+              '''
               # Fix Essential boundary conditions
               rhs[zeroDex[0],0] *= 0.0
               rhs[zeroDex[1],1] *= 0.0
               rhs[zeroDex[2],2] *= 0.0
               rhs[zeroDex[3],3] *= 0.0
-
+              '''
               return rhs
        
        def ketcheson93(sol):

@@ -824,6 +824,11 @@ def runModel(TestName):
               wvar = m_fid.createVariable('w', 'f8', ('time', 'zlev', 'xlon'))
               pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
               tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
+              # Create variables (field tendencies)
+              duvar = m_fid.createVariable('DuDt', 'f8', ('time', 'zlev', 'xlon'))
+              dwvar = m_fid.createVariable('DwDt', 'f8', ('time', 'zlev', 'xlon'))
+              dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
+              dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
               
               # Initialize local sound speed and time step
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
@@ -866,16 +871,17 @@ def runModel(TestName):
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    plt.subplot(4,1,pp+1)
-                                   dqdt = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
+                                   q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
+                                   dqdt = np.reshape(rhsVec[:,pp], (NZ, NX+1), order='F')
                                    
-                                   if np.abs(dqdt.max()) > np.abs(dqdt.min()):
-                                          clim = np.abs(dqdt.max())
-                                   elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
-                                          clim = np.abs(dqdt.min())
+                                   if np.abs(q.max()) > np.abs(q.min()):
+                                          clim = np.abs(q.max())
+                                   elif np.abs(q.max()) < np.abs(q.min()):
+                                          clim = np.abs(q.min())
                                    else:
-                                          clim = np.abs(dqdt.max())
+                                          clim = np.abs(q.max())
                                   
-                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+                                   ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
                                    plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
                                    #plt.xlim(-30.0, 30.0)
                                    #plt.ylim(0.0, 20.0)
@@ -889,16 +895,20 @@ def runModel(TestName):
                                    
                                    if pp == 0:
                                           plt.title('u (m/s): ' + 'Time = {:.5f} (sec)'.format(thisTime))
-                                          uvar[ff-1,:,:] = dqdt
+                                          uvar[ff-1,:,:] = q
+                                          duvar[ff-1,:,:] = dqdt
                                    elif pp == 1:
                                           plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
-                                          wvar[ff-1,:,:] = dqdt
+                                          wvar[ff-1,:,:] = q
+                                          dwvar[ff-1,:,:] = dqdt
                                    elif pp == 2:
                                           plt.title('ln-p (Pa)')
-                                          pvar[ff-1,:,:] = dqdt
+                                          pvar[ff-1,:,:] = q
+                                          dpvar[ff-1,:,:] = dqdt
                                    else:
                                           plt.title('ln-theta (K)')
-                                          tvar[ff-1,:,:] = dqdt
+                                          tvar[ff-1,:,:] = q
+                                          dtvar[ff-1,:,:] = dqdt
        
                             plt.show()
                             ff += 1
@@ -912,87 +922,35 @@ def runModel(TestName):
                             isFirstStep = False
                             
                      # Compute the solution within a time step
-                     #'''
-                     fields_new, rhsVec_new, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
-                                                             DX, DZ, DX2, DZ2,\
-                                                             TOPT, fields, hydroState, DCF, \
-                                                             zeroDex_tran, diffDex, \
-                                                             ResDiff, thisTime, isFirstStep)
-                     
-                     # Compute residual and normalizations
-                     WD = np.abs(fields_new[:,1])
-                     # Compute DynSGS or Flow Dependent diffusion coefficients
-                     if ResDiff:
-                            UD = np.abs(fields_new[:,0] + hydroState[:,0])
-                            QM = bn.nanmax(fields_new, axis=0)
-                            # Trapezoidal Rule estimate of residual
-                            resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
+                     try:
+                            fields_new, rhsVec_new, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
+                                                                    DX, DZ, DX2, DZ2,\
+                                                                    TOPT, fields, hydroState, DCF, \
+                                                                    zeroDex_tran, diffDex, \
+                                                                    ResDiff, thisTime, isFirstStep)
                             
-                            DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[5])
-                     else:
-                            UD = np.abs(fields_new[:,0] + hydroState[:,0])
-                            DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
-                            
-                     fields = np.array(fields_new)
-                     rhsVec = np.array(rhsVec_new)
-                     del(fields_new)
-                     del(rhsVec_new)
-                     #'''
-                     '''
-                     #%% Time integration by applying diffusion AFTER dynamics update
-                     # Dynamics step
-                     fields_new, rhsVec_new = dynint.computeTimeIntegrationDYNCS(PHYS, REFS, REFG, \
-                                                             TOPT, fields, hydroState, \
-                                                             zeroDex_tran, ubdex, isFirstStep)
-                            
-                     # Compute residual and normalizations
-                     UD = np.abs(fields_new[:,0] + hydroState[:,0])
-                     WD = np.abs(fields_new[:,1])
-                     
-                     # Compute DynSGS or Flow Dependent diffusion coefficients
-                     if ResDiff:
-                            QM = bn.nanmax(fields_new, axis=0)
-                            if isFirstStep:
-                                   # Backward Euler estimate of residual
-                                   resInv = (1.0 / TOPT[0]) * (fields_new - fields) - rhsVec_new
-                            else:
+                            # Compute residual and normalizations
+                            WD = np.abs(fields_new[:,1])
+                            # Compute DynSGS or Flow Dependent diffusion coefficients
+                            if ResDiff:
+                                   UD = np.abs(fields_new[:,0] + hydroState[:,0])
+                                   QM = bn.nanmax(fields_new, axis=0)
                                    # Trapezoidal Rule estimate of residual
                                    resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
-                            dcoeff = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX_local, DZ_local, REFG[5])
-                     else:
-                            dcoeff = rescf.computeFlowVelocityCoeffs(UD, WD, DX_local, DZ_local)
-                            
-                     # Diffusion step
-                     fields_new = difint.computeTimeIntegrationVISC(PHYS, REFS, REFG, \
-                                                             TOPT, fields_new, hydroState, dcoeff, \
-                                                             zeroDex_tran, ubdex, \
-                                                             (extDex, latDex, vrtDex), isFirstStep)
-                     fields = np.array(fields_new)
-                     del(fields_new)
-                     del(rhsVec_new)
-                     
-                     # Compute first derivatives
-                     if isFirstStep:
-                            DDXM = REFS[10]
-                            DDZM = REFS[11]
-                     else:
-                            DDXM = REFS[12]
-                            DDZM = REFS[13]
-                         
-                     U = fields[:,0] + hydroState[:,0]
-                     DqDx, DqDz, DqDx_GML, DqDz_GML = \
-                            eqs.computeFieldDerivatives(fields, DDXM, DDZM, REFG[0], REFG[1])
-                     # Compute dynamical tendencies
-                     rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, REFS[15], REFS[9], fields, U)
-                     rhsVec += eqs.computeRayleighTendency(REFG, fields)
-                     
-                     # Fix Essential boundary conditions
-                     rhsVec[zeroDex_tran[0],0] *= 0.0
-                     rhsVec[zeroDex_tran[1],1] *= 0.0
-                     rhsVec[zeroDex_tran[2],2] *= 0.0
-                     rhsVec[zeroDex_tran[3],3] *= 0.0
-                     thisTime += TOPT[0]
-                     '''
+                                   
+                                   DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[5])
+                            else:
+                                   UD = np.abs(fields_new[:,0] + hydroState[:,0])
+                                   DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
+                                   
+                            fields = np.array(fields_new)
+                            rhsVec = np.array(rhsVec_new)
+                            del(fields_new)
+                            del(rhsVec_new)
+                     except:
+                            print('Transient step failed! Closing out to NC file.')
+                            m_fid.close() 
+                     #'''
                      ti += 1
                      
               # Close the output data file
