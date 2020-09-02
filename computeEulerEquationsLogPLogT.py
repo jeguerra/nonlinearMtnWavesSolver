@@ -373,8 +373,8 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D
        DqDt[ebcDex[3],0:2] *= 0.0
        DqDt[ebcDex[2],0:2] *= 0.0
        # Normal to terrain slope vanishes
-       DqDt[ebcDex[1],0] *= scale
-       DqDt[ebcDex[1],1] *= scale * DZDXbc # NOT NEEDED SINCE THIS IS NULLED AS A BC
+       #DqDt[ebcDex[1],0] *= scale
+       #DqDt[ebcDex[1],1] *= scale * DZDXbc # NOT NEEDED SINCE THIS IS NULLED AS A BC
        
        # Diffusion of scalars (broken up into anisotropic components)
        # Normal to top and lateral boundaries vanish

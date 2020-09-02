@@ -959,6 +959,7 @@ def runModel(TestName):
                      except:
                             print('Transient step failed! Closing out to NC file.')
                             m_fid.close() 
+                            sys.exit(2)
                      #'''
                      ti += 1
                      
