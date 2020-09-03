@@ -377,6 +377,7 @@ def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, fields, 
        # Normal to top and lateral boundaries vanish
        xflux[ebcDex[3],2:] *= 0.0
        zflux[ebcDex[2],2:] *= 0.0
+       zflux[ebcDex[2],3] *= 0.0
        DqDt[:,2:] = xflux[:,2:] + zflux[:,2:]
        #DqDt[ebcDex[1],2:] *= 0.0
 
