@@ -544,7 +544,7 @@ def runModel(TestName):
               DqDx, DqDz, DqDx_GML, DqDz_GML = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, \
-                                                         REFS[15], REFS[9][0], fields, U, ubdex)
+                                                         REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
@@ -757,7 +757,7 @@ def runModel(TestName):
               DqDx, DqDz, DqDx_GML, DqDz_GML = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, \
-                                                         REFS[15], REFS[9][0], fields, U, ubdex)
+                                                         REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
@@ -924,32 +924,45 @@ def runModel(TestName):
 
                      if ti == 0:
                             isFirstStep = True
-                            UD = np.abs(fields[:,0] + hydroState[:,0])
-                            WD = np.abs(fields[:,1])
+                            
+                            if TOPT[2] > 0.0:
+                                   initFact = 0.0
+                            elif TOPT[2] == 0.0:
+                                   initFact = 1.0
+                            else:
+                                   print('Ramp time is set < 0! Default is 0.')
+                                   initFact = 1.0
+                                   
+                            fields[:,1] *= initFact
+                            UD = np.abs(fields[:,0] + initFact * hydroState[:,0])
+                            WD = initFact * np.abs(fields[:,1])
                             DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
                      else:
                             isFirstStep = False
                             
                      # Compute the solution within a time step
                      try:
-                            fields_new, rhsVec_new, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
+                            fields_new, rhsVec_new, thisTime, uf = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
                                                                     DX, DZ, DX2, DZ2,\
                                                                     TOPT, fields, hydroState, DCF, \
                                                                     zeroDex_tran, diffDex, \
                                                                     ResDiff, thisTime, isFirstStep)
                             
+                            # Update the boundary
+                            U = fields_new[:,0] + uf * hydroState[:,0]
+                            fields_new[ubdex,1] = REFS[6] * U[ubdex]
+                                   
                             # Compute residual and normalizations
+                            UD = np.abs(U)
                             WD = np.abs(fields_new[:,1])
                             # Compute DynSGS or Flow Dependent diffusion coefficients
                             if ResDiff:
-                                   UD = np.abs(fields_new[:,0] + hydroState[:,0])
                                    QM = bn.nanmax(fields_new, axis=0)
                                    # Trapezoidal Rule estimate of residual
                                    resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
                                    
                                    DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[5])
                             else:
-                                   UD = np.abs(fields_new[:,0] + hydroState[:,0])
                                    DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
                                    
                             fields = np.array(fields_new)

@@ -19,6 +19,21 @@ def computeFieldDerivatives(q, DDX, DDZ, GMLX, GMLZ):
        
        return DqDx, DqDz, DqDx_GML, DqDz_GML
 
+def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, GMLX, GMLZ):
+       
+       D2qDx2 = DDX.dot(DqDx)
+       D2qDz2 = DDZ.dot(DqDz)
+       D2qDxz = DDZ.dot(DqDx)
+       
+       return D2qDx2, D2qDz2, D2qDxz
+       
+       '''
+       D2qDx2_GML = GMLX.dot(D2qDx2)
+       D2qDz2_GML = GMLZ.dot(D2qDz2)
+       D2qDxz_GML = GMLX.dot(D2qDxz)
+       
+       return D2qDx2_GML, D2qDz2_GML, D2qDxz_GML
+       '''
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
               return res
@@ -232,7 +247,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U, botDex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U, uf, botDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -243,13 +258,15 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        GMLZ = REFG[1]
        DQDZ = REFG[3]
        DQDZ_GML = GMLZ.dot(DQDZ)
+       # Time dependence of background wind
+       DQDZ_GML[:,0] *= uf 
 
        # Compute the partial derivative
        PqPx = DqDx - DZDX * DqDz
        PqPx_GML = DqDx_GML - DZDX * DqDz_GML
        
        # Compute advective (multiplicative) operators
-       UM = np.expand_dims(U,1)
+       UM = uf * np.expand_dims(U,1)
        wxz = np.expand_dims(fields[:,1],1)
        # Compute normal compnent to terrain surfaces
        velNorm = (wxz - UM * DZDX)
@@ -333,29 +350,12 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D2ZDX2, SVOL_bar, fields, ebcDex):
+def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, fields, ebcDex):
        
        #kap = PHYS[4]
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
-       
-       # Compute 1 / rho
-       #SVOL = np.expand_dims(SVOL_bar * np.exp((kap - 1.0) * fields[:,2]) * np.exp(fields[:,3]), 1)
-       #RHO = np.reciprocal(SVOL)
-       
-       # Compute terrain projection scaling to local tangent
-       DZDXbc = DZDX[ebcDex[1],0]
-       DZDX2bc = DZDX2[ebcDex[1],0]
-       scale = np.reciprocal(np.sqrt(1.0 + DZDX2bc))
-       
-       # Compute partial derivative
-       PqPx = DqDx - DZDX * DqDz
-       
-       # Compute the Laplacian blocks
-       P2qPz2 = DDZM.dot(DqDz)
-       P2qPxz = DDZM.dot(PqPx)
-       D2qDx2 = DDXM.dot(PqPx)
        
        # Compute the 2nd partial derivative
        P2qPx2 = D2qDx2 - DZDX * P2qPxz
@@ -365,25 +365,19 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, DZDX2, D
        xzflux = RESCFX * P2qPxz[:,0:2]
        zxflux = RESCFZ * P2qPxz[:,0:2]
        
-       DqDt = np.zeros(DqDx.shape)
+       DqDt = np.zeros(fields.shape)
        # Diffusion of u-w vector
        DqDt[:,0] = 2.0 * xflux[:,0] + zflux[:,0] + xzflux[:,1]
        DqDt[:,1] = xflux[:,1] + 2.0 * zflux[:,1] + zxflux[:,0]
        # Normal to top and lateral boundaries vanish
        DqDt[ebcDex[3],0:2] *= 0.0
        DqDt[ebcDex[2],0:2] *= 0.0
-       # Normal to terrain slope vanishes
-       #DqDt[ebcDex[1],0] *= scale
-       #DqDt[ebcDex[1],1] *= scale * DZDXbc # NOT NEEDED SINCE THIS IS NULLED AS A BC
        
        # Diffusion of scalars (broken up into anisotropic components)
        # Normal to top and lateral boundaries vanish
        xflux[ebcDex[3],2:] *= 0.0
        zflux[ebcDex[2],2:] *= 0.0
-       # Normal to terrain slope vanishes
-       xflux[ebcDex[1],2:] *= np.expand_dims(scale, 1)
-       zflux[ebcDex[1],2:] *= np.expand_dims(scale * DZDXbc, 1)
        DqDt[:,2:] = xflux[:,2:] + zflux[:,2:]
-       #DqDt[ebcDex[1],2:] *= 0.0 # NO SCALAR DIFFUSION AT THE TERRAIN...
+       #DqDt[ebcDex[1],2:] *= 0.0
 
        return DqDt# * SVOL
