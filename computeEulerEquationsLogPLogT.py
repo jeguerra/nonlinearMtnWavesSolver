@@ -42,6 +42,22 @@ def computeFieldDerivatives2_GPU(PqPx, PqPz, DDX, DDZ):
        
        return cu.asnumpy(D2qDx2), cu.asnumpy(D2qDz2), cu.asnumpy(D2qDxz)
 
+def computeAllFieldDerivatives_CPU(q, DDX, DDZ, DZDX, DQDZ):
+       
+       # Compute first derivatives (on CPU)
+       DqDx = DDX.dot(q)
+       DqDz = DDZ.dot(q)
+       # Compute first partial in X (on CPU)
+       PqPx = DqDx - DZDX * DqDz
+       PqPz = DqDz + DQDZ
+       
+       # Compute second derivatives (on CPU)
+       D2qDx2 = DDX.dot(PqPx)
+       P2qPz2 = DDZ.dot(PqPz)
+       D2qDxz = DDZ.dot(PqPx)
+       
+       return DqDx, DqDz, D2qDx2, P2qPz2, D2qDxz
+
 def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ):
        
        # Compute first derivatives (on CPU)

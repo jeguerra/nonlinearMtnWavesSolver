@@ -7,6 +7,7 @@ Created on Tue Aug 13 10:09:52 2019
 """
 import numpy as np
 import math as mt
+import cupy as cu
 import computeEulerEquationsLogPLogT as tendency
 
 def rampFactor(time, timeBound):
@@ -32,92 +33,76 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        rampTimeBound = TOPT[2]
        order = TOPT[3]
        dHdX = REFS[6]
-       
-       # Dereference operators
-       GMLX = REFG[0]
-       GMLZ = REFG[1]
-       #RLM = REFG[5]
-       
        RdT_bar = REFS[9][0]
-       #SVOL_bar = REFS[9][1]
-       if isFirstStep:
-              DDXM = REFS[10]
-              DDZM = REFS[11]
-       else:
-              DDXM = REFS[12]
-              DDZM = REFS[13]
-              
-       DZDX = REFS[15]
-       #DZDX2 = REFS[16]
-       #D2ZDX2 = REFS[17]
-       
-       #DDXM_SP = REFS[16]
-       #DDZM_SP = REFS[17]
        
        # Adjust for time ramping
        time = thisTime
        uf, duf = rampFactor(time, rampTimeBound)
+           
+       DQDZ = REFG[2]
+       DZDX = REFS[15]
+       #DZDX2 = REFS[16]
+       #D2ZDX2 = REFS[17]
        
-       def computeUpdate_dynamics(coeff, solA):
+       if isFirstStep:
+              # Use SciPY sparse for dynamics
+              DDXM_CPU = REFS[10]
+              DDZM_CPU = REFS[11]
+              DDXM_GPU = REFS[13][0]
+              DDZM_GPU = REFS[13][1]
+       else:
+              # Use multithreading on CPU and GPU
+              DDXM_CPU = REFS[12][0]
+              DDZM_CPU = REFS[12][1]
+              DDXM_GPU = REFS[13][0]
+              DDZM_GPU = REFS[13][1]
+       
+       #DDXM_SP = REFS[16]
+       #DDZM_SP = REFS[17]
+       
+       isAllCPU = False
+       def computeUpdate(coeff, solA):
               
-              rhs, DqDx, DqDz = computeRHSUpdate_dynamics(solA)
+              if isAllCPU:
+                     DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz = \
+                     tendency.computeAllFieldDerivatives_CPU(solA, DDXM_CPU, DDZM_CPU, DZDX, DQDZ)
+              else:
+                     DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz = \
+                            tendency.computeAllFieldDerivatives_CPU2GPU(solA, DDXM_CPU, DDZM_CPU, DDXM_GPU, DDZM_GPU, DZDX, DQDZ)
+              
+              rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
+              rhsDif = computeRHSUpdate_diffusion(D2qDx2, D2qDz2, D2qDxz)
+              rhs = rhsDyn + rhsDif
+              
+              # Fix Essential boundary conditions and impose constraint
+              rhs[zeroDex[0],0] *= 0.0
+              rhs[ebcDex[1],1] = dHdX * rhs[ebcDex[1],0]
+              rhs[ebcDex[2],1] *= 0.0
+              rhs[zeroDex[2],2] *= 0.0
+              rhs[zeroDex[3],3] *= 0.0
               
               #Apply updates
               dsol = coeff * DT * rhs
               solB = solA + dsol
               
-              # Update boundary
-              solB[ebcDex[1],1] += dHdX * dsol[ebcDex[1],0]
-              
-              return solB, DqDx, DqDz
+              return solB, rhs
        
-       def computeUpdate_diffusion(coeff, solB, DqDx, DqDz):
-              
-              rhs = computeRHSUpdate_diffusion(solB, DqDx, DqDz)
-              
-              #Apply updates
-              dsol = coeff * DT * rhs
-              solC = solB + dsol
-              
-              # Update boundary
-              solC[ebcDex[1],1] += dHdX * dsol[ebcDex[1],0]
-              
-              return solC
-       
-       def computeRHSUpdate_dynamics(fields):
+       def computeRHSUpdate_dynamics(fields, DqDx, DqDz):
               U = fields[:,0] + uf * init0[:,0]
-              # Compute first derivatives of the state
-              DqDx, DqDz, DqDx_GML, DqDz_GML = \
-                     tendency.computeFieldDerivatives(fields, DDXM, DDZM, GMLX, GMLZ)
               # Compute dynamical tendencies
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U, uf, ebcDex[1])
-              rhs += tendency.computeRayleighTendency(REFG, fields)
-
-              # Fix Essential boundary conditions
-              rhs[zeroDex[0],0] *= 0.0
-              rhs[zeroDex[1],1] *= 0.0
-              rhs[zeroDex[2],2] *= 0.0
-              rhs[zeroDex[3],3] *= 0.0
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, uf, ebcDex)
+              #rhs += tendency.computeRayleighTendency(REFG, fields)
                      
-              return rhs, DqDx_GML, DqDz_GML
+              return rhs
        
-       def computeRHSUpdate_diffusion(fields, DqDx, DqDz):
-              # Compute second derivatives of the state from first partials
-              PqPx = DqDx - DZDX * DqDz
-              D2qDx2, D2qDz2, D2qDxz = tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM, DDZM, GMLX, GMLZ)
+       def computeRHSUpdate_diffusion(D2qDx2, D2qDz2, D2qDxz):
               # Compute diffusive tendencies
               if DynSGS:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff0, D2qDx2, D2qDz2, D2qDxz, DZDX, fields, ebcDex)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff0, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
                      #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
               else:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff0, D2qDx2, D2qDz2, D2qDxz, DZDX, fields, ebcDex)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff0, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
                      #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
-
-              # Fix Essential boundary conditions
-              rhs[zeroDex[0],0] *= 0.0
-              rhs[zeroDex[1],1] *= 0.0
-              rhs[zeroDex[2],2] *= 0.0
-              rhs[zeroDex[3],3] *= 0.0
        
               return rhs
        
@@ -127,8 +112,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               c2 = 1.0 / 5.0
                      
               for ii in range(6):
-                     sol, DqDx, DqDz = computeUpdate_dynamics(c1, sol)
-                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
+                     sol, rhs = computeUpdate(c1, sol)
                      
                      if ii == 0:
                             sol1 = np.array(sol)
@@ -138,8 +122,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               
               # Compute stages 7 - 9
               for ii in range(3):
-                     sol, DqDx, DqDz = computeUpdate_dynamics(c1, sol)
-                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
+                     sol, rhs = computeUpdate(c1, sol)
                      
               return sol
        
@@ -149,19 +132,16 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        
               sol2 = np.array(sol)
               for ii in range(5):
-                     sol, DqDx, DqDz = computeUpdate_dynamics(c1, sol)
-                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
+                     sol, DqDx, DqDz = computeUpdate(c1, sol)
               
               sol2 = np.array(0.04 * sol2 + 0.36 * sol)
               sol = np.array(15.0 * sol2 - 5.0 * sol)
               
               for ii in range(4):
-                     sol, DqDx, DqDz = computeUpdate_dynamics(c1, sol)
-                     sol = computeUpdate_diffusion(c1, sol, DqDx, DqDz)
+                     sol, DqDx, DqDz = computeUpdate(c1, sol)
                      
               sol = np.array(sol2 + 0.6 * sol)
-              sol, DqDx, DqDz = computeUpdate_dynamics(0.1, sol)
-              sol = computeUpdate_diffusion(0.1, sol)
+              sol = computeUpdate(0.1, sol)
               
               return sol
        #'''
@@ -175,6 +155,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        
        time += DT
        uf, duf = rampFactor(time, rampTimeBound)
-       rhsf, DqDx, DqDz = computeRHSUpdate_dynamics(solf)
+       DqDx, DqDz = tendency.computeFieldDerivatives(solf, DDXM_CPU, DDZM_CPU)
+       rhsf = computeRHSUpdate_dynamics(solf, DqDx, DqDz)
        
        return solf, rhsf, time, uf
