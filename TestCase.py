@@ -71,10 +71,10 @@ class TestCase:
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(447, 96, 116.0, 40.0, 300.0, 8000.0, 16000.0, 2000.0, 0.01, 3, 1.25E+4, 'inflow_periodic')
+                     self.setUserData(447, 96, 120.0, 40.0, 300.0, 8000.0, 20000.0, 2000.0, 0.01, 3, 1.25E+4, 'inflow_periodic')
                      # UNIFORM STRATIFICATION PARAMETERS
                      #self.setUserData(423, 92, 121.0, 38.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.25E+4)
                      
@@ -139,7 +139,7 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.05 # seconds
               HR = 2.0 # hours
-              rampTime = 300.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
+              rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

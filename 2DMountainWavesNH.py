@@ -156,11 +156,13 @@ def runModel(TestName):
        NewtonLin = thisTest.solType['NewtonLin']
        ExactBC = thisTest.solType['ExactBC']
        
+       # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
        if StaticSolve:
               RSBops = False
               ApplyGML = False
        else:
-              RSBops = True
+              RSBops = False # Turn off PyRSB SpMV
+              CUPYops = True # Turn on CuPy GPU SpMV
               ApplyGML = True
        
        # Set the grid type
@@ -388,13 +390,11 @@ def runModel(TestName):
        SV = PORZ * np.reciprocal(np.exp(LOGP)) # Specific volume (1 / rho_bar)
        
        #%% Rayleigh opearator and GML weight
-       ROPS, RLM, GMLX, GMLZ = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
+       ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
        if ApplyGML:
-              GMLXOP = sps.diags(np.reshape(GMLX, (OPS,), order='F'), offsets=0, format='csr')
-              GMLZOP = sps.diags(np.reshape(GMLZ, (OPS,), order='F'), offsets=0, format='csr')
+              GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
        else:
-              GMLXOP = sps.identity(OPS, format='csr')
-              GMLZOP = sps.identity(OPS, format='csr')
+              GMLOP = sps.identity(OPS, format='csr')
               
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
@@ -404,7 +404,7 @@ def runModel(TestName):
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
        # Make a collection for background field derivatives
-       REFG = [GMLXOP, GMLZOP, DLTDZ, DQDZ, RLOPT[4], RLM]
+       REFG = [GMLOP, DLTDZ, DQDZ, RLOPT[4], RLM]
        
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F'))
@@ -416,29 +416,32 @@ def runModel(TestName):
        del(DLTDZ)
        del(DLPDZ)
        del(DLPTDZ)
-       del(GMLX)
-       del(GMLZ)
+       del(GML)
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        #DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
-       
-       # For use with transient run in CSR format and RHS evaluations
        REFS.append(DDXM) # index 10
        REFS.append(DDZM) # index 11
        
-       if StaticSolve or not RSBops:
+       if not StaticSolve and RSBops:
+              from rsb import rsb_matrix
+              # Multithreaded enabled for transient solution
+              REFS.append(rsb_matrix(DDXM))
+              REFS.append(rsb_matrix(DDZM))
+       elif not StaticSolve and CUPYops:
+              from rsb import rsb_matrix
+              import cupyx.scipy.sparse as cuspr
+              # Multithreaded enabled on GPU
+              REFS.append((rsb_matrix(DDXM), rsb_matrix(DDZM)))
+              REFS.append((cuspr.csr_matrix(DDXM), cuspr.csr_matrix(DDZM)))
+       else: 
               # Matrix operators for Jacobian assembly
               REFS.append(DDXM)
               REFS.append(DDZM)
-       else:
-              # Multithreaded enabled for transient solution
-              from rsb import rsb_matrix
-              REFS.append(rsb_matrix(DDXM))
-              REFS.append(rsb_matrix(DDZM))
-       
+              
        # Store the terrain profilse
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
@@ -475,8 +478,7 @@ def runModel(TestName):
        del(DDXM)
        del(DDZM)
        del(DZDX)
-       del(GMLXOP)
-       del(GMLZOP)
+       del(GMLOP)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
@@ -541,9 +543,9 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              DqDx, DqDz, DqDx_GML, DqDz_GML = \
-                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, \
+              DqDx, DqDz = \
+                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
@@ -754,9 +756,9 @@ def runModel(TestName):
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              DqDx, DqDz, DqDx_GML, DqDz_GML = \
-                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11], REFG[0], REFG[1])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, \
+              DqDx, DqDz = \
+                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
+              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
@@ -778,11 +780,10 @@ def runModel(TestName):
                             
               # Reshape main solution vectors and initialize
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
-              rhsVec = np.zeros((OPS, numVar))
-              error = [np.linalg.norm(rhsVec)]
               
-              # Initialize boundary solution
+              # Initialize vertical velocity
               fields[ubdex,1] = -dWBC
+              #fields[:,1] = REFS[15][:,0] * (hydroState[:,0] + fields[:,0])
                             
               # Initialize time constants
               ti = 0
@@ -842,10 +843,33 @@ def runModel(TestName):
               
               import bottleneck as bn
               import computeResidualViscCoeffs as rescf
-              import computeTimeIntegrationDynamics as dynint
-              import computeTimeIntegrationDiffusion as difint
               
               while thisTime <= TOPT[4]:
+                     
+                     if ti == 0:
+                            isFirstStep = True
+                            
+                            if TOPT[2] > 0.0:
+                                   initFact = 0.0
+                            elif TOPT[2] == 0.0:
+                                   initFact = 1.0
+                            else:
+                                   print('Ramp time is set < 0! Default is 0.')
+                                   initFact = 1.0
+                                   
+                            fields[:,1] *= initFact
+                            UD = np.abs(fields[:,0] + initFact * hydroState[:,0])
+                            WD = initFact * np.abs(fields[:,1])
+                            DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
+                            
+                            DqDx, DqDz = \
+                                   eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
+                            rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
+                                                                          fields, hydroState[:,0], 1.0, ubdex)
+                            rhsVec += eqs.computeRayleighTendency(REFG, fields)
+                            error = [np.linalg.norm(rhsVec)]
+                     else:
+                            isFirstStep = False
                             
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
@@ -921,24 +945,6 @@ def runModel(TestName):
                             if makePlots:
                                    plt.show()
                             ff += 1
-
-                     if ti == 0:
-                            isFirstStep = True
-                            
-                            if TOPT[2] > 0.0:
-                                   initFact = 0.0
-                            elif TOPT[2] == 0.0:
-                                   initFact = 1.0
-                            else:
-                                   print('Ramp time is set < 0! Default is 0.')
-                                   initFact = 1.0
-                                   
-                            fields[:,1] *= initFact
-                            UD = np.abs(fields[:,0] + initFact * hydroState[:,0])
-                            WD = initFact * np.abs(fields[:,1])
-                            DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
-                     else:
-                            isFirstStep = False
                             
                      # Compute the solution within a time step
                      try:
@@ -947,12 +953,9 @@ def runModel(TestName):
                                                                     TOPT, fields, hydroState, DCF, \
                                                                     zeroDex_tran, diffDex, \
                                                                     ResDiff, thisTime, isFirstStep)
-                            
-                            # Update the boundary
-                            U = fields_new[:,0] + uf * hydroState[:,0]
-                            fields_new[ubdex,1] = REFS[6] * U[ubdex]
                                    
                             # Compute residual and normalizations
+                            U = fields_new[:,0] + uf * hydroState[:,0]
                             UD = np.abs(U)
                             WD = np.abs(fields_new[:,1])
                             # Compute DynSGS or Flow Dependent diffusion coefficients
@@ -961,7 +964,7 @@ def runModel(TestName):
                                    # Trapezoidal Rule estimate of residual
                                    resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
                                    
-                                   DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[5])
+                                   DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[4])
                             else:
                                    DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
                                    

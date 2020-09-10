@@ -12,8 +12,8 @@ Works the old fashioned way with lots of nested loops... so sue me!
 import math as mt
 import numpy as np
 import scipy.sparse as sps
-#from matplotlib import cm
-#import matplotlib.pyplot as plt
+from matplotlib import cm
+import matplotlib.pyplot as plt
 
 def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
@@ -51,9 +51,9 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      if applyLateral:
                             # Left layer or right layer or not? [1 0]
                             if XRL >= dLayerR:
-                                   dNormX = (XRL - dLayerR) / width
+                                   dNormX = (L2 - XRL) / width
                             elif XRL <= dLayerL:
-                                   dNormX = (dLayerL - XRL) / width
+                                   dNormX = (XRL - L1) / width
                             else:
                                    dNormX = 1.0
                             # Evaluate the Rayleigh factor
@@ -83,12 +83,14 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        '''
        plt.figure()
        plt.contourf(X, Z, RL, 101, cmap=cm.seismic)
+       plt.colorbar()
        plt.show()
        input()
        '''                     
        # Assemble the Grid Matching Layer field X and Z directions
-       GMLX = np.zeros((NZ, NX))
-       GMLZ = np.zeros((NZ, NX))
+       GML = np.ones((NZ, NX))
+       #GMLX = np.ones((NZ, NX))
+       #GMLZ = np.ones((NZ, NX))
        for ii in range(NZ):
               for jj in range(NX):
                      # Get this X location
@@ -117,12 +119,20 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      else:
                             RFZ = 0.0
                      
-                     GMLX[ii,jj] = 1.0 / (1.0 + RFX)
-                     GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
+                     #GMLX[ii,jj] = 1.0 / (1.0 + RFX)
+                     #GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
                      # Set the field to max(lateral, top) to handle corners
-                     #GML[ii,jj] = np.amax([RFX, RFZ])
-                            
-       return GMLX, GMLZ, RL, RLX, RLZ, SBR
+                     RFM = np.amax([RFX, RFZ])
+                     GML[ii,jj] = 1.0 / (1.0 + RFM)
+                     
+       '''
+       plt.figure()
+       plt.contourf(X, Z, GML, 101, cmap=cm.seismic)
+       plt.colorbar()
+       plt.show()
+       input()
+       '''                  
+       return GML, RL, RLX, RLZ, SBR
 
 def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        # Get options data
@@ -137,7 +147,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        OPS = NX * NZ
        
        # Set up the Rayleigh field
-       GMLX, GMLZ, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
+       GML, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
        
        # Get the individual mu for each prognostic
        mu_U = mu[0]
@@ -162,6 +172,6 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        # Store the diagonal blocks corresponding to Rayleigh damping terms
        ROPS = [mu_U * RLM, mu_W * RLM, mu_P * RLM, mu_T * RLM]
        
-       return ROPS, RLM, GMLX, GMLZ
+       return ROPS, RLM, GML
        
                             

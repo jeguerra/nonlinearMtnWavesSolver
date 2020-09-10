@@ -6,34 +6,85 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
+import cupy as cu
 import warnings
 import scipy.sparse as sps
 
-def computeFieldDerivatives(q, DDX, DDZ, GMLX, GMLZ):
-       
+def computeFieldDerivatives(q, DDX, DDZ):
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
        
-       DqDx_GML = GMLX.dot(DqDx)
-       DqDz_GML = GMLZ.dot(DqDz)
+       return DqDx, DqDz
        
-       return DqDx, DqDz, DqDx_GML, DqDz_GML
+def computeFieldDerivatives_GPU(q, DDX, DDZ):
+       
+       q_gpu = cu.asarray(q)
+       DqDx = DDX.dot(q_gpu)
+       DqDz = DDZ.dot(q_gpu)
+       
+       return cu.asnumpy(DqDx), cu.asnumpy(DqDz)
 
-def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, GMLX, GMLZ):
-       
-       D2qDx2 = DDX.dot(DqDx)
-       D2qDz2 = DDZ.dot(DqDz)
-       D2qDxz = DDZ.dot(DqDx)
+def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ):
+
+       D2qDx2 = DDX.dot(PqPx)
+       D2qDz2 = DDZ.dot(PqPz)
+       D2qDxz = DDZ.dot(PqPx)
        
        return D2qDx2, D2qDz2, D2qDxz
        
-       '''
-       D2qDx2_GML = GMLX.dot(D2qDx2)
-       D2qDz2_GML = GMLZ.dot(D2qDz2)
-       D2qDxz_GML = GMLX.dot(D2qDxz)
+def computeFieldDerivatives2_GPU(PqPx, PqPz, DDX, DDZ):
        
-       return D2qDx2_GML, D2qDz2_GML, D2qDxz_GML
-       '''
+       PqPx_gpu = cu.asarray(PqPx)
+       PqPz_gpu = cu.asarray(PqPz)
+       D2qDx2 = DDX.dot(PqPx_gpu)
+       D2qDz2 = DDZ.dot(PqPz_gpu)
+       D2qDxz = DDZ.dot(PqPx_gpu)
+       
+       return cu.asnumpy(D2qDx2), cu.asnumpy(D2qDz2), cu.asnumpy(D2qDxz)
+
+def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ):
+       
+       # Compute first derivatives (on CPU)
+       DqDx = DDX_CPU.dot(q)
+       DqDz = DDZ_CPU.dot(q)
+       # Compute first partial in X (on CPU)
+       PqPx = DqDx - DZDX * DqDz
+       PqPz = DqDz + DQDZ
+       
+       # Send gradients to GPU
+       PqPx_gpu = cu.asarray(PqPx)
+       PqPz_gpu = cu.asarray(PqPz)
+       # Compute second derivatives (on GPU)
+       D2qDx2 = DDX_GPU.dot(PqPx_gpu)
+       P2qPz2 = DDZ_GPU.dot(PqPz_gpu)
+       D2qDxz = DDZ_GPU.dot(PqPx_gpu)
+       
+       # 2 transfers to GPU
+       # 3 transfers from GPU
+       
+       return DqDx, DqDz, \
+              cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
+
+def computeAllFieldDerivatives_GPU(q, DDX, DDZ, DZDX, DQDZ):
+       # Send state to GPU
+       q_gpu = cu.asarray(q)
+       DZDX_gpu = cu.asarray(DZDX)
+       # Compute first derivatives (on GPU)
+       DqDx = DDX.dot(q_gpu)
+       PqPz = DDZ.dot(q_gpu)
+       # Compute first partial in X (on GPU)
+       PqPx = DqDx - DZDX_gpu * (PqPz + DQDZ)
+       # Compute second derivatives (on GPU)
+       D2qDx2 = DDX.dot(PqPx)
+       P2qPz2 = DDZ.dot(PqPz)
+       D2qDxz = DDZ.dot(PqPx)
+       
+       # 2 transfers to GPU
+       # 5 transfers from GPU
+       
+       return cu.asnumpy(DqDx), cu.asnumpy(PqPz), \
+              cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
+       
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
               return res
@@ -57,14 +108,13 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        gam = PHYS[6]
        
        # Get the derivative operators
-       DDXM = REFS[12]
-       DDZM = REFS[13]
+       DDXM = REFS[10]
+       DDZM = REFS[11]
        DZDX = REFS[15].flatten()
        
-       GMLX = REFG[0]
-       GMLZ = REFG[1]
-       DLTDZ = REFG[2]
-       DQDZ = REFG[3]
+       GML = REFG[0]
+       DLTDZ = REFG[1]
+       DQDZ = REFG[2]
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
@@ -128,27 +178,26 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        WXZM = sps.diags(WXZ, offsets=0, format='csr')
        
        # Compute common horizontal transport block
-       #UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
-       UPXM = UM.dot(GMLX.dot(DDXM)) + WXZM.dot(GMLZ.dot(DDZM))
+       UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
        
        # Compute the blocks of the Jacobian operator
-       LD11 = UPXM + GMLX.dot(PuPxM)
-       LD12 = GMLZ.dot(DuDzM + DUDZM)
+       LD11 = UPXM + PuPxM
+       LD12 = DuDzM + DUDZM
        LD13 = RdTM.dot(PPXM) + (Rd * PtPxM)
        LD14 = RdTM.dot(PlpPxM)
        
-       LD21 = GMLX.dot(PwPxM)
-       LD22 = UPXM + GMLZ.dot(DwDzM)
+       LD21 = PwPxM
+       LD22 = UPXM + DwDzM
        LD23 = RdTM.dot(DDZM) + RdT_barM.dot(DLTDZM) + Rd * DtDzM
        LD24 = RdTM.dot(DlpDzM) - gc * bfM
        
-       LD31 = gam * PPXM + GMLX.dot(PlpPxM)
-       LD32 = gam * DDZM + GMLZ.dot(DlpDzM + DLPDZM)
+       LD31 = gam * PPXM + PlpPxM
+       LD32 = gam * DDZM + DlpDzM + DLPDZM
        LD33 = UPXM
        LD34 = None
        
-       LD41 = GMLX.dot(PltPxM)
-       LD42 = GMLZ.dot(DltDzM + DLPTDZM)
+       LD41 = PltPxM
+       LD42 = DltDzM + DLPTDZM
        LD43 = None
        LD44 = UPXM
        
@@ -202,8 +251,8 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        PORZM = sps.diags(PORZ, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
-       DLTDZ = REFG[2]
-       DQDZ = REFG[3]
+       DLTDZ = REFG[1]
+       DQDZ = REFG[2]
        DLTDZM = sps.diags(DLTDZ[:,0], offsets=0, format='csr')
        DUDZM = sps.diags(DQDZ[:,0], offsets=0, format='csr')
        DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
@@ -247,23 +296,15 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML, DZDX, RdT_bar, fields, U, uf, botDex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, uf, ebcDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
        
        # Get hydrostatic initial fields
-       #GMLX = REFG[0]
-       GMLZ = REFG[1]
-       DQDZ = REFG[3]
-       DQDZ_GML = GMLZ.dot(DQDZ)
-       # Time dependence of background wind
-       DQDZ_GML[:,0] *= uf 
-
-       # Compute the partial derivative
-       PqPx = DqDx - DZDX * DqDz
-       PqPx_GML = DqDx_GML - DZDX * DqDz_GML
+       GML = REFG[0]
+       DQDZ = uf * REFG[2]
        
        # Compute advective (multiplicative) operators
        UM = uf * np.expand_dims(U,1)
@@ -271,7 +312,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
        # Compute normal compnent to terrain surfaces
        velNorm = (wxz - UM * DZDX)
        # Enforce No-Slip condition on transport
-       velNorm[botDex,:] *= 0.0
+       velNorm[ebcDex[1],:] *= 0.0
+       velNorm[ebcDex[2],:] *= 0.0
        
        # Compute pressure gradient force scaling (buoyancy)
        with warnings.catch_warnings():
@@ -295,18 +337,26 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
                      # Close out the netcdf file
                             
        # Compute transport and divergence terms
-       UPqPx = UM * DqDx_GML
-       wDQqDz = velNorm * DqDz_GML + wxz * DQDZ_GML
-       transport = UPqPx + wDQqDz
+       UPqPx = UM * DqDx
+       wDQDz = velNorm * DqDz + wxz * DQDZ
        
-       divergence = (PqPx[:,0] + DqDz[:,1])
-       #divergence = (PqPx_GML[:,0] + DqDz_GML[:,1])
+       # GML CONFIGURATIONS
+       # GML turned off
+       #transport = UPqPx + wDQDz
+       divergence = DqDx[:,0] + DqDz[:,1] - DZDX[:,0] * DqDz[:,0]
+       #pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
+       #pgradz = RdT * DqDz[:,2] - gc * T_ratio
+       # GML turned on
+       transport = GML.dot(UPqPx + wDQDz)
+       #divergence = GMLX.dot(DqDx[:,0]) + GMLZ.dot(DqDz[:,1] - DZDX[:,0] * DqDz[:,0])
+       pgradx = GML.dot(RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2]))
+       pgradz = GML.dot(RdT * DqDz[:,2] - gc * T_ratio)
        
        DqDt = -transport
        # Horizontal momentum equation
-       DqDt[:,0] -= RdT * PqPx_GML[:,2]
+       DqDt[:,0] -= pgradx
        # Vertical momentum equation
-       DqDt[:,1] -= RdT * DqDz_GML[:,2] - GMLZ.dot(gc * T_ratio)
+       DqDt[:,1] -= pgradz
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
@@ -316,8 +366,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DqDx_GML, DqDz_GML,
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
-       mu = np.expand_dims(REFG[4],0)
-       ROP = REFG[5]
+       mu = np.expand_dims(REFG[3],0)
+       ROP = REFG[4]
        
        DqDt = -mu * ROP.dot(fields)
        
@@ -350,9 +400,8 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, fields, ebcDex):
+def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex):
        
-       #kap = PHYS[4]
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
        RESCFZ = RESCF[1]
@@ -365,20 +414,20 @@ def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, fields, 
        xzflux = RESCFX * P2qPxz[:,0:2]
        zxflux = RESCFZ * P2qPxz[:,0:2]
        
-       DqDt = np.zeros(fields.shape)
+       DqDt = np.zeros(D2qDx2.shape)
        # Diffusion of u-w vector
        DqDt[:,0] = 2.0 * xflux[:,0] + zflux[:,0] + xzflux[:,1]
        DqDt[:,1] = xflux[:,1] + 2.0 * zflux[:,1] + zxflux[:,0]
        # Normal to top and lateral boundaries vanish
-       DqDt[ebcDex[3],0:2] *= 0.0
-       DqDt[ebcDex[2],0:2] *= 0.0
+       DqDt[ebcDex[3],0] *= 0.0
+       DqDt[ebcDex[2],1] *= 0.0
        
-       # Diffusion of scalars (broken up into anisotropic components)
        # Normal to top and lateral boundaries vanish
        xflux[ebcDex[3],2:] *= 0.0
        zflux[ebcDex[2],2:] *= 0.0
-       zflux[ebcDex[2],3] *= 0.0
+       # Diffusion of scalars (broken up into anisotropic components)
        DqDt[:,2:] = xflux[:,2:] + zflux[:,2:]
-       #DqDt[ebcDex[1],2:] *= 0.0
+       # No scalar diffusion at boundary
+       DqDt[ebcDex[1],2:] *= 0.0
 
-       return DqDt# * SVOL
+       return DqDt
