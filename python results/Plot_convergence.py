@@ -14,9 +14,9 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 # Read in the text file
-#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
-#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence010m_smooth.txt'
-fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence025m_discrete.txt'
+#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence025m_discrete.txt'
+#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence025m_classical.txt'
+fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence250m_classical.txt'
 
 con_data = np.loadtxt(fname, delimiter=', ')
 
@@ -31,7 +31,7 @@ popt, pcov = curve_fit(func, xdata, ydata, p0=[1.0E-3, 2.0], method='lm')
 rate = popt[1]
 
 # Make the nice paper plot
-fig = plt.figure(figsize=(12.0, 6.0))
+fig = plt.figure(figsize=(12.0, 4.0))
 xdata = np.arange(0,con_data.shape[0])
 fdata = func(xdata, *popt)
 

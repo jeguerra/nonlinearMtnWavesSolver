@@ -91,7 +91,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               U = fields[:,0] + uf * init0[:,0]
               # Compute dynamical tendencies
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, uf, ebcDex)
-              rhs += tendency.computeRayleighTendency(REFG, fields)
+              rhs += tendency.computeRayleighTendency(REFG, fields, ebcDex)
                      
               return rhs
        

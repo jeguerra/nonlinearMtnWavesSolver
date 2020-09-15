@@ -338,7 +338,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      RdT_hat = np.exp(kap * fields[:,2]) * np.exp(fields[:,3])
                      RdT = RdT_bar * RdT_hat
                      T_ratio = RdT_hat - 1.0
-                     #T_ratio = np.exp(kap * fields[:,2] + fields[:,3]) - 1.0
               except FloatingPointError:
                      earg = kap * fields[:,2] + fields[:,3]
                      earg_max = np.amax(earg)
@@ -350,23 +349,15 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      tmax = np.amax(fields[:,3])
                      tmin = np.amin(fields[:,3])
                      print('Min/Max log potential temperature: ', tmin, tmax)
-                     # Close out the netcdf file
                             
-       # Compute transport and divergence terms
+       # Compute transport terms
        UPqPx = UM * DqDx
        wDQDz = velNorm * DqDz + wxz * DQDZ
        
-       # GML CONFIGURATIONS
-       # GML turned off
-       #transport = UPqPx + wDQDz
+       transport = UPqPx + wDQDz
        divergence = DqDx[:,0] + DqDz[:,1] - DZDX[:,0] * DqDz[:,0]
-       #pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
-       #pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       # GML turned on
-       transport = GML.dot(UPqPx + wDQDz)
-       #divergence = GMLX.dot(DqDx[:,0]) + GMLZ.dot(DqDz[:,1] - DZDX[:,0] * DqDz[:,0])
-       pgradx = GML.dot(RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2]))
-       pgradz = GML.dot(RdT * DqDz[:,2] - gc * T_ratio)
+       pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
+       pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
        DqDt = -transport
        # Horizontal momentum equation
@@ -376,10 +367,12 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
+       
+       DqDt[:,1] = GML.dot(DqDt[:,1])
                                   
        return DqDt
 
-def computeRayleighTendency(REFG, fields):
+def computeRayleighTendency(REFG, fields, ebcDex):
        
        # Get the Rayleight operators
        mu = np.expand_dims(REFG[3],0)

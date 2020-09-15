@@ -49,6 +49,7 @@ import faulthandler; faulthandler.enable()
 #localDir = '/scratch/opbuffer/' # NOAA laptop
 localDir = '/home/jeg/scratch/' # Home super desktop
 #localDir = '/Users/TempestGuerra/scratch/' # Davis Macbook Pro
+#localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
@@ -160,10 +161,12 @@ def runModel(TestName):
        if StaticSolve:
               RSBops = False
               ApplyGML = False
+              SymmetricSponge = False
        else:
               RSBops = False # Turn off PyRSB SpMV
               CUPYops = True # Turn on CuPy GPU SpMV
               ApplyGML = True
+              SymmetricSponge = True
        
        # Set the grid type
        HermCheb = thisTest.solType['HermChebGrid']
@@ -310,7 +313,7 @@ def runModel(TestName):
        #% Compute the BC index vector
        uldex, urdex, ubdex, utdex, wbdex, \
        ubcDex, wbcDex, pbcDex, tbcDex, \
-       zeroDex_tran, sysDex, diffDex = \
+       zeroDex_tran, sysDex, ebcDex = \
               computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow)
               
        # Index to interior of terrain boundary
@@ -390,7 +393,7 @@ def runModel(TestName):
        SV = PORZ * np.reciprocal(np.exp(LOGP)) # Specific volume (1 / rho_bar)
        
        #%% Rayleigh opearator and GML weight
-       ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
+       ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
        if ApplyGML:
               GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
        else:
@@ -547,7 +550,7 @@ def runModel(TestName):
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
-              rhs += eqs.computeRayleighTendency(REFG, fields)
+              rhs += eqs.computeRayleighTendency(REFG, fields, ebcDex)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
               rhs[zeroDex_tran[1],1] *= 0.0
@@ -760,7 +763,7 @@ def runModel(TestName):
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
-              rhs += eqs.computeRayleighTendency(REFG, fields)
+              rhs += eqs.computeRayleighTendency(REFG, fields, ebcDex)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
               rhs[zeroDex_tran[1],1] *= 0.0
@@ -866,7 +869,7 @@ def runModel(TestName):
                                    eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
                                                                           fields, hydroState[:,0], 1.0, ubdex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields)
+                            rhsVec += eqs.computeRayleighTendency(REFG, fields, ebcDex)
                             error = [np.linalg.norm(rhsVec)]
                      else:
                             isFirstStep = False
@@ -951,7 +954,7 @@ def runModel(TestName):
                             fields_new, rhsVec_new, thisTime, uf = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
                                                                     DX, DZ, DX2, DZ2,\
                                                                     TOPT, fields, hydroState, DCF, \
-                                                                    zeroDex_tran, diffDex, \
+                                                                    zeroDex_tran, ebcDex, \
                                                                     ResDiff, thisTime, isFirstStep)
                                    
                             # Compute residual and normalizations

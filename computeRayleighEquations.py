@@ -15,7 +15,7 @@ import scipy.sparse as sps
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
+def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symmetricProfile):
        
        # Get DIMS data
        L1 = DIMS[0]
@@ -43,8 +43,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        RLZ = np.zeros((NZ, NX))
        SBR = np.zeros((NZ, NX))
        
-       for ii in range(NZ):
-              for jj in range(NX):
+       for ii in range(0,NZ):
+              for jj in range(0,NX):
                      # Get this X location
                      XRL = X[ii,jj]
                      ZRL = Z[ii,jj]
@@ -57,7 +57,11 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormX = 1.0
                             # Evaluate the Rayleigh factor
-                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**RP
+                            if symmetricProfile:
+                                   RFX = mt.exp(-(2.5 * (dNormX - 0.5))**4) * \
+                                          (1.0 - (mt.cos(mt.pi * dNormX))**6)
+                            else:
+                                   RFX = (mt.cos(0.5 * mt.pi * dNormX))**RP
                      else:
                             RFX = 0.0
                      if applyTop:
@@ -68,8 +72,11 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormZ = 1.0
                             # Evaluate the strength of the field
-                            #RFZ = 1.0 - (mt.cos(0.5 * mt.pi * dNormZ))**RP
-                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**RP
+                            if symmetricProfile:
+                                   RFZ = mt.exp(-(2.5 * (dNormZ - 0.5))**4) * \
+                                          (1.0 - (mt.cos(mt.pi * dNormZ))**6)
+                            else:
+                                   RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**RP
                      else:
                             RFZ = 0.0
                      
@@ -91,8 +98,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        GML = np.ones((NZ, NX))
        #GMLX = np.ones((NZ, NX))
        #GMLZ = np.ones((NZ, NX))
-       for ii in range(NZ):
-              for jj in range(NX):
+       for ii in range(0,NZ):
+              for jj in range(0,NX):
                      # Get this X location
                      XRL = X[ii,jj]
                      ZRL = Z[ii,jj]
@@ -134,7 +141,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        '''                  
        return GML, RL, RLX, RLZ, SBR
 
-def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
+def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex, symmetricProfile):
        # Get options data
        width = RLOPT[1]
        applyTop = RLOPT[2]
@@ -147,7 +154,8 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        OPS = NX * NZ
        
        # Set up the Rayleigh field
-       GML, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, applyTop, applyLateral)
+       GML, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, \
+                                                     applyTop, applyLateral, symmetricProfile)
        
        # Get the individual mu for each prognostic
        mu_U = mu[0]
