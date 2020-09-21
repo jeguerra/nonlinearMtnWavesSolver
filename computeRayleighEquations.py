@@ -96,8 +96,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
        '''                     
        # Assemble the Grid Matching Layer field X and Z directions
        GML = np.ones((NZ, NX))
-       #GMLX = np.ones((NZ, NX))
-       #GMLZ = np.ones((NZ, NX))
+       GMLX = np.ones((NZ, NX))
+       GMLZ = np.ones((NZ, NX))
        for ii in range(0,NZ):
               for jj in range(0,NX):
                      # Get this X location
@@ -126,8 +126,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
                      else:
                             RFZ = 0.0
                      
-                     #GMLX[ii,jj] = 1.0 / (1.0 + RFX)
-                     #GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
+                     GMLX[ii,jj] = 1.0 / (1.0 + RFX)
+                     GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
                      # Set the field to max(lateral, top) to handle corners
                      RFM = np.amax([RFX, RFZ])
                      GML[ii,jj] = 1.0 / (1.0 + RFM)
@@ -139,7 +139,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
        plt.show()
        input()
        '''                  
-       return GML, RL, RLX, RLZ, SBR
+       return (GML, GMLX, GMLZ), RL, RLX, RLZ, SBR
 
 def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex, symmetricProfile):
        # Get options data

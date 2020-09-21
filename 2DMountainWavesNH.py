@@ -166,7 +166,7 @@ def runModel(TestName):
               RSBops = False # Turn off PyRSB SpMV
               CUPYops = True # Turn on CuPy GPU SpMV
               ApplyGML = True
-              SymmetricSponge = True
+              SymmetricSponge = False
        
        # Set the grid type
        HermCheb = thisTest.solType['HermChebGrid']
@@ -283,18 +283,18 @@ def runModel(TestName):
        DZ_local = np.reshape(DZM, (OPS,), order='F')
        
        if not StaticSolve:
-              #'''
+              '''
               DX = 1.0 * DX_avg
               DZ = 1.0 * DZ_avg
               DX2 = DX**2
               DZ2 = DZ**2
-              #'''
               '''
+              #'''
               DX = 1.0 * DX_local
               DZ = 1.0 * DZ_local
               DX2 = np.power(DX, 2.0)
               DZ2 = np.power(DZ, 2.0)
-              '''
+              #'''
               '''
               DX_spr = 1.0 / np.abs(spl.eigs(DDX_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
               DZ_spr = 1.0 / np.abs(spl.eigs(DDZ_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
@@ -395,7 +395,7 @@ def runModel(TestName):
        #%% Rayleigh opearator and GML weight
        ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
        if ApplyGML:
-              GMLOP = sps.diags(np.reshape(GML, (OPS,), order='F'), offsets=0, format='csr')
+              GMLOP = sps.diags(np.reshape(GML[0], (OPS,), order='F'), offsets=0, format='csr')
        else:
               GMLOP = sps.identity(OPS, format='csr')
               
@@ -550,7 +550,7 @@ def runModel(TestName):
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
-              rhs += eqs.computeRayleighTendency(REFG, fields, ebcDex)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
               rhs[zeroDex_tran[1],1] *= 0.0
@@ -763,7 +763,7 @@ def runModel(TestName):
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
-              rhs += eqs.computeRayleighTendency(REFG, fields, ebcDex)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
               rhs[zeroDex_tran[1],1] *= 0.0
@@ -869,7 +869,7 @@ def runModel(TestName):
                                    eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
                                                                           fields, hydroState[:,0], 1.0, ubdex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields, ebcDex)
+                            rhsVec += eqs.computeRayleighTendency(REFG, fields)
                             error = [np.linalg.norm(rhsVec)]
                      else:
                             isFirstStep = False
@@ -958,8 +958,9 @@ def runModel(TestName):
                                                                     ResDiff, thisTime, isFirstStep)
                                    
                             # Compute residual and normalizations
-                            U = fields_new[:,0] + uf * hydroState[:,0]
-                            UD = np.abs(U)
+                            up = fields_new[:,0]
+                            U = up + uf * hydroState[:,0]
+                            UD = np.abs(UD)
                             WD = np.abs(fields_new[:,1])
                             # Compute DynSGS or Flow Dependent diffusion coefficients
                             if ResDiff:

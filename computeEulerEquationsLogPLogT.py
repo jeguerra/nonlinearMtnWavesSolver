@@ -58,6 +58,28 @@ def computeAllFieldDerivatives_CPU(q, DDX, DDZ, DZDX, DQDZ):
        
        return DqDx, DqDz, D2qDx2, P2qPz2, D2qDxz
 
+def computeAllFieldDerivatives_GPU(q, DDX, DDZ, DZDX, DQDZ):
+       # Send state to GPU
+       q_gpu = cu.asarray(q)
+       DZDX_gpu = cu.asarray(DZDX)
+       DQDZ_gpu = cu.asarray(DQDZ)
+       # Compute first derivatives (on GPU)
+       DqDx = DDX.dot(q_gpu)
+       DqDz = DDZ.dot(q_gpu)
+       # Compute first partial in X (on GPU)
+       PqPz = DqDz + DQDZ_gpu
+       PqPx = DqDx - DZDX_gpu * DqDz
+       # Compute second derivatives (on GPU)
+       D2qDx2 = DDX.dot(PqPx)
+       P2qPz2 = DDZ.dot(PqPz)
+       D2qDxz = DDZ.dot(PqPx)
+       
+       # 3 transfers to GPU
+       # 5 transfers from GPU
+       
+       return cu.asnumpy(DqDx), cu.asnumpy(PqPz), \
+              cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
+
 def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ):
        
        # Compute first derivatives (on CPU)
@@ -80,26 +102,30 @@ def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZ
        
        return DqDx, DqDz, \
               cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
-
-def computeAllFieldDerivatives_GPU(q, DDX, DDZ, DZDX, DQDZ):
+              
+def computeAllFieldDerivatives_GPU2CPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ):
        # Send state to GPU
        q_gpu = cu.asarray(q)
-       DZDX_gpu = cu.asarray(DZDX)
        # Compute first derivatives (on GPU)
-       DqDx = DDX.dot(q_gpu)
-       PqPz = DDZ.dot(q_gpu)
+       DqDx = DDX_GPU.dot(q_gpu)
+       DqDz = DDZ_GPU.dot(q_gpu)
+       # Bring derivatives to CPU
+       DqDx_cpu = cu.asnumpy(DqDx)
+       DqDz_cpu = cu.asnumpy(DqDz)
+       PqPz = DqDz_cpu + DQDZ
+       
        # Compute first partial in X (on GPU)
-       PqPx = DqDx - DZDX_gpu * (PqPz + DQDZ)
-       # Compute second derivatives (on GPU)
-       D2qDx2 = DDX.dot(PqPx)
-       P2qPz2 = DDZ.dot(PqPz)
-       D2qDxz = DDZ.dot(PqPx)
+       PqPx = DqDx_cpu - DZDX * DqDz_cpu
        
-       # 2 transfers to GPU
-       # 5 transfers from GPU
+       # Compute second derivatives (on CPU)
+       D2qDx2 = DDX_CPU.dot(PqPx)
+       P2qPz2 = DDZ_CPU.dot(PqPz)
+       D2qDxz = DDZ_CPU.dot(PqPx)
        
-       return cu.asnumpy(DqDx), cu.asnumpy(PqPz), \
-              cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
+       # 1 transfers to GPU
+       # 2 transfers from GPU
+       
+       return DqDx_cpu, DqDz_cpu, D2qDx2, P2qPz2, D2qDxz
        
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -114,6 +140,26 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
 
        return fields, U
+
+def computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex):
+       # Get the Rayleight operators
+       ROPS = REFG[5]
+       
+       # Compute the variable sections
+       uvec = vec[udex]
+       wvec = vec[wdex]
+       pvec = vec[pdex]
+       tvec = vec[tdex]
+       
+       # Compute the block products
+       ures = (DOPS[0] + ROPS[0]).dot(uvec) + DOPS[1].dot(wvec) + DOPS[2].dot(pvec) + DOPS[3].dot(tvec)
+       wres = DOPS[4].dot(uvec) + (DOPS[5] + ROPS[1]).dot(wvec) + DOPS[6].dot(pvec) + DOPS[7].dot(tvec)
+       pres = DOPS[8].dot(uvec) + DOPS[9].dot(wvec) + (DOPS[10] + ROPS[2]).dot(pvec)
+       tres = DOPS[12].dot(uvec) + DOPS[13].dot(wvec) + (DOPS[15] + ROPS[3]).dot(tvec)
+       
+       qprod = np.concatenate((ures, wres, pres, tres))
+       
+       return -qprod
 
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
@@ -223,26 +269,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
                LD41, LD42, LD43, LD44]
        
        return DOPS
-
-def computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex):
-       # Get the Rayleight operators
-       ROPS = REFG[5]
-       
-       # Compute the variable sections
-       uvec = vec[udex]
-       wvec = vec[wdex]
-       pvec = vec[pdex]
-       tvec = vec[tdex]
-       
-       # Compute the block products
-       ures = (DOPS[0] + ROPS[0]).dot(uvec) + DOPS[1].dot(wvec) + DOPS[2].dot(pvec) + DOPS[3].dot(tvec)
-       wres = DOPS[4].dot(uvec) + (DOPS[5] + ROPS[1]).dot(wvec) + DOPS[6].dot(pvec) + DOPS[7].dot(tvec)
-       pres = DOPS[8].dot(uvec) + DOPS[9].dot(wvec) + (DOPS[10] + ROPS[2]).dot(pvec)
-       tres = DOPS[12].dot(uvec) + DOPS[13].dot(wvec) + (DOPS[15] + ROPS[3]).dot(tvec)
-       
-       qprod = np.concatenate((ures, wres, pres, tres))
-       
-       return -qprod
     
 #%% The linear equation operator
 def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
@@ -319,7 +345,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        gam = PHYS[6]
        
        # Get hydrostatic initial fields
-       GML = REFG[0]
        DQDZ = uf * REFG[2]
        
        # Compute advective (multiplicative) operators
@@ -349,6 +374,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      tmax = np.amax(fields[:,3])
                      tmin = np.amin(fields[:,3])
                      print('Min/Max log potential temperature: ', tmin, tmax)
+                     # Compute buoyancy by approximation...
+                     T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
+                     RdT_hat = 1.0 + T_ratio
+                     RdT = RdT_bar * RdT_hat
                             
        # Compute transport terms
        UPqPx = UM * DqDx
@@ -367,12 +396,10 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
-       
-       DqDt[:,1] = GML.dot(DqDt[:,1])
                                   
        return DqDt
 
-def computeRayleighTendency(REFG, fields, ebcDex):
+def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
        mu = np.expand_dims(REFG[3],0)
@@ -418,25 +445,14 @@ def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex):
        # Compute the 2nd partial derivative
        P2qPx2 = D2qDx2 - DZDX * P2qPxz
        
-       xflux = RESCFX * P2qPx2 
-       zflux = RESCFZ * P2qPz2
-       xzflux = RESCFX * P2qPxz[:,0:2]
-       zxflux = RESCFZ * P2qPxz[:,0:2]
-       
        DqDt = np.zeros(D2qDx2.shape)
        # Diffusion of u-w vector
-       DqDt[:,0] = 2.0 * xflux[:,0] + zflux[:,0] + xzflux[:,1]
-       DqDt[:,1] = xflux[:,1] + 2.0 * zflux[:,1] + zxflux[:,0]
-       # Normal to top and lateral boundaries vanish
-       DqDt[ebcDex[3],0] *= 0.0
-       DqDt[ebcDex[2],1] *= 0.0
+       DqDt[:,0] = RESCFX[:,0] * (2.0 * P2qPx2[:,0] + P2qPz2[:,0] + P2qPxz[:,1])
+       DqDt[:,1] = RESCFZ[:,0] * (P2qPx2[:,1] + 2.0 * P2qPz2[:,1] + P2qPxz[:,0])
        
-       # Normal to top and lateral boundaries vanish
-       xflux[ebcDex[3],2:] *= 0.0
-       zflux[ebcDex[2],2:] *= 0.0
        # Diffusion of scalars (broken up into anisotropic components)
-       DqDt[:,2:] = xflux[:,2:] + zflux[:,2:]
-       # No scalar diffusion at boundary
-       DqDt[ebcDex[1],2:] *= 0.0
-
+       xflux = RESCFX * P2qPx2[:,2:] 
+       zflux = RESCFZ * P2qPz2[:,2:]
+       DqDt[:,2:] = xflux + zflux
+       
        return DqDt

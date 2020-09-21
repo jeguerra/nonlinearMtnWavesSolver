@@ -88,9 +88,9 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
        return FLDI
 
 hdir = '/home/jeg/scratch/'
-tdir = '/media/jeg/TransferDATA/Schar025m_tempest/Schar025m/' # home desktop
+tdir = '/media/jeg/TransferDATA/Schar025m_tempest/3Layer025m/' # home desktop
 #tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
-hresl = [1000, 500, 250, 125, 62]
+hresl = [1000, 500, 250]
 #hresl = [250]
 # Loop over the 4 data files
 # Error norms between Tempest and Spectral Reference
@@ -121,9 +121,9 @@ for rr in hresl:
        HermCheb = True
        # Get the reference solution data
        if HermCheb:
-              refname = hdir + 'restartDB_exactBCSchar_025m'
+              refname = hdir + 'restartDB_discrete025m'
        else:
-              refname = hdir + 'restartDB_exactBCSchar_025mP'
+              refname = hdir + 'restartDB_discrete025mP'
               
        rdb = shelve.open(refname, flag='r')
        NX = rdb['NX']
@@ -133,9 +133,7 @@ for rr in hresl:
        PHYS = rdb['PHYS']
        DIMS = rdb['DIMS']
        
-       from BoussinesqSolSchar import ScharBoussinesqKlemp
-       z *= max(REFS[1]) # convert to meters
-       WBK, ETA, WFFT = ScharBoussinesqKlemp(PHYS, x, z)
+       z *= DIMS[2]
        
        # Get the Hermite and Chebyshev transforms
        if HermCheb:
@@ -169,8 +167,6 @@ for rr in hresl:
        
        # Make the differences
        WDIFF1 = WMOD - np.expand_dims(WREFint, axis=0)
-       WDIFF2 = WMOD - np.expand_dims(WBK, axis=0)
-       WDIFF3 = WREFint - WBK
        
        DOPS = len(x) * len(z)
        DOPSint = len(xintDex) * len(zintDex)
@@ -188,19 +184,6 @@ for rr in hresl:
        wflerr1.append(ndiff_fld / nref_fld)
        wnterr1.append(ndiff_int / nref_int)
        
-       # Compute norms (TEMPEST TO CLASSICAL REFERENCE)
-       ndiff_wbc = np.linalg.norm(WDIFF2[:,0,:], axis=1)
-       ndiff_fld = np.linalg.norm(np.reshape(WDIFF2, (len(ts2get),DOPS), order='F'), axis=1)
-       ndiff_int = np.linalg.norm(np.reshape(WDIFF2[:,intDex[0],intDex[1]], (len(ts2get),DOPSint), order='F'), axis=1)
-       
-       nref_wbc = np.linalg.norm(WBK[0,:])
-       nref_fld = np.linalg.norm(np.reshape(WBK, (DOPS,), order='F'))
-       nref_int = np.linalg.norm(np.reshape(WBK[intDex[0],intDex[1]], (DOPSint,), order='F'))
-       # Take the norm and print
-       wbcerr2.append(ndiff_wbc / nref_wbc)
-       wflerr2.append(ndiff_fld / nref_fld)
-       wnterr2.append(ndiff_int / nref_int)
-       
        X, Z = np.meshgrid(1.0E-3 * x, 1.0E-3 * z)
        
        ccount = 40
@@ -210,7 +193,7 @@ for rr in hresl:
        plt.subplot(1,2,1)
        ccheck = plt.contourf(X, Z, WMOD[-1,:,:], ccount, cmap=cm.seismic)
        plt.contour(X, Z, WREFint, ccount, colors='k', linewidths=0.5)
-       plt.xlim(-20.0, 20.0)
+       plt.xlim(-10.0, 30.0)
        plt.clim(-wfbound, wfbound)
        plt.xlabel('X (km)')
        plt.ylabel('Z (km)')
@@ -220,7 +203,7 @@ for rr in hresl:
        #plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.subplot(1,2,2)
        ccheck = plt.contourf(X, Z, WDIFF1[2,:,:], ccount, cmap=cm.seismic)
-       plt.title('Difference W (m/s) @ 72Hr: ' + str(rr) + ' (m)')
+       plt.title('Difference W (m/s) @ 60Hr: ' + str(rr) + ' (m)')
        wdbound = 0.02
        plt.clim(-wdbound, wdbound)
        plt.xlabel('X (km)')
@@ -238,33 +221,31 @@ wnterr2 = np.array(wnterr2)
 print(wbcerr1)
 print(wflerr1)
 #%%  
-convRate = np.power(1.0E-3 * np.array(hresl), 1.5)
-convRate *= 1.0 / np.amax(convRate)
+rate2 = np.power(1.0E-3 * np.array(hresl), 2.0)
      
 fig = plt.figure(figsize=(5.0, 5.0))
-plt.plot(hresl, wbcerr2[:,2], 's-', hresl, wbcerr1[:,2], 's-'); plt.ylim(1.0E-3, 1.0E0)
-plt.plot(hresl, np.amax(wbcerr1[:,2]) * convRate, 'k--')
+plt.plot(hresl, wbcerr1[:,2], 's-'); #plt.ylim(1.0E-3, 1.0E0)
+#plt.plot(hresl, rate2, 'k--')
 plt.title('Terrain Boundary Response')
-plt.xscale('log'); plt.yscale('log')
+plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 plt.ylabel('L-2 Norm W (m/s)')
-plt.legend(('Classical Reference','Spectral 72Hr'), loc='lower right')
+plt.legend(('Spectral 72Hr'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 fig = plt.figure(figsize=(10.0, 5.0))
 plt.subplot(1,2,1)
-plt.plot(hresl, wnterr2[:,2], 'ks-', hresl, wnterr1, 's-'); plt.ylim(1.0E-3, 5.0E-1)
-plt.plot(hresl, np.amax(wnterr1) * convRate, 'k--')
+plt.plot(hresl, wnterr1, 's-'); #plt.ylim(1.0E-3, 5.0E-1)
 plt.title('Interior Domain Response')
-plt.xscale('log'); plt.yscale('log')
+plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 plt.ylabel('L-2 Norm W (m/s)')
-plt.legend(('Classical Reference','Spectral 24Hr','Spectral 48Hr','Spectral 72Hr'), loc='lower right')
+plt.legend(('Spectral 24Hr','Spectral 48Hr','Spectral 72Hr'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 plt.subplot(1,2,2)
-plt.plot(hresl, wflerr1, 's-'); plt.ylim(1.0E-3, 5.0E-1)
-plt.plot(hresl, np.amax(wflerr1) * convRate, 'k--')
+plt.plot(hresl, wflerr1, 's-'); #plt.ylim(1.0E-3, 5.0E-1)
+#plt.plot(hresl, rate2, 'k--')
 plt.title('Entire Domain Response')
-plt.xscale('log'); plt.yscale('log')
+plt.xscale('linear'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 #plt.ylabel('L-2 Norm (m/s)')
 plt.legend(('Spectral 24Hr','Spectral 48Hr','Spectral 72Hr'), loc='lower right')
