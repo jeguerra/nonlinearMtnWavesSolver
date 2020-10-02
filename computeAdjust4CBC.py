@@ -102,7 +102,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
        # W is treated as an essential BC at terrain in solution by direct substitution
-       rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_trans), \
+       rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_statc), \
                               sorted(rowsOutP), sorted(rowsOutT))
               
        # All DOF for all variables

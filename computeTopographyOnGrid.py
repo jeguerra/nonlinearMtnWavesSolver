@@ -9,7 +9,8 @@ import sys
 import numpy as np
 import math as mt
 from scipy import signal
-#import matplotlib.pyplot as plt
+from scipy.interpolate import CubicSpline
+import matplotlib.pyplot as plt
 
 def computeTopographyOnGrid(REFS, opt, DDX):
        h0 = opt[0]
@@ -63,8 +64,29 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               hf = 1.0 / (1.0 + hs) # scale for composite profile to have h = 1
               ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps);
               ht = hf * h0 * kaiserDom * ht2
-              # Take the derivative
-              dhdx = DDX.dot(ht)
+              ht[0] = 0.0; ht[-1] = 0.0
+              # Take the derivative (DO NOT USE NATIVE DERIVATIVE OPERATOR)
+              #dhdx_native = DDX.dot(ht)
+              cs = CubicSpline(xh, ht, bc_type='periodic')
+              dhdx = (cs.derivative())(xh)[:]
+              # Monotonic filter
+              dhdx[0] = 0.0; dhdx[-1] = 0.0
+              for dd in range(1,len(dhdx)-1):
+                     if ht[dd] == 0.0 and ht[dd+1] == 0.0 and ht[dd-1] == 0:
+                            dhdx[dd] = 0.0
+              #print(dhdx)
+              '''
+              plt.plot(xh, dhdx_native, xh, dhdx_cubic)
+              plt.xlim(-25000, 25000)
+              plt.figure()
+              plt.plot(xh, dhdx_native - dhdx_cubic)
+              plt.xlim(-25000, 25000)
+              plt.show()
+              print(ht)
+              #print(dhdx_native)
+              print(dhdx_cubic)
+              input(
+              '''
        elif profile == 4:
               # General even power exponential times a polynomial series
               ht = np.zeros(len(xh))

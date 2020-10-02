@@ -10,6 +10,7 @@ Production panel plot for solution fields
 
 import shelve
 import scipy.io as sio
+import matplotlib as mpl
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import numpy as np
@@ -101,33 +102,40 @@ for pp in range(4):
        plt.subplot(2,2,pp+1)
        
        if pp == 0:
+              dbound = 0.85
               Q = np.reshape(SOL[udex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-0.85, vmax=0.85)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-dbound, vmax=dbound)
               plt.title('U (m/s)')
               plt.ylabel('Height (km)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
        elif pp == 1:
+              dbound = 0.2
               Q = np.reshape(SOL[wdex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-0.2, vmax=0.2)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-dbound, vmax=dbound)
               plt.title('W (m/s)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
               plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
        elif pp == 2:
+              dbound = 1.25E-4
               Q = np.reshape(SOL[pdex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-1.25E-4, vmax=1.25E-4)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-dbound, vmax=dbound)
               plt.title('log-P (Pa)')
               plt.xlabel('Distance (km)')
               plt.ylabel('Height (km)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
        elif pp == 3:
+              dbound = 2.0E-3
               Q = np.reshape(SOL[tdex,0], (NZ, NX+1), order='F')
-              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-2.0E-3, vmax=2.0E-3)
+              ccheck = plt.contourf(1.0E-3*X, 1.0E-3*Z, Q, 50, cmap=cm.seismic, vmin=-dbound, vmax=dbound)
               plt.title('log-Theta (K)')
               plt.xlabel('Distance (km)')
               plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
               plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
-              
-       fig.colorbar(ccheck, format='%.2E')
+       
+       plt.clim(-dbound, dbound)
+       norm = mpl.colors.Normalize(vmin=-dbound, vmax=dbound)
+       plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2E')
+       #fig.colorbar(ccheck, format='%.2E')
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
 
 plt.tight_layout()

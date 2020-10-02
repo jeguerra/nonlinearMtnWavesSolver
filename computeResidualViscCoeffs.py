@@ -44,17 +44,47 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM):
        compare = np.stack((QRESZ, QZMAX),axis=1)
        QRESZ_CF = bn.nanmin(compare, axis=1)
        #'''
+       
+       return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
+
+def computeResidualViscCoeffs1(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM):
+       
+       ARES = np.abs(RES)
+       DL = min(DX, DZ)
+       DL2 = DL**2
+       
+       # Normalize the residuals
        #'''
+       for vv in range(4):
+              # Prandtl number scaling to theta
+              if vv == 3:
+                     scale = 0.71 / 0.4
+              else:
+                     scale = 1.0
+                     
+              if QM[vv] > 0.0:
+                     ARES[:,vv] *= (scale / QM[vv])
+              else:
+                     ARES[:,vv] *= 0.0
+                     
+       # Get the maximum in the residuals
+       QRES_MAX = bn.nanmax(ARES, axis=1)
+       
+       # Compute the anisotropic coefficients
+       QRES = DL2 * QRES_MAX;
+       
+       # Compute upwind flow dependent coefficients
+       QMAX = (0.5 * DL) * np.sqrt(np.power(U,2) + np.power(W,2))
+       #'''
+       compare = np.stack((QRES, QMAX),axis=1)
+       QRES_CF = bn.nanmin(compare, axis=1)
+       #'''
+       '''
        # Upwind diffusion in the sponge layers
        QRESX_CF += RLM.dot(QXMAX)
        QRESZ_CF += RLM.dot(QZMAX)
-       #'''
        '''
-       # Continuous upwind PLUS residual
-       QRESX_CF = 0.5 * (QXMAX + QRESX_CF)
-       QRESZ_CF = 0.5 * (QZMAX + QRESZ_CF)
-       '''
-       return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
+       return (np.expand_dims(QRES_CF,1), np.expand_dims(QRES_CF,1))
 
 
 # This approach keeps each corresponding residual on each variable

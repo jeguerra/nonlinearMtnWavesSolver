@@ -61,14 +61,14 @@ class TestCase:
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     self.setUserData(183, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow_periodic')
+                     self.setUserData(183, 100, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow_periodic')
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
+                                'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
@@ -120,7 +120,7 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-              mu *= 1.0 * np.array([1.0, 1.0, 1.0, 1.0])
+              mu *= 5.0 * np.array([1.0, 1.0, 1.0, 1.0])
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC)
               
               # Set the terrain options

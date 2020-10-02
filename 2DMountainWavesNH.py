@@ -163,8 +163,8 @@ def runModel(TestName):
               ApplyGML = False
               SymmetricSponge = False
        else:
-              RSBops = False # Turn off PyRSB SpMV
-              CUPYops = True # Turn on CuPy GPU SpMV
+              RSBops = True # Turn off PyRSB SpMV
+              CUPYops = False # Turn on CuPy GPU SpMV
               ApplyGML = True
               SymmetricSponge = False
        
@@ -247,8 +247,9 @@ def runModel(TestName):
               
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
          
-       #DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       #DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+       # Turn on compact finite difference...
+       DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+       DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -283,23 +284,23 @@ def runModel(TestName):
        DZ_local = np.reshape(DZM, (OPS,), order='F')
        
        if not StaticSolve:
-              '''
+              #'''
               DX = 1.0 * DX_avg
               DZ = 1.0 * DZ_avg
               DX2 = DX**2
               DZ2 = DZ**2
-              '''
               #'''
+              '''
               DX = 1.0 * DX_local
               DZ = 1.0 * DZ_local
               DX2 = np.power(DX, 2.0)
               DZ2 = np.power(DZ, 2.0)
-              #'''
+              '''
               '''
               DX_spr = 1.0 / np.abs(spl.eigs(DDX_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
               DZ_spr = 1.0 / np.abs(spl.eigs(DDZ_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
-              DX = 2.0 * DX_spr
-              DZ = 2.0 * DZ_spr
+              DX = 1.0 * DX_spr
+              DZ = 1.0 * DZ_spr
               DX2 = DX**2
               DZ2 = DZ**2
               print('Spectral radii of 1st derivative matrices: ', DX_spr, DZ_spr)
@@ -378,6 +379,10 @@ def runModel(TestName):
        DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
        DLTDZ = np.reciprocal(TZ) * DTDZ
        DLPTDZ = DLTDZ - PHYS[4] * DLPDZ
+       # Compute 2nd derivatives
+       print('TO FIX: BACKGROUND 2ND DERIVATIVES VALID ONLY FOR DISCRETE PROFILE!')
+       D2LPDZ2 = - DLTDZ * DLPDZ
+       D2LPTDZ2 = - DLTDZ * DLPTDZ
        
        # Compute the background (initial) fields
        U = np.expand_dims(U, axis=1)
@@ -423,6 +428,7 @@ def runModel(TestName):
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       DDXMS, DDZMS = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
        #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        #DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
@@ -432,8 +438,8 @@ def runModel(TestName):
        if not StaticSolve and RSBops:
               from rsb import rsb_matrix
               # Multithreaded enabled for transient solution
-              REFS.append(rsb_matrix(DDXM))
-              REFS.append(rsb_matrix(DDZM))
+              REFS.append((rsb_matrix(DDXM), rsb_matrix(DDZM)))
+              REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZMS)))
        elif not StaticSolve and CUPYops:
               from rsb import rsb_matrix
               import cupyx.scipy.sparse as cuspr
@@ -445,7 +451,7 @@ def runModel(TestName):
               REFS.append(DDXM)
               REFS.append(DDZM)
               
-       # Store the terrain profilse
+       # Store the terrain profile
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        DZDX2 = np.power(DZDX, 2.0)
@@ -453,6 +459,15 @@ def runModel(TestName):
        REFS.append(DZDX)
        REFS.append(DZDX2)
        REFS.append(D2ZDX2)
+       
+       # Compute and store the 2nd derivatives of background quantities
+       #DDXMS, DDZMS = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       D2QDZ2 = DDZM.dot(DQDZ)
+       D2QDZ2[:,2] = np.reshape(D2LPDZ2, (OPS,), order='F')
+       D2QDZ2[:,3] = np.reshape(D2LPTDZ2, (OPS,), order='F')
+       REFG.append(D2QDZ2)
+       #del(DDXMS)
+       #del(DDZMS)
        '''
        plt.plot(REFS[0], DZDX2[ubdex])
        plt.figure()
@@ -786,7 +801,6 @@ def runModel(TestName):
               
               # Initialize vertical velocity
               fields[ubdex,1] = -dWBC
-              #fields[:,1] = REFS[15][:,0] * (hydroState[:,0] + fields[:,0])
                             
               # Initialize time constants
               ti = 0
@@ -861,8 +875,8 @@ def runModel(TestName):
                                    initFact = 1.0
                                    
                             fields[:,1] *= initFact
-                            UD = np.abs(fields[:,0] + initFact * hydroState[:,0])
-                            WD = initFact * np.abs(fields[:,1])
+                            UD = 0.0 * np.abs(fields[:,0] + initFact * hydroState[:,0])
+                            WD = 0.0 * initFact * np.abs(fields[:,1])
                             DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
                             
                             DqDx, DqDz = \
@@ -870,6 +884,11 @@ def runModel(TestName):
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
                                                                           fields, hydroState[:,0], 1.0, ubdex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields)
+                            # Fix essential BC
+                            rhsVec[zeroDex_tran[0],0] *= 0.0
+                            rhsVec[zeroDex_tran[1],1] *= 0.0
+                            rhsVec[zeroDex_tran[2],2] *= 0.0
+                            rhsVec[zeroDex_tran[3],3] *= 0.0
                             error = [np.linalg.norm(rhsVec)]
                      else:
                             isFirstStep = False
@@ -879,15 +898,6 @@ def runModel(TestName):
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
-                            
-                            # Compute the maximum speed of sound
-                            T_ratio = np.exp(PHYS[4] * fields[:,2] + fields[:,3]) - 1.0
-                            gamRdT = PHYS[6] * REFS[9][0] * (1.0 + T_ratio)
-                            VSND_max = np.amax(np.sqrt(gamRdT))
-                            DTN = min(DX_min / np.amax(VSND_max), DZ_min / np.amax(VSND_max))
-                            DT_factor = DTN / DT0
-                            TOPT[0] *= DT_factor
-                            DT0 = DTN
                             #print('Maximum sound speed (m/s): ', VSND_max)
                             #print('NEW time step estimate (CFL = 1): ', TOPT[0])
                      
@@ -951,31 +961,42 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:
+                            # Compute the maximum speed of sound
+                            T_ratio = np.exp(PHYS[4] * fields[:,2] + fields[:,3]) - 1.0
+                            gamRdT = PHYS[6] * REFS[9][0] * (1.0 + T_ratio)
+                            VSND_max = np.amax(np.sqrt(gamRdT))
+                            DTN = min(DX_min / np.amax(VSND_max), DZ_min / np.amax(VSND_max))
+                            DT_factor = DTN / DT0
+                            TOPT[0] *= DT_factor
+                            DT0 = DTN
+                            
                             fields_new, rhsVec_new, thisTime, uf = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
                                                                     DX, DZ, DX2, DZ2,\
-                                                                    TOPT, fields, hydroState, DCF, \
+                                                                    TOPT, fields, hydroState, rhsVec, DCF, \
                                                                     zeroDex_tran, ebcDex, \
                                                                     ResDiff, thisTime, isFirstStep)
-                                   
+                            
+                            #'''
                             # Compute residual and normalizations
-                            up = fields_new[:,0]
-                            U = up + uf * hydroState[:,0]
-                            UD = np.abs(UD)
-                            WD = np.abs(fields_new[:,1])
+                            u = np.abs(fields_new[:,0])
+                            w = np.abs(fields_new[:,1])
+                            w[ebcDex[1]] *= 0.0
                             # Compute DynSGS or Flow Dependent diffusion coefficients
                             if ResDiff:
-                                   QM = bn.nanmax(fields_new, axis=0)
+                                   QM = bn.nanmax(np.abs(fields_new - bn.nanmean(fields_new)), axis=0)
                                    # Trapezoidal Rule estimate of residual
                                    resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
-                                   
-                                   DCF = rescf.computeResidualViscCoeffs(resInv, QM, UD, WD, DX, DZ, DX**2, DZ**2, REFG[4])
+                                   #resInv[ebcDex[1],0] *= 0.0
+                                   resInv[ebcDex[1],1] *= 0.0
+                                   DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX**2, DZ**2, REFG[4])
                             else:
-                                   DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
+                                   DCF = rescf.computeFlowVelocityCoeffs(u, w, DX, DZ)
                                    
                             fields = np.array(fields_new)
                             rhsVec = np.array(rhsVec_new)
                             del(fields_new)
                             del(rhsVec_new)
+                            #'''
                      except:
                             print('Transient step failed! Closing out to NC file.')
                             m_fid.close() 

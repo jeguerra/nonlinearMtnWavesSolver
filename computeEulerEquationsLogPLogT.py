@@ -24,10 +24,13 @@ def computeFieldDerivatives_GPU(q, DDX, DDZ):
        
        return cu.asnumpy(DqDx), cu.asnumpy(DqDz)
 
-def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ):
+def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, DZDX, D2QDZ2):
+       
+       # Compute first partial in X (on CPU)
+       PqPx = np.array(DqDx - DZDX * DqDz)
 
        D2qDx2 = DDX.dot(PqPx)
-       D2qDz2 = DDZ.dot(PqPz)
+       D2qDz2 = DDZ.dot(DqDz) + D2QDZ2
        D2qDxz = DDZ.dot(PqPx)
        
        return D2qDx2, D2qDz2, D2qDxz
@@ -42,18 +45,17 @@ def computeFieldDerivatives2_GPU(PqPx, PqPz, DDX, DDZ):
        
        return cu.asnumpy(D2qDx2), cu.asnumpy(D2qDz2), cu.asnumpy(D2qDxz)
 
-def computeAllFieldDerivatives_CPU(q, DDX, DDZ, DZDX, DQDZ):
+def computeAllFieldDerivatives_CPU(q, DDX, DDZ, DZDX, DQDZ, D2QDZ2):
        
        # Compute first derivatives (on CPU)
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
-       PqPz = DqDz + DQDZ
        
        # Compute second derivatives (on CPU)
        D2qDx2 = DDX.dot(PqPx)
-       P2qPz2 = DDZ.dot(PqPz)
+       P2qPz2 = DDZ.dot(DqDz) + D2QDZ2
        D2qDxz = DDZ.dot(PqPx)
        
        return DqDx, DqDz, D2qDx2, P2qPz2, D2qDxz
@@ -80,21 +82,20 @@ def computeAllFieldDerivatives_GPU(q, DDX, DDZ, DZDX, DQDZ):
        return cu.asnumpy(DqDx), cu.asnumpy(PqPz), \
               cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
 
-def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ):
+def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ, D2QDZ2):
        
        # Compute first derivatives (on CPU)
        DqDx = DDX_CPU.dot(q)
        DqDz = DDZ_CPU.dot(q)
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
-       PqPz = DqDz + DQDZ
        
        # Send gradients to GPU
        PqPx_gpu = cu.asarray(PqPx)
-       PqPz_gpu = cu.asarray(PqPz)
+       DqDz_gpu = cu.asarray(DqDz)
        # Compute second derivatives (on GPU)
        D2qDx2 = DDX_GPU.dot(PqPx_gpu)
-       P2qPz2 = DDZ_GPU.dot(PqPz_gpu)
+       P2qPz2 = DDZ_GPU.dot(DqDz_gpu) + D2QDZ2
        D2qDxz = DDZ_GPU.dot(PqPx_gpu)
        
        # 2 transfers to GPU
@@ -103,7 +104,7 @@ def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZ
        return DqDx, DqDz, \
               cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
               
-def computeAllFieldDerivatives_GPU2CPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ):
+def computeAllFieldDerivatives_GPU2CPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ, D2QDZ2):
        # Send state to GPU
        q_gpu = cu.asarray(q)
        # Compute first derivatives (on GPU)
@@ -112,14 +113,13 @@ def computeAllFieldDerivatives_GPU2CPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZ
        # Bring derivatives to CPU
        DqDx_cpu = cu.asnumpy(DqDx)
        DqDz_cpu = cu.asnumpy(DqDz)
-       PqPz = DqDz_cpu + DQDZ
        
        # Compute first partial in X (on GPU)
        PqPx = DqDx_cpu - DZDX * DqDz_cpu
        
        # Compute second derivatives (on CPU)
        D2qDx2 = DDX_CPU.dot(PqPx)
-       P2qPz2 = DDZ_CPU.dot(PqPz)
+       P2qPz2 = DDZ_CPU.dot(DqDz) + D2QDZ2
        D2qDxz = DDZ_CPU.dot(PqPx)
        
        # 1 transfers to GPU
@@ -216,8 +216,11 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        RdT_bar = REFS[9][0]
        T_bar = (1.0 / Rd) * RdT_bar
        
-       bf = np.exp(kap * fields[:,2] + fields[:,3])
+       targ = kap * fields[:,2] + fields[:,3]
+       bf = np.exp(targ) 
        T_ratio = bf - 1.0
+       #T_ratio = targ + 0.5 * np.power(targ, 2.0)
+       #bf = T_ratio + 1.0
        RdT = RdT_bar * bf
        
        # Compute T'
@@ -447,8 +450,13 @@ def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex):
        
        DqDt = np.zeros(D2qDx2.shape)
        # Diffusion of u-w vector
-       DqDt[:,0] = RESCFX[:,0] * (2.0 * P2qPx2[:,0] + P2qPz2[:,0] + P2qPxz[:,1])
-       DqDt[:,1] = RESCFZ[:,0] * (P2qPx2[:,1] + 2.0 * P2qPz2[:,1] + P2qPxz[:,0])
+       xflux = 2.0 * P2qPx2[:,0]
+       zflux = P2qPz2[:,0] + P2qPxz[:,1]
+       DqDt[:,0] = RESCFX[:,0] * (xflux + zflux)
+       
+       xflux = P2qPx2[:,1] + P2qPxz[:,0]
+       zflux = 2.0 * P2qPz2[:,1]
+       DqDt[:,1] = RESCFZ[:,0] * (xflux + zflux)
        
        # Diffusion of scalars (broken up into anisotropic components)
        xflux = RESCFX * P2qPx2[:,2:] 
