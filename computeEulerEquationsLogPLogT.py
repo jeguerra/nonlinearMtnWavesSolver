@@ -24,13 +24,13 @@ def computeFieldDerivatives_GPU(q, DDX, DDZ):
        
        return cu.asnumpy(DqDx), cu.asnumpy(DqDz)
 
-def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, DZDX, D2QDZ2):
+def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, DZDX):
        
        # Compute first partial in X (on CPU)
        PqPx = np.array(DqDx - DZDX * DqDz)
 
        D2qDx2 = DDX.dot(PqPx)
-       D2qDz2 = DDZ.dot(DqDz) + D2QDZ2
+       D2qDz2 = DDZ.dot(DqDz)
        D2qDxz = DDZ.dot(PqPx)
        
        return D2qDx2, D2qDz2, D2qDxz
@@ -136,10 +136,11 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        TQ = SOLT + INIT
        # Make the total quatities
        U = TQ[udex]
+       W = TQ[wdex]
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
 
-       return fields, U
+       return fields, U, W
 
 def computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex):
        # Get the Rayleight operators
@@ -341,23 +342,22 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, uf, ebcDex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
        
        # Get hydrostatic initial fields
-       DQDZ = uf * REFG[2]
+       DQDZ = REFG[2]
+       DWDX = REFG[6]
        
        # Compute advective (multiplicative) operators
-       UM = uf * np.expand_dims(U,1)
-       wxz = np.expand_dims(fields[:,1],1)
+       UM = np.expand_dims(U,1)
+       WM = np.expand_dims(W,1)
        # Compute normal compnent to terrain surfaces
-       velNorm = (wxz - UM * DZDX)
-       # Enforce No-Slip condition on transport
+       velNorm = (WM - DZDX * UM)
        velNorm[ebcDex[1],:] *= 0.0
-       velNorm[ebcDex[2],:] *= 0.0
        
        # Compute pressure gradient force scaling (buoyancy)
        with warnings.catch_warnings():
@@ -384,10 +384,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                             
        # Compute transport terms
        UPqPx = UM * DqDx
-       wDQDz = velNorm * DqDz + wxz * DQDZ
+       wDQDz = velNorm * DqDz + WM * DQDZ
        
        transport = UPqPx + wDQDz
-       divergence = DqDx[:,0] + DqDz[:,1] - DZDX[:,0] * DqDz[:,0]
+       transport[:,1] += UM[:,0] * (DWDX - DZDX[:,0] * DQDZ[:,1])
+       divergence = (DqDx[:,0] - DZDX[:,0] * DqDz[:,0]) + (DqDz[:,1] + DQDZ[:,1])
        pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        

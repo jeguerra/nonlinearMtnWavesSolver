@@ -466,8 +466,7 @@ def runModel(TestName):
        D2QDZ2[:,2] = np.reshape(D2LPDZ2, (OPS,), order='F')
        D2QDZ2[:,3] = np.reshape(D2LPTDZ2, (OPS,), order='F')
        REFG.append(D2QDZ2)
-       #del(DDXMS)
-       #del(DDZMS)
+       REFG.append(np.zeros((OPS,)))
        '''
        plt.plot(REFS[0], DZDX2[ubdex])
        plt.figure()
@@ -493,8 +492,8 @@ def runModel(TestName):
        input()
        '''
               
-       del(DDXM)
-       del(DDZM)
+       del(DDXM); del(DDXMS)
+       del(DDZM); del(DDZMS)
        del(DZDX)
        del(GMLOP)
        
@@ -536,7 +535,8 @@ def runModel(TestName):
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
        currentState = np.array(SOLT[:,0])
-       fields, U = eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
+       fields, U, W = \
+              eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
        #% Compute the global LHS operator and RHS
        if StaticSolve:
@@ -564,7 +564,7 @@ def runModel(TestName):
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
-                                                         REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
+                                                         REFS[15], REFS[9][0], fields, U, W, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
@@ -769,7 +769,8 @@ def runModel(TestName):
               print('Recover full linear solution vector... DONE!')
               
               # Prepare the fields
-              fields, U = eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+              fields, U, W = \
+                     eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
               
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
@@ -777,7 +778,7 @@ def runModel(TestName):
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
-                                                         REFS[15], REFS[9][0], fields, U, 1.0, ubdex)
+                                                         REFS[15], REFS[9][0], fields, U, W, ubdex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
@@ -799,9 +800,32 @@ def runModel(TestName):
               # Reshape main solution vectors and initialize
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
               
+              # Initialize damping coefficients
+              DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
+              
+              #fields[ubdex,1] = -dWBC
+              #'''
               # Initialize vertical velocity
-              fields[ubdex,1] = -dWBC
-                            
+              hydroState[ubdex,1] = -dWBC
+              
+              # Make the derivative in X of the forcing
+              DWDX = REFS[12][0].dot(hydroState[:,1])
+              (REFG[6])[:] = DWDX
+              
+              # Make the derivative in Z of the forcing
+              DWDZ = REFS[12][1].dot(hydroState[:,1])
+              (REFG[2])[:,1] = DWDZ
+              
+              # Make the 2nd derivative in Z of the forcing
+              D2WDZ2 = REFS[13][1].dot(DWDZ)
+              (REFG[5])[:,1] = D2WDZ2
+              
+              # Make the 2nd derivative in X of the 1st partial in X
+              PWPX = DWDX - (REFS[15])[:,0] * DWDZ
+              D2WDX2 = REFS[13][0].dot(PWPX)
+              D2WDXZ = REFS[13][1].dot(PWPX)
+              REFG.append((D2WDX2, D2WDXZ))
+              #'''          
               # Initialize time constants
               ti = 0
               ff = 1
@@ -858,9 +882,6 @@ def runModel(TestName):
               OTI = int(TOPT[5] / DT0)
               ITI = int(TOPT[6] / DT0)
               
-              import bottleneck as bn
-              import computeResidualViscCoeffs as rescf
-              
               while thisTime <= TOPT[4]:
                      
                      if ti == 0:
@@ -874,21 +895,20 @@ def runModel(TestName):
                                    print('Ramp time is set < 0! Default is 0.')
                                    initFact = 1.0
                                    
-                            fields[:,1] *= initFact
-                            UD = 0.0 * np.abs(fields[:,0] + initFact * hydroState[:,0])
-                            WD = 0.0 * initFact * np.abs(fields[:,1])
-                            DCF = rescf.computeFlowVelocityCoeffs(UD, WD, DX, DZ)
-                            
+                            UD = fields[:,0] + hydroState[:,0]
+                            WD = fields[:,1] + hydroState[:,1]
                             DqDx, DqDz = \
                                    eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
-                                                                          fields, hydroState[:,0], 1.0, ubdex)
+                                                                          fields, UD, WD, ubdex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields)
                             # Fix essential BC
                             rhsVec[zeroDex_tran[0],0] *= 0.0
                             rhsVec[zeroDex_tran[1],1] *= 0.0
                             rhsVec[zeroDex_tran[2],2] *= 0.0
                             rhsVec[zeroDex_tran[3],3] *= 0.0
+                            
+                            rhsVec[ebcDex[1],1] = dHdX * rhsVec[ebcDex[1],0]
                             error = [np.linalg.norm(rhsVec)]
                      else:
                             isFirstStep = False
@@ -915,7 +935,7 @@ def runModel(TestName):
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
                                    elif pp == 1:
-                                          wvar[ff-1,:,:] = q
+                                          wvar[ff-1,:,:] = q + np.reshape(hydroState[:,1], (NZ, NX+1), order='F')
                                           dwvar[ff-1,:,:] = dqdt
                                    elif pp == 2:
                                           pvar[ff-1,:,:] = q
@@ -970,33 +990,12 @@ def runModel(TestName):
                             TOPT[0] *= DT_factor
                             DT0 = DTN
                             
-                            fields_new, rhsVec_new, thisTime, uf = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
+                            fields, rhsVec, thisTime, DCF = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
                                                                     DX, DZ, DX2, DZ2,\
-                                                                    TOPT, fields, hydroState, rhsVec, DCF, \
+                                                                    TOPT, fields, hydroState, rhsVec, \
                                                                     zeroDex_tran, ebcDex, \
-                                                                    ResDiff, thisTime, isFirstStep)
+                                                                    ResDiff, DCF, thisTime, isFirstStep)
                             
-                            #'''
-                            # Compute residual and normalizations
-                            u = np.abs(fields_new[:,0])
-                            w = np.abs(fields_new[:,1])
-                            w[ebcDex[1]] *= 0.0
-                            # Compute DynSGS or Flow Dependent diffusion coefficients
-                            if ResDiff:
-                                   QM = bn.nanmax(np.abs(fields_new - bn.nanmean(fields_new)), axis=0)
-                                   # Trapezoidal Rule estimate of residual
-                                   resInv = (1.0 / TOPT[0]) * (fields_new - fields) - 0.5 * (rhsVec_new + rhsVec)
-                                   #resInv[ebcDex[1],0] *= 0.0
-                                   resInv[ebcDex[1],1] *= 0.0
-                                   DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX**2, DZ**2, REFG[4])
-                            else:
-                                   DCF = rescf.computeFlowVelocityCoeffs(u, w, DX, DZ)
-                                   
-                            fields = np.array(fields_new)
-                            rhsVec = np.array(rhsVec_new)
-                            del(fields_new)
-                            del(rhsVec_new)
-                            #'''
                      except:
                             print('Transient step failed! Closing out to NC file.')
                             m_fid.close() 
