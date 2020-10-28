@@ -53,6 +53,44 @@ localDir = '/home/jeg/scratch/' # Home super desktop
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
+def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar):
+       plt.figure(figsize=(8.0, 12.0))
+       for pp in range(numVar):
+              q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
+              plt.subplot(4,1,pp+1)
+                                                 
+              if np.abs(q.max()) > np.abs(q.min()):
+                     clim = np.abs(q.max())
+              elif np.abs(q.max()) < np.abs(q.min()):
+                     clim = np.abs(q.min())
+              else:
+                     clim = np.abs(q.max())
+             
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+              #plt.xlim(-30.0, 30.0)
+              #plt.ylim(0.0, 20.0)
+              
+              if pp < (numVar - 1):
+                     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+              else:
+                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                     
+              plt.colorbar(ccheck, format='%.2e')
+              
+              if pp == 0:
+                     plt.title('u (m/s): ' + 'Time = {:.5f} (sec)'.format(thisTime))
+              elif pp == 1:
+                     plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
+              elif pp == 2:
+                     plt.title('ln-p (Pa)')
+              else:
+                     plt.title('ln-theta (K)')
+                     
+       plt.show()
+              
+       return
+
 def displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex):
        err = np.linalg.norm(RHS)
        err1 = np.linalg.norm(RHS[udex])
@@ -146,10 +184,6 @@ def runModel(TestName):
        import TestCase
        
        thisTest = TestCase.TestCase(TestName)
-       
-       # Need to move this to TestCase.py
-       SparseDerivativesDynamics = False
-       SparseDerivativesDynSGS = False
        
        # Set the solution type (MUTUALLY EXCLUSIVE)
        StaticSolve = thisTest.solType['StaticSolve']
@@ -248,8 +282,11 @@ def runModel(TestName):
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
          
        # Turn on compact finite difference...
-       DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+       #DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+       #DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+       # Turn on cubic spline derivatives...
+       DDX_SP = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
+       DDZ_SP = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -280,9 +317,6 @@ def runModel(TestName):
        # USE UNIFORM STRETCHING
        #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        
-       DX_local = np.reshape(DXM, (OPS,), order='F')
-       DZ_local = np.reshape(DZM, (OPS,), order='F')
-       
        if not StaticSolve:
               #'''
               DX = 1.0 * DX_avg
@@ -291,8 +325,10 @@ def runModel(TestName):
               DZ2 = DZ**2
               #'''
               '''
-              DX = 1.0 * DX_local
-              DZ = 1.0 * DZ_local
+              DX_local = np.reshape(DXM, (OPS,), order='F')
+              DZ_local = np.reshape(DZM, (OPS,), order='F')
+              DX = 2.0 * DX_local
+              DZ = 2.0 * DZ_local
               DX2 = np.power(DX, 2.0)
               DZ2 = np.power(DZ, 2.0)
               '''
@@ -326,7 +362,7 @@ def runModel(TestName):
        SENSIBLE = 1
        #POTENTIAL = 2
        # Map the sounding to the computational vertical 2D grid [0 H]
-       TZ, DTDZ = \
+       TZ, DTDZ, D2TDZ2 = \
               computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
        '''
        # Make a figure of the temperature background
@@ -380,9 +416,8 @@ def runModel(TestName):
        DLTDZ = np.reciprocal(TZ) * DTDZ
        DLPTDZ = DLTDZ - PHYS[4] * DLPDZ
        # Compute 2nd derivatives
-       print('TO FIX: BACKGROUND 2ND DERIVATIVES VALID ONLY FOR DISCRETE PROFILE!')
        D2LPDZ2 = - DLTDZ * DLPDZ
-       D2LPTDZ2 = - DLTDZ * DLPTDZ
+       D2LPTDZ2 = np.reciprocal(TZ) * D2TDZ2 - DLTDZ * DLPTDZ
        
        # Compute the background (initial) fields
        U = np.expand_dims(U, axis=1)
@@ -428,10 +463,10 @@ def runModel(TestName):
        
        #%% Get the 2D linear operators in Hermite-Chebyshev space
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXMS, DDZMS = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
-       #DDXM_SP, DDZM_SP = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       #%% Store the operator blocks
        REFS.append(DDXM) # index 10
        REFS.append(DDZM) # index 11
        
@@ -454,43 +489,14 @@ def runModel(TestName):
        # Store the terrain profile
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
-       DZDX2 = np.power(DZDX, 2.0)
-       D2ZDX2 = DDXM.dot(DZDX)
        REFS.append(DZDX)
-       REFS.append(DZDX2)
-       REFS.append(D2ZDX2)
        
        # Compute and store the 2nd derivatives of background quantities
-       #DDXMS, DDZMS = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        D2QDZ2 = DDZM.dot(DQDZ)
        D2QDZ2[:,2] = np.reshape(D2LPDZ2, (OPS,), order='F')
        D2QDZ2[:,3] = np.reshape(D2LPTDZ2, (OPS,), order='F')
        REFG.append(D2QDZ2)
        REFG.append(np.zeros((OPS,)))
-       '''
-       plt.plot(REFS[0], DZDX2[ubdex])
-       plt.figure()
-       plt.plot(REFS[0], D2ZDX2[ubdex])
-       plt.show()
-       input()
-       '''
-       # Store the more sparse FD matrices
-       #REFS.append(rsb_matrix(DDXM_SP))
-       #REFS.append(rsb_matrix(DDZM_SP))
-       '''
-       # Check derivatives for consistency
-       dcheck1 = DDXM.dot(np.ones((OPS,)))
-       dcheck2 = DMX.dot(np.ones((OPS,)))
-       plt.plot(dcheck1 - dcheck2, 'k-')
-       plt.title('Hermite Function Derivative: (SciPy - PyRSB) Dot')
-       plt.show()
-       dcheck1 = DDZM.dot(np.ones((OPS,)))
-       dcheck2 = DMZ.dot(np.ones((OPS,)))
-       plt.plot(dcheck1 - dcheck2, 'k-')
-       plt.title('Chebyshev Derivative: (SciPy - PyRSB) Dot')
-       plt.show()
-       input()
-       '''
               
        del(DDXM); del(DDXMS)
        del(DDZM); del(DDZMS)
@@ -564,13 +570,14 @@ def runModel(TestName):
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ubdex)
+                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
               rhs[zeroDex_tran[1],1] *= 0.0
               rhs[zeroDex_tran[2],2] *= 0.0
               rhs[zeroDex_tran[3],3] *= 0.0
+              rhs[ebcDex[1],1] = dHdX * rhs[ebcDex[1],0]
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
@@ -734,6 +741,12 @@ def runModel(TestName):
                      print('Solve DS^-1 * CS... DONE!')
                      print('Compute Schur Complement of D... DONE!')
                      
+                     # Store factor_DS for a little bit...
+                     FDS = shelve.open(localDir + 'factorDS', flag='n', protocol=4)
+                     FDS['factorDS'] = factorDS
+                     FDS.close()
+                     del(factorDS)
+                     
                      # Apply Schur C. solver on block partitioned DS_SC
                      factorDS_SC = dsl.lu_factor(AS, overwrite_a=True)
                      del(AS)
@@ -746,6 +759,9 @@ def runModel(TestName):
                      CS = computeSchurBlock(schurName, 'CS')
                      f2_hat = f2 - CS.dot(sol1)
                      del(CS)
+                     FDS = shelve.open(localDir + 'factorDS', flag='r', protocol=4)
+                     factorDS = FDS['factorDS']
+                     FDS.close()
                      sol2 = dsl.lu_solve(factorDS, f2_hat)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
@@ -778,13 +794,14 @@ def runModel(TestName):
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ubdex)
+                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
               # Fix essential BC
               rhs[zeroDex_tran[0],0] *= 0.0
               rhs[zeroDex_tran[1],1] *= 0.0
               rhs[zeroDex_tran[2],2] *= 0.0
               rhs[zeroDex_tran[3],3] *= 0.0
+              rhs[ebcDex[1],1] = dHdX * rhs[ebcDex[1],0]
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
@@ -803,29 +820,9 @@ def runModel(TestName):
               # Initialize damping coefficients
               DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
               
-              #fields[ubdex,1] = -dWBC
-              #'''
               # Initialize vertical velocity
-              hydroState[ubdex,1] = -dWBC
+              fields[ubdex,1] = -dWBC
               
-              # Make the derivative in X of the forcing
-              DWDX = REFS[12][0].dot(hydroState[:,1])
-              (REFG[6])[:] = DWDX
-              
-              # Make the derivative in Z of the forcing
-              DWDZ = REFS[12][1].dot(hydroState[:,1])
-              (REFG[2])[:,1] = DWDZ
-              
-              # Make the 2nd derivative in Z of the forcing
-              D2WDZ2 = REFS[13][1].dot(DWDZ)
-              (REFG[5])[:,1] = D2WDZ2
-              
-              # Make the 2nd derivative in X of the 1st partial in X
-              PWPX = DWDX - (REFS[15])[:,0] * DWDZ
-              D2WDX2 = REFS[13][0].dot(PWPX)
-              D2WDXZ = REFS[13][1].dot(PWPX)
-              REFG.append((D2WDX2, D2WDXZ))
-              #'''          
               # Initialize time constants
               ti = 0
               ff = 1
@@ -871,6 +868,9 @@ def runModel(TestName):
               dwvar = m_fid.createVariable('DwDt', 'f8', ('time', 'zlev', 'xlon'))
               dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
               dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
+              # Create variables (diffusion coefficients)
+              dvar0 = m_fid.createVariable('dcoeff0', 'f8', ('time', 'zlev', 'xlon'))
+              dvar1 = m_fid.createVariable('dcoeff1', 'f8', ('time', 'zlev', 'xlon'))
               
               # Initialize local sound speed and time step
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
@@ -886,14 +886,6 @@ def runModel(TestName):
                      
                      if ti == 0:
                             isFirstStep = True
-                            
-                            if TOPT[2] > 0.0:
-                                   initFact = 0.0
-                            elif TOPT[2] == 0.0:
-                                   initFact = 1.0
-                            else:
-                                   print('Ramp time is set < 0! Default is 0.')
-                                   initFact = 1.0
                                    
                             UD = fields[:,0] + hydroState[:,0]
                             WD = fields[:,1] + hydroState[:,1]
@@ -924,8 +916,6 @@ def runModel(TestName):
                      if ti % ITI == 0:
                             # Store current time
                             tmvar[ff-1] = thisTime
-                            if makePlots:
-                                   fig = plt.figure(figsize=(8.0, 12.0))
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
@@ -943,40 +933,13 @@ def runModel(TestName):
                                    else:
                                           tvar[ff-1,:,:] = q
                                           dtvar[ff-1,:,:] = dqdt
-                                   
-                                   if makePlots:
-                                          plt.subplot(4,1,pp+1)
                                           
-                                          if np.abs(q.max()) > np.abs(q.min()):
-                                                 clim = np.abs(q.max())
-                                          elif np.abs(q.max()) < np.abs(q.min()):
-                                                 clim = np.abs(q.min())
-                                          else:
-                                                 clim = np.abs(q.max())
-                                         
-                                          ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-                                          plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                          #plt.xlim(-30.0, 30.0)
-                                          #plt.ylim(0.0, 20.0)
+                            dvar0[ff-1,:,:] = np.reshape(DCF[0][:,0], (NZ, NX+1), order='F')
+                            dvar1[ff-1,:,:] = np.reshape(DCF[1][:,0], (NZ, NX+1), order='F')
                                           
-                                          if pp < (numVar - 1):
-                                                 plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-                                          else:
-                                                 plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-                                                 
-                                          plt.colorbar(ccheck, format='%.2e')
-                                          
-                                          if pp == 0:
-                                                 plt.title('u (m/s): ' + 'Time = {:.5f} (sec)'.format(thisTime))
-                                          elif pp == 1:
-                                                 plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
-                                          elif pp == 2:
-                                                 plt.title('ln-p (Pa)')
-                                          else:
-                                                 plt.title('ln-theta (K)')
-       
                             if makePlots:
-                                   plt.show()
+                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar)
+                                   
                             ff += 1
                             
                      # Compute the solution within a time step
@@ -990,15 +953,17 @@ def runModel(TestName):
                             TOPT[0] *= DT_factor
                             DT0 = DTN
                             
-                            fields, rhsVec, thisTime, DCF = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
+                            fields, rhsVec, thisTime, resVec, DCF = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
                                                                     DX, DZ, DX2, DZ2,\
                                                                     TOPT, fields, hydroState, rhsVec, \
                                                                     zeroDex_tran, ebcDex, \
                                                                     ResDiff, DCF, thisTime, isFirstStep)
                             
                      except:
-                            print('Transient step failed! Closing out to NC file.')
+                            print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             m_fid.close() 
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar)
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, rhsVec, NX, NZ, numVar)
                             sys.exit(2)
                      #'''
                      ti += 1

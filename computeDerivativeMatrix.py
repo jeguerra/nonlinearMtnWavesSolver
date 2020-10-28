@@ -32,6 +32,68 @@ def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex):
        
        return DOP
 
+# Computes Cubic Spline 1st derivative matrix
+def computeCubicSplineDerivativeMatrix(DIMS, dom, isClamped):
+       # Initialize matrix blocks
+       N = len(dom)
+       A = np.zeros((N,N)) # coefficients to 2nd derivatives
+       B = np.zeros((N,N)) # coefficients to RHS of 2nd derivatives
+       C = np.zeros((N,N)) # coefficients to 1st derivatives
+       D = np.zeros((N,N)) # coefficients to additive part of 1st derivatives
+       
+       # Loop over each interior point in the irregular grid
+       for ii in range(1,N-1):
+              hp = dom[ii+1] - dom[ii]
+              hm = dom[ii] - dom[ii-1]
+              hc = dom[ii+1] - dom[ii-1]
+              
+              A[ii,ii-1] = -1.0 / 6.0 * hm
+              A[ii,ii] = 1.0 / 6.0 * (hp + hm) - 0.5 * hc
+              A[ii,ii+1] = -1.0 / 6.0 * hp
+              
+              B[ii,ii-1] = -1.0 / hm
+              B[ii,ii] = (1.0 / hm + 1.0 / hp)
+              B[ii,ii+1] = -1.0 / hp
+              
+       for ii in range(0,N-1):
+              hp = dom[ii+1] - dom[ii]
+              C[ii,ii] = -1.0 / 3.0 * hp
+              C[ii,ii+1] = -1.0 / 6.0 * hp
+              
+              D[ii,ii] = -1.0 / hp
+              D[ii,ii+1] = 1.0 / hp
+              
+       # Adjust the right end of the 1st derivative matrix
+       hn = dom[N-1] - dom[N-2]
+       C[N-1,N-2] = hn / 6.0
+       C[N-1,N-1] = hn / 3.0
+       D[N-1,N-2] = -1.0 / hn
+       D[N-1,N-1] = 1.0 / hn
+              
+       if isClamped:
+              DDM_CFD = computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom)
+              A[0,0] = C[0,0]
+              A[0,1] = C[0,1]
+              B[0,:] = DDM_CFD[0,:]
+              B[0,0] -= D[0,0]
+              B[0,1] -= D[0,1]
+              hn = dom[N-1] - dom[N-2]
+              A[N-1,N-2] = hn / 6.0
+              A[N-1,N-1] = hn / 3.0
+              B[N-1,:] = DDM_CFD[N-1,:]
+              B[N-1,N-2] += 1.0 / hn
+              B[N-1,N-1] += -1.0 / hn
+              
+       if isClamped:
+              AIB = np.linalg.solve(A, B)
+       else:
+              AIB = np.zeros((N,N))
+              AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:N-1,1:N-1], B[1:N-1,1:N-1])
+              
+       DDM = C.dot(AIB) + D
+       
+       return DDM
+
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):
        # Initialize the left and right derivative matrices
@@ -189,11 +251,7 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        temp = (HTD).dot(SDIFF)
        temp = temp.dot(STR_H)
        DDM = b * temp
-       '''
-       # Compute block for viscous operator
-       FXH = DDM.dot(HT)
-       FXH = -(FXH.T).dot(W)
-       '''
+
        return DDM, STR_H
 
 def computeChebyshevDerivativeMatrix(DIMS):
@@ -243,12 +301,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Domain scale factor included here
        temp = (CT).dot(SDIFF)
        DDM = -(2.0 / ZH) * temp.dot(STR_C);
-       '''
-       # Compute blocks for viscous operator (must be scaled by sigma later...)
-       FZC = DDM.dot(CT)
-       FZC = FZC.dot(W) # RHS discretization of diffusion operator
-       FZC = -S.dot(FZC)
-       '''
+
        return DDM, STR_C
 
 def computeFourierDerivativeMatrix(DIMS):

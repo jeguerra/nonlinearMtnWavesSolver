@@ -11,6 +11,7 @@ import warnings
 import scipy.sparse as sps
 
 def computeFieldDerivatives(q, DDX, DDZ):
+       
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
        
@@ -24,13 +25,13 @@ def computeFieldDerivatives_GPU(q, DDX, DDZ):
        
        return cu.asnumpy(DqDx), cu.asnumpy(DqDz)
 
-def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, DZDX):
+def computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDX, DDZ, DZDX):
        
        # Compute first partial in X (on CPU)
        PqPx = np.array(DqDx - DZDX * DqDz)
 
        D2qDx2 = DDX.dot(PqPx)
-       D2qDz2 = DDZ.dot(DqDz)
+       D2qDz2 = DDZ.dot(DqDz + DQDZ)
        D2qDxz = DDZ.dot(PqPx)
        
        return D2qDx2, D2qDz2, D2qDxz
@@ -44,88 +45,6 @@ def computeFieldDerivatives2_GPU(PqPx, PqPz, DDX, DDZ):
        D2qDxz = DDZ.dot(PqPx_gpu)
        
        return cu.asnumpy(D2qDx2), cu.asnumpy(D2qDz2), cu.asnumpy(D2qDxz)
-
-def computeAllFieldDerivatives_CPU(q, DDX, DDZ, DZDX, DQDZ, D2QDZ2):
-       
-       # Compute first derivatives (on CPU)
-       DqDx = DDX.dot(q)
-       DqDz = DDZ.dot(q)
-       # Compute first partial in X (on CPU)
-       PqPx = DqDx - DZDX * DqDz
-       
-       # Compute second derivatives (on CPU)
-       D2qDx2 = DDX.dot(PqPx)
-       P2qPz2 = DDZ.dot(DqDz) + D2QDZ2
-       D2qDxz = DDZ.dot(PqPx)
-       
-       return DqDx, DqDz, D2qDx2, P2qPz2, D2qDxz
-
-def computeAllFieldDerivatives_GPU(q, DDX, DDZ, DZDX, DQDZ):
-       # Send state to GPU
-       q_gpu = cu.asarray(q)
-       DZDX_gpu = cu.asarray(DZDX)
-       DQDZ_gpu = cu.asarray(DQDZ)
-       # Compute first derivatives (on GPU)
-       DqDx = DDX.dot(q_gpu)
-       DqDz = DDZ.dot(q_gpu)
-       # Compute first partial in X (on GPU)
-       PqPz = DqDz + DQDZ_gpu
-       PqPx = DqDx - DZDX_gpu * DqDz
-       # Compute second derivatives (on GPU)
-       D2qDx2 = DDX.dot(PqPx)
-       P2qPz2 = DDZ.dot(PqPz)
-       D2qDxz = DDZ.dot(PqPx)
-       
-       # 3 transfers to GPU
-       # 5 transfers from GPU
-       
-       return cu.asnumpy(DqDx), cu.asnumpy(PqPz), \
-              cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
-
-def computeAllFieldDerivatives_CPU2GPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ, D2QDZ2):
-       
-       # Compute first derivatives (on CPU)
-       DqDx = DDX_CPU.dot(q)
-       DqDz = DDZ_CPU.dot(q)
-       # Compute first partial in X (on CPU)
-       PqPx = DqDx - DZDX * DqDz
-       
-       # Send gradients to GPU
-       PqPx_gpu = cu.asarray(PqPx)
-       DqDz_gpu = cu.asarray(DqDz)
-       # Compute second derivatives (on GPU)
-       D2qDx2 = DDX_GPU.dot(PqPx_gpu)
-       P2qPz2 = DDZ_GPU.dot(DqDz_gpu) + D2QDZ2
-       D2qDxz = DDZ_GPU.dot(PqPx_gpu)
-       
-       # 2 transfers to GPU
-       # 3 transfers from GPU
-       
-       return DqDx, DqDz, \
-              cu.asnumpy(D2qDx2), cu.asnumpy(P2qPz2), cu.asnumpy(D2qDxz)
-              
-def computeAllFieldDerivatives_GPU2CPU(q, DDX_CPU, DDZ_CPU, DDX_GPU, DDZ_GPU, DZDX, DQDZ, D2QDZ2):
-       # Send state to GPU
-       q_gpu = cu.asarray(q)
-       # Compute first derivatives (on GPU)
-       DqDx = DDX_GPU.dot(q_gpu)
-       DqDz = DDZ_GPU.dot(q_gpu)
-       # Bring derivatives to CPU
-       DqDx_cpu = cu.asnumpy(DqDx)
-       DqDz_cpu = cu.asnumpy(DqDz)
-       
-       # Compute first partial in X (on GPU)
-       PqPx = DqDx_cpu - DZDX * DqDz_cpu
-       
-       # Compute second derivatives (on CPU)
-       D2qDx2 = DDX_CPU.dot(PqPx)
-       P2qPz2 = DDZ_CPU.dot(DqDz) + D2QDZ2
-       D2qDxz = DDZ_CPU.dot(PqPx)
-       
-       # 1 transfers to GPU
-       # 2 transfers from GPU
-       
-       return DqDx_cpu, DqDz_cpu, D2qDx2, P2qPz2, D2qDxz
        
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -350,14 +269,12 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        
        # Get hydrostatic initial fields
        DQDZ = REFG[2]
-       DWDX = REFG[6]
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
        WM = np.expand_dims(W,1)
        # Compute normal compnent to terrain surfaces
        velNorm = (WM - DZDX * UM)
-       velNorm[ebcDex[1],:] *= 0.0
        
        # Compute pressure gradient force scaling (buoyancy)
        with warnings.catch_warnings():
@@ -381,14 +298,18 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
                      RdT_hat = 1.0 + T_ratio
                      RdT = RdT_bar * RdT_hat
-                            
+                          
+       # Enforce No-Slip condition on transport
+       velNorm[ebcDex[1],:] *= 0.0
+       velNorm[ebcDex[2],:] *= 0.0
+       
        # Compute transport terms
        UPqPx = UM * DqDx
        wDQDz = velNorm * DqDz + WM * DQDZ
-       
        transport = UPqPx + wDQDz
-       transport[:,1] += UM[:,0] * (DWDX - DZDX[:,0] * DQDZ[:,1])
-       divergence = (DqDx[:,0] - DZDX[:,0] * DqDz[:,0]) + (DqDz[:,1] + DQDZ[:,1])
+       # Compute local divergence
+       divergence = (DqDx[:,0] - DZDX[:,0] * DqDz[:,0]) + DqDz[:,1]
+       # Compute pressure gradient forces
        pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
@@ -413,7 +334,7 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
+def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX):
        
        # Get the anisotropic coefficients
        RESCFX = RESCF[0]
@@ -440,11 +361,11 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex):
+def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX):
        
        # Get the anisotropic coefficients
-       RESCFX = RESCF[0]
-       RESCFZ = RESCF[1]
+       RESCF1 = RESCF[0]
+       RESCF2 = RESCF[1]
        
        # Compute the 2nd partial derivative
        P2qPx2 = D2qDx2 - DZDX * P2qPxz
@@ -453,15 +374,15 @@ def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex):
        # Diffusion of u-w vector
        xflux = 2.0 * P2qPx2[:,0]
        zflux = P2qPz2[:,0] + P2qPxz[:,1]
-       DqDt[:,0] = RESCFX[:,0] * (xflux + zflux)
+       DqDt[:,0] = RESCF1[:,0] * (xflux + zflux)
        
        xflux = P2qPx2[:,1] + P2qPxz[:,0]
        zflux = 2.0 * P2qPz2[:,1]
-       DqDt[:,1] = RESCFZ[:,0] * (xflux + zflux)
+       DqDt[:,1] = RESCF2[:,0] * (xflux + zflux)
        
        # Diffusion of scalars (broken up into anisotropic components)
-       xflux = RESCFX * P2qPx2[:,2:] 
-       zflux = RESCFZ * P2qPz2[:,2:]
-       DqDt[:,2:] = xflux + zflux
+       Pr = 0.71 / 0.4
+       DqDt[:,2] = RESCF1[:,0] * P2qPx2[:,2] + RESCF2[:,0] * P2qPz2[:,2]
+       DqDt[:,3] = Pr * (RESCF1[:,0] * P2qPx2[:,3] + RESCF2[:,0] * P2qPz2[:,3])
        
        return DqDt

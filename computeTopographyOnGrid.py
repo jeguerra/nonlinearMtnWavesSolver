@@ -67,7 +67,7 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               ht[0] = 0.0; ht[-1] = 0.0
               # Take the derivative (DO NOT USE NATIVE DERIVATIVE OPERATOR)
               #dhdx_native = DDX.dot(ht)
-              cs = CubicSpline(xh, ht, bc_type='periodic')
+              cs = CubicSpline(xh, ht, bc_type='clamped')
               dhdx = (cs.derivative())(xh)[:]
               # Monotonic filter
               dhdx[0] = 0.0; dhdx[-1] = 0.0

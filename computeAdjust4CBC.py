@@ -64,8 +64,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        if latPeriodic and not latInflow:
               # Periodic with no inflow condition
               rowsOutU = set()
-              rowsOutW_statc = set(utdex)
-              rowsOutW_trans = set(np.concatenate((ubdex,utdex)))
+              rowsOutW = set(utdex)
               rowsOutP = set()
               rowsOutT = set()
               # Indexing for static solver
@@ -74,8 +73,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        elif not latPeriodic and latInflow:
               # Only inflow condition specified
               rowsOutU = set(uldex)
-              rowsOutW_statc = set(np.concatenate((uldex,utdex)))
-              rowsOutW_trans = set(np.concatenate((uldex,ubdex,utdex)))
+              rowsOutW = set(np.concatenate((uldex,utdex)))
               rowsOutP = set(uldex)
               rowsOutT = set(uldex)
               # Indexing for static solver
@@ -85,24 +83,23 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        elif latPeriodic and latInflow:
               # Periodic with inflow condition (pinned boundary)
               rowsOutU = set(np.concatenate((uldex, urdex)))
-              rowsOutW_statc = set(np.concatenate((uldex,urdex,utdex)))
-              rowsOutW_trans = set(np.concatenate((uldex,urdex,ubdex,utdex)))
-              rowsOutP = set(np.concatenate((uldex, urdex)))
-              rowsOutT = set(np.concatenate((uldex, urdex)))
+              rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
+              rowsOutP = set(np.concatenate((uldex,urdex)))
+              rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
                # Indexing for static solver
               left = np.concatenate((uldex, wldex, pldex, tldex))
               right = np.concatenate((urdex, wrdex, prdex, trdex))
-              top = wtdex
+              top = np.concatenate((wtdex, ttdex))
               rowsOutBC_static = set(np.concatenate((left, right, top)))
        
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
-       wbcDex = rowsAll.difference(rowsOutW_statc); wbcDex = sorted(wbcDex)
+       wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
        pbcDex = rowsAll.difference(rowsOutP); pbcDex = sorted(pbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
        
        # W is treated as an essential BC at terrain in solution by direct substitution
-       rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW_statc), \
+       rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW), \
                               sorted(rowsOutP), sorted(rowsOutT))
               
        # All DOF for all variables

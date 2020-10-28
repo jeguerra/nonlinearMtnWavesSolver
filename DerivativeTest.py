@@ -31,9 +31,12 @@ REFS = computeGrid(DIMS, True, False)
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 #DDX_1D, HF_TRANS, dummy = derv.computeFourierDerivativeMatrix(DIMS)
 
-DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+#DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+DDX_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
 DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+
+#DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+DDZ_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
 DDZ2A_CFD = DDZ_CFD.dot(DDZ_CFD)
 DDZ2B_CFD = derv.computeCompactFiniteDiffDerivativeMatrix2(DIMS, REFS[1])
 

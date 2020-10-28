@@ -20,16 +20,17 @@ def computeGrid(DIMS, HermCheb, FourCheb):
        NX = DIMS[3]
        NZ = DIMS[4]
        
-       # Compute the Hermite function and Chebyshev native grids
-       alpha, whf = hefunclb(NX) #(-inf inf)
+       # Compute the Chebyshev native grids
        xi, wcp = cheblb(NZ) #[-1 +1]
        
        # Map reference 1D domains to physical 1D domains
        if HermCheb and not FourCheb:
+              alpha, whf = hefunclb(NX) #(-inf inf)
               x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
        elif FourCheb and not HermCheb:
               x = np.linspace(L1, L2, num=NX+1, endpoint=True)
        else:
+              alpha, whf = hefunclb(NX) #(-inf inf)
               x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
               
        z = 0.5 * ZH * (1.0 + xi)

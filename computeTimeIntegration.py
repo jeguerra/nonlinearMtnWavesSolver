@@ -61,18 +61,8 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        uf, duf = rampFactor(time, rampTimeBound)
            
        GML = REFG[0]
-       DWDZ = (REFG[2])[:,1]
-       DWDX = REFG[6]
-       D2QDZ2 = REFG[5]
-       D2WDX2 = REFG[7][0]
-       D2WDXZ = REFG[7][1]
+       DQDZ = REFG[2]
        DZDX = REFS[15]
-       #'''
-       DZDX2 = REFS[16]
-       DZDXbc = DZDX[ebcDex[1],0]
-       DZDX2bc = DZDX2[ebcDex[1],0]
-       #scale = np.expand_dims(np.sqrt(1.0 + DZDX2bc), 1)
-       #scale = np.reciprocal(np.sqrt(1.0 + DZDX2bc))
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
@@ -93,22 +83,23 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
+              # Apply GML to W and LnT
+              rhsDyn[:,1] = GML.dot(rhsDyn[:,1])
+              rhsDyn[:,3] = GML.dot(rhsDyn[:,3])
+              
               # Compute 2nd derivatives
-              #DqDx[:,1] += DWDX
-              #DqDz[:,1] += DWDZ
               D2qDx2, D2qDz2, D2qDxz = \
-                     tendency.computeFieldDerivatives2(DqDx, DqDz, DDXM_CFD, DDZM_CFD, DZDX)
-              #'''
-              D2qDx2[:,1] += D2WDX2
-              #D2qDz2[:,1] += D2QDZ2[:,1]
-              D2qDz2 += D2QDZ2
-              D2qDxz[:,1] += D2WDXZ
-              #'''
+                     tendency.computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDXM_CFD, DDZM_CFD, DZDX)
+              
               # Compute the diffusion update
               rhsDif = computeRHSUpdate_diffusion(D2qDx2, D2qDz2, D2qDxz, DCF)
               
-              # Apply diffusion
+              # Compute the sponge layer update
+              rhsRay = tendency.computeRayleighTendency(REFG, solA)
+              
+              # Compute diffusion updates
               rhsDyn += rhsDif
+              rhsDyn += rhsRay
               
               # Apply update
               dsol = coeff * DT * rhsDyn
@@ -121,14 +112,6 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               W = fields[:,1] + init0[:,1]
               # Compute dynamical tendencies
               rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex)
-              rhsRay = tendency.computeRayleighTendency(REFG, fields)
-
-              # Null Rayleigh layer on W (has GML)
-              rhs += rhsRay
-              
-              # GML layer on all W and LnT tendencies
-              rhs[:,1] = GML.dot(rhs[:,1])
-              rhs[:,3] = GML.dot(rhs[:,3])
               
               # Fix essential boundary conditions
               rhs[zeroDex[0],0] *= 0.0
@@ -145,18 +128,37 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               
               # Compute diffusive tendencies
               if DynSGS:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
-                     #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, D2qDx2, D2qDz2, D2qDxz, DZDX)
               else:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
-                     #rhsDiff = tendency.computeDiffusiveFluxTendency(dcoeff, DqDx, DqDz, DDXM, DDZM, DZDX, ebcDex)
-
-              # GML layer on all diffusion tendencies
-              rhs = GML.dot(rhs)
-              # Adjust diffusion at terrain boundary
-              rhs[ebcDex[1],:] *= 0.0
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, D2qDx2, D2qDz2, D2qDxz, DZDX)
+              
+              # Null diffusion at terrain
+              rhs[ebcDex[3],:] *= 0.0
               
               return rhs
+       
+       def computeDCFUpdate(solA, solB, rhsA, rhsB):
+              
+              if rhsB == None:
+                     DqDx, DqDz = tendency.computeFieldDerivatives(solB, DDXM_CPU, DDZM_CPU)
+                     rhsB = computeRHSUpdate_dynamics(solB, DqDx, DqDz)
+       
+              # Compute residual and normalizations
+              u = np.abs(solB[:,0])
+              w = np.abs(solA[:,1])
+              
+              # Trapezoidal Rule estimate of residual
+              #dqdt = (1.0 / TOPT[0]) * (solB - solA)
+              #resInv = dqdt - 0.5 * (rhsA + rhsB)
+              resInv = rhsA - rhsB
+              # Compute DynSGS or Flow Dependent diffusion coefficients
+              if DynSGS:
+                     QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
+                     DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4])
+              else:  
+                     DCF = rescf.computeFlowVelocityCoeffs(u, w, DX, DZ)
+                     
+              return DCF, resInv, rhsB
        
        def ketcheson62(sol):
               m = 5
@@ -225,22 +227,8 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               solf, rhsDyn = ketcheson62(sol0)
        
        time += DT
-       
-       DqDx, DqDz = tendency.computeFieldDerivatives(solf, DDXM_CPU, DDZM_CPU)
-       rhsf = computeRHSUpdate_dynamics(solf, DqDx, DqDz)
+       DCF, resInv, rhsf = computeDCFUpdate(sol0, solf, rhs0, None)
+              
        #input('End of time step. ' + str(time))
        
-       # Compute residual and normalizations
-       u = np.abs(solf[:,0])
-       w = np.abs(solf[:,1] + init0[:,1])
-       # Compute DynSGS or Flow Dependent diffusion coefficients
-       if DynSGS:
-              QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
-              # Trapezoidal Rule estimate of residual
-              resInv = (1.0 / TOPT[0]) * (solf - sol0) - 0.5 * (rhsf + rhs0)
-              resInv[ebcDex[3],:] *= 0.0
-              DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX**2, DZ**2, REFG[4])
-       else:
-              DCF = rescf.computeFlowVelocityCoeffs(u, w, DX, DZ)
-       
-       return solf, rhsf, time, DCF
+       return solf, rhsf, time, resInv, DCF

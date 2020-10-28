@@ -90,7 +90,7 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
 hdir = '/home/jeg/scratch/'
 tdir = '/media/jeg/TransferDATA/Schar025m_tempest/3Layer025m/' # home desktop
 #tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
-hresl = [1000, 500, 250]
+hresl = [1000, 500, 250, 125]
 #hresl = [250]
 # Loop over the 4 data files
 # Error norms between Tempest and Spectral Reference
@@ -221,7 +221,8 @@ wnterr2 = np.array(wnterr2)
 print(wbcerr1)
 print(wflerr1)
 #%%  
-rate2 = np.power(1.0E-3 * np.array(hresl), 2.0)
+convRate = np.power(1.0E-3 * np.array(hresl), 1.5)
+convRate *= 1.0 / np.amax(convRate)
      
 fig = plt.figure(figsize=(5.0, 5.0))
 plt.plot(hresl, wbcerr1[:,2], 's-'); #plt.ylim(1.0E-3, 1.0E0)
@@ -235,17 +236,18 @@ plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth
 fig = plt.figure(figsize=(10.0, 5.0))
 plt.subplot(1,2,1)
 plt.plot(hresl, wnterr1, 's-'); #plt.ylim(1.0E-3, 5.0E-1)
+plt.plot(hresl, np.amax(wnterr1) * convRate, 'k--')
 plt.title('Interior Domain Response')
-plt.xscale('linear'); plt.yscale('log')
+plt.xscale('log'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 plt.ylabel('L-2 Norm W (m/s)')
 plt.legend(('Spectral 24Hr','Spectral 48Hr','Spectral 72Hr'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
 plt.subplot(1,2,2)
 plt.plot(hresl, wflerr1, 's-'); #plt.ylim(1.0E-3, 5.0E-1)
-#plt.plot(hresl, rate2, 'k--')
+plt.plot(hresl, np.amax(wflerr1) * convRate, 'k--')
 plt.title('Entire Domain Response')
-plt.xscale('linear'); plt.yscale('log')
+plt.xscale('log'); plt.yscale('log')
 plt.xlabel('Resolution (m)')
 #plt.ylabel('L-2 Norm (m/s)')
 plt.legend(('Spectral 24Hr','Spectral 48Hr','Spectral 72Hr'), loc='lower right')

@@ -14,10 +14,12 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
        ZTL = REFS[5]
        NC = len(ZTL[0,:])
        
+       TZ = np.zeros(ZTL.shape)
+       DTDZ = np.zeros(ZTL.shape)
+       D2TDZ2 = np.zeros(ZTL.shape)
+       
        if isUniform:
               # Loop over each column and evaluate termperature for uniform N
-              TZ = np.zeros(ZTL.shape)
-              DTDZ = np.zeros(ZTL.shape)
               T0 = T_in[0]
               A = PHYS[7]**2 / PHYS[0]
               C = PHYS[0] / PHYS[2]
@@ -26,6 +28,7 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
                      EXPF = np.exp(A * zcol)
                      TZ[:,cc] = T0 * EXPF + (C / A) * (1.0 - EXPF)
                      DTDZ[:,cc] = (A * T0 - C) * EXPF
+                     D2TDZ2[:,cc] = A * (A * T0 - C) * EXPF
        else:
               if isSmooth:
                      ZTP = Z_in[1] # tropopause height
@@ -67,8 +70,6 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
                      coeffs = np.linalg.solve(VandermondeM, VRHS)
                      
                      # Loop over each column and evaluate interpolant
-                     TZ = np.zeros(ZTL.shape)
-                     DTDZ = np.zeros(ZTL.shape)
                      for cc in range(NC):
                             zcol = ZTL[:,cc]
                             # Get the 1D linear interpolation for this sounding
@@ -81,6 +82,7 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
                                    for kk in range(len(zcol)):
                                           if (z[kk] >= Z_in[pp]) and (z[kk] <= Z_in[pp+1]):
                                                  DTDZ[kk,cc] = LR
+                                                 D2TDZ2[kk,cc] = 0.0
                                                  
                             # Adjust the tropopause to smooth the profile
                             tpDex = [kk for kk in range(len(zcol)) if ZTP <= zcol[kk] <= ZTM]
@@ -91,6 +93,8 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
                                               
                             DTDZ[tpDex,cc] = coeffs[1] + 2 * coeffs[2] * zcol[tpDex] + \
                                                          3 * coeffs[3] * np.power(zcol[tpDex],2)
+                                                         
+                            D2TDZ2[tpDex,cc] = 2 * coeffs[2] + 6 * coeffs[3] * zcol[tpDex]
                                                  
                      '''
                      # Loop over each column and evaluate interpolant
@@ -125,5 +129,6 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
                                    for kk in range(len(zcol)):
                                           if (z[kk] >= Z_in[pp]) and (z[kk] <= Z_in[pp+1]):
                                                  DTDZ[kk,cc] = LR
+                                                 D2TDZ2[kk,cc] = 0.0
        
-       return TZ, DTDZ
+       return TZ, DTDZ, D2TDZ2
