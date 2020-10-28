@@ -54,6 +54,7 @@ restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
 def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar):
+       plt.close('all')
        plt.figure(figsize=(8.0, 12.0))
        for pp in range(numVar):
               q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
@@ -87,7 +88,7 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar):
               else:
                      plt.title('ln-theta (K)')
                      
-       plt.show()
+       plt.show(block=False)
               
        return
 
@@ -714,7 +715,9 @@ def runModel(TestName):
                      BS = computeSchurBlock(schurName,'BS')
                      f2_hat = dsl.lu_solve(factorDS, f2)
                      f1_hat = f1 - BS.dot(f2_hat)
-                     del(BS); del(f2_hat)
+                     del(f1)
+                     del(BS) 
+                     del(f2_hat)
                      print('Compute modified force vectors... DONE!')
                      
                      # Get CS block and store in column chunks
@@ -731,7 +734,7 @@ def runModel(TestName):
                             crange = cranges[cc] 
                             CS_chunk = mdb['CS' + str(cc)]
                             
-                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk) # LONG EXECUTION
+                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk, overwrite_b=True) # LONG EXECUTION
                             del(CS_chunk)
                             AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
                             del(DS_chunk)
@@ -746,30 +749,32 @@ def runModel(TestName):
                      FDS['factorDS'] = factorDS
                      FDS.close()
                      del(factorDS)
+                     print('Store Schur Complement of D... DONE!')
                      
                      # Apply Schur C. solver on block partitioned DS_SC
                      factorDS_SC = dsl.lu_factor(AS, overwrite_a=True)
                      del(AS)
                      print('Factor D and Schur Complement of D... DONE!')
                      
-                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat)
+                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat, overwrite_b=True)
+                     del(f1_hat)
                      del(factorDS_SC)
                      print('Solve for u and w... DONE!')
                      
                      CS = computeSchurBlock(schurName, 'CS')
                      f2_hat = f2 - CS.dot(sol1)
+                     del(f2)
                      del(CS)
                      FDS = shelve.open(localDir + 'factorDS', flag='r', protocol=4)
                      factorDS = FDS['factorDS']
                      FDS.close()
-                     sol2 = dsl.lu_solve(factorDS, f2_hat)
+                     sol2 = dsl.lu_solve(factorDS, f2_hat, overwrite_b=True)
+                     del(f2_hat)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
                      dsol = np.concatenate((sol1, sol2))
                      
                      # Get memory back
-                     del(f1); del(f2)
-                     del(f1_hat); del(f2_hat)
                      del(sol1); del(sol2)
                      
               #%% Update the interior and boundary solution
