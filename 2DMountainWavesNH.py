@@ -1103,10 +1103,10 @@ def runModel(TestName):
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       TestName = 'ClassicalScharIter'
+       #TestName = 'ClassicalScharIter'
        #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       #TestName = 'CustomTest'
+       TestName = 'CustomTest'
        
        # Run the model in a loop if needed...
        for ii in range(1):

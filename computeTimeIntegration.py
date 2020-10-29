@@ -7,6 +7,7 @@ Created on Tue Aug 13 10:09:52 2019
 """
 import numpy as np
 import math as mt
+import scipy.sparse as sps
 import time as timing
 import bottleneck as bn
 import matplotlib.pyplot as plt
@@ -79,32 +80,45 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              # Evaluate the dynamics first
+              # Compute 1st derivatives
               DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
+              # Compute 2nd derivatives
+              D2qDx2, D2qDz2, D2qDxz = \
+                     tendency.computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDXM_CFD, DDZM_CFD, DZDX)
+              
+              # Compute dynamics update
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
+              
+              # Compute the diffusion update
+              rhsDif = computeRHSUpdate_diffusion(D2qDx2, D2qDz2, D2qDxz, DCF)
+              
+              # Combine dynamics and diffusion
+              rhsDyn += rhsDif
               
               # Apply GML to W and LnT
               rhsDyn[:,1] = GML.dot(rhsDyn[:,1])
               rhsDyn[:,3] = GML.dot(rhsDyn[:,3])
               
-              # Compute 2nd derivatives
-              D2qDx2, D2qDz2, D2qDxz = \
-                     tendency.computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDXM_CFD, DDZM_CFD, DZDX)
-              
-              # Compute the diffusion update
-              rhsDif = computeRHSUpdate_diffusion(D2qDx2, D2qDz2, D2qDxz, DCF)
-              
-              # Compute the sponge layer update
-              rhsRay = tendency.computeRayleighTendency(REFG, solA)
-              
-              # Compute diffusion updates
-              rhsDyn += rhsDif
-              rhsDyn += rhsRay
-              
               # Apply update
               dsol = coeff * DT * rhsDyn
               solB = sol2Update + dsol
               
+              # 
+              mu = -REFG[3]
+              propagator = 1.0 + (mu * coeff * DT * REFG[4]).data
+              propagator = sps.diags(np.reciprocal(propagator[0,:]), format='csr')
+              solB = propagator.dot(solB)
+              '''
+              # Compute the sponge layer update
+              rhsRay = tendency.computeRayleighTendency(REFG, sol2Update)
+              
+              # Compute diffusion updates
+              rhsDif += rhsRay
+              
+              # Apply update
+              dsol = coeff * DT * rhsDif
+              solB = sol2Update + dsol
+              '''
               return solB
        
        def computeRHSUpdate_dynamics(fields, DqDx, DqDz):
@@ -148,9 +162,9 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               w = np.abs(solA[:,1])
               
               # Trapezoidal Rule estimate of residual
-              #dqdt = (1.0 / TOPT[0]) * (solB - solA)
-              #resInv = dqdt - 0.5 * (rhsA + rhsB)
-              resInv = rhsA - rhsB
+              dqdt = (1.0 / TOPT[0]) * (solB - solA)
+              resInv = dqdt - 0.5 * (rhsA + rhsB)
+              #resInv = rhsA - rhsB
               # Compute DynSGS or Flow Dependent diffusion coefficients
               if DynSGS:
                      QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)

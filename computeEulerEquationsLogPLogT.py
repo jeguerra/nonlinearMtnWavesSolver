@@ -6,7 +6,6 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
-import cupy as cu
 import warnings
 import scipy.sparse as sps
 
@@ -16,14 +15,6 @@ def computeFieldDerivatives(q, DDX, DDZ):
        DqDz = DDZ.dot(q)
        
        return DqDx, DqDz
-       
-def computeFieldDerivatives_GPU(q, DDX, DDZ):
-       
-       q_gpu = cu.asarray(q)
-       DqDx = DDX.dot(q_gpu)
-       DqDz = DDZ.dot(q_gpu)
-       
-       return cu.asnumpy(DqDx), cu.asnumpy(DqDz)
 
 def computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDX, DDZ, DZDX):
        
@@ -35,16 +26,6 @@ def computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDX, DDZ, DZDX):
        D2qDxz = DDZ.dot(PqPx)
        
        return D2qDx2, D2qDz2, D2qDxz
-       
-def computeFieldDerivatives2_GPU(PqPx, PqPz, DDX, DDZ):
-       
-       PqPx_gpu = cu.asarray(PqPx)
-       PqPz_gpu = cu.asarray(PqPz)
-       D2qDx2 = DDX.dot(PqPx_gpu)
-       D2qDz2 = DDZ.dot(PqPz_gpu)
-       D2qDxz = DDZ.dot(PqPx_gpu)
-       
-       return cu.asnumpy(D2qDx2), cu.asnumpy(D2qDz2), cu.asnumpy(D2qDxz)
        
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])

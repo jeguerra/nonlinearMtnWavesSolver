@@ -129,8 +129,7 @@ class TestCase:
               # Set the Rayleigh options
               applyTop = True
               applyLateral = True
-              mu = np.array([1.0E-2, 1.0E-2, 1.0E-2, 1.0E-2])
-              mu *= rlf * np.array([1.0, 1.0, 1.0, 1.0])
+              mu = rlf * 1.0E-2
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC)
               
               # Set the terrain options

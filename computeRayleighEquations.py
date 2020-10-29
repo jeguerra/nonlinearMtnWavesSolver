@@ -157,12 +157,6 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex, symmetric
        GML, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, \
                                                      applyTop, applyLateral, symmetricProfile)
        
-       # Get the individual mu for each prognostic
-       mu_U = mu[0]
-       mu_W = mu[1]
-       mu_P = mu[2]
-       mu_T = mu[3]
-       
        # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
        # Compute the matrix operator
@@ -178,7 +172,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex, symmetric
        RLZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
        '''
        # Store the diagonal blocks corresponding to Rayleigh damping terms
-       ROPS = [mu_U * RLM, mu_W * RLM, mu_P * RLM, mu_T * RLM]
+       ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        return ROPS, RLM, GML
        
