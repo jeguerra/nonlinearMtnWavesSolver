@@ -88,7 +88,9 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar):
               else:
                      plt.title('ln-theta (K)')
                      
+       plt.tight_layout()
        plt.show(block=False)
+       #plt.savefig('transient_diagnostic.png', format='png')
               
        return
 
