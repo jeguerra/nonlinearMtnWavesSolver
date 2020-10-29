@@ -103,8 +103,8 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               dsol = coeff * DT * rhsDyn
               solB = sol2Update + dsol
               
-              # 
-              mu = -REFG[3]
+              # Apply Rayleigh layer implicitly
+              mu = REFG[3]
               propagator = 1.0 + (mu * coeff * DT * REFG[4]).data
               propagator = sps.diags(np.reciprocal(propagator[0,:]), format='csr')
               solB = propagator.dot(solB)
