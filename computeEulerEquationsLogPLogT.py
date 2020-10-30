@@ -261,7 +261,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        with warnings.catch_warnings():
               np.seterr(all='raise')
               try:
-                     RdT_hat = np.exp(kap * fields[:,2]) * np.exp(fields[:,3])
+                     p_hat = np.exp(fields[:,2])
+                     RdT_hat = np.power(p_hat, kap) * np.exp(fields[:,3])
                      RdT = RdT_bar * RdT_hat
                      T_ratio = RdT_hat - 1.0
               except FloatingPointError:
@@ -342,11 +343,14 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX):
+def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, D2qDx2, P2qPz2, P2qPxz, DZDX):
        
        # Get the anisotropic coefficients
        RESCF1 = RESCF[0]
        RESCF2 = RESCF[1]
+       
+       # Compute the 1st partial derivative
+       PqPx = DqDx - DZDX * DqDz
        
        # Compute the 2nd partial derivative
        P2qPx2 = D2qDx2 - DZDX * P2qPxz
@@ -363,7 +367,9 @@ def computeDiffusionTendency(PHYS, RESCF, D2qDx2, P2qPz2, P2qPxz, DZDX):
        
        # Diffusion of scalars (broken up into anisotropic components)
        Pr = 0.71 / 0.4
-       DqDt[:,2] = RESCF1[:,0] * P2qPx2[:,2] + RESCF2[:,0] * P2qPz2[:,2]
-       DqDt[:,3] = Pr * (RESCF1[:,0] * P2qPx2[:,3] + RESCF2[:,0] * P2qPz2[:,3])
+       DqDt[:,2] = RESCF1[:,0] * (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2]) + \
+                   RESCF2[:,0] * (P2qPz2[:,2] + DqDz[:,2] * DqDz[:,2])
+       DqDt[:,3] = Pr * RESCF1[:,0] * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
+                        RESCF2[:,0] * (P2qPz2[:,3] + DqDz[:,3] * DqDz[:,3])
        
        return DqDt

@@ -11,7 +11,7 @@ import numpy as np
 import bottleneck as bn
 
 # This approach blends by maximum residuals on each variable
-def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM):
+def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM, SV):
        
        ARES = np.abs(RES)
        
@@ -42,6 +42,10 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM):
        # Upwind diffusion in the sponge layers
        QRESX_CF += RLM.dot(QXMAX)
        QRESZ_CF += RLM.dot(QZMAX)
+       
+       # Scale with specific volume
+       QRESX_CF *= SV
+       QRESZ_CF *= SV
        
        return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
 

@@ -56,6 +56,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        order = TOPT[3]
        dHdX = REFS[6]
        RdT_bar = REFS[9][0]
+       P_bar = REFS[9][1]
        
        # Adjust for time ramping
        time = thisTime
@@ -90,7 +91,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
               # Compute the diffusion update
-              rhsDif = computeRHSUpdate_diffusion(D2qDx2, D2qDz2, D2qDxz, DCF)
+              rhsDif = computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DCF)
               
               # Combine dynamics and diffusion
               rhsDyn += rhsDif
@@ -108,17 +109,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               propagator = 1.0 + (mu * coeff * DT * REFG[4]).data
               propagator = sps.diags(np.reciprocal(propagator[0,:]), format='csr')
               solB = propagator.dot(solB)
-              '''
-              # Compute the sponge layer update
-              rhsRay = tendency.computeRayleighTendency(REFG, sol2Update)
               
-              # Compute diffusion updates
-              rhsDif += rhsRay
-              
-              # Apply update
-              dsol = coeff * DT * rhsDif
-              solB = sol2Update + dsol
-              '''
               return solB
        
        def computeRHSUpdate_dynamics(fields, DqDx, DqDz):
@@ -138,13 +129,13 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
                      
               return rhs
        
-       def computeRHSUpdate_diffusion(D2qDx2, D2qDz2, D2qDxz, dcoeff):
+       def computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, dcoeff):
               
               # Compute diffusive tendencies
               if DynSGS:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, D2qDx2, D2qDz2, D2qDxz, DZDX)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX)
               else:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, D2qDx2, D2qDz2, D2qDxz, DZDX)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX)
               
               # Null diffusion at terrain
               rhs[ebcDex[3],:] *= 0.0
@@ -164,11 +155,17 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               # Trapezoidal Rule estimate of residual
               dqdt = (1.0 / TOPT[0]) * (solB - solA)
               resInv = dqdt - 0.5 * (rhsA + rhsB)
-              #resInv = rhsA - rhsB
               # Compute DynSGS or Flow Dependent diffusion coefficients
               if DynSGS:
+                     # Compute the specific volume
+                     kap = PHYS[4]
+                     p_hat = np.exp(solB[:,2])
+                     RdT_hat = np.power(p_hat, kap) * np.exp(solB[:,3])
+                     RdT = RdT_bar * RdT_hat
+                     SV = RdT * np.reciprocal(P_bar * (p_hat - 1.0))
+                     # Compute field norms
                      QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
-                     DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4])
+                     DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4], SV)
               else:  
                      DCF = rescf.computeFlowVelocityCoeffs(u, w, DX, DZ)
                      

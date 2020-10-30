@@ -433,7 +433,7 @@ def runModel(TestName):
        LOGT = np.tile(LPT, NX+1)
        LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
        
-       SV = PORZ * np.reciprocal(np.exp(LOGP)) # Specific volume (1 / rho_bar)
+       PBAR = np.exp(LOGP) # Hydrostatic pressure
        
        #%% Rayleigh opearator and GML weight
        ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
@@ -454,7 +454,7 @@ def runModel(TestName):
        
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F'))
-       REFS.append((np.reshape(PORZ, (OPS,), order='F'), np.reshape(SV, (OPS,), order='F')))
+       REFS.append((np.reshape(PORZ, (OPS,), order='F'), np.reshape(PBAR, (OPS,), order='F')))
        
        # Get some memory back here
        del(PORZ)
