@@ -162,7 +162,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
                      p_hat = np.exp(solB[:,2])
                      RdT_hat = np.power(p_hat, kap) * np.exp(solB[:,3])
                      RdT = RdT_bar * RdT_hat
-                     SV = RdT * np.reciprocal(P_bar * (p_hat - 1.0))
+                     SV = RdT * np.reciprocal(P_bar * p_hat)
                      # Compute field norms
                      QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
                      DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4], SV)
