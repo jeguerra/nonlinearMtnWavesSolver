@@ -93,12 +93,12 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               # Compute the diffusion update
               rhsDif = computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DCF)
               
-              # Combine dynamics and diffusion
-              rhsDyn += rhsDif
-              
               # Apply GML to W and LnT
               rhsDyn[:,1] = GML.dot(rhsDyn[:,1])
               rhsDyn[:,3] = GML.dot(rhsDyn[:,3])
+              
+              # Combine dynamics and diffusion
+              rhsDyn += rhsDif
               
               # Apply update
               dsol = coeff * DT * rhsDyn
@@ -149,7 +149,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
                      rhsB = computeRHSUpdate_dynamics(solB, DqDx, DqDz)
        
               # Compute residual and normalizations
-              u = np.abs(solB[:,0])
+              u = np.abs(solA[:,0])
               w = np.abs(solA[:,1])
               
               # Trapezoidal Rule estimate of residual
@@ -158,14 +158,16 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               # Compute DynSGS or Flow Dependent diffusion coefficients
               if DynSGS:
                      # Compute the specific volume
+                     '''
                      kap = PHYS[4]
                      p_hat = np.exp(solB[:,2])
                      RdT_hat = np.power(p_hat, kap) * np.exp(solB[:,3])
                      RdT = RdT_bar * RdT_hat
                      SV = RdT * np.reciprocal(P_bar * p_hat)
+                     '''
                      # Compute field norms
                      QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
-                     DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4], SV)
+                     DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4], None)
               else:  
                      DCF = rescf.computeFlowVelocityCoeffs(u, w, DX, DZ)
                      

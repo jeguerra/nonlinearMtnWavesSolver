@@ -50,16 +50,16 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
        z = REFS[1]
        
        # Compute the flat XZ mesh (computational domain)
-       HTZL, dummy = np.meshgrid(hx,z)
+       HTZL, dummy = np.meshgrid(hx / ZH,z)
        XL, ZL = np.meshgrid(x,z)
        
        # High Order Improved Guellrich coordinate 3 parameter function
        xi = 1.0 / ZH * ZL
-       ang = 1.0/3.0 * mt.pi * xi
+       ang = 1.0 / 3.0 * mt.pi * xi
        dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang, StaticSolve)
        
-       dxidz = ZH + (HTZL * d_dzdh_dxi)
-       sigma = ZH * np.reciprocal(dxidz)
+       dxidz = 1.0 + (HTZL * d_dzdh_dxi)
+       sigma = np.reciprocal(dxidz)
        
        # Make the global array of terrain height and slope features
        ZTL = np.zeros((NZ,NX))
@@ -73,7 +73,7 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
        
        # Compute the coordinate surface at edge of Rayleigh layer
        xi = 1.0 / ZH * zRay
-       ang = mt.pi * zRay
+       ang = 1.0 / 3.0 * mt.pi * xi
        dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang, StaticSolve)
        
        ZRL = (dzdh * hx) + zRay

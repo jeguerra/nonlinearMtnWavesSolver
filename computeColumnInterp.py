@@ -48,7 +48,8 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
               # Check
               if NZI <= 0:
                      print('ERROR: Invalid number of points in new grid! ', NZI)
-                     return FLD
+                     print('Defaulting to vertical number: ', NZ)
+                     NZI = NZ
               
               # Interpolated field has a new size
               FLDI = np.zeros((NZI, NX))

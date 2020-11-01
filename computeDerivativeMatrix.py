@@ -300,7 +300,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
        temp = (CT).dot(SDIFF)
-       DDM = -(2.0 / ZH) * temp.dot(STR_C);
+       DDM = -(2.0 / ZH) * temp.dot(STR_C)
 
        return DDM, STR_C
 

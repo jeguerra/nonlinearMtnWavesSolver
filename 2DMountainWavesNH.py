@@ -53,6 +53,44 @@ localDir = '/home/jeg/scratch/' # Home super desktop
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
+def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
+       
+       # Make a figure of the temperature background
+       plt.figure(figsize=(12.0, 6.0))
+       plt.subplot(1,2,1)
+       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
+       plt.title('Discrete Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.ylabel('Height (km)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(1,2,2)
+       plt.plot(TZ, 1.0E-3*ZTL, 'k-')
+       plt.title('Smooth Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.tight_layout()
+       plt.savefig('python results/Temperature_Background.png')
+       plt.show()
+       # Make a figure of the temperature lapse rates background
+       plt.figure(figsize=(12.0, 6.0))
+       plt.subplot(1,2,1)
+       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
+       plt.title('Discrete Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.ylabel('Height (km)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(1,2,2)
+       plt.plot(DTDZ, 1.0E-3*ZTL, 'k-')
+       plt.title('Smooth Temperature Profile (K)')
+       plt.xlabel('Temperature (K)')
+       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.tight_layout()
+       plt.savefig('python results/Temperature_Background.png')
+       plt.show()
+       sys.exit(2)
+
+       return       
+
 def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar):
        plt.close('all')
        plt.figure(figsize=(8.0, 12.0))
@@ -201,7 +239,6 @@ def runModel(TestName):
               SymmetricSponge = False
        else:
               RSBops = True # Turn off PyRSB SpMV
-              CUPYops = False # Turn on CuPy GPU SpMV
               ApplyGML = True
               SymmetricSponge = False
        
@@ -212,8 +249,7 @@ def runModel(TestName):
               FourCheb = True
        else:
               FourCheb = False
-       #FourCheb = thisTest.solType['FourChebGrid']
-       
+              
        # Set residual diffusion switch
        ResDiff = thisTest.solType['DynSGS']
        if ResDiff:
@@ -270,9 +306,10 @@ def runModel(TestName):
        Z_in = thisTest.Z_in
        T_in = thisTest.T_in
        
-       #%% SET UP THE GRID AND INITIAL STATE
+       #%% SET UP THE GRID AND INDEX VECTORS
        #% Define the computational and physical grids+
-       REFS = computeGrid(DIMS, HermCheb, FourCheb)
+       verticalChebGrid = True
+       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
        if HermCheb and not FourCheb:
@@ -311,14 +348,6 @@ def runModel(TestName):
        DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
        DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
        print('Wavelength grid lengths:',DX_wav,DZ_wav)
-              
-       # Make the 2D physical domains from reference grids and topography
-       zRay = DIMS[2] - RLOPT[0]
-       # USE THE GUELLRICH TERRAIN DECAY
-       XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
-              coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX, StaticSolve)
-       # USE UNIFORM STRETCHING
-       #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        
        if not StaticSolve:
               #'''
@@ -335,15 +364,15 @@ def runModel(TestName):
               DX2 = np.power(DX, 2.0)
               DZ2 = np.power(DZ, 2.0)
               '''
-              '''
-              DX_spr = 1.0 / np.abs(spl.eigs(DDX_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
-              DZ_spr = 1.0 / np.abs(spl.eigs(DDZ_1D[1:-2,1:-2], k=1, which='LM', return_eigenvectors=False))
-              DX = 1.0 * DX_spr
-              DZ = 1.0 * DZ_spr
-              DX2 = DX**2
-              DZ2 = DZ**2
-              print('Spectral radii of 1st derivative matrices: ', DX_spr, DZ_spr)
-              '''
+              
+       # Make the 2D physical domains from reference grids and topography
+       zRay = DIMS[2] - RLOPT[0]
+       # USE THE GUELLRICH TERRAIN DECAY
+       XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
+              coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX, StaticSolve)
+       # USE UNIFORM STRETCHING
+       #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       
        # Update the REFS collection
        REFS.append(XL)
        REFS.append(ZTL)
@@ -361,58 +390,27 @@ def runModel(TestName):
        # Index to the entire bottom boundary on U
        uBotDex = np.array(range(0, OPS, NZ))
        
-       #% Read in sensible or potential temperature soundings (corner points)
-       SENSIBLE = 1
-       #POTENTIAL = 2
+       #%% MAKE THE INITIAL/BACKGROUND STATE
        # Map the sounding to the computational vertical 2D grid [0 H]
        TZ, DTDZ, D2TDZ2 = \
               computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
-       '''
-       # Make a figure of the temperature background
-       fig = plt.figure(figsize=(12.0, 6.0))
-       plt.subplot(1,2,1)
-       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
-       plt.title('Discrete Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.ylabel('Height (km)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(1,2,2)
-       plt.plot(TZ, 1.0E-3*ZTL, 'k-')
-       plt.title('Smooth Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.tight_layout()
-       plt.savefig('python results/Temperature_Background.png')
-       plt.show()
-       # Make a figure of the temperature lapse rates background
-       fig = plt.figure(figsize=(12.0, 6.0))
-       plt.subplot(1,2,1)
-       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
-       plt.title('Discrete Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.ylabel('Height (km)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(1,2,2)
-       plt.plot(DTDZ, 1.0E-3*ZTL, 'k-')
-       plt.title('Smooth Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.tight_layout()
-       plt.savefig('python results/Temperature_Background.png')
-       plt.show()
-       sys.exit(2)
-       '''
+
        # Compute background fields on the reference column
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], SENSIBLE, uniformStrat)
+              computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], 'sensible', uniformStrat)
        
        # Read in or compute background horizontal wind profile
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, PHYS[1], PZ, dlnPdz, uniformWind, linearShear)
        
+       if verticalChebGrid:
+              interpolationType = '1DtoTerrainFollowingCheb'
+       else:
+              interpolationType = '1DtoTerrainFollowingCheb2Lin'
+       
        #% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(dUdz, axis=1)
        DUDZ = np.tile(dUdz, NX+1)
-       DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, '1DtoTerrainFollowingCheb')
+       DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, interpolationType)
        # Compute thermodynamic gradients (no interpolation!)
        PORZ = PHYS[3] * TZ
        DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
@@ -422,32 +420,31 @@ def runModel(TestName):
        D2LPDZ2 = - DLTDZ * DLPDZ
        D2LPTDZ2 = np.reciprocal(TZ) * D2TDZ2 - DLTDZ * DLPTDZ
        
-       # Compute the background (initial) fields
-       U = np.expand_dims(U, axis=1)
-       UZ = np.tile(U, NX+1)
-       UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, '1DtoTerrainFollowingCheb')
-       LPZ = np.expand_dims(LPZ, axis=1)
-       LOGP = np.tile(LPZ, NX+1)
-       LOGP = computeColumnInterp(DIMS, REFS[1], LPZ, 0, ZTL, LOGP, CH_TRANS, '1DtoTerrainFollowingCheb')
-       LPT = np.expand_dims(LPT, axis=1)
-       LOGT = np.tile(LPT, NX+1)
-       LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, '1DtoTerrainFollowingCheb')
-       
-       PBAR = np.exp(LOGP) # Hydrostatic pressure
-       
-       #%% Rayleigh opearator and GML weight
-       ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
-       if ApplyGML:
-              GMLOP = sps.diags(np.reshape(GML[0], (OPS,), order='F'), offsets=0, format='csr')
-       else:
-              GMLOP = sps.identity(OPS, format='csr')
-              
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
        DLTDZ = np.reshape(DLTDZ, (OPS,1), order='F')
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
+       
+       # Compute the background (initial) fields
+       U = np.expand_dims(U, axis=1)
+       UZ = np.tile(U, NX+1)
+       UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, interpolationType)
+       LPZ = np.expand_dims(LPZ, axis=1)
+       LOGP = np.tile(LPZ, NX+1)
+       LOGP = computeColumnInterp(DIMS, REFS[1], LPZ, 0, ZTL, LOGP, CH_TRANS, interpolationType)
+       LPT = np.expand_dims(LPT, axis=1)
+       LOGT = np.tile(LPT, NX+1)
+       LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, interpolationType)       
+       PBAR = np.exp(LOGP) # Hydrostatic pressure
+       
+       #%% RAYLEIGH AND GML WEIGHT OPERATORS
+       ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
+       if ApplyGML:
+              GMLOP = sps.diags(np.reshape(GML[0], (OPS,), order='F'), offsets=0, format='csr')
+       else:
+              GMLOP = sps.identity(OPS, format='csr')
        
        # Make a collection for background field derivatives
        REFG = [GMLOP, DLTDZ, DQDZ, RLOPT[4], RLM]
@@ -464,12 +461,10 @@ def runModel(TestName):
        del(DLPTDZ)
        del(GML)
        
-       #%% Get the 2D linear operators in Hermite-Chebyshev space
+       #%% DIFFERENTIATION OPERATORS
        DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       #%% Get the 2D linear operators in Compact Finite Diff (for Laplacian)
        DDXMS, DDZMS = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       #%% Store the operator blocks
        REFS.append(DDXM) # index 10
        REFS.append(DDZM) # index 11
        
@@ -478,12 +473,10 @@ def runModel(TestName):
               # Multithreaded enabled for transient solution
               REFS.append((rsb_matrix(DDXM), rsb_matrix(DDZM)))
               REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZMS)))
-       elif not StaticSolve and CUPYops:
-              from rsb import rsb_matrix
-              import cupyx.scipy.sparse as cuspr
-              # Multithreaded enabled on GPU
-              REFS.append((rsb_matrix(DDXM), rsb_matrix(DDZM)))
-              REFS.append((cuspr.csr_matrix(DDXM), cuspr.csr_matrix(DDZM)))
+       elif not StaticSolve and not RSBops:
+              # Native sparsr
+              REFS.append((DDXM, DDZM))
+              REFS.append((DDXMS, DDZMS))
        else: 
               # Matrix operators for Jacobian assembly
               REFS.append(DDXM)

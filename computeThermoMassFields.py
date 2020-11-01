@@ -154,7 +154,7 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform):
               # Recover density
               RHO = 1.0 / Rd * (PZ * np.reciprocal(TZ)) 
        else:
-              if TempType == 1:
+              if TempType == 'sensible':
                      AC = - gc / Rd
                      PZ, LPZ = computePfromSensibleT(DDZ, TZ, AC, P0, NZ)
                      # Recover vertical gradient in log pressure
@@ -165,7 +165,7 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform):
                      PT = np.exp(LPT)
                      # Recover density
                      RHO = 1.0 / Rd * (PZ * np.reciprocal(TZ))
-              elif TempType == 2:
+              elif TempType == 'potential':
                      AC = - gc * P0**Kp / Rd
                      PZ, LPZ = computePfromPotentialT(DDZ, TZ, AC, P0, Kp, NZ)
                      # Recover vertical gradient in log pressure

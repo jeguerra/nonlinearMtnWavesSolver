@@ -44,8 +44,8 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, RLM, SV):
        QRESZ_CF += RLM.dot(QZMAX)
        
        # Scale with specific volume
-       QRESX_CF *= SV
-       QRESZ_CF *= SV
+       #QRESX_CF *= SV
+       #QRESZ_CF *= SV
        
        return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
 

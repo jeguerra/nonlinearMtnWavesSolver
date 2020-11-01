@@ -14,6 +14,12 @@ import scipy.sparse as sps
 from joblib import Parallel, delayed
 from oct2py import Oct2Py
 from rsb import rsb_matrix
+
+import math as mt
+import matplotlib.pyplot as plt
+from computeGrid import computeGrid
+import computeDerivativeMatrix as derv
+import computeTopographyOnGrid as top
                      
 def computeMatVecDotParfor(aCSRmat, aDenseVec, runParFor):
        
@@ -44,23 +50,35 @@ def computeMatVecDotParfor(aCSRmat, aDenseVec, runParFor):
 
 if __name__ == '__main__':
        
-       # Set up problem
-       N = 4096
+        # Set grid dimensions and order
+       L2 = 1.0E4 * 3.0 * mt.pi
+       L1 = -L2
+       ZH = 36000.0
+       NX = 347
+       NZ = 92
+       DIMS = [L1, L2, ZH, NX, NZ]
        
-       # Make a test sparse matrix
-       A = sps.random(N, N, density=0.5, format='csr')
+       # Define the computational and physical grids+
+       REFS = computeGrid(DIMS, True, False)
+       
+       #% Compute the raw derivative matrix operators in alpha-xi computational space
+       #A, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       #A, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
+       #A = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+       A = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
        
        # Make a dense teste vector (MUST be NX1 for Octave to work)
-       V = np.ones((N,1))
+       ACSR = sps.csr_matrix(np.real(A))
+       V = np.zeros((NX+1,1))
        
        # Test native dot product
        start = time.time()
        R1 = A.dot(V)
        end = time.time()
-       print('Native SpMV: ', end - start, ' sec')
+       print('Native numpy MV: ', end - start, ' sec')
        
        # Test native rsb dot product
-       AR = rsb_matrix(A)
+       AR = rsb_matrix(ACSR)
        #AR.autotune()
        start = time.time()
        R2 = AR.dot(V)
@@ -69,13 +87,13 @@ if __name__ == '__main__':
        
        # Test SpMV serial implementation
        start = time.time()
-       R3 = computeMatVecDotParfor(A, V, False)
+       R3 = computeMatVecDotParfor(ACSR, V, False)
        end = time.time()
        print('Serial SpMV: ', end - start, ' sec')
        
        # Test SpMV parallel implementation
        start = time.time()
-       R4 = computeMatVecDotParfor(A, V, True)
+       R4 = computeMatVecDotParfor(ACSR, V, True)
        end = time.time()
        print('Parallel SpMV: ', end - start, ' sec')
        

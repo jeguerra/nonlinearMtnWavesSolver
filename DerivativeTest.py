@@ -25,7 +25,7 @@ NZ = 92
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS, True, False)
+REFS = computeGrid(DIMS, True, False, True)
 
 #% Compute the raw derivative matrix operators in alpha-xi computational space
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
@@ -76,7 +76,7 @@ term1 = 8.0 * mt.pi * zv
 term2 = np.sin(4.0 * mt.pi * zv2)
 DY -= np.multiply(term1, term2);
     
-DYD = ZH * DDZ_1D.dot(Y)
+DYD = DDZ_1D.dot(Y)
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(zv, Y, label='Function')
 plt.plot(zv, DY, 'r-', label='Analytical Derivative')
