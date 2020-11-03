@@ -90,12 +90,12 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               # Compute dynamics update
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
-              # Compute the diffusion update
-              rhsDif = computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DCF)
-              
               # Apply GML to W and LnT
               rhsDyn[:,1] = GML.dot(rhsDyn[:,1])
               rhsDyn[:,3] = GML.dot(rhsDyn[:,3])
+              
+              # Compute the diffusion update
+              rhsDif = computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DCF)
               
               # Combine dynamics and diffusion
               rhsDyn += rhsDif
@@ -116,16 +116,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               U = fields[:,0] + init0[:,0]
               W = fields[:,1] + init0[:,1]
               # Compute dynamical tendencies
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex)
-              
-              # Fix essential boundary conditions
-              rhs[zeroDex[0],0] *= 0.0
-              rhs[zeroDex[1],1] *= 0.0
-              rhs[zeroDex[2],2] *= 0.0
-              rhs[zeroDex[3],3] *= 0.0
-              
-              # Update the boundary constraint
-              rhs[ebcDex[1],1] = dHdX * rhs[ebcDex[1],0]
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex)
                      
               return rhs
        
@@ -133,12 +124,9 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               
               # Compute diffusive tendencies
               if DynSGS:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
               else:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX)
-              
-              # Null diffusion at terrain
-              rhs[ebcDex[3],:] *= 0.0
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
               
               return rhs
        
@@ -149,22 +137,14 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
                      rhsB = computeRHSUpdate_dynamics(solB, DqDx, DqDz)
        
               # Compute residual and normalizations
-              u = np.abs(solA[:,0])
-              w = np.abs(solA[:,1])
+              u = np.abs(init0[:,0] + solB[:,0])
+              w = np.abs(solB[:,1])
               
               # Trapezoidal Rule estimate of residual
               dqdt = (1.0 / TOPT[0]) * (solB - solA)
               resInv = dqdt - 0.5 * (rhsA + rhsB)
               # Compute DynSGS or Flow Dependent diffusion coefficients
               if DynSGS:
-                     # Compute the specific volume
-                     '''
-                     kap = PHYS[4]
-                     p_hat = np.exp(solB[:,2])
-                     RdT_hat = np.power(p_hat, kap) * np.exp(solB[:,3])
-                     RdT = RdT_bar * RdT_hat
-                     SV = RdT * np.reciprocal(P_bar * p_hat)
-                     '''
                      # Compute field norms
                      QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
                      DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4], None)

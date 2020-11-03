@@ -382,7 +382,7 @@ def runModel(TestName):
        #% Compute the BC index vector
        uldex, urdex, ubdex, utdex, wbdex, \
        ubcDex, wbcDex, pbcDex, tbcDex, \
-       zeroDex_tran, sysDex, ebcDex = \
+       zeroDex, sysDex, ebcDex = \
               computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow)
               
        # Index to interior of terrain boundary
@@ -566,14 +566,8 @@ def runModel(TestName):
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex)
+                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
-              # Fix essential BC
-              rhs[zeroDex_tran[0],0] *= 0.0
-              rhs[zeroDex_tran[1],1] *= 0.0
-              rhs[zeroDex_tran[2],2] *= 0.0
-              rhs[zeroDex_tran[3],3] *= 0.0
-              rhs[ebcDex[1],1] = dHdX * rhs[ebcDex[1],0]
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
@@ -794,14 +788,8 @@ def runModel(TestName):
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex)
+                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
               rhs += eqs.computeRayleighTendency(REFG, fields)
-              # Fix essential BC
-              rhs[zeroDex_tran[0],0] *= 0.0
-              rhs[zeroDex_tran[1],1] *= 0.0
-              rhs[zeroDex_tran[2],2] *= 0.0
-              rhs[zeroDex_tran[3],3] *= 0.0
-              rhs[ebcDex[1],1] = dHdX * rhs[ebcDex[1],0]
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
@@ -892,15 +880,8 @@ def runModel(TestName):
                             DqDx, DqDz = \
                                    eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
-                                                                          fields, UD, WD, ubdex)
+                                                                          fields, UD, WD, ebcDex, zeroDex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields)
-                            # Fix essential BC
-                            rhsVec[zeroDex_tran[0],0] *= 0.0
-                            rhsVec[zeroDex_tran[1],1] *= 0.0
-                            rhsVec[zeroDex_tran[2],2] *= 0.0
-                            rhsVec[zeroDex_tran[3],3] *= 0.0
-                            
-                            rhsVec[ebcDex[1],1] = dHdX * rhsVec[ebcDex[1],0]
                             error = [np.linalg.norm(rhsVec)]
                      else:
                             isFirstStep = False
@@ -956,7 +937,7 @@ def runModel(TestName):
                             fields, rhsVec, thisTime, resVec, DCF = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
                                                                     DX, DZ, DX2, DZ2,\
                                                                     TOPT, fields, hydroState, rhsVec, \
-                                                                    zeroDex_tran, ebcDex, \
+                                                                    zeroDex, ebcDex, \
                                                                     ResDiff, DCF, thisTime, isFirstStep)
                             
                      except:

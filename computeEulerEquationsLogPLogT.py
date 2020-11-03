@@ -8,6 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 import numpy as np
 import warnings
 import scipy.sparse as sps
+import matplotlib.pyplot as plt
 
 def computeFieldDerivatives(q, DDX, DDZ):
        
@@ -242,7 +243,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex):
+def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -280,10 +281,6 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
                      RdT_hat = 1.0 + T_ratio
                      RdT = RdT_bar * RdT_hat
-                          
-       # Enforce No-Slip condition on transport
-       velNorm[ebcDex[1],:] *= 0.0
-       velNorm[ebcDex[2],:] *= 0.0
        
        # Compute transport terms
        UPqPx = UM * DqDx
@@ -303,6 +300,15 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
+       
+       # Enforce terrain condition to change in W
+       DqDt[ebcDex[1],1] = np.array(DZDX[ebcDex[1],0] * DqDt[ebcDex[1],0])
+       
+       # Fix essential boundary conditions
+       DqDt[zeroDex[0],0] *= 0.0
+       DqDt[zeroDex[1],1] *= 0.0
+       DqDt[zeroDex[2],2] *= 0.0
+       DqDt[zeroDex[3],3] *= 0.0
                                   
        return DqDt
 
@@ -343,7 +349,7 @@ def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, D2qDx2, P2qPz2, P2qPxz, DZDX):
+def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex):
        
        # Get the anisotropic coefficients
        RESCF1 = RESCF[0]
@@ -371,5 +377,8 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, D2qDx2, P2qPz2, P2qPxz, DZ
                    RESCF2[:,0] * (P2qPz2[:,2] + DqDz[:,2] * DqDz[:,2])
        DqDt[:,3] = Pr * RESCF1[:,0] * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
                         RESCF2[:,0] * (P2qPz2[:,3] + DqDz[:,3] * DqDz[:,3])
+                        
+       # Null diffusion at boundaries
+       DqDt[ebcDex[3],:] *= 0.0
        
        return DqDt
