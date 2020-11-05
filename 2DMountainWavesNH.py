@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
-from computePartialDerivativesXZ import computePartialDerivativesXZ
+import computePartialDerivativesXZ as devop
 from computeTopographyOnGrid import computeTopographyOnGrid
 import computeGuellrichDomain2D as coords
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
@@ -462,8 +462,8 @@ def runModel(TestName):
        del(GML)
        
        #%% DIFFERENTIATION OPERATORS
-       DDXM, DDZM = computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       DDXMS, DDZMS = computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
+       DDXM, DDZM = devop.computePartialDerivativesXZ_BC(DIMS, REFS, DDX_1D, DDZ_1D, DDX_SP, DDZ_SP)
+       DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
        REFS.append(DDXM) # index 10
        REFS.append(DDZM) # index 11
