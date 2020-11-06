@@ -462,7 +462,8 @@ def runModel(TestName):
        del(GML)
        
        #%% DIFFERENTIATION OPERATORS
-       DDXM, DDZM = devop.computePartialDerivativesXZ_BC(DIMS, REFS, DDX_1D, DDZ_1D, DDX_SP, DDZ_SP)
+       #DDXM, DDZM = devop.computePartialDerivativesXZ_BC(DIMS, REFS, DDX_1D, DDZ_1D, DDX_SP, DDZ_SP)
+       DDXM, DDZM = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
        REFS.append(DDXM) # index 10

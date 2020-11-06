@@ -63,6 +63,8 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        uf, duf = rampFactor(time, rampTimeBound)
            
        GML = REFG[0]
+       mu = REFG[3]
+       RML = REFG[4]
        DQDZ = REFG[2]
        DZDX = REFS[15]
        #'''
@@ -105,8 +107,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               solB = sol2Update + dsol
               
               # Apply Rayleigh layer implicitly
-              mu = REFG[3]
-              propagator = 1.0 + (mu * coeff * DT * REFG[4]).data
+              propagator = 1.0 + (mu * coeff * DT * RML).data
               propagator = sps.diags(np.reciprocal(propagator[0,:]), format='csr')
               solB = propagator.dot(solB)
               

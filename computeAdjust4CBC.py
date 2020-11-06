@@ -85,7 +85,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
               rowsOutU = set(np.concatenate((uldex, urdex)))
               rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
               rowsOutP = set(np.concatenate((uldex,urdex)))
-              rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
+              rowsOutT = set(np.concatenate((uldex,urdex)))
                # Indexing for static solver
               left = np.concatenate((uldex, wldex, pldex, tldex))
               right = np.concatenate((urdex, wrdex, prdex, trdex))
