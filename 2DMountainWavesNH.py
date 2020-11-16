@@ -440,14 +440,19 @@ def runModel(TestName):
        PBAR = np.exp(LOGP) # Hydrostatic pressure
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
+       ROPS, RLM, GML, SBR = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
        if ApplyGML:
               GMLOP = sps.diags(np.reshape(GML[0], (OPS,), order='F'), offsets=0, format='csr')
+              GMLOX = sps.diags(np.reshape(GML[1], (OPS,), order='F'), offsets=0, format='csr')
+              GMLOZ = sps.diags(np.reshape(GML[2], (OPS,), order='F'), offsets=0, format='csr')
        else:
               GMLOP = sps.identity(OPS, format='csr')
+              GMLOX = sps.identity(OPS, format='csr')
+              GMLOZ = sps.identity(OPS, format='csr')
        
+       SBROP = sps.diags(np.reshape(SBR, (OPS,), order='F'), offsets=0, format='csr')
        # Make a collection for background field derivatives
-       REFG = [GMLOP, DLTDZ, DQDZ, RLOPT[4], RLM]
+       REFG = [(GMLOP, GMLOX, GMLOZ), DLTDZ, DQDZ, RLOPT[4], RLM, SBROP]
        
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F'))
@@ -819,6 +824,26 @@ def runModel(TestName):
               
               # Initialize netcdf output
               from netCDF4 import Dataset
+              
+              isRestartFromNC = False
+              if isRestartFromNC:
+                     try:
+                            rdex = 159
+                            fname = 'transientNL_bkp.nc'
+                            m_fid = Dataset(fname, 'r', format="NETCDF4")
+                            fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
+                            fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
+                            fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:], (OPS,), order='F')
+                            fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:], (OPS,), order='F')
+                            
+                            DCF[0][:,0] = np.reshape(m_fid.variables['dcoeff0'][rdex,:,:], (OPS,), order='F')
+                            DCF[1][:,0] = np.reshape(m_fid.variables['dcoeff1'][rdex,:,:], (OPS,), order='F')
+                            
+                            thisTime = m_fid.variables['t'][rdex]
+                     except:
+                            print('Could NOT read restart NC file!', fname)       
+              
+              # Rename output file to the current time for subsequent storage
               fname = 'transientNL' + str(int(thisTime)) + '.nc'
               try:
                      m_fid = Dataset(fname, 'w', format="NETCDF4")
@@ -862,15 +887,16 @@ def runModel(TestName):
               dvar1 = m_fid.createVariable('dcoeff1', 'f8', ('time', 'zlev', 'xlon'))
               
               # Initialize local sound speed and time step
+              #'''
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
               VSND_max = np.amax(VSND)
-              DT0 = min(DX_min / np.amax(VSND), DZ_min / np.amax(VSND))
+              DT0 = min(DX_min / VSND_max, DZ_min / VSND_max)
               TOPT[0] = DT0
-              print('Initial time step: ', str(DT0) + ' (sec)')
+              print('Initial time step by sound speed: ', str(DT0) + ' (sec)')
               
               OTI = int(TOPT[5] / DT0)
               ITI = int(TOPT[6] / DT0)
-              
+              #'''
               while thisTime <= TOPT[4]:
                      
                      if ti == 0:
@@ -882,7 +908,6 @@ def runModel(TestName):
                                    eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields)
                             error = [np.linalg.norm(rhsVec)]
                      else:
                             isFirstStep = False
@@ -892,8 +917,6 @@ def runModel(TestName):
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
-                            #print('Maximum sound speed (m/s): ', VSND_max)
-                            #print('NEW time step estimate (CFL = 1): ', TOPT[0])
                      
                      if ti % ITI == 0:
                             # Store current time
@@ -930,11 +953,10 @@ def runModel(TestName):
                             T_ratio = np.exp(PHYS[4] * fields[:,2] + fields[:,3]) - 1.0
                             gamRdT = PHYS[6] * REFS[9][0] * (1.0 + T_ratio)
                             VSND_max = np.amax(np.sqrt(gamRdT))
-                            DTN = min(DX_min / np.amax(VSND_max), DZ_min / np.amax(VSND_max))
+                            DTN = min(DX_min / VSND_max, DZ_min / VSND_max)
                             DT_factor = DTN / DT0
                             TOPT[0] *= DT_factor
                             DT0 = DTN
-                            
                             fields, rhsVec, thisTime, resVec, DCF = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
                                                                     DX, DZ, DX2, DZ2,\
                                                                     TOPT, fields, hydroState, rhsVec, \

@@ -59,17 +59,17 @@ if __name__ == '__main__':
        DIMS = [L1, L2, ZH, NX, NZ]
        
        # Define the computational and physical grids+
-       REFS = computeGrid(DIMS, True, False)
+       REFS = computeGrid(DIMS, True, False, True)
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
-       #A, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       A, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        #A, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        #A = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       A = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
+       #A = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
        
        # Make a dense teste vector (MUST be NX1 for Octave to work)
        ACSR = sps.csr_matrix(np.real(A))
-       V = np.zeros((NX+1,1))
+       V = np.expand_dims(REFS[0],1) * np.ones((NX+1,1))
        
        # Test native dot product
        start = time.time()

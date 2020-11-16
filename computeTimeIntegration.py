@@ -62,9 +62,11 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
        time = thisTime
        uf, duf = rampFactor(time, rampTimeBound)
            
-       GML = REFG[0]
+       GML = REFG[0][0]
+       GMLX = REFG[0][1]
        mu = REFG[3]
-       RML = REFG[4]
+       RLM = REFG[4]
+       SBR = REFG[5]
        DQDZ = REFG[2]
        DZDX = REFS[15]
        #'''
@@ -86,31 +88,43 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               # Compute 1st derivatives
               DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
               # Compute 2nd derivatives
-              D2qDx2, D2qDz2, D2qDxz = \
+              D2qDx2, D2qDz2, D2qDxz, PqPx, PqPz = \
                      tendency.computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDXM_CFD, DDZM_CFD, DZDX)
               
               # Compute dynamics update
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
-              # Apply GML to W and LnT
+              '''
+              # Apply GML to match essential BCs
+              rhsDyn[:,0] = GMLX.dot(rhsDyn[:,0])
               rhsDyn[:,1] = GML.dot(rhsDyn[:,1])
+              rhsDyn[:,2] = GMLX.dot(rhsDyn[:,2])
               rhsDyn[:,3] = GML.dot(rhsDyn[:,3])
-              
+              '''
+
               # Compute the diffusion update
-              rhsDif = computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DCF)
+              rhsDif = computeRHSUpdate_diffusion(PqPx, PqPz, D2qDx2, D2qDz2, D2qDxz, DCF)
+              #rhsDif = GML.dot(rhsDif)
               
               # Combine dynamics and diffusion
-              rhsDyn += rhsDif
+              rhsDyn += 1.0 * rhsDif
               
               # Apply update
               dsol = coeff * DT * rhsDyn
               solB = sol2Update + dsol
               
+              #''' TURNED ON IN ORIGINAL RUN
               # Apply Rayleigh layer implicitly
-              propagator = 1.0 + (mu * coeff * DT * RML).data
-              propagator = sps.diags(np.reciprocal(propagator[0,:]), format='csr')
-              solB = propagator.dot(solB)
-              
+              propagator = np.reciprocal(1.0 + (mu * coeff * DT) * RLM.data)
+              solB = propagator.T * solB
+              #'''
+              #'''
+              # Apply layer damping to match essential BCs
+              solB[:,0] = GMLX.dot(solB[:,0])
+              solB[:,1] = GML.dot(solB[:,1])
+              #solB[:,2] = GMLX.dot(solB[:,2])
+              solB[:,3] = GML.dot(solB[:,3])
+              #'''
               return solB
        
        def computeRHSUpdate_dynamics(fields, DqDx, DqDz):
@@ -125,9 +139,9 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               
               # Compute diffusive tendencies
               if DynSGS:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex, zeroDex)
               else:
-                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex)
+                     rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex, zeroDex)
               
               return rhs
        
@@ -148,7 +162,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               if DynSGS:
                      # Compute field norms
                      QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
-                     DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, REFG[4], None)
+                     DCF = rescf.computeResidualViscCoeffs(resInv, QM, u, w, DX, DZ, DX2, DZ2, SBR, ebcDex)
               else:  
                      DCF = rescf.computeFlowVelocityCoeffs(u, w, DX, DZ)
                      

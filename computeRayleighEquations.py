@@ -25,7 +25,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
        NZ = DIMS[4]
        
        RP = 4
-       GP = 2
+       GP = 4
        
        # Get REFS data
        X = REFS[4]
@@ -41,7 +41,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
        RL = np.zeros((NZ, NX))
        RLX = np.zeros((NZ, NX))
        RLZ = np.zeros((NZ, NX))
-       SBR = np.zeros((NZ, NX))
+       SBR = np.ones((NZ, NX))
        
        for ii in range(0,NZ):
               for jj in range(0,NX):
@@ -86,7 +86,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
                      RL[ii,jj] = np.amax([RFX, RFZ])
                      # Set the binary matrix
                      if RL[ii,jj] != 0.0:
-                            SBR[ii,jj] = 1.0                            
+                            SBR[ii,jj] = 0.0                            
        '''
        plt.figure()
        plt.contourf(X, Z, RL, 101, cmap=cm.seismic)
@@ -98,6 +98,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
        GML = np.ones((NZ, NX))
        GMLX = np.ones((NZ, NX))
        GMLZ = np.ones((NZ, NX))
+       C1 = 0.01
+       C2 = 10.0
        for ii in range(0,NZ):
               for jj in range(0,NX):
                      # Get this X location
@@ -112,9 +114,12 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
                             else:
                                    dNormX = 0.0
                             # Evaluate the GML factor
-                            RFX = (mt.tan(0.5 * mt.pi * dNormX))**GP
+                            #RFX = (mt.tan(0.5 * mt.pi * dNormX))**GP
+                            # Evaluate buffer layer factor
+                            RFX = (1.0 - C1 * dNormX**2) * \
+                                   (1.0 - (1.0 - mt.exp(C2 * dNormX**2)) / (1.0 - mt.exp(C2)))
                      else:
-                            RFX = 0.0
+                            RFX = 1.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
@@ -122,16 +127,24 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
                             else:
                                    dNormZ = 0.0
                             # Evaluate the strength of the field
-                            RFZ = (mt.tan(0.5 * mt.pi * dNormZ))**GP
+                            #RFZ = (mt.tan(0.5 * mt.pi * dNormZ))**GP
+                            # Evaluate buffer layer factor
+                            RFZ = (1.0 - C1 * dNormZ**2) * \
+                                   (1.0 - (1.0 - mt.exp(C2 * dNormZ**2)) / (1.0 - mt.exp(C2)))
                      else:
-                            RFZ = 0.0
-                     
+                            RFZ = 1.0
+                     '''
                      GMLX[ii,jj] = 1.0 / (1.0 + RFX)
                      GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
                      # Set the field to max(lateral, top) to handle corners
                      RFM = np.amax([RFX, RFZ])
                      GML[ii,jj] = 1.0 / (1.0 + RFM)
-                     
+                     '''
+                     GMLX[ii,jj] = RFX
+                     GMLZ[ii,jj] = RFZ
+                     # Set the field to max(lateral, top) to handle corners
+                     GML[ii,jj] = np.amin([RFX, RFZ])
+                     #'''
        '''
        plt.figure()
        plt.contourf(X, Z, GML, 101, cmap=cm.seismic)
@@ -174,6 +187,6 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex, symmetric
        # Store the diagonal blocks corresponding to Rayleigh damping terms
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
-       return ROPS, RLM, GML
+       return ROPS, RLM, GML, SBR
        
                             

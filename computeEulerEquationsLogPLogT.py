@@ -20,13 +20,14 @@ def computeFieldDerivatives(q, DDX, DDZ):
 def computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDX, DDZ, DZDX):
        
        # Compute first partial in X (on CPU)
-       PqPx = np.array(DqDx - DZDX * DqDz)
+       PqPx = DqDx - DZDX * DqDz
+       PqPz = DqDz + DQDZ
 
        D2qDx2 = DDX.dot(PqPx)
-       D2qDz2 = DDZ.dot(DqDz + DQDZ)
+       D2qDz2 = DDZ.dot(PqPz)
        D2qDxz = DDZ.dot(PqPx)
        
-       return D2qDx2, D2qDz2, D2qDxz
+       return D2qDx2, D2qDz2, D2qDxz, PqPx, PqPz
        
 def localDotProduct(arg):
               res = arg[0].dot(arg[1])
@@ -309,7 +310,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        DqDt[zeroDex[1],1] *= 0.0
        DqDt[zeroDex[2],2] *= 0.0
        DqDt[zeroDex[3],3] *= 0.0
-                                  
+                            
        return DqDt
 
 def computeRayleighTendency(REFG, fields):
@@ -322,41 +323,11 @@ def computeRayleighTendency(REFG, fields):
        
        return DqDt
 
-def computeDiffusiveFluxTendency(RESCF, DqDx, DqDz, DDXM, DDZM, DZDX):
-       
-       # Get the anisotropic coefficients
-       RESCFX = RESCF[0]
-       RESCFZ = RESCF[1]
-       
-       # Compute the partial derivative
-       PqPx = DqDx - DZDX * DqDz
-       
-       # Compute diffusive fluxes
-       xflux = RESCFX * PqPx
-       zflux = RESCFZ * DqDz
-       
-       # Scale kinematic fluxes
-       xflux[:,0] *= 2.0
-       zflux[:,1] *= 2.0
-              
-       # Compute the Laplacian blocks
-       PqPz2 = DDZM.dot(zflux)
-       DdqDx = DDZM.dot(xflux) - DZDX * PqPz2
-       PqPx2 = DDXM.dot(xflux) - DZDX * DdqDx
-       
-       # Compute the tendencies (divergence of diffusive flux... discontinuous)
-       DqDt = PqPx2 + PqPz2
-       
-       return DqDt
-
-def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex):
+def computeDiffusionTendency(PHYS, RESCF, PqPx, PqPz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex, zeroDex):
        
        # Get the anisotropic coefficients
        RESCF1 = RESCF[0]
        RESCF2 = RESCF[1]
-       
-       # Compute the 1st partial derivative
-       PqPx = DqDx - DZDX * DqDz
        
        # Compute the 2nd partial derivative
        P2qPx2 = D2qDx2 - DZDX * P2qPxz
@@ -374,11 +345,11 @@ def computeDiffusionTendency(PHYS, RESCF, DqDx, DqDz, D2qDx2, P2qPz2, P2qPxz, DZ
        # Diffusion of scalars (broken up into anisotropic components)
        Pr = 0.71 / 0.4
        DqDt[:,2] = RESCF1[:,0] * (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2]) + \
-                   RESCF2[:,0] * (P2qPz2[:,2] + DqDz[:,2] * DqDz[:,2])
-       DqDt[:,3] = Pr * RESCF1[:,0] * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
-                        RESCF2[:,0] * (P2qPz2[:,3] + DqDz[:,3] * DqDz[:,3])
-                        
-       # Null diffusion at boundaries
+                   RESCF2[:,0] * (P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
+       DqDt[:,3] = Pr * (RESCF1[:,0] * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
+                        RESCF2[:,0] * (P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3]))
+       
+       # No damping boundaries
        DqDt[ebcDex[3],:] *= 0.0
        
        return DqDt
