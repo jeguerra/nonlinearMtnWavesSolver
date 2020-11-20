@@ -10,8 +10,11 @@ import numpy as np
 from numpy import multiply as mul
 from scipy import linalg as las
 import math as mt
+from scipy.special import roots_hermite
+from scipy.special import roots_chebyt
 
 def hefunclb(NX):
+       '''
        # Compute off-diagonals of 7.84 in Spectral Methods, Springer
        b = range(1,NX+1)
        bd = 0.5 * np.array(b)
@@ -26,28 +29,16 @@ def hefunclb(NX):
        # Sort the eigenvalues in ascending order and store nodes
        xi = np.sort(np.real(ew))
        
-       # Force symmetry!
-       '''
-       print(xi)
-       print(NX)
-       if NX % 2 == 0:
-              symDex = int(NX/2)
-              xi_m = -xi[NX:symDex-1:-1]
-              xi_p = xi[symDex:]
-              print(xi_m)
-              print(xi_p)
-              xi = np.concatenate((xi_m, xi_p))
-       else:
-              symDex = int((NX-1)/2)
-              xi_m = -xi[NX:symDex:-1]
-              xi_p = xi[symDex+1:]
-              print(xi_m)
-              print(xi_p)
-              xi = np.concatenate((xi_m, xi_p))
-       '''
        # Compute the Hermite function weights
        hf = hefuncm(NX, xi, False)
-       w = 1.0 / (NX+1) * np.power(hf, -2.0)       
+       w = 1.0 / (NX+1) * np.power(hf, -2.0)
+       '''
+       xi, w = roots_hermite(NX+1)
+       #'''
+       # Compute the Hermite function weights
+       hf = hefuncm(NX, xi, False)
+       w = 1.0 / (NX+1) * np.power(hf, -2.0)
+       #'''     
        return xi, w
        
 def hefuncm(NX, xi, fullMat):
@@ -92,10 +83,10 @@ def cheblb(NZ):
        xc = np.array(range(NZ))
        xi = -np.cos(mt.pi / ep * xc)
        
-       w = mt.pi / (ep + 1) * np.ones(NZ)
+       w = mt.pi / NZ * np.ones(NZ)
        w[0] *= 0.5
        w[ep] *= 0.5
-   
+       
        return xi, w
    
 def chebpolym(NM, xi):

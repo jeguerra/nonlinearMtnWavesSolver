@@ -236,11 +236,9 @@ def runModel(TestName):
        if StaticSolve:
               RSBops = False
               ApplyGML = False
-              SymmetricSponge = False
        else:
               RSBops = True # Turn off PyRSB SpMV
               ApplyGML = True
-              SymmetricSponge = False
        
        # Set the grid type
        HermCheb = thisTest.solType['HermChebGrid']
@@ -440,7 +438,7 @@ def runModel(TestName):
        PBAR = np.exp(LOGP) # Hydrostatic pressure
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML, SBR = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex, SymmetricSponge)
+       ROPS, RLM, GML, SBR = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
        if ApplyGML:
               GMLOP = sps.diags(np.reshape(GML[0], (OPS,), order='F'), offsets=0, format='csr')
               GMLOX = sps.diags(np.reshape(GML[1], (OPS,), order='F'), offsets=0, format='csr')

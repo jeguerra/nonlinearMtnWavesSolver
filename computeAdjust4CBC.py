@@ -81,10 +81,11 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
               top = np.concatenate((wtdex, ttdex))
               rowsOutBC_static = set(np.concatenate((left, top)))
        elif latPeriodic and latInflow:
-              #'''
+              '''
               # Periodic with inflow condition (pinned boundary)
               rowsOutU = set(np.concatenate((uldex,urdex)))
               rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
+              rowsOutP = set(np.concatenate((uldex,urdex)))
               rowsOutP = set(np.concatenate((uldex,urdex)))
               rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
                # Indexing for static solver
@@ -92,18 +93,19 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
               right = np.concatenate((urdex, wrdex, prdex, trdex))
               top = np.concatenate((wtdex, ttdex))
               rowsOutBC_static = set(np.concatenate((left, right, top)))
+              '''
               #'''
-              '''
               # Periodic with inflow condition (pinned boundary)
-              rowsOutU = set(uldex)
-              rowsOutW = set(np.concatenate((uldex,utdex)))
+              rowsOutU = set(np.concatenate((uldex,urdex)))
+              rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
               rowsOutP = set()
-              rowsOutT = set()
+              rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
                # Indexing for static solver
-              left = np.concatenate((uldex, wldex))
-              top = wtdex
-              rowsOutBC_static = set(np.concatenate((left, top)))
-              '''
+              left = np.concatenate((uldex, wldex, tldex))
+              right = np.concatenate((urdex, wrdex, trdex))
+              top = np.concatenate((wtdex, ttdex))
+              rowsOutBC_static = set(np.concatenate((left, right, top)))
+              #'''
        
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)

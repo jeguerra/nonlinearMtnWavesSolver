@@ -15,7 +15,7 @@ import scipy.sparse as sps
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symmetricProfile):
+def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
        # Get DIMS data
        L1 = DIMS[0]
@@ -57,11 +57,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
                             else:
                                    dNormX = 1.0
                             # Evaluate the Rayleigh factor
-                            if symmetricProfile:
-                                   RFX = mt.exp(-(2.5 * (dNormX - 0.5))**4) * \
-                                          (1.0 - (mt.cos(mt.pi * dNormX))**6)
-                            else:
-                                   RFX = (mt.cos(0.5 * mt.pi * dNormX))**RP
+                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**RP
                      else:
                             RFX = 0.0
                      if applyTop:
@@ -72,11 +68,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
                             else:
                                    dNormZ = 1.0
                             # Evaluate the strength of the field
-                            if symmetricProfile:
-                                   RFZ = mt.exp(-(2.5 * (dNormZ - 0.5))**4) * \
-                                          (1.0 - (mt.cos(mt.pi * dNormZ))**6)
-                            else:
-                                   RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**RP
+                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**RP
                      else:
                             RFZ = 0.0
                      
@@ -98,7 +90,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
        GML = np.ones((NZ, NX))
        GMLX = np.ones((NZ, NX))
        GMLZ = np.ones((NZ, NX))
-       C1 = 0.01
+       C1 = 0.02
        C2 = 10.0
        for ii in range(0,NZ):
               for jj in range(0,NX):
@@ -154,7 +146,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral, symm
        '''                  
        return (GML, GMLX, GMLZ), RL, RLX, RLZ, SBR
 
-def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex, symmetricProfile):
+def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        # Get options data
        width = RLOPT[1]
        applyTop = RLOPT[2]
@@ -168,7 +160,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex, symmetric
        
        # Set up the Rayleigh field
        GML, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, \
-                                                     applyTop, applyLateral, symmetricProfile)
+                                                     applyTop, applyLateral)
        
        # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
