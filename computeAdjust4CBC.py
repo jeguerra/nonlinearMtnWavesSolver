@@ -66,46 +66,45 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
               rowsOutU = set()
               rowsOutW = set(utdex)
               rowsOutP = set()
-              rowsOutT = set(utdex)
+              rowsOutT = set()
               # Indexing for static solver
-              top = np.concatenate((wtdex, ttdex))
+              top = wtdex
               rowsOutBC_static = set(top)
        elif not latPeriodic and latInflow:
               # Only inflow condition specified
               rowsOutU = set(uldex)
               rowsOutW = set(np.concatenate((uldex,utdex)))
               rowsOutP = set(uldex)
-              rowsOutT = set(np.concatenate((uldex,utdex)))
+              rowsOutT = set(uldex)
               # Indexing for static solver
               left = np.concatenate((uldex, wldex, pldex, tldex))
               top = np.concatenate((wtdex, ttdex))
               rowsOutBC_static = set(np.concatenate((left, top)))
        elif latPeriodic and latInflow:
-              '''
+              #'''
               # Periodic with inflow condition (pinned boundary)
               rowsOutU = set(np.concatenate((uldex,urdex)))
               rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
               rowsOutP = set(np.concatenate((uldex,urdex)))
-              rowsOutP = set(np.concatenate((uldex,urdex)))
-              rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
+              rowsOutT = set(np.concatenate((uldex,urdex)))
                # Indexing for static solver
               left = np.concatenate((uldex, wldex, pldex, tldex))
               right = np.concatenate((urdex, wrdex, prdex, trdex))
-              top = np.concatenate((wtdex, ttdex))
+              top = wtdex
               rowsOutBC_static = set(np.concatenate((left, right, top)))
-              '''
               #'''
+              '''
               # Periodic with inflow condition (pinned boundary)
               rowsOutU = set(np.concatenate((uldex,urdex)))
               rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
               rowsOutP = set()
-              rowsOutT = set(np.concatenate((uldex,urdex,utdex)))
+              rowsOutT = set(np.concatenate((uldex,urdex)))
                # Indexing for static solver
               left = np.concatenate((uldex, wldex, tldex))
               right = np.concatenate((urdex, wrdex, trdex))
-              top = np.concatenate((wtdex, ttdex))
+              top = wtdex
               rowsOutBC_static = set(np.concatenate((left, right, top)))
-              #'''
+              '''
        
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)

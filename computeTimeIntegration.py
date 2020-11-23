@@ -102,7 +102,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               #'''
               # Compute the diffusion update
               rhsDif = computeRHSUpdate_diffusion(PqPx, PqPz, D2qDx2, D2qDz2, D2qDxz, DCF)
-              #rhsDif = GML.dot(rhsDif)
+              rhsDif = GML.dot(rhsDif)
               
               # Combine dynamics and diffusion
               rhsDyn += 1.0 * rhsDif
@@ -116,13 +116,6 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               propagator = np.reciprocal(1.0 + (mu * coeff * DT) * RLM.data)
               solB = propagator.T * solB
               #'''
-              '''
-              # Apply layer damping to match essential BCs
-              solB[:,0] = GMLX.dot(solB[:,0])
-              solB[:,1] = GML.dot(solB[:,1])
-              #solB[:,2] = GMLX.dot(solB[:,2])
-              #solB[:,3] = GML.dot(solB[:,3])
-              '''
               return solB
        
        def computeRHSUpdate_dynamics(fields, DqDx, DqDz):
