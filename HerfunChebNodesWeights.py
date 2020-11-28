@@ -14,7 +14,7 @@ from scipy.special import roots_hermite
 from scipy.special import roots_chebyt
 
 def hefunclb(NX):
-       '''
+       #'''
        # Compute off-diagonals of 7.84 in Spectral Methods, Springer
        b = range(1,NX+1)
        bd = 0.5 * np.array(b)
@@ -32,13 +32,14 @@ def hefunclb(NX):
        # Compute the Hermite function weights
        hf = hefuncm(NX, xi, False)
        w = 1.0 / (NX+1) * np.power(hf, -2.0)
+       #'''
        '''
        xi, w = roots_hermite(NX+1)
-       #'''
+       
        # Compute the Hermite function weights
        hf = hefuncm(NX, xi, False)
        w = 1.0 / (NX+1) * np.power(hf, -2.0)
-       #'''     
+       '''     
        return xi, w
        
 def hefuncm(NX, xi, fullMat):

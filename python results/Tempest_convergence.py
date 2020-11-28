@@ -92,7 +92,7 @@ hdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # runs done on Farm
 tdir = '/media/jeg/TransferDATA/Schar025m_tempest/Schar025m/' # home desktop
 #tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
 hresl = [1000, 500, 250, 125, 62]
-refName = 'restartDB_BC3'
+refName = 'restartDB_BC4'
 #hresl = [250]
 # Loop over the 4 data files
 # Error norms between Tempest and Spectral Reference

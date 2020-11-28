@@ -64,6 +64,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
            
        GML = REFG[0][0]
        GMLX = REFG[0][1]
+       GMLZ = REFG[0][2]
        mu = REFG[3]
        RLM = REFG[4]
        SBR = REFG[5]
@@ -87,6 +88,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               
               # Compute 1st derivatives
               DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
+              
               # Compute 2nd derivatives
               D2qDx2, D2qDz2, D2qDxz, PqPx, PqPz = \
                      tendency.computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDXM_CFD, DDZM_CFD, DZDX)
@@ -95,10 +97,10 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX, DZ, DX2, DZ2, TOPT, \
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               #'''
               # Apply GML to match essential BCs
-              rhsDyn[:,0] = GMLX.dot(rhsDyn[:,0])
-              rhsDyn[:,1] = GML.dot(rhsDyn[:,1])
+              #rhsDyn[:,0] = GMLX.dot(rhsDyn[:,0])
+              rhsDyn[:,1] = GMLZ.dot(rhsDyn[:,1])
               #rhsDyn[:,2] = GMLX.dot(rhsDyn[:,2])
-              #rhsDyn[:,3] = GML.dot(rhsDyn[:,3])
+              #rhsDyn[:,3] = GMLX.dot(rhsDyn[:,3])
               #'''
               # Compute the diffusion update
               rhsDif = computeRHSUpdate_diffusion(PqPx, PqPz, D2qDx2, D2qDz2, D2qDxz, DCF)
