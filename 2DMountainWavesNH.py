@@ -20,6 +20,7 @@ import time
 import shelve
 import numpy as np
 import math as mt
+import bottleneck as bn
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
 import scipy.linalg as dsl
@@ -346,22 +347,6 @@ def runModel(TestName):
        DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
        DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
        print('Wavelength grid lengths:',DX_wav,DZ_wav)
-       
-       if not StaticSolve:
-              #'''
-              DX = 1.0 * DX_avg
-              DZ = 1.0 * DZ_avg
-              DX2 = DX**2
-              DZ2 = DZ**2
-              #'''
-              '''
-              DX_local = np.reshape(DXM, (OPS,), order='F')
-              DZ_local = np.reshape(DZM, (OPS,), order='F')
-              DX = 2.0 * DX_local
-              DZ = 2.0 * DZ_local
-              DX2 = np.power(DX, 2.0)
-              DZ2 = np.power(DZ, 2.0)
-              '''
               
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
@@ -497,6 +482,21 @@ def runModel(TestName):
        D2QDZ2[:,3] = np.reshape(D2LPTDZ2, (OPS,), order='F')
        REFG.append(D2QDZ2)
        REFG.append(np.zeros((OPS,)))
+       
+       if not StaticSolve:
+              #'''
+              # Diffusion grid lengths
+              DXD = DX_avg
+              DZD = DZ_avg
+              #'''            
+              #'''
+              print('Computing spectral radii of derivative operators...')
+              PPXM = DDXM - sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr') * DDZM
+              DX_spr = 1.0 / np.abs(spl.eigs(PPXM[np.ix_(ubdex,ubdex)], k=1, which='LM', return_eigenvectors=False))
+              DZ_spr = 1.0 / np.abs(spl.eigs(DDZM[np.ix_(uldex,uldex)], k=1, which='LM', return_eigenvectors=False))
+              print('Spectral radii of 1st derivative matrices: ', DX_spr, DZ_spr)
+              DLS = mt.sqrt(DX_spr * DZ_spr)
+              #'''
               
        del(DDXM); del(DDXMS)
        del(DDZM); del(DDZMS)
@@ -571,7 +571,7 @@ def runModel(TestName):
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
-              rhs += eqs.computeRayleighTendency(REFG, fields)
+              rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
@@ -700,9 +700,15 @@ def runModel(TestName):
                      print('Solving linear system by Schur Complement...')
                      # Factor DS and compute the Schur Complement of DS
                      DS = computeSchurBlock(schurName,'DS')
-                     factorDS = dsl.lu_factor(DS, overwrite_a=True)
+                     factorDS = dsl.lu_factor(DS, overwrite_a=True, check_finite=False)
                      del(DS)
                      print('Factor D... DONE!')
+                     
+                     # Store factor_DS for a little bit...
+                     FDS = shelve.open(localDir + 'factorDS', flag='n', protocol=4)
+                     FDS['factorDS'] = factorDS
+                     FDS.close()
+                     print('Store LU factor of D... DONE!')
                      
                      # Compute f2_hat = DS^-1 * f2 and f1_hat
                      BS = computeSchurBlock(schurName,'BS')
@@ -716,42 +722,62 @@ def runModel(TestName):
                      # Get CS block and store in column chunks
                      CS = computeSchurBlock(schurName, 'CS')
                      fileCS = localDir + 'CS'
-                     NCPU, cranges = storeColumnChunks(CS, 'CS', fileCS)
+                     NCPU, CS_cranges = storeColumnChunks(CS, 'CS', fileCS)
+                     print('Partition block C into chunks and store... DONE!')
                      del(CS)
                      
-                     # Loop over the chunks from disk
+                     # Get AS block and store in column chunks
                      AS = computeSchurBlock(schurName, 'AS')
+                     fileAS = localDir + 'AS'
+                     NCPU, AS_cranges = storeColumnChunks(AS, 'AS', fileAS)
+                     print('Partition block A into chunks and store... DONE!')
+                     del(AS)
+                     
+                     # Loop over the chunks from disk
+                     #AS = computeSchurBlock(schurName, 'AS')
                      BS = computeSchurBlock(schurName, 'BS')
-                     mdb = shelve.open(fileCS, flag='r')
+                     ASmdb = shelve.open(fileAS, flag='r')
+                     CSmdb = shelve.open(fileCS, flag='r')
+                     print('Computing DS^-1 * CS in chunks: ', NCPU)
                      for cc in range(NCPU):
-                            crange = cranges[cc] 
-                            CS_chunk = mdb['CS' + str(cc)]
+                            # Get CS chunk
+                            CS_crange = CS_cranges[cc] 
+                            CS_chunk = CSmdb['CS' + str(cc)]
                             
-                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk, overwrite_b=True) # LONG EXECUTION
+                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk, overwrite_b=True, check_finite=False) # LONG EXECUTION
                             del(CS_chunk)
-                            AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
-                            del(DS_chunk)
                             
-                     mdb.close()
+                            # Get AS chunk
+                            AS_crange = AS_cranges[cc] 
+                            AS_chunk = ASmdb['AS' + str(cc)]
+                            #AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
+                            ASmdb['AS' + str(cc)] = AS_chunk - BS.dot(DS_chunk)
+                            del(AS_chunk)
+                            del(DS_chunk)
+                            print('Computed chunk: ', cc+1)
+                            
+                     CSmdb.close()
                      del(BS)
+                     del(factorDS)
+                     
+                     # Reassemble Schur complement of DS from AS chunk storage
+                     print('Computing Schur Complement of D from chunks.')
+                     DS_SC = ASmdb['AS0']
+                     for cc in range(1,NCPU):
+                            DS_SC = np.hstack((DS_SC, ASmdb['AS' + str(cc)]))
+                     ASmdb.close()
                      print('Solve DS^-1 * CS... DONE!')
                      print('Compute Schur Complement of D... DONE!')
-                     
-                     # Store factor_DS for a little bit...
-                     FDS = shelve.open(localDir + 'factorDS', flag='n', protocol=4)
-                     FDS['factorDS'] = factorDS
-                     FDS.close()
-                     del(factorDS)
-                     print('Store Schur Complement of D... DONE!')
-                     
+                     #'''
                      # Apply Schur C. solver on block partitioned DS_SC
-                     factorDS_SC = dsl.lu_factor(AS, overwrite_a=True)
-                     del(AS)
-                     print('Factor D and Schur Complement of D... DONE!')
-                     
-                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat, overwrite_b=True)
-                     del(f1_hat)
+                     factorDS_SC = dsl.lu_factor(DS_SC, overwrite_a=True)
+                     del(DS_SC)
+                     print('Factor Schur Complement of D... DONE!')
+                     #'''
+                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat, overwrite_b=True, check_finite=False)
                      del(factorDS_SC)
+                     #sol1, icode = spl.bicgstab(AS, f1_hat)
+                     del(f1_hat)
                      print('Solve for u and w... DONE!')
                      
                      CS = computeSchurBlock(schurName, 'CS')
@@ -761,7 +787,7 @@ def runModel(TestName):
                      FDS = shelve.open(localDir + 'factorDS', flag='r', protocol=4)
                      factorDS = FDS['factorDS']
                      FDS.close()
-                     sol2 = dsl.lu_solve(factorDS, f2_hat, overwrite_b=True)
+                     sol2 = dsl.lu_solve(factorDS, f2_hat, overwrite_b=True, check_finite=False)
                      del(f2_hat)
                      del(factorDS)
                      print('Solve for ln(p) and ln(theta)... DONE!')
@@ -793,7 +819,7 @@ def runModel(TestName):
                      eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
               rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, \
                                                          REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
-              rhs += eqs.computeRayleighTendency(REFG, fields)
+              rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
@@ -826,16 +852,16 @@ def runModel(TestName):
               isRestartFromNC = False
               if isRestartFromNC:
                      try:
-                            rdex = 159
-                            fname = 'transientNL_bkp.nc'
+                            rdex = 200
+                            fname = 'transientNL0.nc'
                             m_fid = Dataset(fname, 'r', format="NETCDF4")
                             fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
                             fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
                             fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:], (OPS,), order='F')
                             fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:], (OPS,), order='F')
                             
-                            DCF[0][:,0] = np.reshape(m_fid.variables['dcoeff0'][rdex,:,:], (OPS,), order='F')
-                            DCF[1][:,0] = np.reshape(m_fid.variables['dcoeff1'][rdex,:,:], (OPS,), order='F')
+                            DCF[0][:,0] = np.reshape(m_fid.variables['QRES'][rdex,:,:], (OPS,), order='F')
+                            DCF[1][:,0] = np.reshape(m_fid.variables['QMAX'][rdex,:,:], (OPS,), order='F')
                             
                             thisTime = m_fid.variables['t'][rdex]
                      except:
@@ -881,14 +907,19 @@ def runModel(TestName):
               dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
               dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
               # Create variables (diffusion coefficients)
-              dvar0 = m_fid.createVariable('dcoeff0', 'f8', ('time', 'zlev', 'xlon'))
-              dvar1 = m_fid.createVariable('dcoeff1', 'f8', ('time', 'zlev', 'xlon'))
+              dvar0 = m_fid.createVariable('QRES', 'f8', ('time', 'zlev', 'xlon'))
+              dvar1 = m_fid.createVariable('QMAX', 'f8', ('time', 'zlev', 'xlon'))
               
               # Initialize local sound speed and time step
               #'''
+              UD = fields[:,0] + hydroState[:,0]
+              WD = fields[:,1]
+              vel = np.stack((UD, WD),axis=1)
+              VFLW = np.linalg.norm(vel, axis=1)
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
-              VSND_max = np.amax(VSND)
-              DT0 = min(DX_min / VSND_max, DZ_min / VSND_max)
+              VWAV = VFLW + VSND
+              VWAV_max = bn.nanmax(VWAV)
+              DT0 = DLS / VWAV_max
               TOPT[0] = DT0
               print('Initial time step by sound speed: ', str(DT0) + ' (sec)')
               
@@ -900,8 +931,6 @@ def runModel(TestName):
                      if ti == 0:
                             isFirstStep = True
                                    
-                            UD = fields[:,0] + hydroState[:,0]
-                            WD = fields[:,1] + hydroState[:,1]
                             DqDx, DqDz = \
                                    eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, REFS[15], REFS[9][0], \
@@ -947,20 +976,14 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:
-                            # Compute the maximum speed of sound
-                            T_ratio = np.exp(PHYS[4] * fields[:,2] + fields[:,3]) - 1.0
-                            gamRdT = PHYS[6] * REFS[9][0] * (1.0 + T_ratio)
-                            VSND_max = np.amax(np.sqrt(gamRdT))
-                            DTN = min(DX_min / VSND_max, DZ_min / VSND_max)
-                            DT_factor = DTN / DT0
-                            TOPT[0] *= DT_factor
-                            DT0 = DTN
-                            fields, rhsVec, thisTime, resVec, DCF = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
-                                                                    DX, DZ, DX2, DZ2,\
+                            # Compute a time step
+                            fields, rhsVec, thisTime, resVec, DCF, DTN = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
+                                                                    DLS, DXD, DZD,\
                                                                     TOPT, fields, hydroState, rhsVec, \
                                                                     zeroDex, ebcDex, \
                                                                     ResDiff, DCF, thisTime, isFirstStep)
-                            
+                            # Update the local time step
+                            TOPT[0] = DTN
                      except:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             m_fid.close() 

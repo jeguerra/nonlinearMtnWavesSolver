@@ -121,7 +121,7 @@ for rr in hresl:
        HermCheb = True
        # Get the reference solution data
        if HermCheb:
-              refname = hdir + 'restartDB_discrete025m'
+              refname = hdir + 'restartDB_discrete025m_R200m'
        else:
               refname = hdir + 'restartDB_discrete025mP'
               

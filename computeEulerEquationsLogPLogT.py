@@ -253,20 +253,27 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        # Get hydrostatic initial fields
        DQDZ = REFG[2]
        
+       # Get the GML factors
+       GMLX = REFG[0][1]
+       GMLZ = REFG[0][2]
+       
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
        WM = np.expand_dims(W,1)
-       # Compute normal compnent to terrain surfaces
-       velNorm = (WM - DZDX * UM)
        
        # Compute pressure gradient force scaling (buoyancy)
        with warnings.catch_warnings():
               np.seterr(all='raise')
               try:
-                     p_hat = np.exp(fields[:,2])
-                     RdT_hat = np.power(p_hat, kap) * np.exp(fields[:,3])
+                     earg = kap * fields[:,2] + fields[:,3]
+                     T_ratio = np.expm1(earg, dtype=np.longdouble)
+                     RdT = RdT_bar * (T_ratio + 1.0)
+                     '''
+                     p_hat = np.exp(kap * fields[:,2], dtype=np.longdouble)
+                     RdT_hat = p_hat * np.exp(fields[:,3], dtype=np.longdouble)
                      RdT = RdT_bar * RdT_hat
                      T_ratio = RdT_hat - 1.0
+                     '''
               except FloatingPointError:
                      earg = kap * fields[:,2] + fields[:,3]
                      earg_max = np.amax(earg)
@@ -284,20 +291,26 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      RdT = RdT_bar * RdT_hat
        
        # Compute transport terms
-       UPqPx = UM * DqDx
-       wDQDz = velNorm * DqDz + WM * DQDZ
-       transport = UPqPx + wDQDz
+       Uadvect = UM * (DqDx - DZDX * DqDz)
+       Wadvect = WM * (DqDz + DQDZ)
+       
+       # Apply GML to advection
+       Uadvect[:,0] = GMLX.dot(Uadvect[:,0])
+       Uadvect[:,1] = GMLX.dot(Uadvect[:,1])
+       Wadvect[:,1] = GMLZ.dot(Wadvect[:,1])
+       
        # Compute local divergence
        divergence = (DqDx[:,0] - DZDX[:,0] * DqDz[:,0]) + DqDz[:,1]
+       
        # Compute pressure gradient forces
        pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
-       DqDt = -transport
+       DqDt = -Uadvect - Wadvect
        # Horizontal momentum equation
-       DqDt[:,0] -= pgradx
+       DqDt[:,0] -= GMLX.dot(pgradx)
        # Vertical momentum equation
-       DqDt[:,1] -= pgradz
+       DqDt[:,1] -= GMLZ.dot(pgradz)
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
@@ -313,7 +326,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                             
        return DqDt
 
-def computeRayleighTendency(REFG, fields):
+def computeRayleighTendency(REFG, fields, zeroDex):
        
        # Get the Rayleight operators
        mu = np.expand_dims(REFG[3],0)
@@ -321,35 +334,55 @@ def computeRayleighTendency(REFG, fields):
        
        DqDt = -mu * ROP.dot(fields)
        
+       # Fix essential boundary conditions
+       DqDt[zeroDex[0],0] *= 0.0
+       DqDt[zeroDex[1],1] *= 0.0
+       DqDt[zeroDex[2],2] *= 0.0
+       DqDt[zeroDex[3],3] *= 0.0
+       
        return DqDt
 
-def computeDiffusionTendency(PHYS, RESCF, PqPx, PqPz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex, zeroDex):
+def computeDiffusionTendency(PHYS, RESCF, PqPx, PqPz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex, DX2, DZ2, DXZ):
        
        # Get the anisotropic coefficients
-       RESCF1 = RESCF[0]
-       RESCF2 = RESCF[1]
+       RESCF = RESCF[0]
+       #RESCF2 = RESCF[1]
        
        # Compute the 2nd partial derivative
        P2qPx2 = D2qDx2 - DZDX * P2qPxz
        
        DqDt = np.zeros(D2qDx2.shape)
+       '''
        # Diffusion of u-w vector
-       xflux = 2.0 * P2qPx2[:,0]
-       zflux = P2qPz2[:,0] + P2qPxz[:,1]
-       DqDt[:,0] = RESCF1[:,0] * (xflux + zflux)
+       flux = 2.0 * DX2 * P2qPx2[:,0] + DZ2 * P2qPz2[:,0] + DXZ * P2qPxz[:,1]
+       DqDt[:,0] = RESCF1[:,0] * flux
        
-       xflux = P2qPx2[:,1] + P2qPxz[:,0]
-       zflux = 2.0 * P2qPz2[:,1]
-       DqDt[:,1] = RESCF2[:,0] * (xflux + zflux)
+       flux = DX2 * P2qPx2[:,1] + 2.0 * DZ2 * P2qPz2[:,1] + DXZ * P2qPxz[:,0]
+       DqDt[:,1] = RESCF1[:,0] * flux
        
        # Diffusion of scalars (broken up into anisotropic components)
        Pr = 0.71 / 0.4
-       DqDt[:,2] = RESCF1[:,0] * (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2]) + \
-                   RESCF2[:,0] * (P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
-       DqDt[:,3] = Pr * (RESCF1[:,0] * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
-                        RESCF2[:,0] * (P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3]))
+       DqDt[:,2] = RESCF1[:,0] * DX2 * (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2]) + \
+                   RESCF1[:,0] * DZ2 * (P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
+       DqDt[:,3] = Pr * (RESCF1[:,0] * DX2 * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
+                         RESCF1[:,0] * DZ2 * (P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3]))
+       '''
+       #'''
+       # Diffusion of u-w vector
+       flux = 2.0 * DX2 * P2qPx2[:,0] + DZ2 * P2qPz2[:,0] + DXZ * P2qPxz[:,1]
+       DqDt[:,0] = RESCF[:,0] * flux
        
-       # No damping boundaries
+       flux = DX2 * P2qPx2[:,1] + 2.0 * DZ2 * P2qPz2[:,1] + DXZ * P2qPxz[:,0]
+       DqDt[:,1] = RESCF[:,0] * flux
+       
+       # Diffusion of scalars (broken up into anisotropic components)
+       Pr = 0.71 / 0.4
+       DqDt[:,2] = RESCF[:,0] * (DX2 * P2qPx2[:,2] + DZ2 * P2qPz2[:,2])
+       DqDt[:,3] = Pr * RESCF[:,0] * (DX2 * P2qPx2[:,3] + DZ2 * P2qPz2[:,3])
+       #'''
+       
        DqDt[ebcDex[3],:] *= 0.0
+       #DqDt[ebcDex[3],0] *= 0.0
+       #DqDt[ebcDex[3],1] *= 0.0
        
        return DqDt

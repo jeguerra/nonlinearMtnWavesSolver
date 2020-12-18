@@ -92,7 +92,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        GMLZ = np.ones((NZ, NX))
        C1 = 0.02
        C2 = 10.0
-       isTrigGML = True
+       isStretchGML = True # True: trig GML to RHS, False, direct GML to state
        for ii in range(0,NZ):
               for jj in range(0,NX):
                      # Get this X location
@@ -107,15 +107,16 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormX = 0.0
                             
-                            if isTrigGML:
+                            if isStretchGML:
                                    # Evaluate the GML factor
-                                   RFX = (mt.tan(0.5 * mt.pi * dNormX))**GP
+                                   #RFX = (mt.tan(0.5 * mt.pi * dNormX))**GP
+                                   RFX = 2.0 * dNormX**2
                             else:
                                    # Evaluate buffer layer factor
                                    RFX = (1.0 - C1 * dNormX**2) * \
                                           (1.0 - (1.0 - mt.exp(C2 * dNormX**2)) / (1.0 - mt.exp(C2)))
                      else:
-                            RFX = 1.0
+                            RFX = 0.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
@@ -123,17 +124,18 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormZ = 0.0
                                    
-                            if isTrigGML:
+                            if isStretchGML:
                                    # Evaluate the strength of the field
-                                   RFZ = (mt.tan(0.5 * mt.pi * dNormZ))**GP
+                                   #RFZ = (mt.tan(0.5 * mt.pi * dNormZ))**GP
+                                   RFZ = 2.0 * dNormZ**2
                             else:
                                    # Evaluate buffer layer factor
                                    RFZ = (1.0 - C1 * dNormZ**2) * \
                                           (1.0 - (1.0 - mt.exp(C2 * dNormZ**2)) / (1.0 - mt.exp(C2)))
                      else:
-                            RFZ = 1.0
+                            RFZ = 0.0
                      
-                     if isTrigGML:
+                     if isStretchGML:
                             GMLX[ii,jj] = 1.0 / (1.0 + RFX)
                             GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
                             # Set the field to max(lateral, top) to handle corners
@@ -146,7 +148,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             GML[ii,jj] = np.amin([RFX, RFZ])
        '''
        plt.figure()
-       plt.contourf(X, Z, GML, 101, cmap=cm.seismic)
+       plt.contourf(X, Z, GMLX, 101, cmap=cm.seismic)
        plt.colorbar()
        plt.show()
        input()

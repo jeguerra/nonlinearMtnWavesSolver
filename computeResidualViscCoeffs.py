@@ -11,8 +11,9 @@ import numpy as np
 import bottleneck as bn
 
 # This approach blends by maximum residuals on each variable
-def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, SBR, ebcDex):
+def computeResidualViscCoeffs(RES, QM, VWAV, DX, DZ, DX2, DZ2, RHOI):
        
+       # Turn off residual coefficients in the sponge layers
        ARES = np.abs(RES)
        
        # Normalize the residuals (U and W only!)
@@ -22,35 +23,18 @@ def computeResidualViscCoeffs(RES, QM, U, W, DX, DZ, DX2, DZ2, SBR, ebcDex):
               else:
                      ARES[:,vv] *= 0.0
                      
-       # Get the maximum in the residuals
-       QRES_MAX = bn.nanmax(ARES, axis=1)
+       # Get the maximum in the residuals (unit = 1/s)
+       QRES_MAX =  bn.nanmax(ARES, axis=1)
        
-       # Compute the anisotropic coefficients
-       QRESX = DX2 * QRES_MAX;
-       QRESZ = DZ2 * QRES_MAX;
+       # Upper bound for coefficients (unit = 1/s)
+       loclen = mt.sqrt(DX2 + DZ2)
+       QMAX = 0.5 / loclen * VWAV
        
-       # Compute upwind flow dependent coefficients
-       QXMAX = (0.5 * DX) * U
-       QZMAX = (0.5 * DZ) * W
+       # Limit DynSGS to upper bound
+       compare = np.stack((QRES_MAX, QMAX),axis=1)
+       QRES_CF = bn.nanmin(compare, axis=1)
 
-       # Compute the upwind-limited coefficients
-       compare = np.stack((QRESX, QXMAX),axis=1)
-       QRESX_CF = bn.nanmin(compare, axis=1)
-       compare = np.stack((QRESZ, QZMAX),axis=1)
-       QRESZ_CF = bn.nanmin(compare, axis=1)
-       
-       return (np.expand_dims(QRESX_CF,1), np.expand_dims(QRESZ_CF,1))
-
-def computeFlowVelocityCoeffs(U, W, DX, DZ):
-                     
-       QRESX = np.zeros((len(U), 1))
-       QRESZ = np.zeros((len(W), 1))
-       
-       # Compute the anisotropic coefficients
-       QRESX[:,0] = (0.5 * DX) * U
-       QRESZ[:,0] = (0.5 * DZ) * W
-       
-       return (QRESX, QRESZ)
+       return (np.expand_dims(RHOI * QRES_CF,1), np.expand_dims(RHOI * QMAX,1))
 
 def computeFlowAccelerationCoeffs(RES, DT, U, W, DX, DZ):
        
