@@ -450,7 +450,6 @@ def runModel(TestName):
        del(GML)
        
        #%% DIFFERENTIATION OPERATORS
-       #DDXM, DDZM = devop.computePartialDerivativesXZ_BC(DIMS, REFS, DDX_1D, DDZ_1D, DDX_SP, DDZ_SP)
        DDXM, DDZM = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
@@ -468,8 +467,8 @@ def runModel(TestName):
               REFS.append((DDXMS, DDZMS))
        else: 
               # Matrix operators for Jacobian assembly
-              REFS.append(DDXM)
-              REFS.append(DDZM)
+              REFS.append(DDXMS)
+              REFS.append(DDZMS)
               
        # Store the terrain profile
        REFS.append(DZT)
