@@ -31,25 +31,25 @@ class TestCase:
                      # Reproduction of the Classical Schar case (one solve)
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(183, 84, 70.0, 22.0, 280.0, 
+                     self.setUserData(191, 86, 70.0, 22.0, 280.0, 
                                       7000.0, 10000.0, 1.0, \
-                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'inflow_periodic')
+                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow')
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(183, 84, 70.0, 22.0, 280.0, \
+                     self.setUserData(191, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'inflow_periodic')
+                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow')
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -59,19 +59,21 @@ class TestCase:
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(183, 90, 70.0, 31.0, 300.0, 6000.0, 10000.0, 25.0, 0.01, 2, 1.2E+4, 'inflow_periodic')
-                     
+                     self.setUserData(191, 86, 75.0, 32.0, 300.0, \
+                                      6000.0, 10000.0, 1.0, \
+                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow') 
+                            
               elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(199, 128, 75.0, 32.0, 300.0, \
+                     self.setUserData(191, 148, 75.0, 32.0, 300.0, \
                                       7000.0, 15000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'inflow_periodic')
+                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow')
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
@@ -82,11 +84,9 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(511, 96, 130.0, 42.0, 300.0, \
+                     self.setUserData(583, 100, 150, 42.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
-                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'inflow_periodic')
-                     # UNIFORM STRATIFICATION PARAMETERS
-                     #self.setUserData(423, 92, 121.0, 38.0, 300.0, 8000.0, 21000.0, 2000.0, 0.01, 3, 1.25E+4)
+                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_inflow')
                      
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')

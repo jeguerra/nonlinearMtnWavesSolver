@@ -87,12 +87,13 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               
        return FLDI
 
-#hdir = '/home/jeg/scratch/' # home desktop runs
-hdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # runs done on Farm
+hdir = '/home/jeg/scratch/' # home desktop runs
+refName = 'restartDB'
+#hdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # runs done on Farm
+#refName = 'restartDB_exactBCSchar_025m'
 tdir = '/media/jeg/TransferDATA/Schar025m_tempest/Schar025m/' # home desktop
 #tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
 hresl = [1000, 500, 250, 125, 62]
-refName = 'restartDB_BC4'
 #hresl = [250]
 # Loop over the 4 data files
 # Error norms between Tempest and Spectral Reference

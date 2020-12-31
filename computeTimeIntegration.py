@@ -58,7 +58,6 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
        rampTimeBound = TOPT[2]
        order = TOPT[3]
        RdT_bar = REFS[9][0]
-       P_bar = REFS[9][1]
        
        # Adjust for time ramping
        time = thisTime
@@ -96,7 +95,14 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
               # Compute the diffusion update
-              rhsDif = computeRHSUpdate_diffusion(PqPx, PqPz, D2qDx2, D2qDz2, D2qDxz, DCF)
+              rhsDif = computeRHSUpdate_diffusion(PqPx, PqPz, D2qDx2, D2qDz2, D2qDxz)
+              
+              if DynSGS:
+                     #rhsDif = 0.5 * (DCF[0] + DCF[1]) * rhsDif
+                     rhsDif = DCF[0] * rhsDif
+                     #rhsDif = DCF[1] * rhsDif
+              else:
+                     rhsDif = DCF[1] * rhsDif
               
               # Apply update
               dsol = coeff * DT * (rhsDyn + rhsDif)
@@ -118,28 +124,28 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
                      
               return rhs
        
-       def computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, dcoeff):
+       def computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz):
               
-              rhs = tendency.computeDiffusionTendency(PHYS, dcoeff, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex, DX2, DZ2, DXZ)
+              rhs = tendency.computeDiffusionTendency(PHYS, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ)
        
               return rhs
        
        def computeDCFUpdate(solA, solB, rhsA, rhsB):
               # Compute sound speed
-              T_ratio = np.exp(PHYS[4] * solB[:,2] + solB[:,3]) - 1.0
+              T_ratio = np.expm1(PHYS[4] * solB[:,2] + solB[:,3])
               RdT = REFS[9][0] * (1.0 + T_ratio)
               #PZ = np.exp(solB[:,2] + init0[:,2])
               #RHOI = RdT * np.reciprocal(PZ)
               VSND = np.sqrt(PHYS[6] * RdT)
               # Compute flow speed
-              UD = solB[:,0] + init0[:,0]
+              UD = solB[:,0]# + init0[:,0]
               WD = solB[:,1]
               vel = np.stack((UD, WD),axis=1)
               VFLW = np.linalg.norm(vel, axis=1)
               # Compute total wave speed
-              VWAV = VFLW + VSND
+              #VWAV = VFLW + VSND
               # Compute max norm of total wave speed
-              VWAV_max = bn.nanmax(VWAV)
+              VWAV_max = bn.nanmax(VSND)
               DTN = DLS / VWAV_max
               
               # Trapezoidal Rule estimate of residual
@@ -268,9 +274,9 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
        if order == 2:
               solf, rhsf = ketcheson62(sol0)
        elif order == 3:
-              solf, rhsf = ketcheson93(sol0)
+              #solf, rhsf = ketcheson93(sol0)
               #solf = kinnGray53(sol0)
-              #solf, rhsf = ssprk53_Opt(sol0)
+              solf, rhsf = ssprk53_Opt(sol0)
        elif order == 4:
               solf = ketcheson104(sol0)
        else:

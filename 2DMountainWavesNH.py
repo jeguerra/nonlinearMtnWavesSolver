@@ -94,11 +94,12 @@ def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
 
 def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar):
        plt.close('all')
-       plt.figure(figsize=(8.0, 12.0))
+       plt.figure(figsize=(16.0, 12.0))
        for pp in range(numVar):
               q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
-              plt.subplot(4,1,pp+1)
-                                                 
+              
+              # Plot of the full field
+              plt.subplot(4,2,2*(pp+1)-1)
               if np.abs(q.max()) > np.abs(q.min()):
                      clim = np.abs(q.max())
               elif np.abs(q.max()) < np.abs(q.min()):
@@ -122,6 +123,27 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, NX, NZ, numVar):
                      plt.title('u (m/s): ' + 'Time = {:.5f} (sec)'.format(thisTime))
               elif pp == 1:
                      plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
+              elif pp == 2:
+                     plt.title('ln-p (Pa)')
+              else:
+                     plt.title('ln-theta (K)')
+                     
+              # Plot the terrain response
+              plt.subplot(4,2,2*(pp+1))
+              plt.plot(1.0E-3*XL[0,:], q[0,:], 'r')
+              plt.plot(1.0E-3*XL[1,:], q[1,:], 'b--')
+              plt.legend(('z = h(x)', 'level 1'))
+              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+              
+              if pp < (numVar - 1):
+                     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+              else:
+                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+              
+              if pp == 0:
+                     plt.title('u (m/s)')
+              elif pp == 1:
+                     plt.title('w (m/s)')
               elif pp == 2:
                      plt.title('ln-p (Pa)')
               else:
@@ -279,18 +301,24 @@ def runModel(TestName):
        HOPT = thisTest.HOPT # Terrain profile options
        TOPT = thisTest.TOPT # Time integration options
        
-       if RLOPT[5] == 'periodic':
-              latPeriodic = True
-              latInflow = False
-       elif RLOPT[5] == 'inflow':
-              latPeriodic = False
-              latInflow = True
-       elif RLOPT[5] == 'periodic_inflow':
-              latPeriodic = True
-              latInflow = True
+       if RLOPT[5] == 'kinematic_inflow':
+              bcType = 1
+              print('BC profile: ' + RLOPT[5])
+       elif RLOPT[5] == 'kinematic_pinned':
+              bcType = 2
+              print('BC profile: ' + RLOPT[5])
+       elif RLOPT[5] == 'uwpt_inflow':
+              bcType = 3
+              print('BC profile: ' + RLOPT[5])
+       elif RLOPT[5] == 'uwpt_pinned':
+              bcType = 4
+              print('BC profile: ' + RLOPT[5])
+       elif RLOPT[5] == 'uwt_pinned':
+              bcType = 5
+              print('BC profile: ' + RLOPT[5])
        else:
-              latPeriodic = False
-              latInflow = True
+              bcType = 4
+              print('DEFAULT BC profile: ' + RLOPT[5])
        
        # Make the equation index vectors for all DOF
        numVar = 4
@@ -321,11 +349,11 @@ def runModel(TestName):
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
          
        # Turn on compact finite difference...
-       #DDX_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       #DDZ_SP = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
+       DDX_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
+       DDZ_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        # Turn on cubic spline derivatives...
-       DDX_SP = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
-       DDZ_SP = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
+       DDX_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
+       DDZ_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -366,7 +394,7 @@ def runModel(TestName):
        uldex, urdex, ubdex, utdex, wbdex, \
        ubcDex, wbcDex, pbcDex, tbcDex, \
        zeroDex, sysDex, ebcDex = \
-              computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow)
+              computeAdjust4CBC(DIMS, numVar, varDex, bcType)
               
        # Index to interior of terrain boundary
        hdex = range(0,NX+1)
@@ -450,25 +478,36 @@ def runModel(TestName):
        del(GML)
        
        #%% DIFFERENTIATION OPERATORS
-       DDXM, DDZM = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_SP, DDZ_SP)
        
-       REFS.append(DDXM) # index 10
-       REFS.append(DDZM) # index 11
+       # Quality control on derivative matrices
+       DDX_1D[np.isclose(DDX_1D, 0.0, atol=1.0E-15)] = 0.0
+       DDZ_1D[np.isclose(DDZ_1D, 0.0, atol=1.0E-15)] = 0.0
+       
+       DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       # 4th order compact finite difference (Gamet, 1999)
+       DDXM_D4, DDZM_D4 = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_D4, DDZ_D4)
+       # Cubic Spline derivative matrix
+       DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
+       
+       DDXMA = 0.5 * (DDXMS + DDXM_D4)
+       #DDZMA = 0.5 * (DDZMS + DDZM_CS)
+       
+       REFS.append(DDXMS) # index 10
+       REFS.append(DDZMS) # index 11
        
        if not StaticSolve and RSBops:
               from rsb import rsb_matrix
               # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(DDXM), rsb_matrix(DDZM)))
-              REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZMS)))
+              REFS.append((rsb_matrix(DDXMA), rsb_matrix(DDZMS)))
+              REFS.append((rsb_matrix(DDXM_CS), rsb_matrix(DDZM_CS)))
        elif not StaticSolve and not RSBops:
               # Native sparsr
-              REFS.append((DDXM, DDZM))
-              REFS.append((DDXMS, DDZMS))
+              REFS.append((DDXMA, DDZMS))
+              REFS.append((DDXM_CS, DDZM_CS))
        else: 
               # Matrix operators for Jacobian assembly
-              REFS.append(DDXMS)
-              REFS.append(DDZMS)
+              REFS.append(DDXM_CS)
+              REFS.append(DDZM_CS)
               
        # Store the terrain profile
        REFS.append(DZT)
@@ -476,7 +515,7 @@ def runModel(TestName):
        REFS.append(DZDX)
        
        # Compute and store the 2nd derivatives of background quantities
-       D2QDZ2 = DDZM.dot(DQDZ)
+       D2QDZ2 = DDZMS.dot(DQDZ)
        D2QDZ2[:,2] = np.reshape(D2LPDZ2, (OPS,), order='F')
        D2QDZ2[:,3] = np.reshape(D2LPTDZ2, (OPS,), order='F')
        REFG.append(D2QDZ2)
@@ -485,20 +524,21 @@ def runModel(TestName):
        if not StaticSolve:
               #'''
               # Diffusion grid lengths
-              DXD = DX_avg
-              DZD = DZ_avg
+              DXD = 2.0 * DX_avg
+              DZD = 2.0 * DZ_avg
               #'''            
               #'''
               print('Computing spectral radii of derivative operators...')
-              PPXM = DDXM - sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr') * DDZM
-              DX_spr = 1.0 / np.abs(spl.eigs(PPXM[np.ix_(ubdex,ubdex)], k=1, which='LM', return_eigenvectors=False))
-              DZ_spr = 1.0 / np.abs(spl.eigs(DDZM[np.ix_(uldex,uldex)], k=1, which='LM', return_eigenvectors=False))
+              PPXMS = DDXMS - sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr') * DDZMS
+              DX_spr = 1.0 / np.abs(spl.eigs(PPXMS[np.ix_(ubdex,ubdex)], k=1, which='LM', return_eigenvectors=False))
+              DZ_spr = 1.0 / np.abs(spl.eigs(DDZMS[np.ix_(uldex[1:],uldex[1:])], k=1, which='LM', return_eigenvectors=False))
               print('Spectral radii of 1st derivative matrices: ', DX_spr, DZ_spr)
-              DLS = mt.sqrt(DX_spr * DZ_spr)
+              #DLS = mt.sqrt(DX_spr * DZ_spr)
+              DLS = min(DX_spr[0], DZ_spr[0])
               #'''
               
-       del(DDXM); del(DDXMS)
-       del(DDZM); del(DDZMS)
+       del(DDXMS); del(DDXM_D4); del(DDXM_CS)
+       del(DDZMS); del(DDZM_D4); del(DDZM_CS)
        del(DZDX)
        del(GMLOP)
        
@@ -735,19 +775,19 @@ def runModel(TestName):
                      # Loop over the chunks from disk
                      #AS = computeSchurBlock(schurName, 'AS')
                      BS = computeSchurBlock(schurName, 'BS')
-                     ASmdb = shelve.open(fileAS, flag='r')
+                     ASmdb = shelve.open(fileAS)
                      CSmdb = shelve.open(fileCS, flag='r')
                      print('Computing DS^-1 * CS in chunks: ', NCPU)
                      for cc in range(NCPU):
                             # Get CS chunk
-                            CS_crange = CS_cranges[cc] 
+                            #CS_crange = CS_cranges[cc] 
                             CS_chunk = CSmdb['CS' + str(cc)]
                             
                             DS_chunk = dsl.lu_solve(factorDS, CS_chunk, overwrite_b=True, check_finite=False) # LONG EXECUTION
                             del(CS_chunk)
                             
                             # Get AS chunk
-                            AS_crange = AS_cranges[cc] 
+                            #AS_crange = AS_cranges[cc] 
                             AS_chunk = ASmdb['AS' + str(cc)]
                             #AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
                             ASmdb['AS' + str(cc)] = AS_chunk - BS.dot(DS_chunk)
@@ -851,7 +891,7 @@ def runModel(TestName):
               isRestartFromNC = False
               if isRestartFromNC:
                      try:
-                            rdex = 200
+                            rdex = 189
                             fname = 'transientNL0.nc'
                             m_fid = Dataset(fname, 'r', format="NETCDF4")
                             fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
@@ -913,11 +953,11 @@ def runModel(TestName):
               #'''
               UD = fields[:,0] + hydroState[:,0]
               WD = fields[:,1]
-              vel = np.stack((UD, WD),axis=1)
-              VFLW = np.linalg.norm(vel, axis=1)
+              #vel = np.stack((UD, WD),axis=1)
+              #VFLW = np.linalg.norm(vel, axis=1)
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
-              VWAV = VFLW + VSND
-              VWAV_max = bn.nanmax(VWAV)
+              #VWAV = VFLW + VSND
+              VWAV_max = bn.nanmax(VSND)
               DT0 = DLS / VWAV_max
               TOPT[0] = DT0
               print('Initial time step by sound speed: ', str(DT0) + ' (sec)')

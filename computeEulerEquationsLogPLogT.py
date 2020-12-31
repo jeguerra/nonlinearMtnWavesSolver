@@ -120,10 +120,8 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        T_bar = (1.0 / Rd) * RdT_bar
        
        targ = kap * fields[:,2] + fields[:,3]
-       bf = np.exp(targ) 
-       T_ratio = bf - 1.0
-       #T_ratio = targ + 0.5 * np.power(targ, 2.0)
-       #bf = T_ratio + 1.0
+       T_ratio = np.expm1(targ) 
+       bf = T_ratio + 1.0
        RdT = RdT_bar * bf
        
        # Compute T'
@@ -137,7 +135,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        PtPx = PPXM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
        
-       PtPx = DDXM.dot(T_prime) - DZDX * DtDz
        PtPxM = sps.diags(PtPx, offsets=0, format='csr')
        DtDzM = sps.diags(DtDz, offsets=0, format='csr')
        
@@ -293,9 +290,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      RdT = RdT_bar * RdT_hat
        
        # Compute transport terms
-       Uadvect = UM * (DqDx - DZDX * DqDz)
-       Wadvect = WM * (DqDz + DQDZ)
-       
+       Uadvect = UM * DqDx
+       Wadvect = WM * DQDZ
+       Tadvect = (WM - UM * DZDX) * DqDz
+       Tadvect[ebcDex[1],:] *= 0.0
+        
        # Compute local divergence
        divergence = (DqDx[:,0] - DZDX[:,0] * DqDz[:,0]) + DqDz[:,1]
        
@@ -303,7 +302,7 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
-       DqDt = -(Uadvect + Wadvect)
+       DqDt = -(Uadvect + Wadvect + Tadvect)
        # Horizontal momentum equation
        DqDt[:,0] -= pgradx
        # Vertical momentum equation
@@ -345,46 +344,34 @@ def computeRayleighTendency(REFG, fields, zeroDex):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, RESCF, PqPx, PqPz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex, DX2, DZ2, DXZ):
-       
-       # Get the anisotropic coefficients
-       RESCF = RESCF[0]
-       #RESCF = RESCF[1]
+def computeDiffusionTendency(PHYS, PqPx, PqPz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ):
        
        # Compute the 2nd partial derivative
        P2qPx2 = D2qDx2 - DZDX * P2qPxz
        
        DqDt = np.zeros(D2qDx2.shape)
-       #'''
+       
        # Diffusion of u-w vector
        DqDt[:,0] = 2.0 * DX2 * P2qPx2[:,0] + DZ2 * P2qPz2[:,0] + DXZ * P2qPxz[:,1]       
        DqDt[:,1] = DX2 * P2qPx2[:,1] + 2.0 * DZ2 * P2qPz2[:,1] + DXZ * P2qPxz[:,0]
        # Diffusion of scalars (broken up into anisotropic components)
        Pr = 0.71 / 0.4
-       DqDt[:,2] = DX2 * (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2]) + \
-                   DZ2 * (P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
-       DqDt[:,3] = Pr * (DX2 * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
-                         DZ2 * (P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3]))
-       #'''
+       DqDt[:,2] = DX2 * (P2qPx2[:,2] + np.square(PqPx[:,2])) + \
+                   DZ2 * (P2qPz2[:,2] + np.square(PqPz[:,2]))
+       #DqDt[:,2] = DX2 * (P2qPx2[:,2]) + \
+       #            DZ2 * (P2qPz2[:,2])
+       DqDt[:,3] = Pr * (DX2 * (P2qPx2[:,3] + np.square(PqPx[:,3])) + \
+                         DZ2 * (P2qPz2[:,3] + np.square(PqPz[:,3])))
+       #DqDt[:,3] = Pr * (DX2 * (P2qPx2[:,3]) + \
+       #                  DZ2 * (P2qPz2[:,3]))
+       
        '''
-       # Diffusion of u-w vector
-       flux = 2.0 * DX2 * P2qPx2[:,0] + DZ2 * P2qPz2[:,0] + DXZ * P2qPxz[:,1]
-       DqDt[:,0] = RESCF[:,0] * flux
-       
-       flux = DX2 * P2qPx2[:,1] + 2.0 * DZ2 * P2qPz2[:,1] + DXZ * P2qPxz[:,0]
-       DqDt[:,1] = RESCF[:,0] * flux
-       
-       # Diffusion of scalars (broken up into anisotropic components)
-       Pr = 0.71 / 0.4
-       DqDt[:,2] = RESCF[:,0] * (DX2 * P2qPx2[:,2] + DZ2 * P2qPz2[:,2])
-       DqDt[:,3] = Pr * RESCF[:,0] * (DX2 * P2qPx2[:,3] + DZ2 * P2qPz2[:,3])
+       # Fix essential boundary conditions
+       DqDt[zeroDex[0],0] *= 0.0
+       DqDt[zeroDex[1],1] *= 0.0
+       DqDt[zeroDex[2],2] *= 0.0
+       DqDt[zeroDex[3],3] *= 0.0
        '''
-       
-       # Scale with DynSGS coefficients
-       DqDt = RESCF * DqDt
-       
        DqDt[ebcDex[3],:] *= 0.0
-       #DqDt[ebcDex[3],0] *= 0.0
-       #DqDt[ebcDex[3],1] *= 0.0
        
        return DqDt

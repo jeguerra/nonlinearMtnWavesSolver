@@ -8,11 +8,11 @@ Created on Tue Jul 23 10:49:24 2019
 
 import numpy as np
 
-def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
+def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        # Get DIMS data
-       NX = DIMS[3] + 1
+       NX = DIMS[3]
        NZ = DIMS[4]
-       OPS = NX * NZ
+       OPS = (NX+1) * NZ
        
        # All DOF per variable
        rowsAll = set(np.array(range(0,OPS)))
@@ -24,87 +24,92 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        iT = varDex[3]
        
        # Compute BC index vectors for U and W (coupled top and bottom BC)
-       
-       # including corners
-       #uldex = np.array(range(0, NZ))
-       #urdex = np.array(range((OPS-NZ)-1, OPS))
-       # excluding bottom corners
-       uldex = np.array(range(1, NZ))
-       urdex = np.array(range((OPS-NZ)+1, OPS))
-       
        # including corners
        ubdex = np.array(range(0, OPS, NZ))
        utdex = np.array(range(NZ-1, OPS, NZ))
-       # excluding corners
-       #ubdex = np.array(range(1, OPS-2*NZ, NZ))
-       #utdex = np.array(range(2*NZ-1, OPS-NZ, NZ))
+       
+       # including corners
+       uldex1 = np.array(range(ubdex[0], NZ))
+       urdex1 = np.array(range(ubdex[-1], OPS))
+       # excluding corners at terrain boundary
+       uldex2 = np.array(range(ubdex[0]+1, NZ))
+       urdex2 = np.array(range(ubdex[-1]+1, OPS))
               
-       wldex = np.add(uldex, iW * OPS)
-       wrdex = np.add(urdex, iW * OPS)
+       wldex = np.add(uldex2, iW * OPS)
+       wrdex = np.add(urdex2, iW * OPS)
        wbdex = np.add(ubdex, iW * OPS)
        wtdex = np.add(utdex, iW * OPS)
        
-       pldex = np.add(uldex, iP * OPS)
-       prdex = np.add(urdex, iP * OPS)
-       pbdex = np.add(ubdex, iP * OPS)
-       ptdex = np.add(utdex, iP * OPS)
+       pldex = np.add(uldex2, iP * OPS)
+       prdex = np.add(urdex2, iP * OPS)
+       #pbdex = np.add(ubdex, iP * OPS)
+       #ptdex = np.add(utdex, iP * OPS)
        
-       tldex = np.add(uldex, iT * OPS)
-       trdex = np.add(urdex, iT * OPS)
-       tbdex = np.add(ubdex, iT * OPS)
-       ttdex = np.add(utdex, iT * OPS)
+       tldex = np.add(uldex2, iT * OPS)
+       trdex = np.add(urdex2, iT * OPS)
+       #tbdex = np.add(ubdex, iT * OPS)
+       #ttdex = np.add(utdex, iT * OPS)
        
        # Index all boundary DOF that can be diffused on
-       latDex = np.unique(np.concatenate((uldex,urdex)))
-       vrtDex = np.unique(np.concatenate((ubdex,utdex)))
-       extDex = np.unique(np.concatenate((urdex,uldex,ubdex,utdex)))
+       latDex = np.unique(np.concatenate((uldex2,urdex2)))
+       #vrtDex = np.unique(np.concatenate((ubdex,utdex)))
+       extDex = np.unique(np.concatenate((urdex2,uldex2,ubdex,utdex)))
        diffDex = (latDex, ubdex, utdex, extDex)
        
        # BC indices for static solution (per variable)
-       if latPeriodic and not latInflow:
-              # Periodic with no inflow condition
-              rowsOutU = set()
-              rowsOutW = set(utdex)
+       if bcType == 1:
+              # Inflow condition on kinematic variables
+              rowsOutU = set(uldex2)
+              rowsOutW = set(np.concatenate((uldex2,utdex)))
               rowsOutP = set()
               rowsOutT = set()
               # Indexing for static solver
-              top = wtdex
-              rowsOutBC_static = set(top)
-       elif not latPeriodic and latInflow:
-              # Only inflow condition specified
-              rowsOutU = set(uldex)
-              rowsOutW = set(np.concatenate((uldex,utdex)))
-              rowsOutP = set(uldex)
-              rowsOutT = set(uldex)
-              # Indexing for static solver
-              left = np.concatenate((uldex, wldex, pldex, tldex))
+              left = np.concatenate((uldex2, wldex))
               top = wtdex
               rowsOutBC_static = set(np.concatenate((left, top)))
-       elif latPeriodic and latInflow:
-              #'''
-              # Periodic with inflow condition (pinned boundary)
-              rowsOutU = set(np.concatenate((uldex,urdex)))
-              rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
+       elif bcType == 2:
+              # Pinned condition on kinematic variables
+              rowsOutU = set(np.concatenate((uldex2,urdex1)))
+              rowsOutW = set(np.concatenate((uldex2,urdex1,utdex)))
               rowsOutP = set()
               rowsOutT = set()
                # Indexing for static solver
-              left = np.concatenate((uldex, wldex))
-              right = np.concatenate((urdex, wrdex))
+              left = np.concatenate((uldex2, wldex))
+              right = np.concatenate((urdex2, wrdex))
               top = wtdex
               rowsOutBC_static = set(np.concatenate((left, right, top)))
-              #'''
-              '''
-              # Periodic with inflow condition (pinned boundary)
-              rowsOutU = set(np.concatenate((uldex,urdex)))
-              rowsOutW = set(np.concatenate((uldex,urdex,utdex)))
-              rowsOutP = set()
-              rowsOutT = set(np.concatenate((uldex,urdex)))
+       elif bcType == 3:
+              # Inflow condition on UWPT
+              rowsOutU = set(uldex2)
+              rowsOutW = set(np.concatenate((uldex2,utdex)))
+              rowsOutP = set(uldex2)
+              rowsOutT = set(uldex2)
+              # Indexing for static solver
+              left = np.concatenate((uldex2, wldex, pldex, tldex))
+              top = wtdex
+              rowsOutBC_static = set(np.concatenate((left, top)))
+       elif bcType == 4:
+              # Pinned condition on UWPT
+              rowsOutU = set(np.concatenate((uldex2,urdex2)))
+              rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
+              rowsOutP = set(np.concatenate((uldex2,urdex2)))
+              rowsOutT = set(np.concatenate((uldex2,urdex2)))
                # Indexing for static solver
-              left = np.concatenate((uldex, wldex, tldex))
-              right = np.concatenate((urdex, wrdex, trdex))
+              left = np.concatenate((uldex2, wldex, pldex, tldex))
+              right = np.concatenate((urdex2, wrdex, prdex, trdex))
               top = wtdex
               rowsOutBC_static = set(np.concatenate((left, right, top)))
-              '''
+       elif bcType == 5:
+              # Pinned condition on UWT
+              rowsOutU = set(np.concatenate((uldex2,urdex2)))
+              rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
+              rowsOutP = set()
+              rowsOutT = set(np.concatenate((uldex2,urdex2)))
+               # Indexing for static solver
+              left = np.concatenate((uldex2, wldex, tldex))
+              right = np.concatenate((urdex2, wrdex, trdex))
+              top = wtdex
+              rowsOutBC_static = set(np.concatenate((left, right, top)))
        
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
@@ -122,4 +127,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex, latPeriodic, latInflow):
        sysDex = rowsAll.difference(rowsOutBC_static)
        sysDex = sorted(sysDex)
        
-       return uldex, urdex, ubdex, utdex, wbdex, ubcDex, wbcDex, pbcDex, tbcDex, rowsOutBC_transient, sysDex, diffDex
+       return uldex1, urdex1, ubdex, utdex, wbdex, ubcDex, wbcDex, pbcDex, tbcDex, rowsOutBC_transient, sysDex, diffDex

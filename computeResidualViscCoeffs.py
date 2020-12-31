@@ -11,7 +11,7 @@ import numpy as np
 import bottleneck as bn
 
 # This approach blends by maximum residuals on each variable
-def computeResidualViscCoeffs(RES, QM, VWAV, DX, DZ, DX2, DZ2, RHOI):
+def computeResidualViscCoeffs(RES, QM, VFLW, DX, DZ, DX2, DZ2, RHOI):
        
        # Turn off residual coefficients in the sponge layers
        ARES = np.abs(RES)
@@ -27,8 +27,8 @@ def computeResidualViscCoeffs(RES, QM, VWAV, DX, DZ, DX2, DZ2, RHOI):
        QRES_MAX =  bn.nanmax(ARES, axis=1)
        
        # Upper bound for coefficients (unit = 1/s)
-       loclen = mt.sqrt(DX2 + DZ2)
-       QMAX = 0.5 / loclen * VWAV
+       loclen = mt.sqrt(DX * DZ)
+       QMAX = 0.5 / loclen * VFLW
        
        # Limit DynSGS to upper bound
        compare = np.stack((QRES_MAX, QMAX),axis=1)
