@@ -92,7 +92,7 @@ def computeCubicSplineDerivativeMatrix(DIMS, dom, isClamped):
               
        DDM = C.dot(AIB) + D
        
-       return DDM
+       return DDM, AIB
 
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):

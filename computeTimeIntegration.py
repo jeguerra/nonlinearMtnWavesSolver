@@ -11,7 +11,6 @@ import scipy.sparse as sps
 import time as timing
 import bottleneck as bn
 import matplotlib.pyplot as plt
-import computeResidualViscCoeffs as rescf
 import computeEulerEquationsLogPLogT as tendency
 
 def rampFactor(time, timeBound):
@@ -47,13 +46,10 @@ def plotRHS(time, rhs, ebcDex):
        
        return
 
-def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
-                              sol0, init0, rhs0, zeroDex, ebcDex, \
+def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
+                              sol0, init0, zeroDex, ebcDex, \
                               DynSGS, DCF, thisTime, isFirstStep):
        
-       DX2 = DXD * DXD
-       DZ2 = DZD * DZD
-       DXZ = DXD * DZD
        DT = TOPT[0]
        rampTimeBound = TOPT[2]
        order = TOPT[3]
@@ -62,10 +58,14 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
        # Adjust for time ramping
        time = thisTime
        uf, duf = rampFactor(time, rampTimeBound)
+       
+       # Get the GML factors
+       #GMLX = REFG[0][1]
+       #GMLZ = REFG[0][2]
            
        mu = REFG[3]
        RLM = REFG[4]
-       DQDZ = REFG[2]
+       #DQDZ = REFG[2]
        #DQDZ = GMLZ.dot(REFG[2])
        DZDX = REFS[15]
        #'''
@@ -88,25 +88,29 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
               DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
               
               # Compute 2nd derivatives
-              D2qDx2, D2qDz2, D2qDxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDXM_CFD, DDZM_CFD, DZDX)
+              P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+                     tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
               
               # Compute dynamics update
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
               # Compute the diffusion update
-              rhsDif = computeRHSUpdate_diffusion(PqPx, PqPz, D2qDx2, D2qDz2, D2qDxz)
+              rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
               
-              if DynSGS:
-                     #rhsDif = 0.5 * (DCF[0] + DCF[1]) * rhsDif
-                     rhsDif = DCF[0] * rhsDif
-                     #rhsDif = DCF[1] * rhsDif
-              else:
-                     rhsDif = DCF[1] * rhsDif
+              # Dynamics and diffusive update
+              rhsUpdate = rhsDyn + rhsDif
               
               # Apply update
-              dsol = coeff * DT * (rhsDyn + rhsDif)
+              dsol = coeff * DT * rhsUpdate
               solB = sol2Update + dsol
+              
+              # Enforce essential boundary conditions
+              solB[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
+              solB[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
+              solB[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
+              solB[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
+              U = solB[:,0] + init0[:,0]
+              solB[ebcDex[1],1] = np.array(DZDX[ebcDex[1],0] * U[ebcDex[1]])
               
               #''' TURNED ON IN ORIGINAL RUN
               # Apply Rayleigh layer implicitly
@@ -114,49 +118,28 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
               solB = propagator.T * solB
               #'''
               
-              return solB, rhsDyn
+              return solB
        
        def computeRHSUpdate_dynamics(fields, DqDx, DqDz):
               U = fields[:,0] + init0[:,0]
-              W = fields[:,1] + init0[:,1]
+              W = fields[:,1]
               # Compute dynamical tendencies
-              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex)
+              rhs = tendency.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex)
                      
               return rhs
        
-       def computeRHSUpdate_diffusion(DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz):
+       def computeRHSUpdate_diffusion(fields, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz):
               
-              rhs = tendency.computeDiffusionTendency(PHYS, DqDx, DqDz, D2qDx2, D2qDz2, D2qDxz, DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ)
+              # Compute sound speed
+              T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
+              RdT = RdT_bar * (1.0 + T_ratio)
+              PZ = np.exp(fields[:,2] + init0[:,2])
+              RHOI = np.expand_dims(RdT * np.reciprocal(PZ), axis=1)
+              
+              rhs = tendency.computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      DZDX, ebcDex, DX2, DZ2, DXZ, RHOI, DCF, DynSGS)
        
               return rhs
-       
-       def computeDCFUpdate(solA, solB, rhsA, rhsB):
-              # Compute sound speed
-              T_ratio = np.expm1(PHYS[4] * solB[:,2] + solB[:,3])
-              RdT = REFS[9][0] * (1.0 + T_ratio)
-              #PZ = np.exp(solB[:,2] + init0[:,2])
-              #RHOI = RdT * np.reciprocal(PZ)
-              VSND = np.sqrt(PHYS[6] * RdT)
-              # Compute flow speed
-              UD = solB[:,0]# + init0[:,0]
-              WD = solB[:,1]
-              vel = np.stack((UD, WD),axis=1)
-              VFLW = np.linalg.norm(vel, axis=1)
-              # Compute total wave speed
-              #VWAV = VFLW + VSND
-              # Compute max norm of total wave speed
-              VWAV_max = bn.nanmax(VSND)
-              DTN = DLS / VWAV_max
-              
-              # Trapezoidal Rule estimate of residual
-              dqdt = (1.0 / TOPT[0]) * (solB - solA)
-              resInv = dqdt - 0.5 * (rhsA + rhsB)
-              
-              # Compute DynSGS or Flow Dependent diffusion coefficients
-              QM = bn.nanmax(np.abs(solf - bn.nanmean(solf)), axis=0)
-              DCF = rescf.computeResidualViscCoeffs(resInv, QM, VFLW, DXD, DZD, DX2, DZ2, 1.0)                     
-              
-              return DCF, resInv, rhsB, DTN
        
        def ssprk34(sol):
               # Stage 1
@@ -174,46 +157,46 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
        def ssprk53_Opt(sol):
               # Optimized truncation error to SSP coefficient method from Higueras, 2019
               # Stage 1
-              sol1, rhs = computeUpdate(0.377268915331368, sol, sol)
+              sol1 = computeUpdate(0.377268915331368, sol, sol)
               # Stage 2
-              sol2, rhs = computeUpdate(0.377268915331368, sol1, sol1)
+              sol2 = computeUpdate(0.377268915331368, sol1, sol1)
               # Stage 3
               sol3 = np.array(0.426988976571684 * sol + 0.5730110234283154 * sol2)
-              sol2, rhs = computeUpdate(0.216179247281718, sol2, sol3)
+              sol2 = computeUpdate(0.216179247281718, sol2, sol3)
               # Stage 4
               sol3 = np.array(0.193245318771018 * sol + 0.199385926238509 * sol1 + 0.607368754990473 * sol2)
-              sol2, rhs = computeUpdate(0.229141351401419, sol2, sol3)
+              sol2 = computeUpdate(0.229141351401419, sol2, sol3)
               # Stage 5
               sol3 = np.array(0.108173740702208 * sol1 + 0.891826259297792 * sol2)
-              sol, rhs = computeUpdate(0.336458325509300, sol2, sol3)
+              sol = computeUpdate(0.336458325509300, sol2, sol3)
               
-              return sol, rhs
+              return sol
        
        def RK64_NL(sol):
               # Stage 1
-              omega, rhs = computeUpdate(0.032918605146, sol, 0.0)
+              omega = computeUpdate(0.032918605146, sol, 0.0)
               sol += omega
               # Stage 2
-              omega, rhs = computeUpdate(1.0, sol, -0.737101392796 * omega)
+              omega = computeUpdate(1.0, sol, -0.737101392796 * omega)
               sol += 0.8232569982 * omega
               # Stage 3
-              omega, rhs = computeUpdate(1.0, sol, -1.634740794341 * omega)
+              omega = computeUpdate(1.0, sol, -1.634740794341 * omega)
               sol += 0.3815309489 * omega
               # Stage 4
-              omega, rhs = computeUpdate(1.0, sol, -0.744739003780 * omega)
+              omega = computeUpdate(1.0, sol, -0.744739003780 * omega)
               sol += 0.200092213184 * omega
               # Stage 5
-              omega, rhs = computeUpdate(1.0, sol, -1.469897351522 * omega)
+              omega = computeUpdate(1.0, sol, -1.469897351522 * omega)
               sol += 1.718581042715 * omega
               # Stage 6
-              omega, rhs = computeUpdate(1.0, sol, -2.813971388035 * omega)
-              sol += 0,27 * omega
+              omega = computeUpdate(1.0, sol, -2.813971388035 * omega)
+              sol += 0.27 * omega
               # Stage 7
-              sol, rhs = computeUpdate(1.0 - 0.847252983783, sol, sol)
+              sol = computeUpdate(1.0 - 0.847252983783, sol, sol)
               
               # third output is a factor on DT: T_new = T_old + 0.85 * DT
               # this integrator does not move a whole time step...
-              return sol, rhs
+              return sol
        
        def ketcheson62(sol):
               m = 5
@@ -234,20 +217,20 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
               c1 = 1.0 / 6.0
               c2 = 1.0 / 15.0
               
-              sol, rhs = computeUpdate(c1, sol, sol)
+              sol = computeUpdate(c1, sol, sol)
               sol1 = np.array(sol)
                      
               for ii in range(4):
-                     sol, rhs = computeUpdate(c1, sol, sol)
+                     sol = computeUpdate(c1, sol, sol)
                      
               # Compute stage 6 with linear combination
               sol1 = np.array(0.6 * sol1 + 0.4 * sol)
-              sol, rhs = computeUpdate(c2, sol, sol1)
+              sol = computeUpdate(c2, sol, sol1)
               
               for ii in range(3):
-                     sol, rhs = computeUpdate(c1, sol, sol)
+                     sol= computeUpdate(c1, sol, sol)
                      
-              return sol, rhs
+              return sol
        
        def ketcheson104(sol):
               # Ketchenson, 2008 10.1137/07070485X
@@ -269,23 +252,21 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DLS, DXD, DZD, TOPT, \
               return sol
 
        #%% THE MAIN TIME INTEGRATION STAGES
-       
+
        # Compute dynamics update
        if order == 2:
-              solf, rhsf = ketcheson62(sol0)
+              solB = ketcheson62(sol0)
        elif order == 3:
-              #solf, rhsf = ketcheson93(sol0)
-              #solf = kinnGray53(sol0)
-              solf, rhsf = ssprk53_Opt(sol0)
+              #solB, rhsDyn, resDyn = ketcheson93(sol0)
+              #solB, rhsDyn, resDyn = RK64_NL(sol0)
+              solB = ssprk53_Opt(sol0)
        elif order == 4:
-              solf = ketcheson104(sol0)
+              solB = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
-              solf, rhsDyn = ketcheson62(sol0)
+              solB = ketcheson62(sol0)
        
        time += DT
-       DCF, resInv, rhsf, DTN = computeDCFUpdate(sol0, solf, rhs0, rhsf)
-              
        #input('End of time step. ' + str(time))
        
-       return solf, rhsf, time, resInv, DCF, DTN
+       return solB, time

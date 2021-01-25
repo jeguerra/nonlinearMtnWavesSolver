@@ -34,21 +34,6 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        # excluding corners at terrain boundary
        uldex2 = np.array(range(ubdex[0]+1, NZ))
        urdex2 = np.array(range(ubdex[-1]+1, OPS))
-              
-       wldex = np.add(uldex2, iW * OPS)
-       wrdex = np.add(urdex2, iW * OPS)
-       wbdex = np.add(ubdex, iW * OPS)
-       wtdex = np.add(utdex, iW * OPS)
-       
-       pldex = np.add(uldex2, iP * OPS)
-       prdex = np.add(urdex2, iP * OPS)
-       #pbdex = np.add(ubdex, iP * OPS)
-       #ptdex = np.add(utdex, iP * OPS)
-       
-       tldex = np.add(uldex2, iT * OPS)
-       trdex = np.add(urdex2, iT * OPS)
-       #tbdex = np.add(ubdex, iT * OPS)
-       #ttdex = np.add(utdex, iT * OPS)
        
        # Index all boundary DOF that can be diffused on
        latDex = np.unique(np.concatenate((uldex2,urdex2)))
@@ -58,58 +43,28 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        
        # BC indices for static solution (per variable)
        if bcType == 1:
-              # Inflow condition on kinematic variables
-              rowsOutU = set(uldex2)
-              rowsOutW = set(np.concatenate((uldex2,utdex)))
-              rowsOutP = set()
-              rowsOutT = set()
-              # Indexing for static solver
-              left = np.concatenate((uldex2, wldex))
-              top = wtdex
-              rowsOutBC_static = set(np.concatenate((left, top)))
-       elif bcType == 2:
-              # Pinned condition on kinematic variables
-              rowsOutU = set(np.concatenate((uldex2,urdex1)))
-              rowsOutW = set(np.concatenate((uldex2,urdex1,utdex)))
-              rowsOutP = set()
-              rowsOutT = set()
-               # Indexing for static solver
-              left = np.concatenate((uldex2, wldex))
-              right = np.concatenate((urdex2, wrdex))
-              top = wtdex
-              rowsOutBC_static = set(np.concatenate((left, right, top)))
-       elif bcType == 3:
-              # Inflow condition on UWPT
+              # Inflow condition on UWPT STATIC SOLUTION
               rowsOutU = set(uldex2)
               rowsOutW = set(np.concatenate((uldex2,utdex)))
               rowsOutP = set(uldex2)
               rowsOutT = set(uldex2)
               # Indexing for static solver
-              left = np.concatenate((uldex2, wldex, pldex, tldex))
-              top = wtdex
+              left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
+              top = utdex + iW*OPS
               rowsOutBC_static = set(np.concatenate((left, top)))
-       elif bcType == 4:
-              # Pinned condition on UWPT
-              rowsOutU = set(np.concatenate((uldex2,urdex2)))
-              rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
-              rowsOutP = set(np.concatenate((uldex2,urdex2)))
-              rowsOutT = set(np.concatenate((uldex2,urdex2)))
+       elif bcType == 2:
+              # Inflow condition on UWPT TRANSIENT SOLUTION
+              rowsOutU = set(uldex1)
+              rowsOutW = set(np.concatenate((uldex1,utdex)))
+              rowsOutP = set(uldex1)
+              rowsOutT = set(uldex1)
+              #rowsOutP = set(np.concatenate((uldex1,urdex1)))
+              #rowsOutT = set(np.concatenate((uldex1,urdex1)))
                # Indexing for static solver
-              left = np.concatenate((uldex2, wldex, pldex, tldex))
-              right = np.concatenate((urdex2, wrdex, prdex, trdex))
-              top = wtdex
-              rowsOutBC_static = set(np.concatenate((left, right, top)))
-       elif bcType == 5:
-              # Pinned condition on UWT
-              rowsOutU = set(np.concatenate((uldex2,urdex2)))
-              rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
-              rowsOutP = set()
-              rowsOutT = set(np.concatenate((uldex2,urdex2)))
-               # Indexing for static solver
-              left = np.concatenate((uldex2, wldex, tldex))
-              right = np.concatenate((urdex2, wrdex, trdex))
-              top = wtdex
-              rowsOutBC_static = set(np.concatenate((left, right, top)))
+              left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+              #right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iP*OPS, urdex1 + iT*OPS))
+              top = utdex + iW*OPS
+              rowsOutBC_static = set(np.concatenate((left, top)))
        
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
@@ -127,4 +82,4 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        sysDex = rowsAll.difference(rowsOutBC_static)
        sysDex = sorted(sysDex)
        
-       return uldex1, urdex1, ubdex, utdex, wbdex, ubcDex, wbcDex, pbcDex, tbcDex, rowsOutBC_transient, sysDex, diffDex
+       return uldex1, urdex1, ubdex, utdex, ubdex + iW*OPS, ubcDex, wbcDex, pbcDex, tbcDex, rowsOutBC_transient, sysDex, diffDex

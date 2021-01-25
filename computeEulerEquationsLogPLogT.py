@@ -12,26 +12,36 @@ import matplotlib.pyplot as plt
 
 def computeFieldDerivatives(q, DDX, DDZ):
        
+       #qv = np.reshape(q, (q.shape[0] * q.shape[1],1), order='F')
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
        
        return DqDx, DqDz
+       #return np.reshape(DqDx, q.shape, order='F'), np.reshape(DqDz, q.shape, order='F')
 
-def computeFieldDerivatives2(DqDx, DqDz, DQDZ, DDX, DDZ, DZDX):
+def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
+       
+       DQDZ = REFG[2]
+       D2QDZ2 = REFG[-1]
        
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
        PqPz = DqDz + DQDZ
+       
+       vd = np.hstack((PqPx, DqDz))
+       dvdx = DDX.dot(vd)
+       dvdz = DDZ.dot(vd)
 
-       D2qDx2 = DDX.dot(PqPx)
-       D2qDz2 = DDZ.dot(PqPz)
-       D2qDxz = DDZ.dot(PqPx)
+       D2qDz2 = dvdz[:,4:] #DDZ.dot(DqDz)
+       P2qPz2 = D2qDz2 + D2QDZ2
+       D2qDx2 = dvdx[:,0:4] #DDX.dot(PqPx)
        
-       return D2qDx2, D2qDz2, D2qDxz, PqPx, PqPz
+       P2qPzx = dvdz[:,0:4] #DDZ.dot(PqPx)
+       P2qPxz = dvdx[:,4:] - DZDX * D2qDz2 #DDX.dot(DqDz)
        
-def localDotProduct(arg):
-              res = arg[0].dot(arg[1])
-              return res
+       P2qPx2 = D2qDx2 - DZDX * P2qPzx
+       
+       return P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz
 
 def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        
@@ -241,18 +251,16 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Function evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
+def computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
        
-       # Get hydrostatic initial fields
-       DQDZ = REFG[2]
-       
        # Get the GML factors
        GMLX = REFG[0][1]
        GMLZ = REFG[0][2]
+       DQDZ = REFG[2]
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
@@ -289,11 +297,17 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
                      RdT_hat = 1.0 + T_ratio
                      RdT = RdT_bar * RdT_hat
        
-       # Compute transport terms
+       # Compute transport terms with stretching
+       ''' Advection with grid stretching
+       Uadvect = UM * GMLX.dot(DqDx)
+       Wadvect = WM * GMLZ.dot(DQDZ)
+       Tadvect = (WM - UM * DZDX) * GMLZ.dot(DqDz)
+       '''
+       #''' Advection without grid stretching
        Uadvect = UM * DqDx
        Wadvect = WM * DQDZ
        Tadvect = (WM - UM * DZDX) * DqDz
-       Tadvect[ebcDex[1],:] *= 0.0
+       #'''
         
        # Compute local divergence
        divergence = (DqDx[:,0] - DZDX[:,0] * DqDz[:,0]) + DqDz[:,1]
@@ -311,21 +325,15 @@ def computeEulerEquationsLogPLogT_NL(PHYS, REFG, DqDx, DqDz, DZDX, RdT_bar, fiel
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
        
-       # Enforce terrain condition to change in W
-       DqDt[ebcDex[1],1] = np.array(DZDX[ebcDex[1],0] * DqDt[ebcDex[1],0])
-       
        # Fix essential boundary conditions
-       DqDt[zeroDex[0],0] *= 0.0
-       DqDt[zeroDex[1],1] *= 0.0
-       DqDt[zeroDex[2],2] *= 0.0
-       DqDt[zeroDex[3],3] *= 0.0
-       
-       # Apply GML
-       '''
-       DqDt[:,0] = GMLX.dot(DqDt[:,0])
-       DqDt[:,1] = GMLX.dot(DqDt[:,1])
-       DqDt[:,1] = GMLZ.dot(DqDt[:,1])
-       '''                    
+       #'''
+       DqDt[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
+       DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
+       DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
+       DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
+       DqDt[ebcDex[1],1] = DZDX[ebcDex[1],0] * DqDt[ebcDex[1],0]
+       #'''
+                        
        return DqDt
 
 def computeRayleighTendency(REFG, fields, zeroDex):
@@ -337,41 +345,47 @@ def computeRayleighTendency(REFG, fields, zeroDex):
        DqDt = -mu * ROP.dot(fields)
        
        # Fix essential boundary conditions
-       DqDt[zeroDex[0],0] *= 0.0
-       DqDt[zeroDex[1],1] *= 0.0
-       DqDt[zeroDex[2],2] *= 0.0
-       DqDt[zeroDex[3],3] *= 0.0
+       #'''
+       DqDt[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
+       DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
+       DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
+       DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
+       #'''
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, PqPx, PqPz, D2qDx2, P2qPz2, P2qPxz, DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ):
+def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, DZDX, ebcDex, DX2, DZ2, DXZ, RHOI, DCF, DynSGS):
        
-       # Compute the 2nd partial derivative
-       P2qPx2 = D2qDx2 - DZDX * P2qPxz
-       
-       DqDt = np.zeros(D2qDx2.shape)
-       
+       DqDt = np.zeros(P2qPx2.shape)
+       '''
        # Diffusion of u-w vector
-       DqDt[:,0] = 2.0 * DX2 * P2qPx2[:,0] + DZ2 * P2qPz2[:,0] + DXZ * P2qPxz[:,1]       
+       DqDt[:,0] = 2.0 * DX2 * P2qPx2[:,0] + DZ2 * P2qPz2[:,0] + DXZ * P2qPzx[:,1]       
        DqDt[:,1] = DX2 * P2qPx2[:,1] + 2.0 * DZ2 * P2qPz2[:,1] + DXZ * P2qPxz[:,0]
        # Diffusion of scalars (broken up into anisotropic components)
        Pr = 0.71 / 0.4
-       DqDt[:,2] = DX2 * (P2qPx2[:,2] + np.square(PqPx[:,2])) + \
-                   DZ2 * (P2qPz2[:,2] + np.square(PqPz[:,2]))
-       #DqDt[:,2] = DX2 * (P2qPx2[:,2]) + \
-       #            DZ2 * (P2qPz2[:,2])
-       DqDt[:,3] = Pr * (DX2 * (P2qPx2[:,3] + np.square(PqPx[:,3])) + \
-                         DZ2 * (P2qPz2[:,3] + np.square(PqPz[:,3])))
-       #DqDt[:,3] = Pr * (DX2 * (P2qPx2[:,3]) + \
-       #                  DZ2 * (P2qPz2[:,3]))
+       DqDt[:,2] = DX2 * (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2]) + \
+                   DZ2 * (P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
+       DqDt[:,3] = DX2 * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
+                   DZ2 * (P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3])
+       '''
+       if DynSGS:
+              DC = DCF[0]
+       else:
+              DC = DCF[1]
+              
+       # Diffusion of u-w vector
+       DqDt[:,0] = (2.0 * P2qPx2[:,0] + P2qPz2[:,0] + P2qPzx[:,1])      
+       DqDt[:,1] = (P2qPx2[:,1] + 2.0 * P2qPz2[:,1] + P2qPxz[:,0])
+       # Diffusion of scalars (broken up into anisotropic components
+       DqDt[:,2] = (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2] + P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
+       DqDt[:,3] = (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3] + P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3])
        
-       '''
-       # Fix essential boundary conditions
-       DqDt[zeroDex[0],0] *= 0.0
-       DqDt[zeroDex[1],1] *= 0.0
-       DqDt[zeroDex[2],2] *= 0.0
-       DqDt[zeroDex[3],3] *= 0.0
-       '''
-       DqDt[ebcDex[3],:] *= 0.0
+       # Scale and apply coefficients
+       DqDt *= (0.5 * 1.0 * DC)
+       Pr = 0.71 / 0.4
+       DqDt[:,3] *= 1.0*Pr
+       
+       # Fix essential boundary condition
+       DqDt[ebcDex[3],:] = np.zeros((len(ebcDex[3]),4))       
        
        return DqDt

@@ -37,19 +37,19 @@ class TestCase:
                             
                      self.setUserData(191, 86, 70.0, 22.0, 280.0, 
                                       7000.0, 10000.0, 1.0, \
-                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow')
+                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
                      self.setUserData(191, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow')
+                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -61,7 +61,7 @@ class TestCase:
                             
                      self.setUserData(191, 86, 75.0, 32.0, 300.0, \
                                       6000.0, 10000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow') 
+                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static') 
                             
               elif TestName == 'DiscreteStratScharIter':
                      # Newton iteration with discrete stratification
@@ -73,7 +73,7 @@ class TestCase:
                             
                      self.setUserData(191, 148, 75.0, 32.0, 300.0, \
                                       7000.0, 15000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_inflow')
+                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
               
               elif TestName == "CustomTest":
                      # Used for... testing purposes =)
@@ -86,7 +86,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(583, 100, 150, 42.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
-                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_inflow')
+                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
                      
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
