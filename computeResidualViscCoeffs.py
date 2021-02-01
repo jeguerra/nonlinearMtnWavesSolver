@@ -14,8 +14,6 @@ import bottleneck as bn
 def computeResidualViscCoeffs(RES, QM, VFLW, DX, DZ, DXD, DZD, DX2, DZ2):
        
        # Compute a filter length...
-       #DL = 0.5 * (DX + DZ)
-       #DL = DX * DZ
        DXZ = DXD * DZD
        DL = mt.sqrt(DXZ)
        
@@ -33,8 +31,7 @@ def computeResidualViscCoeffs(RES, QM, VFLW, DX, DZ, DXD, DZD, DX2, DZ2):
        QRES_MAX = DXZ * bn.nanmax(ARES, axis=1)
        
        # Compute flow speed plus sound speed coefficients
-       QMAX = DL * VFLW
-       #QMAX = bn.nanmax(DL * VWAV) # USE THE TOTAL MAX NORM
+       QMAX = 0.5 * DL * VFLW
        
        # Limit DynSGS to upper bound
        compare = np.stack((QRES_MAX, QMAX),axis=1)
@@ -42,16 +39,32 @@ def computeResidualViscCoeffs(RES, QM, VFLW, DX, DZ, DXD, DZD, DX2, DZ2):
 
        return (np.expand_dims(QRES_CF,1), np.expand_dims(QMAX,1))
 
-def computeFlowAccelerationCoeffs(RES, DT, U, W, DX, DZ):
+def computeCellAveragingOperator(DIMS):
        
-       ARES = np.abs(RES)
-              
-       QRESX = np.zeros((len(U), 4))
-       QRESZ = np.zeros((len(W), 4))
+       # Get the dimensions
+       NX = DIMS[3] + 1
+       NZ = DIMS[4]
+       OPS = NX * NZ
        
-       for vv in range(4):
-              # Compute the anisotropic coefficients
-              QRESX[:,vv] = (DX * DT) * ARES[0,vv]
-              QRESZ[:,vv] = (DZ * DT) * ARES[1,vv]
-
-       return (QRESX, QRESZ)
+       # Initialize matrix
+       CAM = np.zeros((OPS, OPS))
+       
+       # Compute edge indices
+       bdex = np.array(range(0, OPS, NZ))
+       tdex = np.array(range(NZ-1, OPS, NZ))
+       ldex = np.array(range(bdex[0], NZ))
+       rdex = np.array(range(bdex[-1], OPS))
+       
+       # Compute interior indices
+       adex = np.array(range(OPS))
+       
+       rowsAll = set(adex)
+       rowsInt = rowsAll.difference(set(np.concatenate(bdex, ldex, tdex, rdex)))
+       '''
+       # Loop over the rows (2D FORTRAN ORDER TARGET VECTOR)
+       stencil = []
+       for ii in ldex:
+              loc = range()
+              CAM[ii,]
+       '''      
+       return CAM

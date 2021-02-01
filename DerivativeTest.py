@@ -32,12 +32,11 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 #DDX_1D, HF_TRANS, dummy = derv.computeFourierDerivativeMatrix(DIMS)
 
 #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-DDX_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
+DDX_CFD, DDX2A_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], False)
 DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
 
 #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-DDZ_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
-DDZ2A_CFD = DDZ_CFD.dot(DDZ_CFD)
+DDZ_CFD, DDZ2A_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
 DDZ2B_CFD = derv.computeCompactFiniteDiffDerivativeMatrix2(DIMS, REFS[1])
 
 # COMPACT FINITE DIFF DERIVATIVE TEST
@@ -76,7 +75,7 @@ term1 = 8.0 * mt.pi * zv
 term2 = np.sin(4.0 * mt.pi * zv2)
 DY -= np.multiply(term1, term2);
     
-DYD = DDZ_1D.dot(Y)
+DYD = ZH * DDZ_1D.dot(Y)
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(zv, Y, label='Function')
 plt.plot(zv, DY, 'r-', label='Analytical Derivative')

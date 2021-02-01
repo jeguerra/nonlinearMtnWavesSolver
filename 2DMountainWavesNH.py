@@ -375,7 +375,7 @@ def runModel(TestName):
        DDX_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        # Turn on cubic spline derivatives...
-       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
+       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], False)
        DDZ_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
        
        # Update the REFS collection
@@ -511,9 +511,6 @@ def runModel(TestName):
        DDXM_D4, DDZM_D4 = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_D4, DDZ_D4)
        # Cubic Spline first derivative matrix
        DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
-       # Cubic Spline second derivative matrix
-       #DDXM2_CS, DDZM2_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
-       #DDXZM2_CS = DDZM_CS.dot(DDXM_CS)
        
        #DDXMA = 0.5 * (DDXMS + DDXM_CS)
        #DDZMA = 0.5 * (DDZMS + DDZM_CS)
@@ -1079,7 +1076,7 @@ def runModel(TestName):
                             
                             # Compute the RHS at the new time level
                             DqDx, DqDz = \
-                            eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
+                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
                                                                        REFS[15], REFS[9][0], fields, UD, WD, ebcDex, zeroDex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)

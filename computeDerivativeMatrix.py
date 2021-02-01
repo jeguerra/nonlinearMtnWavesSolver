@@ -71,6 +71,7 @@ def computeCubicSplineDerivativeMatrix(DIMS, dom, isClamped):
        D[N-1,N-1] = 1.0 / hn
               
        if isClamped:
+              # Use the CFD operator to set the boundary condition
               DDM_CFD = computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom)
               A[0,0] = C[0,0]
               A[0,1] = C[0,1]

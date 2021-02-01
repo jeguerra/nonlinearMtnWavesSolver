@@ -297,26 +297,25 @@ def computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fiel
                      RdT_hat = 1.0 + T_ratio
                      RdT = RdT_bar * RdT_hat
        
+       PqPx = DqDx - DZDX * DqDz
        # Compute transport terms with stretching
        ''' Advection with grid stretching
-       Uadvect = UM * GMLX.dot(DqDx)
-       Wadvect = WM * GMLZ.dot(DQDZ)
-       Tadvect = (WM - UM * DZDX) * GMLZ.dot(DqDz)
+       Uadvect = UM * GMLX.dot(PqPx)
+       Wadvect = WM * GMLZ.dot(DqDz + DQDZ)
        '''
        #''' Advection without grid stretching
-       Uadvect = UM * DqDx
-       Wadvect = WM * DQDZ
-       Tadvect = (WM - UM * DZDX) * DqDz
+       Uadvect = UM * PqPx
+       Wadvect = WM * (DqDz + DQDZ)
        #'''
         
        # Compute local divergence
-       divergence = (DqDx[:,0] - DZDX[:,0] * DqDz[:,0]) + DqDz[:,1]
+       divergence = PqPx[:,0] + DqDz[:,1]
        
        # Compute pressure gradient forces
-       pgradx = RdT * (DqDx[:,2] - DZDX[:,0] * DqDz[:,2])
+       pgradx = RdT * PqPx[:,2]
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
-       DqDt = -(Uadvect + Wadvect + Tadvect)
+       DqDt = -(Uadvect + Wadvect)
        # Horizontal momentum equation
        DqDt[:,0] -= pgradx
        # Vertical momentum equation
