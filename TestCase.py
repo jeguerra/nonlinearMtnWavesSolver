@@ -43,13 +43,13 @@ class TestCase:
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
                      self.setUserData(191, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
+                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'SmoothStratScharIter':
                      # Newton iteration with smooth stratification
@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(583, 100, 150, 42.0, 300.0, \
+                     self.setUserData(511, 108, 150.0, 42.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
                                       2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
                      
@@ -107,7 +107,7 @@ class TestCase:
               L2 = 1.0E+3 * XF # In 10s of km
               L1 = -L2
               ZH = 1.0E+3 * ZF # In km
-              OPS = (NX + 1) * NZ
+              OPS = (NX + 1) * (NZ + 1)
               iU = 0
               iW = 1
               iP = 2
@@ -147,7 +147,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 2.0 # hours
+              HR = 4.0 # hours
               rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator

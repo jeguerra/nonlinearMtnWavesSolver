@@ -54,6 +54,9 @@ localDir = '/home/jeg/scratch/' # Home super desktop
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 
+#import pnumpy as pnp
+#pnp.enable()
+
 def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
        
        # Make a figure of the temperature background
@@ -92,15 +95,16 @@ def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
 
        return       
 
-def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
+def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
        plt.close('all')
        plt.figure(figsize=(26.0, 18.0))
        for pp in range(numVar):
-              q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
-              dqdt = np.reshape(rhs[:,pp], (NZ, NX+1), order='F')
+              q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
+              dqdt = np.reshape(rhs[:,pp], (NZ+1, NX+1), order='F')
+              residual = np.reshape(res[:,pp], (NZ+1, NX+1), order='F')
               rowDex = 1 + 3*pp
               
-              # Plot of the full field
+              #%% Plot of the full field
               plt.subplot(4,3,rowDex)
               if np.abs(q.max()) > np.abs(q.min()):
                      clim = np.abs(q.max())
@@ -109,7 +113,7 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
               else:
                      clim = np.abs(q.max())
              
-              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 61, cmap=cm.seismic, vmin=-clim, vmax=clim)
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               #plt.xlim(-30.0, 30.0)
               #plt.ylim(0.0, 20.0)
@@ -130,29 +134,8 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
               else:
                      plt.title('ln-theta (K)')
                      
-              # Plot the terrain and level 1 response
+              #%% Plot the full tendencies
               plt.subplot(4,3,rowDex + 1)
-              plt.plot(1.0E-3*XL[0,:], q[0,:], 'r')
-              plt.plot(1.0E-3*XL[1,:], q[1,:], 'b--')
-              plt.legend(('z = h(x)', 'level 1'))
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-              
-              if pp < (numVar - 1):
-                     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-              else:
-                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-              
-              if pp == 0:
-                     plt.title('u (m/s)')
-              elif pp == 1:
-                     plt.title('w (m/s)')
-              elif pp == 2:
-                     plt.title('ln-p (Pa)')
-              else:
-                     plt.title('ln-theta (K)')
-                     
-              # Plot the full tendencies
-              plt.subplot(4,3,rowDex + 2)
               if np.abs(dqdt.max()) > np.abs(dqdt.min()):
                      clim = np.abs(dqdt.max())
               elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
@@ -160,7 +143,37 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
               else:
                      clim = np.abs(dqdt.max())
              
-              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 61, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+              #plt.xlim(-30.0, 30.0)
+              #plt.ylim(0.0, 20.0)
+              
+              if pp < (numVar - 1):
+                     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+              else:
+                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                     
+              plt.colorbar(ccheck, format='%.2e')
+              
+              if pp == 0:
+                     plt.title('du/dt (m/s2): ' + 'Time = {:.5f} (sec)'.format(thisTime))
+              elif pp == 1:
+                     plt.title('dw/dt (m/s2): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
+              elif pp == 2:
+                     plt.title('dln-p/dt (Pa/s)')
+              else:
+                     plt.title('dln-theta/dt (K/s)')
+                     
+              #%% Plot the full residuals
+              plt.subplot(4,3,rowDex + 2)
+              if np.abs(residual.max()) > np.abs(residual.min()):
+                     clim = np.abs(residual.max())
+              elif np.abs(residual.max()) < np.abs(residual.min()):
+                     clim = np.abs(residual.min())
+              else:
+                     clim = np.abs(residual.max())
+             
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, residual, 61, cmap=cm.seismic, vmin=-clim, vmax=clim)
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               #plt.xlim(-30.0, 30.0)
               #plt.ylim(0.0, 20.0)
@@ -304,8 +317,8 @@ def runModel(TestName):
               FourCheb = False
               
        # Set residual diffusion switch
-       ResDiff = thisTest.solType['DynSGS']
-       if ResDiff:
+       DynSGS = thisTest.solType['DynSGS']
+       if DynSGS:
               print('DynSGS Diffusion Model.')
        else:
               print('Flow-Dependent Diffusion Model.')
@@ -384,20 +397,6 @@ def runModel(TestName):
        
        #% Read in topography profile or compute from analytical function
        HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_1D)
-       
-       # Compute DX and DZ grid length scales
-       DX_min = 1.0 * np.min(np.abs(np.diff(REFS[0])))
-       DZ_min = 1.0 * np.min(np.abs(np.diff(REFS[1])))
-       print('Minimum grid lengths:',DX_min,DZ_min)
-       DX_avg = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
-       DZ_avg = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
-       print('Average grid lengths:',DX_avg,DZ_avg)
-       DX_max = 1.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ_max = 1.0 * np.max(np.abs(np.diff(REFS[1])))
-       print('Maximum grid lengths:',DX_max,DZ_max)
-       DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
-       DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
-       print('Wavelength grid lengths:',DX_wav,DZ_wav)
               
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
@@ -406,6 +405,21 @@ def runModel(TestName):
               coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX, StaticSolve)
        # USE UNIFORM STRETCHING
        #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       
+       
+       # Compute DX and DZ grid length scales
+       DX_min = 1.0 * np.min(np.abs(DXM))
+       DZ_min = 1.0 * np.min(np.abs(DZM))
+       print('Minimum grid lengths:',DX_min,DZ_min)
+       DX_avg = 1.0 * np.mean(np.abs(DXM))
+       DZ_avg = 1.0 * np.mean(np.abs(DZM))
+       print('Average grid lengths:',DX_avg,DZ_avg)
+       DX_max = 1.0 * np.max(np.abs(DXM))
+       DZ_max = 1.0 * np.max(np.abs(DZM))
+       print('Maximum grid lengths:',DX_max,DZ_max)
+       DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
+       DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
+       print('Wavelength grid lengths:',DX_wav,DZ_wav)
        
        # Update the REFS collection
        REFS.append(XL)
@@ -422,7 +436,7 @@ def runModel(TestName):
        # Index to interior of terrain boundary
        hdex = range(0,NX+1)
        # Index to the entire bottom boundary on U
-       uBotDex = np.array(range(0, OPS, NZ))
+       uBotDex = np.array(range(0, OPS, NZ+1))
        
        #%% MAKE THE INITIAL/BACKGROUND STATE
        # Map the sounding to the computational vertical 2D grid [0 H]
@@ -501,10 +515,10 @@ def runModel(TestName):
        del(GML)
        
        #%% DIFFERENTIATION OPERATORS
-       
+       #'''
        # Quality control on derivative matrices
-       #DDX_1D[np.isclose(DDX_1D, 0.0, atol=1.0E-15)] = 0.0
-       #DDZ_1D[np.isclose(DDZ_1D, 0.0, atol=1.0E-15)] = 0.0
+       #DDX_1D[np.isclose(DDX_1D, 0.0, atol=1.0E-14)] = 0.0
+       #DDZ_1D[np.isclose(DDZ_1D, 0.0, atol=1.0E-14)] = 0.0
        
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        # 4th order compact finite difference (Gamet, 1999)
@@ -512,8 +526,6 @@ def runModel(TestName):
        # Cubic Spline first derivative matrix
        DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
        
-       #DDXMA = 0.5 * (DDXMS + DDXM_CS)
-       #DDZMA = 0.5 * (DDZMS + DDZM_CS)
        '''
        DDXM = sps.bmat([[DDXMS, None, None, None], \
                      [None, DDXMS, None, None], \
@@ -554,30 +566,53 @@ def runModel(TestName):
        REFG.append(D2QDZ2)
        
        if not StaticSolve:
-              # Time stepping grid lengths
-              '''
-              DX = DX_min
-              DZ = DZ_min
-              # Diffusion grid lengths
-              DXD = 1.0 * DX_avg#np.reshape(DXM, (OPS,), order='F') #1.0 * DX_avg
-              DZD = 1.0 * DZ_avg#np.reshape(DZM, (OPS,), order='F') #1.0 * DZ_avg
-              '''
+              NL = 5 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
-              PPXMS = DDXMS - sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr') * DDZMS
-              DX_spr = 1.0 / np.abs(spl.eigs(PPXMS[np.ix_(ubdex,ubdex)], k=1, which='LM', return_eigenvectors=False))
-              DZ_spr = 1.0 / np.abs(spl.eigs(DDZMS[np.ix_(uldex[1:],uldex[1:])], k=1, which='LM', return_eigenvectors=False))
-              print('Spectral radii of 1st derivative matrices: ', DX_spr, DZ_spr)
-              DX = 1.0 * DX_spr[0]
-              DZ = 1.0 * DZ_spr[0]
-              DXD = 1.0 * DX_avg
-              DZD = 1.0 * DZ_avg
+              minDex = np.argmax(REFS[7][0,:])
+              SIGMA = sps.diags(REFS[7][:,minDex])
+              PPXMS = (DDXMS - DZDX[:,0] * DDZMS).astype(dtype=np.double)
+              PPZMS = SIGMA.dot(DDZ_1D.astype(dtype=np.double))
+              
+              DX_eig = spl.eigs(PPXMS[np.ix_(ubdex,ubdex)], k=2, which='LM', return_eigenvectors=False)
+              #DX_eig = spl.eigs(DDX_1D.astype(dtype=np.double), k=10, which='LM', return_eigenvectors=False)
+              DZ_eig = spl.eigs(PPZMS, k=NL, which='LM', return_eigenvectors=False)
+              
+              print('Eigenvalues (largest magnitude) of derivative matrices:')
+              print('X: ', DX_eig)
+              print('Z: ', DZ_eig)
+              
+              print('Eigenvalues with largest real part:')
+              DZ_eig = spl.eigs(PPZMS, k=NL, which='LR', return_eigenvectors=False)
+              print('Z: ', DZ_eig)
+              
+              DX_spr = np.reciprocal(np.abs(DX_eig))
+              DZ_spr = np.reciprocal(np.abs(DZ_eig))
+              
+              print('Singular values of derivative matrices:')
+              ss = sps.linalg.svds(PPXMS[np.ix_(ubdex,ubdex)], k=NL, return_singular_vectors=False)
+              print('X: ', ss)
+              ss = sps.linalg.svds(PPZMS, k=NL, return_singular_vectors=False)
+              print('Z: ', ss)
+              
+              print('Grid resolution based on 1st derivative matrices: ')
+              print('X: ', DX_spr)
+              print('Z: ', DZ_spr)
+              # Diffusion grid lengths based on resolution power
+              DXD = 1.0 * DX_spr[0]
+              DZD = 1.0 * DZ_spr[0]
+              #'''
+              
+              del(PPXMS); del(PPZMS)
               
               DX2 = DXD * DXD
               DZ2 = DZD * DZD
               DXZ = DXD * DZD
               
-              DLS = min(DX, DZ)
+              # Smallest physical grid spacing in the 2D mesh
+              DX = DX_min
+              DZ = DZ_min
+              DLS = 1.0 * min(DX, DZ)
               #'''
               
        del(DDXMS); del(DDXM_D4); del(DDXM_CS)
@@ -919,7 +954,7 @@ def runModel(TestName):
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
               
               # Initialize damping coefficients
-              DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
+              DCF = (np.zeros((OPS,)), np.zeros((OPS,)))
               
               # Initialize vertical velocity
               fields[ubdex,1] = -dWBC
@@ -938,15 +973,14 @@ def runModel(TestName):
                             rdex = 140
                             fname = 'transientNL0.nc'
                             m_fid = Dataset(fname, 'r', format="NETCDF4")
+                            thisTime = m_fid.variables['t'][rdex]
                             fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
                             fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
                             fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:], (OPS,), order='F')
                             fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:], (OPS,), order='F')
                             
-                            DCF[0][:,0] = np.reshape(m_fid.variables['QRES'][rdex,:,:], (OPS,), order='F')
-                            DCF[1][:,0] = np.reshape(m_fid.variables['QMAX'][rdex,:,:], (OPS,), order='F')
-                            
-                            thisTime = m_fid.variables['t'][rdex]
+                            DCF[0][:,0] = np.reshape(m_fid.variables['CRES_X'][rdex,:,:], (OPS,), order='F')
+                            DCF[1][:,0] = np.reshape(m_fid.variables['CRES_Z'][rdex,:,:], (OPS,), order='F')
                      except:
                             print('Could NOT read restart NC file!', fname)       
               
@@ -961,9 +995,9 @@ def runModel(TestName):
                      m_fid = Dataset(fname, 'w', format="NETCDF4")
                      
               # Make dimensions
-              taxis = m_fid.createDimension('time', None)
-              xaxis = m_fid.createDimension('xlon', NX+1)
-              zaxis = m_fid.createDimension('zlev', NZ)
+              m_fid.createDimension('time', None)
+              m_fid.createDimension('xlon', NX+1)
+              m_fid.createDimension('zlev', NZ+1)
               # Create variables (time and grid)
               tmvar = m_fid.createVariable('t', 'f8', ('time',))
               xgvar = m_fid.createVariable('XL', 'f8', ('zlev', 'xlon'))
@@ -976,9 +1010,9 @@ def runModel(TestName):
               PVAR = m_fid.createVariable('LNP', 'f8', ('zlev', 'xlon'))
               TVAR = m_fid.createVariable('LNT', 'f8', ('zlev', 'xlon'))
               # Store variables
-              UVAR[:] = np.reshape(hydroState[:,0], (NZ,NX+1), order='F')
-              PVAR[:] = np.reshape(hydroState[:,2], (NZ,NX+1), order='F')
-              TVAR[:] = np.reshape(hydroState[:,3], (NZ,NX+1), order='F')
+              UVAR[:] = np.reshape(hydroState[:,0], (NZ+1,NX+1), order='F')
+              PVAR[:] = np.reshape(hydroState[:,2], (NZ+1,NX+1), order='F')
+              TVAR[:] = np.reshape(hydroState[:,3], (NZ+1,NX+1), order='F')
               # Create variables (transient fields)
               uvar = m_fid.createVariable('u', 'f8', ('time', 'zlev', 'xlon'))
               wvar = m_fid.createVariable('w', 'f8', ('time', 'zlev', 'xlon'))
@@ -990,8 +1024,8 @@ def runModel(TestName):
               dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
               dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
               # Create variables (diffusion coefficients)
-              dvar0 = m_fid.createVariable('QRES', 'f8', ('time', 'zlev', 'xlon'))
-              dvar1 = m_fid.createVariable('QMAX', 'f8', ('time', 'zlev', 'xlon'))
+              dvar0 = m_fid.createVariable('CRES_X', 'f8', ('time', 'zlev', 'xlon'))
+              dvar1 = m_fid.createVariable('CRES_Z', 'f8', ('time', 'zlev', 'xlon'))
               
               # Initialize local sound speed and time step
               #'''
@@ -1020,7 +1054,11 @@ def runModel(TestName):
                             error = [np.linalg.norm(rhsVec)]
                             
                             prevFields = np.array(fields)
+                            old2Fields = np.array(fields)
                             prevRhsVec = np.array(rhsVec)
+                            resVec = np.zeros(fields.shape)
+                            del(fields)
+                            del(rhsVec)
                      else:
                             isFirstStep = False
                             
@@ -1035,9 +1073,18 @@ def runModel(TestName):
                             tmvar[ff-1] = thisTime
                             # Check the fields or tendencies
                             for pp in range(numVar):
-                                   q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
-                                   dqdt = np.reshape(rhsVec[:,pp], (NZ, NX+1), order='F')
-                                   
+                                   #DqDx, DqDz = \
+                                   #eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
+                                   q = np.reshape(solFields[:,pp], (NZ+1, NX+1), order='F')
+                                   #dqdt = np.reshape(prevRhsVec[:,pp], (NZ+1, NX+1), order='F')
+                                   dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
+                                   '''
+                                   gc = PHYS[0]
+                                   kap = PHYS[4]
+                                   earg = kap * prevFields[:,2] + prevFields[:,3]
+                                   T_ratio = np.expm1(earg, dtype=np.longdouble)
+                                   RdT = (REFS[9][0]) * (T_ratio + 1.0)
+                                   '''
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
@@ -1047,15 +1094,16 @@ def runModel(TestName):
                                    elif pp == 2:
                                           pvar[ff-1,:,:] = q
                                           dpvar[ff-1,:,:] = dqdt
+                                          #dpvar[ff-1,:,:] = np.reshape(RdT, (NZ+1, NX+1), order='F')
                                    else:
                                           tvar[ff-1,:,:] = q
                                           dtvar[ff-1,:,:] = dqdt
                                           
-                            dvar0[ff-1,:,:] = np.reshape(DCF[0][:,0], (NZ, NX+1), order='F')
-                            dvar1[ff-1,:,:] = np.reshape(DCF[1][:,0], (NZ, NX+1), order='F')
+                            dvar0[ff-1,:,:] = np.reshape(DCF[0], (NZ+1, NX+1), order='F')
+                            dvar1[ff-1,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
                                           
                             if makePlots:
-                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, NX, NZ, numVar)
+                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, prevFields, prevRhsVec, resVec, NX, NZ, numVar)
                                    
                             ff += 1
                             
@@ -1071,8 +1119,11 @@ def runModel(TestName):
                             # Compute flow speed
                             UD = fields[:,0] + hydroState[:,0]
                             WD = fields[:,1]
-                            vel = np.stack((UD, WD),axis=1)
-                            VFLW = np.linalg.norm(vel, axis=1)
+                            
+                            # Compute sound speed
+                            T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
+                            RdT = REFS[9][0] * (1.0 + T_ratio)
+                            VSND = np.sqrt(PHYS[6] * RdT)
                             
                             # Compute the RHS at the new time level
                             DqDx, DqDz = \
@@ -1082,17 +1133,14 @@ def runModel(TestName):
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
                             
                             # Compute residual
-                            dqdt = (1.0 / TOPT[0]) * (fields - prevFields)
+                            dqdt = (0.5 / TOPT[0]) * (3.0 * fields - 4.0 * prevFields + old2Fields)
                             resVec = dqdt - 0.5 * (rhsVec + prevRhsVec)
                             
                             # Compute DynSGS or Flow Dependent diffusion coefficients
-                            QM = bn.nanmax(np.abs(fields - bn.nanmean(fields)), axis=0)
-                            DCF = rescf.computeResidualViscCoeffs(resVec, QM, VFLW, DX, DZ, DXD, DZD, DX2, DZ2)
-                            
-                            # Compute sound speed
-                            T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
-                            RdT = REFS[9][0] * (1.0 + T_ratio)
-                            VSND = np.sqrt(PHYS[6] * RdT)
+                            Q = fields# + hydroState
+                            QS = Q - bn.nanmean(Q, axis=0)
+                            QM = bn.nanmax(np.abs(QS), axis=0)
+                            DCF = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
                             
                             # Compute new time step based on updated sound speed
                             DTN = DLS / bn.nanmax(VSND)
@@ -1102,11 +1150,12 @@ def runModel(TestName):
                             prevRhsVec = rhsVec
                             
                             # Update the local time step
+                            thisTime += TOPT[0]
                             TOPT[0] = DTN
                      except:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             m_fid.close() 
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, resVec, NX, NZ, numVar)
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, solFields, rhsVec, resVec, NX, NZ, numVar)
                             sys.exit(2)
                      #'''
                      ti += 1
@@ -1143,10 +1192,10 @@ def runModel(TestName):
               rdb.close()
        
        #%% Recover the solution (or check the residual)
-       uxz = np.reshape(SOLT[udex,0], (NZ,NX+1), order='F') 
-       wxz = np.reshape(SOLT[wdex,0], (NZ,NX+1), order='F')
-       pxz = np.reshape(SOLT[pdex,0], (NZ,NX+1), order='F') 
-       txz = np.reshape(SOLT[tdex,0], (NZ,NX+1), order='F')
+       uxz = np.reshape(SOLT[udex,0], (NZ+1,NX+1), order='F') 
+       wxz = np.reshape(SOLT[wdex,0], (NZ+1,NX+1), order='F')
+       pxz = np.reshape(SOLT[pdex,0], (NZ+1,NX+1), order='F') 
+       txz = np.reshape(SOLT[tdex,0], (NZ+1,NX+1), order='F')
        
        #%% Make some plots for static or transient solutions
        if makePlots:
@@ -1226,7 +1275,7 @@ def runModel(TestName):
                             qdex = pdex
                      else:
                             qdex = tdex
-                     dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
+                     dqdt = np.reshape(RHS[qdex], (NZ+1, NX+1), order='F')
                      ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
                      plt.colorbar(ccheck, format='%+.3E')
                      plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
@@ -1235,7 +1284,7 @@ def runModel(TestName):
               plt.show()
               
               # Check W at the boundaries...
-              dwdt = np.reshape(RHS[wdex], (NZ, NX+1), order='F')
+              dwdt = np.reshape(RHS[wdex], (NZ+1, NX+1), order='F')
               return (XL, ZTL, dwdt)
        
 if __name__ == '__main__':

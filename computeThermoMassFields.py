@@ -38,7 +38,9 @@ def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex, isGivenValue, DP):
        
        return DOP
 
-def computePfromSensibleT(DDZ, TZ, AC, P0, N):
+def computePfromSensibleT(DDZ, TZ, AC, P0):
+       N = len(TZ)
+       
        # Solves for lnP_bar so set the constant of integration
        lnP0 = mt.log(P0)
        
@@ -64,14 +66,14 @@ def computePfromSensibleT(DDZ, TZ, AC, P0, N):
        bdex = range(0,NE)
        
        # Compute the forcing due to matching at the model top
-       f = -dpdZ_H / DDZ[N-1,N-1] * DDZ[:,N-1]
+       f = -dpdZ_H / DDZ[NE,NE] * DDZ[:,NE]
        F = np.add(tempBarI, f)
        # Solve the system for lnP
        ln_pBar[idex] = AC * lan.solve(DOPS, F[1:NE])
        
        # Compute and set the value at the top that satisfies the BC
-       dPdZ_partial = np.dot(DDZ[N-1,bdex], ln_pBar[bdex])
-       ln_pBar[N-1] = (dpdZ_H - dPdZ_partial) / DDZ[N-1,N-1]
+       dPdZ_partial = np.dot(DDZ[NE,bdex], ln_pBar[bdex])
+       ln_pBar[NE] = (dpdZ_H - dPdZ_partial) / DDZ[NE,NE]
                               
        #%% Reconstruct hydrostatic pressure p from p^K
        ln_pBar += lnP0
@@ -123,7 +125,7 @@ def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
 
 def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform):
        # Get DIMS data
-       NZ = DIMS[4]
+       NZ = DIMS[4]+1
        
        # Get physical constants (dry air)
        gc = PHYS[0]
@@ -156,7 +158,7 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform):
        else:
               if TempType == 'sensible':
                      AC = - gc / Rd
-                     PZ, LPZ = computePfromSensibleT(DDZ, TZ, AC, P0, NZ)
+                     PZ, LPZ = computePfromSensibleT(DDZ, TZ, AC, P0)
                      # Recover vertical gradient in log pressure
                      dlnPdz = AC * np.reciprocal(TZ)
                      # Recover potential temperature background

@@ -71,7 +71,7 @@ axc = plt.subplot(1,3,3)
 axc.set_axis_off()
 fig.colorbar(ccheck, fraction=1.0)
 plt.tight_layout()
-plt.savefig('ScharTestComparisonW.png')
+plt.savefig('ScharTestComparisonW.pdf')
 
 
 #%% Make plot for iterative solution to 250m Schar problem
@@ -138,4 +138,4 @@ plt.xlabel('Newton Iteration')
 plt.ylabel('L2-norm of Residual')
 plt.title('Total Residual Convergence')
 plt.tight_layout()
-plt.savefig('ScharTestNewtonW.png')
+plt.savefig('ScharTestNewtonW.pdf')

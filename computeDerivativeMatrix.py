@@ -10,6 +10,7 @@ import numpy as np
 import math as mt
 from HerfunChebNodesWeights import hefuncm, hefunclb
 from HerfunChebNodesWeights import chebpolym, cheblb
+from HerfunChebNodesWeights import lgfuncm, lgfunclb
 
 def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex):
        # D2A is the operator to adjust
@@ -73,17 +74,34 @@ def computeCubicSplineDerivativeMatrix(DIMS, dom, isClamped):
        if isClamped:
               # Use the CFD operator to set the boundary condition
               DDM_CFD = computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom)
-              A[0,0] = C[0,0]
-              A[0,1] = C[0,1]
+              
+              # Left end
+              h0 = dom[1] - dom[0]
+              A[0,0] = -2.0 * h0 / 3.0
+              A[0,1] = h0 / 6.0
+              # Use derivative by CFD
               B[0,:] = DDM_CFD[0,:]
-              B[0,0] -= D[0,0]
-              B[0,1] -= D[0,1]
+              # Use derivative by O1 diff
+              #B[0,:] = np.zeros(N)
+              #B[0,0] = -1.0 / h0
+              #B[0,1] = 1.0 / h0
+              
+              B[0,0] -= -1.0 / h0
+              B[0,1] -= 1.0 / h0
+              
+              # Right end
               hn = dom[N-1] - dom[N-2]
-              A[N-1,N-2] = hn / 6.0
-              A[N-1,N-1] = hn / 3.0
+              A[N-1,N-2] = -hn / 6.0
+              A[N-1,N-1] = 2.0 * hn / 3.0
+              # Use derivative by CFD
               B[N-1,:] = DDM_CFD[N-1,:]
-              B[N-1,N-2] += 1.0 / hn
-              B[N-1,N-1] += -1.0 / hn
+              # Use derivative by O1 diff
+              #B[N-1,:] = np.zeros(N)
+              #B[N-1,N-2] = -1.0 / hn
+              #B[N-1,N-1] = 1.0 / hn
+              
+              B[N-1,N-2] -= -1.0 / hn
+              B[N-1,N-1] -= 1.0 / hn
               
        if isClamped:
               AIB = np.linalg.solve(A, B)
@@ -124,8 +142,7 @@ def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):
               LDM[ii,ii-1] = d * hm
               LDM[ii,ii] = -(hp * (a + c) + hm * (d - b))
               LDM[ii,ii+1] = c * hp
-              
-       # Handle the left and right boundaries
+                     # Handle the left and right boundaries
        LDM[0,0] = 1.0
        LDM[N-1,N-1] = 1.0
        
@@ -237,19 +254,19 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        W = np.diag(whf, k=0)
        
        # Compute the coefficients of spectral derivative in matrix form
-       SDIFF = np.zeros((NX+2,NX+1));
+       SDIFF = np.zeros((NX+2,NX+1))
        SDIFF[0,1] = mt.sqrt(0.5)
-       SDIFF[NX,NX-1] = -mt.sqrt(NX * 0.5);
-       SDIFF[NX+1,NX] = -mt.sqrt((NX + 1) * 0.5);
+       SDIFF[NX,NX-1] = -mt.sqrt(NX * 0.5)
+       SDIFF[NX+1,NX] = -mt.sqrt((NX + 1) * 0.5)
                      
        for rr in range(1,NX):
-              SDIFF[rr,rr+1] = mt.sqrt((rr + 1) * 0.5);
-              SDIFF[rr,rr-1] = -mt.sqrt(rr * 0.5);
+              SDIFF[rr,rr+1] = mt.sqrt((rr + 1) * 0.5)
+              SDIFF[rr,rr-1] = -mt.sqrt(rr * 0.5)
               
        # Hermite function spectral transform in matrix form
-       STR_H = (HT.T).dot(W)
+       STR_H = HT.dot(W)
        # Hermite function spatial derivative based on spectral differentiation
-       temp = (HTD).dot(SDIFF)
+       temp = (HTD.T).dot(SDIFF)
        temp = temp.dot(STR_H)
        DDM = b * temp
 
@@ -265,26 +282,26 @@ def computeChebyshevDerivativeMatrix(DIMS):
        xi, wcp = cheblb(NZ)
    
        # Get the Chebyshev transformation matrix
-       CT = chebpolym(NZ-1, -xi)
+       CT = chebpolym(NZ+1, -xi)
    
        # Make a diagonal matrix of weights
        W = np.diag(wcp)
    
        # Compute scaling for the forward transform
-       S = np.eye(NZ)
+       S = np.eye(NZ+1)
    
-       for ii in range(NZ - 1):
+       for ii in range(NZ):
               temp = W.dot(CT[:,ii])
               temp = ((CT[:,ii]).T).dot(temp)
               S[ii,ii] = temp ** (-1)
 
-       S[NZ-1,NZ-1] = 1.0 / mt.pi
+       S[NZ,NZ] = 1.0 / mt.pi
    
        # Compute the spectral derivative coefficients
-       SDIFF = np.zeros((NZ,NZ))
-       SDIFF[NZ-2,NZ-1] = 2.0 * NZ
+       SDIFF = np.zeros((NZ+1,NZ+1))
+       SDIFF[NZ-1,NZ] = 2.0 * NZ
    
-       for ii in reversed(range(NZ - 2)):
+       for ii in reversed(range(NZ - 1)):
               A = 2.0 * (ii + 1)
               B = 1.0
               if ii > 0:
@@ -297,11 +314,15 @@ def computeChebyshevDerivativeMatrix(DIMS):
     
        # Chebyshev spectral transform in matrix form
        temp = CT.dot(W)
-       STR_C = S.dot(temp);
+       STR_C = S.dot(temp)
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
        temp = (CT).dot(SDIFF)
        DDM = -(2.0 / ZH) * temp.dot(STR_C)
+       
+       #print(xi)
+       #print(DDM[0,0], -(2.0 * NZ**2 + 1) / 3.0 / ZH)
+       #print(DDM[-1,-1], (2.0 * NZ**2 + 1) / 3.0 / ZH)
 
        return DDM, STR_C
 
@@ -319,60 +340,46 @@ def computeFourierDerivativeMatrix(DIMS):
        
        return DDM, DFT
 
-def computeChebyshevDerivativeMatrix_X(DIMS):
+def computeLaguerreDerivativeMatrix(DIMS):
        
        # Get data from DIMS
-       #ZH = DIMS[2]
-       #NZ = DIMS[4]
+       ZH = DIMS[2]
+       NZ = DIMS[4]
        
-       # Get data from DIMS
-       L1 = DIMS[0]
-       L2 = DIMS[1]
-       NX = DIMS[3]
+       xi, wlf = lgfunclb(NZ)
+       LT = lgfuncm(NZ, xi, True)
        
-       ZH = abs(L2 - L1)
-       NZ = NX + 1
+       # Get the scale factor
+       b = np.amax(xi) / abs(ZH)
        
-       # Initialize grid and make column vector
-       xi, wcp = cheblb(NZ)
-   
-       # Get the Chebyshev transformation matrix
-       CTD = chebpolym(NZ-1, -xi)
-   
        # Make a diagonal matrix of weights
-       W = np.diag(wcp)
+       W = np.diag(wlf, k=0)
+       '''
+       # Compute scaling for the forward transform (for alpha != 0)
+       S = np.eye(NZ+1)
    
-       # Compute scaling for the forward transform
-       S = np.eye(NZ)
-   
-       for ii in range(NZ - 1):
-              temp = W.dot(CTD[:,ii])
-              temp = ((CTD[:,ii]).T).dot(temp)
+       for ii in range(NZ):
+              temp = W.dot(CT[:,ii])
+              temp = ((CT[:,ii]).T).dot(temp)
               S[ii,ii] = temp ** (-1)
 
-       S[NZ-1,NZ-1] = 1.0 / mt.pi
-   
+       S[NZ,NZ] = 1.0 / mt.pi
+       '''
        # Compute the spectral derivative coefficients
-       SDIFF = np.zeros((NZ,NZ))
-       SDIFF[NZ-2,NZ-1] = 2.0 * NZ
-   
-       for ii in reversed(range(NZ - 2)):
-              A = 2.0 * (ii + 1)
-              B = 1.0
-              if ii > 0:
-                     c = 1.0
-              else:
-                     c = 2.0
-            
-              SDIFF[ii,:] = B / c * SDIFF[ii+2,:]
-              SDIFF[ii,ii+1] = A / c
-    
-       # Chebyshev spectral transform in matrix form
-       temp = CTD.dot(W)
-       STR_C = S.dot(temp);
-       # Chebyshev spatial derivative based on spectral differentiation
-       # Domain scale factor included here
-       temp = (CTD).dot(SDIFF)
-       DDM = - (2.0 / ZH) * temp.dot(STR_C);
+       SDIFF = np.zeros((NZ+1,NZ+1))
+       SDIFF[NZ,NZ] = -0.5
+                   
+       for rr in reversed(range(NZ)):
+              SDIFF[rr,rr+1] = -0.5
+              SDIFF[rr,rr] = -0.5
+              SDIFF[rr,:] += SDIFF[rr+1,:]
+              
+       # Hermite function spectral transform in matrix form
+       STR_L = LT.dot(W)
+       # Hermite function spatial derivative based on spectral differentiation
+       temp = (LT.T).dot(SDIFF)
+       temp = temp.dot(STR_L)
+       DDM = b * temp
+
+       return DDM, STR_L
        
-       return DDM, STR_C

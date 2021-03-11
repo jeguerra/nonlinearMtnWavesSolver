@@ -43,7 +43,7 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NZ = DIMS[4] + 1
        
        # input REFS = [x, z, HFM, whf, CPM, wcp]
        x = REFS[0]
@@ -53,21 +53,21 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
        HTZL, dummy = np.meshgrid(hx / ZH,z)
        XL, ZL = np.meshgrid(x,z)
        
+       # Make the global array of terrain height and slope features
+       ZTL = np.zeros((NZ,NX))
+       DZT = np.zeros((NZ,NX))
+       
        # High Order Improved Guellrich coordinate 3 parameter function
        xi = 1.0 / ZH * ZL
        ang = 1.0 / 3.0 * mt.pi * xi
        dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang, StaticSolve)
        
-       dxidz = 1.0 + (HTZL * d_dzdh_dxi)
-       sigma = np.reciprocal(dxidz)
-       
-       # Make the global array of terrain height and slope features
-       ZTL = np.zeros((NZ,NX))
-       DZT = np.zeros((NZ,NX))
-       
        for rr in range(NZ):
               ZTL[rr,:] = (dzdh[rr,0] * hx) + ZL[rr,:]
               DZT[rr,:] = dzdh[rr,0] * dhdx
+       
+       dxidz = 1.0 + (HTZL * d_dzdh_dxi)
+       sigma = np.reciprocal(dxidz)
               
        #plt.plot(z, dzdh[:,0])
        
@@ -79,16 +79,8 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
        ZRL = (dzdh * hx) + zRay
        
        # Compute the local grid lengths at each node
-       DXM = np.zeros((NZ,NX))
-       DZM = np.zeros((NZ,NX))
-       
-       for ii in range(NZ):
-              xdiff = np.diff(XL[ii,:])
-              DXM[ii,:] = np.concatenate((np.expand_dims(xdiff[0],0), xdiff)) 
-       
-       for jj in range(NX):
-              zdiff = np.diff(ZTL[:,jj])
-              DZM[:,jj] = np.concatenate((np.expand_dims(zdiff[0],0), zdiff)) 
+       DXM = np.gradient(XL, np.arange(XL.shape[1]), axis=1, edge_order=1)
+       DZM = np.gradient(ZTL, np.arange(ZTL.shape[0]), axis=0, edge_order=1)
        
        return XL, ZTL, DZT, sigma, ZRL, DXM, DZM
 
@@ -96,7 +88,7 @@ def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NZ = DIMS[4] + 1
        
        # Get REFS data
        x = REFS[0]

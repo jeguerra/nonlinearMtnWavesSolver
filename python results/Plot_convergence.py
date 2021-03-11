@@ -14,9 +14,9 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 # Read in the text file
-#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence025m_discrete.txt'
+fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence025m_discrete.txt'
 #fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence025m_classical.txt'
-fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence250m_classical.txt'
+#fname = '/media/jeg/FastDATA/linearMtnWavesSolver/python results/convergence250m_classical.txt'
 
 con_data = np.loadtxt(fname, delimiter=', ')
 
@@ -54,4 +54,6 @@ plt.legend(('u', 'w', 'log-p', 'log-theta'))
 plt.xlabel('Newton Iteration')
 plt.title('Convergence per Variable')
 
+plt.tight_layout()
+plt.savefig('convergence025m_discrete.pdf')
 plt.show()

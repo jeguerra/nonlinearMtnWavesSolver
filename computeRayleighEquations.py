@@ -22,7 +22,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        L2 = DIMS[1]
        ZH = DIMS[2]
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NZ = DIMS[4] + 1
        
        RP = 4
        GP = 2
@@ -164,8 +164,8 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        
        # Get DIMS data
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
-       OPS = NX * NZ
+       NZ = DIMS[4] + 1
+       OPS = DIMS[5]
        
        # Set up the Rayleigh field
        GML, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, \

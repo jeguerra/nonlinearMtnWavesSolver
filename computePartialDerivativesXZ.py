@@ -12,8 +12,8 @@ import scipy.sparse as sps
 def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        # Get the dimensions
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
-       OPS = NX * NZ
+       NZ = DIMS[4] + 1
+       OPS = DIMS[5]
        
        # Get REFS data
        sigma = REFS[7]

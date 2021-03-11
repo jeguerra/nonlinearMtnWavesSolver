@@ -10,9 +10,9 @@ import numpy as np
 
 def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        # Get DIMS data
-       NX = DIMS[3]
-       NZ = DIMS[4]
-       OPS = (NX+1) * NZ
+       #NX = DIMS[3] + 1
+       NZ = DIMS[4] + 1
+       OPS = DIMS[5]
        
        # All DOF per variable
        rowsAll = set(np.array(range(0,OPS)))

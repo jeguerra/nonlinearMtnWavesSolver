@@ -12,7 +12,7 @@ import HerfunChebNodesWeights as hcnw
 
 def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NZ = DIMS[4] + 1
        
        # Interpolate the nominal column profile to TF Chebyshev grid
        if TypeInt == '1DtoTerrainFollowingCheb':
@@ -35,7 +35,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      xi = 1.0 * ((2.0 / zpan * thisZ) - 1.0)
                      
                      # Get the Chebyshev matrix for this column
-                     CTM = hcnw.chebpolym(NZ-1, -xi)
+                     CTM = hcnw.chebpolym(NZ, -xi)
                      
                      # Apply the interpolation
                      temp = (CTM).dot(fcoeffs)
@@ -62,7 +62,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      fcoeffs = CH_TRANS.dot(FLD[:,cc])
                      
                      # Get the Chebyshev matrix for this column
-                     CTM = hcnw.chebpolym(NZ-1, -xi)
+                     CTM = hcnw.chebpolym(NZ, -xi)
                      
                      # Apply the interpolation
                      temp = (CTM).dot(fcoeffs)

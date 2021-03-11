@@ -34,7 +34,7 @@ def computeHorizontalInterpHermite(NX, xint, FLD, HF_TRANS):
        #plt.plot(xi, HFM[0,:])
        
        # Apply the backward transforms
-       FLDI = HFM.dot(fcoeffs)
+       FLDI = (HFM.T).dot(fcoeffs)
        
        return FLDI.T
 
@@ -68,7 +68,7 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
        import HerfunChebNodesWeights as hcnw
                      
        # Interpolated field has a new size
-       FLDI = np.zeros((NZI, NX+1))
+       FLDI = np.zeros((NZI, NX))
        # Compute the new column reference grid (linear space)
        zint = np.linspace(-1.0, 1.0, num=NZI, endpoint=True)
        
@@ -78,7 +78,7 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               fcoeffs = CH_TRANS.dot(FLD[:,cc])
               
               # Get the Chebyshev matrix for this column
-              CTM = hcnw.chebpolym(NZ-1, -zint)
+              CTM = hcnw.chebpolym(NZ+1, -zint)
               
               # Apply the interpolation
               temp = (CTM).dot(fcoeffs)
@@ -87,10 +87,10 @@ def computeColumnInterp(NX, NZ, NZI, ZTL, FLD, CH_TRANS):
               
        return FLDI
 
-hdir = '/home/jeg/scratch/' # home desktop runs
-refName = 'restartDB'
-#hdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # runs done on Farm
-#refName = 'restartDB_exactBCSchar_025m'
+#hdir = '/home/jeg/scratch/' # home desktop runs
+#refName = 'restartDB'
+hdir = '/media/jeg/TransferDATA/Schar025m_tempest/' # runs done on Farm
+refName = 'restartDB_exactBCSchar_025m'
 tdir = '/media/jeg/TransferDATA/Schar025m_tempest/Schar025m/' # home desktop
 #tdir = '/Volumes/TransferDATA/Schar025m_tempest/' # Macbook Pro
 hresl = [1000, 500, 250, 125, 62]
@@ -129,12 +129,14 @@ for rr in hresl:
               refname = hdir + 'restartDB_exactBCSchar_025mP'
               
        rdb = shelve.open(refname, flag='r')
-       NX = rdb['NX']
-       NZ = rdb['NZ']
        SOLT = rdb['SOLT']
        REFS = rdb['REFS']
        PHYS = rdb['PHYS']
        DIMS = rdb['DIMS']
+       NX = len(REFS[0]) - 1
+       NZ = len(REFS[1]) - 1
+       OPS = len(REFS[0]) * len(REFS[1])
+       DIMS1 = (DIMS[0], DIMS[1], DIMS[2], NX, NZ, OPS)
        
        from BoussinesqSolSchar import ScharBoussinesqKlemp
        z *= max(REFS[1]) # convert to meters
@@ -142,22 +144,21 @@ for rr in hresl:
        
        # Get the Hermite and Chebyshev transforms
        if HermCheb:
-              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS1)
        else:
-              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
-       DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS1)
+       DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS1)
        
        # Get the reference vertical velocity (on the native HermCheb grid)
-       OPS = DIMS[5]
        fields = np.reshape(SOLT[:,0], (OPS, 4), order='F')
-       WREF = np.reshape(fields[:,1], (NZ, NX+1), order='F')
+       WREF = np.reshape(fields[:,1], (NZ+1, NX+1), order='F')
        
        # Interpolate to the Tempest grid
        ZTL = REFS[5]
        NXI = len(x)
        NZI = len(z)
 
-       WREFint = computeColumnInterp(NX, NZ, NZI, ZTL, WREF, CH_TRANS)
+       WREFint = computeColumnInterp(NX+1, NZ, NZI, ZTL, WREF, CH_TRANS)
        if HermCheb:
               WREFint = computeHorizontalInterpHermite(NX, np.array(x), WREFint, HF_TRANS)
        else:
@@ -232,6 +233,12 @@ for rr in hresl:
        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic))
        plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        
+       plt.tight_layout()
+       if rr == 500:
+              plt.savefig('Guerra2020Figure4a.pdf')
+       elif rr == 125:
+              plt.savefig('Guerra2020Figure4b.pdf')
+       
 wbcerr1 = np.array(wbcerr1)
 wbcerr2 = np.array(wbcerr2)
 wflerr1 = np.array(wflerr1)
@@ -273,4 +280,5 @@ plt.xlabel('Resolution (m)')
 plt.legend(('Spectral 24Hr','Spectral 48Hr','Spectral 72Hr'), loc='lower right')
 plt.grid(b=None, which='both', axis='both', color='k', linestyle='--', linewidth=0.5)
        
-       
+plt.tight_layout()
+plt.savefig('Guerra2020Figure5.pdf')
