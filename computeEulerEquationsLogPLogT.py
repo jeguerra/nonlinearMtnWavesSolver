@@ -297,17 +297,27 @@ def computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fiel
                      RdT_hat = 1.0 + T_ratio
                      RdT = RdT_bar * RdT_hat
        
+       # Compute W partial and advection
+       PwPx = DqDx[:,1] - DZDX[:,0] * DqDz[:,1]
+       Uadvect = UM[:,0] * PwPx
+       Wadvect = WM[:,0] * DqDz[:,1]
+       #'''
+       
+       # Adjust vertical pressure derivatives
+       RdTI = np.reciprocal(RdT)
+       DqDz[ebcDex[1],2] = RdTI[ebcDex[1]] * (gc * T_ratio[ebcDex[1]] - Uadvect[ebcDex[1]] - Wadvect[ebcDex[1]])
+       DqDz[ebcDex[2],2] = RdTI[ebcDex[2]] * (gc * T_ratio[ebcDex[2]])
+       
+       # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
-       # Compute transport terms with stretching
        ''' Advection with grid stretching
        Uadvect = UM * GMLX.dot(PqPx)
        Wadvect = WM * GMLZ.dot(DqDz + DQDZ)
        '''
-       #''' Advection without grid stretching
        Uadvect = UM * PqPx
        Wadvect = WM * (DqDz + DQDZ)
        #'''
-        
+       
        # Compute local divergence
        divergence = PqPx[:,0] + DqDz[:,1]
        
@@ -353,38 +363,47 @@ def computeRayleighTendency(REFG, fields, zeroDex):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, DZDX, ebcDex, DX2, DZ2, DXZ, RHOI, DCF, DynSGS):
+def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS):
        
        DqDt = np.zeros(P2qPx2.shape)
-       '''
-       # Diffusion of u-w vector
-       DqDt[:,0] = 2.0 * DX2 * P2qPx2[:,0] + DZ2 * P2qPz2[:,0] + DXZ * P2qPzx[:,1]       
-       DqDt[:,1] = DX2 * P2qPx2[:,1] + 2.0 * DZ2 * P2qPz2[:,1] + DXZ * P2qPxz[:,0]
-       # Diffusion of scalars (broken up into anisotropic components)
-       Pr = 0.71 / 0.4
-       DqDt[:,2] = DX2 * (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2]) + \
-                   DZ2 * (P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
-       DqDt[:,3] = DX2 * (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3]) + \
-                   DZ2 * (P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3])
-       '''
-       if DynSGS:
-              DC = DCF[0]
-       else:
-              DC = DCF[1]
-              
-       # Diffusion of u-w vector
-       DqDt[:,0] = (2.0 * P2qPx2[:,0] + P2qPz2[:,0] + P2qPzx[:,1])      
-       DqDt[:,1] = (P2qPx2[:,1] + 2.0 * P2qPz2[:,1] + P2qPxz[:,0])
-       # Diffusion of scalars (broken up into anisotropic components
-       DqDt[:,2] = (P2qPx2[:,2] + PqPx[:,2] * PqPx[:,2] + P2qPz2[:,2] + PqPz[:,2] * PqPz[:,2])
-       DqDt[:,3] = (P2qPx2[:,3] + PqPx[:,3] * PqPx[:,3] + P2qPz2[:,3] + PqPz[:,3] * PqPz[:,3])
        
-       # Scale and apply coefficients
-       DqDt *= (0.5 * 1.0 * DC)
-       Pr = 0.71 / 0.4
-       DqDt[:,3] *= 1.0*Pr
+       DC1 = DCF[0][:,0]
+       DC2 = DCF[1][:,0]
+            
+       #%% INTERIOR DIFFUSION
+       # Diffusion of u-w vector
+       DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPz2[:,0] + P2qPzx[:,1])      
+       DqDt[:,1] = DC1 * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2 * (2.0 * P2qPz2[:,1])
+       # Diffusion of scalars (broken up into anisotropic components
+       DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
+       DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
        
        # Fix essential boundary condition
-       DqDt[ebcDex[3],:] = np.zeros((len(ebcDex[3]),4))       
+       DqDt[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
+       DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
+       DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
+       DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
+                   
+       #%% TOP DIFFUSION (flow along top edge)
+       tdex = ebcDex[2]
+       DqDt[tdex,0] = 2.0 * DC1[tdex] * P2qPx2[tdex,0]
+       DqDt[tdex,2] = DC1[tdex] * P2qPx2[tdex,2]
+       DqDt[tdex,3] = DC1[tdex] * P2qPx2[tdex,3]
        
+       #%% BOTTOM DIFFUSION (flow along the terrain surface)
+       bdex = ebcDex[1]
+       DZDX2 = np.power(DZDX[bdex,0], 2.0)
+       S2 = DZDX2 + 1.0
+       S = np.power(S2, -0.5)
+       DCB = S * np.linalg.norm(np.stack((DC1[bdex], DZDX[bdex,0] * DC2[bdex])), axis=0)
+       
+       DqDt[bdex,0] = S * (2.0 * DC1[bdex] * P2qPx2[bdex,0])
+       DqDt[bdex,1] = DZDX[bdex,0] * DqDt[bdex,0]
+       DqDt[bdex,2] = DCB * S2 * (P2qPx2[bdex,2] + 2.0 * DZDX[bdex,0] * P2qPzx[bdex,2] + DZDX2 * P2qPz2[bdex,2])
+       DqDt[bdex,3] = DCB * S2 * (P2qPx2[bdex,3] + 2.0 * DZDX[bdex,0] * P2qPzx[bdex,3] + DZDX2 * P2qPz2[bdex,3])
+       
+       # Scale and apply coefficients
+       Pr = 0.71 / 0.4
+       DqDt[:,3] *= 1.0*Pr
+              
        return DqDt

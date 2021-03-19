@@ -137,7 +137,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
               RHOI = np.expand_dims(RdT * np.reciprocal(PZ), axis=1)
               
               rhs = tendency.computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      DZDX, ebcDex, DX2, DZ2, DXZ, RHOI, DCF, DynSGS)
+                                                      DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS)
        
               return rhs
        
@@ -265,8 +265,5 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketcheson62(sol0)
-       
-       time += DT
-       #input('End of time step. ' + str(time))
        
        return solB, time

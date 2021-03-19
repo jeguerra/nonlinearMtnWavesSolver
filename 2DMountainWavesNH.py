@@ -369,10 +369,37 @@ def runModel(TestName):
        Z_in = thisTest.Z_in
        T_in = thisTest.T_in
        
+       #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION CHEBYSHEV
+       DIM0 = (DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5])
+       REF0 = computeGrid(DIM0, HermCheb, FourCheb, True, False)
+       DDZP, CHT = derv.computeChebyshevDerivativeMatrix(DIM0)
+       REF0.append(DDZP)
+       REF0.append(DDZP)
+       DDXC, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIM0, REF0[0], False)
+       hx, dhx = computeTopographyOnGrid(REF0, HOPT, DDXC)
+       zRay = DIMS[2] - RLOPT[0]
+       
+       xl, ztl, dzt, sig, ZRL, DXM, DZM = \
+              coords.computeGuellrichDomain2D(DIM0, REF0, zRay, hx, dhx, StaticSolve)
+       
+       REF0.append(xl)
+       REF0.append(ztl)
+       REF0.append(dhx)
+       REF0.append(sig)
+       
+       tz, dtz, dtz2 = \
+              computeTemperatureProfileOnGrid(PHYS, REF0, Z_in, T_in, smooth3Layer, uniformStrat)
+              
+       dlpz, lpz, pz, dlptz, lpt, pt, rho = \
+              computeThermoMassFields(PHYS, DIM0, REF0, tz[:,0], dtz[:,0], 'sensible', uniformStrat)
+              
+       uz, duz = computeShearProfileOnGrid(REF0, JETOPS, PHYS[1], pz, dlpz, uniformWind, linearShear)
+       
        #%% SET UP THE GRID AND INDEX VECTORS
        #% Define the computational and physical grids+
        verticalChebGrid = True
-       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid)
+       verticalLagrGrid = False
+       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLagrGrid)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
        if HermCheb and not FourCheb:
@@ -383,6 +410,8 @@ def runModel(TestName):
               DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
               
        DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       #DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+       #DDZ_1D, CH_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
          
        # Turn on compact finite difference...
        DDX_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
@@ -405,7 +434,6 @@ def runModel(TestName):
               coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX, StaticSolve)
        # USE UNIFORM STRETCHING
        #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
-       
        
        # Compute DX and DZ grid length scales
        DX_min = 1.0 * np.min(np.abs(DXM))
@@ -438,27 +466,25 @@ def runModel(TestName):
        # Index to the entire bottom boundary on U
        uBotDex = np.array(range(0, OPS, NZ+1))
        
-       #%% MAKE THE INITIAL/BACKGROUND STATE
+       #%% MAKE THE INITIAL/BACKGROUND STATE ON COMPUTATIONAL GRID
        # Map the sounding to the computational vertical 2D grid [0 H]
        TZ, DTDZ, D2TDZ2 = \
               computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
 
+       '''
        # Compute background fields on the reference column
        dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
               computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], 'sensible', uniformStrat)
        
        # Read in or compute background horizontal wind profile
        U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, PHYS[1], PZ, dlnPdz, uniformWind, linearShear)
+       '''              
        
-       if verticalChebGrid:
-              interpolationType = '1DtoTerrainFollowingCheb'
-       else:
-              interpolationType = '1DtoTerrainFollowingCheb2Lin'
-       
+       interpolationType = '1DtoTerrainFollowingCheb'
        #% Compute the background gradients in physical 2D space
-       dUdz = np.expand_dims(dUdz, axis=1)
+       dUdz = np.expand_dims(duz, axis=1)
        DUDZ = np.tile(dUdz, NX+1)
-       DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, interpolationType)
+       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, 0, ZTL, DUDZ, CHT, interpolationType)
        # Compute thermodynamic gradients (no interpolation!)
        PORZ = PHYS[3] * TZ
        DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
@@ -476,15 +502,15 @@ def runModel(TestName):
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
        # Compute the background (initial) fields
-       U = np.expand_dims(U, axis=1)
+       U = np.expand_dims(uz, axis=1)
        UZ = np.tile(U, NX+1)
-       UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, interpolationType)
-       LPZ = np.expand_dims(LPZ, axis=1)
+       UZ = computeColumnInterp(DIM0, REF0[1], U, 0, ZTL, UZ, CHT, interpolationType)
+       LPZ = np.expand_dims(lpz, axis=1)
        LOGP = np.tile(LPZ, NX+1)
-       LOGP = computeColumnInterp(DIMS, REFS[1], LPZ, 0, ZTL, LOGP, CH_TRANS, interpolationType)
-       LPT = np.expand_dims(LPT, axis=1)
+       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, 0, ZTL, LOGP, CHT, interpolationType)
+       LPT = np.expand_dims(lpt, axis=1)
        LOGT = np.tile(LPT, NX+1)
-       LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, interpolationType)       
+       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, 0, ZTL, LOGT, CHT, interpolationType)       
        PBAR = np.exp(LOGP) # Hydrostatic pressure
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
@@ -513,6 +539,8 @@ def runModel(TestName):
        del(DLPDZ)
        del(DLPTDZ)
        del(GML)
+       del(REF0)
+       del(DIM0)
        
        #%% DIFFERENTIATION OPERATORS
        #'''
@@ -954,7 +982,7 @@ def runModel(TestName):
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
               
               # Initialize damping coefficients
-              DCF = (np.zeros((OPS,)), np.zeros((OPS,)))
+              DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
               
               # Initialize vertical velocity
               fields[ubdex,1] = -dWBC
@@ -1065,7 +1093,7 @@ def runModel(TestName):
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
                             message = ''
-                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
+                            err = displayResiduals(message, np.reshape(prevRhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
                      if ti % ITI == 0:
@@ -1075,16 +1103,10 @@ def runModel(TestName):
                             for pp in range(numVar):
                                    #DqDx, DqDz = \
                                    #eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
-                                   q = np.reshape(solFields[:,pp], (NZ+1, NX+1), order='F')
+                                   q = np.reshape(prevFields[:,pp], (NZ+1, NX+1), order='F')
                                    #dqdt = np.reshape(prevRhsVec[:,pp], (NZ+1, NX+1), order='F')
                                    dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
-                                   '''
-                                   gc = PHYS[0]
-                                   kap = PHYS[4]
-                                   earg = kap * prevFields[:,2] + prevFields[:,3]
-                                   T_ratio = np.expm1(earg, dtype=np.longdouble)
-                                   RdT = (REFS[9][0]) * (T_ratio + 1.0)
-                                   '''
+                                   
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
@@ -1094,7 +1116,6 @@ def runModel(TestName):
                                    elif pp == 2:
                                           pvar[ff-1,:,:] = q
                                           dpvar[ff-1,:,:] = dqdt
-                                          #dpvar[ff-1,:,:] = np.reshape(RdT, (NZ+1, NX+1), order='F')
                                    else:
                                           tvar[ff-1,:,:] = q
                                           dtvar[ff-1,:,:] = dqdt
@@ -1114,7 +1135,7 @@ def runModel(TestName):
                                                                     DX2, DZ2, DXZ,\
                                                                     TOPT, prevFields, hydroState, \
                                                                     zeroDex, ebcDex, \
-                                                                    ResDiff, DCF, thisTime, isFirstStep)
+                                                                    DynSGS, DCF, thisTime, isFirstStep)
                             
                             # Compute flow speed
                             UD = fields[:,0] + hydroState[:,0]
@@ -1140,12 +1161,16 @@ def runModel(TestName):
                             Q = fields# + hydroState
                             QS = Q - bn.nanmean(Q, axis=0)
                             QM = bn.nanmax(np.abs(QS), axis=0)
-                            DCF = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
+                            newDiff = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
+                            DCF[0][:,0] = newDiff[0]
+                            DCF[1][:,0] = newDiff[1]
+                            del(newDiff)
                             
                             # Compute new time step based on updated sound speed
                             DTN = DLS / bn.nanmax(VSND)
                             
                             # Store the new solution
+                            old2Fields = prevFields
                             prevFields = fields
                             prevRhsVec = rhsVec
                             
@@ -1155,7 +1180,7 @@ def runModel(TestName):
                      except:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             m_fid.close() 
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, solFields, rhsVec, resVec, NX, NZ, numVar)
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
                             sys.exit(2)
                      #'''
                      ti += 1

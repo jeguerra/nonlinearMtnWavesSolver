@@ -22,7 +22,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      return FLD
               
               # Interpolated field is of the same size as the original
-              FLDI = np.zeros((NZ, NX))
+              FLDI = np.zeros((len(ZTL[:,0]), NX))
               # Compute the total height of nominal column
               zpan = np.amax(zdata) - np.min(zdata)
               # Apply forward transform on the nominal column
@@ -34,11 +34,12 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      thisZ = ZTL[:,cc]
                      xi = 1.0 * ((2.0 / zpan * thisZ) - 1.0)
                      
-                     # Get the Chebyshev matrix for this column
+                     # Get the inverse matrix for this column
                      CTM = hcnw.chebpolym(NZ, -xi)
+                     #CTM, DTM = hcnw.legpolym(NZ-1, xi, True)
                      
                      # Apply the interpolation
-                     temp = (CTM).dot(fcoeffs)
+                     temp = CTM.dot(fcoeffs)
                      FLDI[:,cc] = np.ravel(temp)
                      
               return FLDI
@@ -61,11 +62,12 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      # Apply the forward transform at this column
                      fcoeffs = CH_TRANS.dot(FLD[:,cc])
                      
-                     # Get the Chebyshev matrix for this column
+                     # Get the inverse matrix for this column
                      CTM = hcnw.chebpolym(NZ, -xi)
+                     #CTM, DTM = hcnw.legpolym(NZ-1, xi, True)
                      
                      # Apply the interpolation
-                     temp = (CTM).dot(fcoeffs)
+                     temp = CTM.dot(fcoeffs)
                      FLDI[:,cc] = np.ravel(temp)
               
               return FLDI

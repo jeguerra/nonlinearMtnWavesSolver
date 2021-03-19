@@ -11,7 +11,7 @@ from numpy import multiply as mul
 import math as mt
 from scipy.special import roots_hermite
 from scipy.special import roots_genlaguerre
-#from scipy.special import roots_chebyt
+from scipy.special import roots_legendre
 #from scipy import linalg as las
 
 def lgfunclb(NX):
@@ -104,8 +104,8 @@ def hefuncm(NX, xi, fullMat):
        for nn in range(1,NX):
               polyn = mt.sqrt(2.0 / (nn+1)) * (xi * poly1)
               polyn -= mt.sqrt(nn / (nn+1)) * poly0
-              poly0 = poly1; 
-              poly1 = polyn;
+              poly0 = poly1
+              poly1 = polyn
               # Put the new function in its matrix place
               if fullMat:
                      HFM[nn+1,:] = polyn
@@ -141,3 +141,82 @@ def chebpolym(NM, xi):
               CTM[:,ii-2]
               
        return CTM
+
+def leglb(NZ):
+       # Compute LG nodes as initial guess
+       xlz, wl = roots_legendre(NZ)
+       xi = np.zeros(NZ+1)
+       xi[0] = -1.0
+       xi[-1] = 1.0
+       
+       #print('Zeros of LP:', xlz)
+       
+       NI = 10
+       kk = 1
+       # Compute interior zeros of DLP for LGL
+       for ii in range(1,len(xlz)):
+              # Initialize to between zeros of LP
+              xl = 0.5 * (xlz[ii] + xlz[ii-1])
+              # Loop over Newton iterations
+              for nn in range(NI):
+                     LN, DLN = legpolym(NZ, xl, False)
+                     xl -= (1.0 - xl**2) * DLN / (2.0 * xl * DLN - NZ * (NZ + 1) * LN)
+
+              xi[kk] = xl
+              kk += 1
+                   
+       #print('Zeros of DLP:', xi)
+       LN, DLN = legpolym(NZ, xi, False)
+       #print((1.0-np.power(xi,2.0)) * DLN)
+       
+       # Compute the weights
+       wl = 2.0 / (NZ * (NZ + 1)) * np.power(LN, -2.0)
+       
+       return xi, wl
+
+def legpolym(NM, xi, fullMat):
+       
+       try:
+              NX = len(xi)
+       except:
+              NX = 1
+       
+       # Initialize the polynomials and their derivatives
+       poly0 = np.ones(NX)
+       poly1 = xi
+       dpoly0 = np.zeros(NX)
+       dpoly1 = np.ones(NX)
+                        
+       # Initialize the output matrices if needed
+       if fullMat:
+              LTM = np.zeros((NX,NM+1))
+              LTM[0,:] = poly0
+              LTM[1,:] = poly1
+              DLTM = np.zeros((NX,NM+1))
+              DLTM[0,:] = dpoly0
+              DLTM[1,:] = dpoly1
+       
+       for nn in range(1,NM):
+              # Compute the new polynomial
+              polyn = (2 * nn + 1) / (nn + 1) * xi * poly1
+              polyn -= nn / (nn + 1) * poly0
+              # Compute the new polynomial derivative
+              dpolyn = (2 * nn + 1) * poly1 + dpoly0
+              # Set boundaries of derivative
+              #dpolyn[0] = 0.5 * (-1.0**(nn-1)) * nn * (nn + 1)
+              #dpolyn[-1] = 0.5 * (+1.0**(nn-1)) * nn * (nn + 1)
+              # Update polynomials
+              poly0 = poly1
+              poly1 = polyn
+              # Update polynomial derivatives
+              dpoly0 = dpoly1
+              dpoly1 = dpolyn
+              # Put the new function in its matrix place
+              if fullMat:
+                     LTM[nn+1,:] = polyn
+                     DLTM[nn+1,:] = dpolyn
+              else:
+                     LTM = polyn
+                     DLTM = dpolyn
+       
+       return LTM, DLTM

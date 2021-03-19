@@ -69,7 +69,7 @@ def computePfromSensibleT(DDZ, TZ, AC, P0):
        f = -dpdZ_H / DDZ[NE,NE] * DDZ[:,NE]
        F = np.add(tempBarI, f)
        # Solve the system for lnP
-       ln_pBar[idex] = AC * lan.solve(DOPS, F[1:NE])
+       ln_pBar[idex] = AC * lan.solve(DOPS, (F[1:NE]).astype(dtype=np.float64))
        
        # Compute and set the value at the top that satisfies the BC
        dPdZ_partial = np.dot(DDZ[NE,bdex], ln_pBar[bdex])
@@ -124,6 +124,7 @@ def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
        return pBar, ln_pBar
 
 def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform):
+       
        # Get DIMS data
        NZ = DIMS[4]+1
        

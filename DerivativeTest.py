@@ -151,3 +151,41 @@ print('Laguerre vertical derivative eigenvalues', DZ_eig)
 DDZM = DDZ_1D.astype(dtype=np.double)
 DZ_eig = spl.eigs(DDZM, k=12, which='LM', return_eigenvectors=False)
 print('Chebyshev vertical derivative eigenvalues', DZ_eig)
+
+#%% LEGENDRE FUNCTION DERIVATIVE TEST
+NZ = 64
+DIMS[-1] = NZ
+import HerfunChebNodesWeights as hcl
+xi, whf = hcl.leglb(NZ) #[0 inf]
+zv = ZH * (0.5 * (xi + 1.0))
+
+A = 5.0
+B = 3.0
+C = 4.0
+Y = C * np.exp(-A / ZH * zv) * np.sin(B * mt.pi / ZH * zv)
+DY = -(A * C) / ZH * np.exp(-A / ZH * zv) * np.sin(B * mt.pi / ZH * zv)
+DY += (B * C) * mt.pi / ZH * np.exp(-A / ZH * zv) * np.cos(B * mt.pi / ZH * zv)
+
+#DDZ_CFD, DDZ2A_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, zv, False)
+#DY = DDZ_CFD.dot(Y)
+
+DDZ_LG, LG_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+DYD_LG = DDZ_LG.dot(Y)
+
+plt.figure(figsize=(8, 6), tight_layout=True)
+plt.plot(zv, Y, label='Function')
+plt.plot(zv, DY, 'rs-', label='Analytical Derivative')
+plt.plot(zv, DYD_LG, 'k--', label='Spectral Derivative')
+plt.ylim([1.5*min(DY), 1.5*max(DY)])
+plt.xlabel('Domain')
+plt.ylabel('Functions')
+plt.title('Legendre Derivative Test')
+plt.grid(b=True, which='both', axis='both')
+plt.legend()
+plt.savefig("DerivativeTestZ_Legendre.png")
+
+#%% Report eigenvalues
+import scipy.sparse.linalg as spl
+DDZM = DDZ_LG.astype(dtype=np.double)
+DZ_eig = spl.eigs(DDZM, k=12, which='LM', return_eigenvectors=False)
+print('Legendre vertical derivative eigenvalues', DZ_eig)

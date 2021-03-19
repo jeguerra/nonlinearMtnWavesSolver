@@ -11,6 +11,7 @@ import math as mt
 from HerfunChebNodesWeights import hefuncm, hefunclb
 from HerfunChebNodesWeights import chebpolym, cheblb
 from HerfunChebNodesWeights import lgfuncm, lgfunclb
+from HerfunChebNodesWeights import legpolym, leglb
 
 def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex):
        # D2A is the operator to adjust
@@ -354,17 +355,7 @@ def computeLaguerreDerivativeMatrix(DIMS):
        
        # Make a diagonal matrix of weights
        W = np.diag(wlf, k=0)
-       '''
-       # Compute scaling for the forward transform (for alpha != 0)
-       S = np.eye(NZ+1)
-   
-       for ii in range(NZ):
-              temp = W.dot(CT[:,ii])
-              temp = ((CT[:,ii]).T).dot(temp)
-              S[ii,ii] = temp ** (-1)
-
-       S[NZ,NZ] = 1.0 / mt.pi
-       '''
+       
        # Compute the spectral derivative coefficients
        SDIFF = np.zeros((NZ+1,NZ+1))
        SDIFF[NZ,NZ] = -0.5
@@ -382,4 +373,49 @@ def computeLaguerreDerivativeMatrix(DIMS):
        DDM = b * temp
 
        return DDM, STR_L
+
+def computeLegendreDerivativeMatrix(DIMS):
+       
+       # Get data from DIMS
+       ZH = DIMS[2]
+       NZ = DIMS[4]
+       
+       xi, wlf = leglb(NZ)
+       LT, DLT = legpolym(NZ, xi, True)
+       
+       # Make a diagonal matrix of weights
+       W = np.diag(wlf, k=0)
+       
+       # Compute scaling for the forward transform
+       S = np.eye(NZ+1)
+   
+       for ii in range(NZ):
+              S[ii,ii] = ii + 0.5
+       S[NZ,NZ] = 0.5 * NZ
+       
+       # Compute the spectral derivative coefficients
+       SDIFF = np.zeros((NZ+1,NZ+1))
+       SDIFF[NZ,NZ] = 0.0
+       SDIFF[NZ-1,NZ] = (2 * NZ - 1)
+                   
+       for rr in reversed(range(1,NZ)):
+              A = (2 * rr - 1)
+              B = (2 * rr + 3)
+              SDIFF[rr-1,rr] = A
+              SDIFF[rr-1,:] += (A / B) * SDIFF[rr+1,:]
+              
+       # Legendre spectral transform in matrix form
+       temp = LT.dot(W)
+       STR_L = S.dot(temp)
+       # Legendre spatial derivative based on spectral differentiation
+       # Domain scale factor included here
+       #-(2.0 / ZH) * 
+       temp = (LT.T).dot(SDIFF)
+       DDM = (2.0 / ZH) * temp.dot(STR_L)
+       
+       #print(DDM[0,0], -NZ * (NZ + 1) / 2.0 / ZH)
+       #print(DDM[-1,-1], NZ * (NZ + 1) / 2.0 / ZH)
+       
+       return DDM, STR_L
+       
        
