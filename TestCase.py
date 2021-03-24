@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(523, 108, 150.0, 42.0, 300.0, \
+                     self.setUserData(563, 112, 150.0, 42.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
                                       2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
                      
@@ -152,8 +152,8 @@ class TestCase:
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 20.0 # Time for diagnostic output
-              ITI = 20.0 # Time for image output
+              OTI = 30.0 # Time for diagnostic output
+              ITI = 30.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]
        

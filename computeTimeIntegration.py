@@ -130,12 +130,12 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
        
        def computeRHSUpdate_diffusion(fields, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz):
               
-              # Compute sound speed
+              '''# Compute sound speed
               T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
               RdT = RdT_bar * (1.0 + T_ratio)
               PZ = np.exp(fields[:,2] + init0[:,2])
               RHOI = np.expand_dims(RdT * np.reciprocal(PZ), axis=1)
-              
+              '''
               rhs = tendency.computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                       DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS)
        

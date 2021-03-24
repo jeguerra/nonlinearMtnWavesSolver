@@ -96,8 +96,7 @@ def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
        return       
 
 def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
-       plt.close('all')
-       plt.figure(figsize=(26.0, 18.0))
+       fig = plt.figure(num=1, clear=True, figsize=(26.0, 18.0)) 
        for pp in range(numVar):
               q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
               dqdt = np.reshape(rhs[:,pp], (NZ+1, NX+1), order='F')
@@ -113,7 +112,7 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               else:
                      clim = np.abs(q.max())
              
-              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 61, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               #plt.xlim(-30.0, 30.0)
               #plt.ylim(0.0, 20.0)
@@ -130,9 +129,9 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               elif pp == 1:
                      plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
               elif pp == 2:
-                     plt.title('ln-p (Pa)')
+                     plt.title('(ln$p$)\' (Pa)')
               else:
-                     plt.title('ln-theta (K)')
+                     plt.title(r'(ln$\theta$)' + '\' (K)')
                      
               #%% Plot the full tendencies
               plt.subplot(4,3,rowDex + 1)
@@ -143,10 +142,8 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               else:
                      clim = np.abs(dqdt.max())
              
-              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 61, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-              #plt.xlim(-30.0, 30.0)
-              #plt.ylim(0.0, 20.0)
               
               if pp < (numVar - 1):
                      plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -160,9 +157,12 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               elif pp == 1:
                      plt.title('dw/dt (m/s2): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
               elif pp == 2:
-                     plt.title('dln-p/dt (Pa/s)')
+                     plt.title('d(ln$p$)\'' + '/dt' + ' (Pa/s)')
               else:
-                     plt.title('dln-theta/dt (K/s)')
+                     plt.title(r'd(ln$\theta$)' + '\'/dt' + ' (K/s)')
+                     
+              plt.xlim(-50.0, 50.0)
+              plt.ylim(0.0, 25.0)
                      
               #%% Plot the full residuals
               plt.subplot(4,3,rowDex + 2)
@@ -172,11 +172,14 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
                      clim = np.abs(residual.min())
               else:
                      clim = np.abs(residual.max())
-             
-              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, residual, 61, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              
+              if clim > 0.0:
+                     normr = 1.0 / clim
+              else:
+                     normr = 1.0
+                     
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, normr * residual, 101, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-              #plt.xlim(-30.0, 30.0)
-              #plt.ylim(0.0, 20.0)
               
               if pp < (numVar - 1):
                      plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -186,18 +189,23 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               plt.colorbar(ccheck, format='%.2e')
               
               if pp == 0:
-                     plt.title('du/dt (m/s2): ' + 'Time = {:.5f} (sec)'.format(thisTime))
+                     plt.title('SGS: u')
               elif pp == 1:
-                     plt.title('dw/dt (m/s2): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
+                     plt.title('SGS: w')
               elif pp == 2:
-                     plt.title('dln-p/dt (Pa/s)')
+                     plt.title('SGS: ' + '(ln$p$)\'')
               else:
-                     plt.title('dln-theta/dt (K/s)')
+                     plt.title('SGS: ' + r'(ln$\theta$)' + '\'')
+                     
+              plt.xlim(-50.0, 50.0)
+              plt.ylim(0.0, 25.0)
                      
        plt.tight_layout()
-       plt.show(block=False)
-       #plt.savefig('transient_diagnostic.png', format='png')
-              
+       #plt.show(block=False)
+       plt.savefig('/media/jeg/FastDATA/linearMtnWavesSolver/animations/transient' + '{:0>6d}'.format(int(thisTime)) +  '.pdf')
+       fig.clear()
+       del(fig)
+       
        return
 
 def displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex):
@@ -640,7 +648,7 @@ def runModel(TestName):
               # Smallest physical grid spacing in the 2D mesh
               DX = DX_min
               DZ = DZ_min
-              DLS = 1.0 * min(DX, DZ)
+              DLS = 1.5 * min(DX, DZ)
               #'''
               
        del(DDXMS); del(DDXM_D4); del(DDXM_CS)
@@ -1101,11 +1109,9 @@ def runModel(TestName):
                             tmvar[ff-1] = thisTime
                             # Check the fields or tendencies
                             for pp in range(numVar):
-                                   #DqDx, DqDz = \
-                                   #eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
                                    q = np.reshape(prevFields[:,pp], (NZ+1, NX+1), order='F')
-                                   #dqdt = np.reshape(prevRhsVec[:,pp], (NZ+1, NX+1), order='F')
-                                   dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
+                                   dqdt = np.reshape(prevRhsVec[:,pp], (NZ+1, NX+1), order='F')
+                                   #dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
                                    
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q

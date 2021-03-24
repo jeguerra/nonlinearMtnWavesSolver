@@ -377,12 +377,6 @@ def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, D
        # Diffusion of scalars (broken up into anisotropic components
        DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
        DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
-       
-       # Fix essential boundary condition
-       DqDt[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
-       DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
-       DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
-       DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
                    
        #%% TOP DIFFUSION (flow along top edge)
        tdex = ebcDex[2]
@@ -392,18 +386,28 @@ def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, D
        
        #%% BOTTOM DIFFUSION (flow along the terrain surface)
        bdex = ebcDex[1]
+       dhx = DZDX[bdex,0]
        DZDX2 = np.power(DZDX[bdex,0], 2.0)
        S2 = DZDX2 + 1.0
+       S4 = np.power(S2, 2.0)
        S = np.power(S2, -0.5)
-       DCB = S * np.linalg.norm(np.stack((DC1[bdex], DZDX[bdex,0] * DC2[bdex])), axis=0)
+       DCB = S * np.linalg.norm(np.stack((DC1[bdex], dhx * DC2[bdex])), axis=0)
        
-       DqDt[bdex,0] = S * (2.0 * DC1[bdex] * P2qPx2[bdex,0])
-       DqDt[bdex,1] = DZDX[bdex,0] * DqDt[bdex,0]
-       DqDt[bdex,2] = DCB * S2 * (P2qPx2[bdex,2] + 2.0 * DZDX[bdex,0] * P2qPzx[bdex,2] + DZDX2 * P2qPz2[bdex,2])
-       DqDt[bdex,3] = DCB * S2 * (P2qPx2[bdex,3] + 2.0 * DZDX[bdex,0] * P2qPzx[bdex,3] + DZDX2 * P2qPz2[bdex,3])
+       D2qDx2 = P2qPx2[bdex,:] + DZDX[bdex,:] * P2qPzx[bdex,:]
+       DqDt[bdex,0] = 2.0 * DC1[bdex] * S4 * D2qDx2[:,0]
+       DqDt[bdex,0] += DC1[bdex] * S2 * D2qDx2[:,1]
+       DqDt[bdex,1] = 2.0 * DC2[bdex] * S2 * D2qDx2[:,1]
+       DqDt[bdex,2] = DCB * S2 * D2qDx2[:,2]
+       DqDt[bdex,3] = DCB * S2 * D2qDx2[:,3]
        
        # Scale and apply coefficients
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr
+       
+       # Fix essential boundary condition
+       DqDt[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
+       DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
+       DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
+       DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
               
        return DqDt
