@@ -304,9 +304,11 @@ def computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fiel
        #'''
        
        # Adjust vertical pressure derivatives
+       bdex = ebcDex[1]
+       tdex = ebcDex[2]
        RdTI = np.reciprocal(RdT)
-       DqDz[ebcDex[1],2] = RdTI[ebcDex[1]] * (gc * T_ratio[ebcDex[1]] - Uadvect[ebcDex[1]] - Wadvect[ebcDex[1]])
-       DqDz[ebcDex[2],2] = RdTI[ebcDex[2]] * (gc * T_ratio[ebcDex[2]])
+       DqDz[bdex,2] = RdTI[bdex] * (gc * T_ratio[bdex] - Uadvect[bdex] - Wadvect[bdex])
+       DqDz[tdex,2] = RdTI[tdex] * (gc * T_ratio[tdex])
        
        # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
@@ -340,7 +342,8 @@ def computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fiel
        DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
        DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
        DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
-       DqDt[ebcDex[1],1] = DZDX[ebcDex[1],0] * DqDt[ebcDex[1],0]
+       #DqDt[ebcDex[1],1] = DZDX[ebcDex[1],0] * DqDt[ebcDex[1],0]
+       DqDt[bdex,1] = np.zeros(len(bdex))
        #'''
                         
        return DqDt
@@ -363,8 +366,10 @@ def computeRayleighTendency(REFG, fields, zeroDex):
        
        return DqDt
 
-def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS):
+def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS):
        
+       DZDX = REFS[15]
+       DZDX2 = REFS[16]
        DqDt = np.zeros(P2qPx2.shape)
        
        DC1 = DCF[0][:,0]
@@ -387,18 +392,23 @@ def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, D
        #%% BOTTOM DIFFUSION (flow along the terrain surface)
        bdex = ebcDex[1]
        dhx = DZDX[bdex,0]
-       DZDX2 = np.power(DZDX[bdex,0], 2.0)
-       S2 = DZDX2 + 1.0
+       d2hx = DZDX2[bdex,0]
+       dhx2 = np.power(dhx, 2.0)
+       S2 = dhx2 + 1.0
        S4 = np.power(S2, 2.0)
        S = np.power(S2, -0.5)
+       #DCB = DC1[bdex]
        DCB = S * np.linalg.norm(np.stack((DC1[bdex], dhx * DC2[bdex])), axis=0)
        
-       D2qDx2 = P2qPx2[bdex,:] + DZDX[bdex,:] * P2qPzx[bdex,:]
-       DqDt[bdex,0] = 2.0 * DC1[bdex] * S4 * D2qDx2[:,0]
-       DqDt[bdex,0] += DC1[bdex] * S2 * D2qDx2[:,1]
-       DqDt[bdex,1] = 2.0 * DC2[bdex] * S2 * D2qDx2[:,1]
-       DqDt[bdex,2] = DCB * S2 * D2qDx2[:,2]
-       DqDt[bdex,3] = DCB * S2 * D2qDx2[:,3]
+       DqDt[bdex,0] = DCB * S * (2.0 * P2qPx2[bdex,0])
+       #DqDt[bdex,0] *= S
+       DqDt[bdex,1] = np.zeros(len(bdex))
+       
+       DqDt[bdex,2] = DCB * S2 * (P2qPx2[bdex,2] + 2.0 * dhx * P2qPzx[bdex,2] + dhx2 * P2qPz2[bdex,2])
+       DqDt[bdex,2] += DCB * S4 * d2hx * (dhx * PqPx[bdex,2] + (1.0 + 2.0 * dhx) * PqPz[bdex,2])
+       
+       DqDt[bdex,3] = DCB * S2 * (P2qPx2[bdex,3] + 2.0 * dhx * P2qPzx[bdex,3] + dhx2 * P2qPz2[bdex,3])
+       DqDt[bdex,3] += DCB * S4 * d2hx * (dhx * PqPx[bdex,3] + (1.0 + 2.0 * dhx) * PqPz[bdex,3])
        
        # Scale and apply coefficients
        Pr = 0.71 / 0.4
@@ -409,5 +419,6 @@ def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, D
        DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
        DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
        DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
+       #DqDt[bdex,1] = dhx * DqDt[bdex,0]
               
        return DqDt

@@ -594,6 +594,7 @@ def runModel(TestName):
        REFS.append(DZT)
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
+       REFS.append(DDXM_CS.dot(DZDX))
        
        # Compute and store the 2nd derivatives of background quantities
        D2QDZ2 = DDZM_CS.dot(DQDZ)
@@ -1116,6 +1117,13 @@ def runModel(TestName):
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
+                                          fig = plt.figure(figsize=(6.0, 4.0)) 
+                                          plt.plot(1.0E-3*XL[0,:], q[0,:], 'k')
+                                          plt.xlim(-25.0, 25.0)
+                                          plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                                          plt.title('Minimum: {:.2f}'.format(np.amin(q[0,:])))
+                                          plt.show()
+                                          del(fig)
                                    elif pp == 1:
                                           wvar[ff-1,:,:] = q
                                           dwvar[ff-1,:,:] = dqdt
@@ -1183,10 +1191,12 @@ def runModel(TestName):
                             # Update the local time step
                             thisTime += TOPT[0]
                             TOPT[0] = DTN
-                     except:
+                     except Exception as e:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             m_fid.close() 
                             makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
+                            import traceback
+                            traceback.print_exc()
                             sys.exit(2)
                      #'''
                      ti += 1

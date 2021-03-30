@@ -68,6 +68,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
        #DQDZ = REFG[2]
        #DQDZ = GMLZ.dot(REFG[2])
        DZDX = REFS[15]
+       #DZDX2 = REFS[16]
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
@@ -137,7 +138,7 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
               RHOI = np.expand_dims(RdT * np.reciprocal(PZ), axis=1)
               '''
               rhs = tendency.computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      DZDX, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS)
+                                                      REFS, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS)
        
               return rhs
        
