@@ -986,6 +986,11 @@ def runModel(TestName):
        #%% Transient solutions       
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
+              
+              T_DynSGS = True
+              R_DynSGS = False
+              DynSGS_E = True
+              DynSGS_N = False
                             
               # Reshape main solution vectors and initialize
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
@@ -1117,6 +1122,7 @@ def runModel(TestName):
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
+                                          '''
                                           fig = plt.figure(figsize=(6.0, 4.0)) 
                                           plt.plot(1.0E-3*XL[0,:], q[0,:], 'k')
                                           plt.xlim(-25.0, 25.0)
@@ -1124,6 +1130,7 @@ def runModel(TestName):
                                           plt.title('Minimum: {:.2f}'.format(np.amin(q[0,:])))
                                           plt.show()
                                           del(fig)
+                                          '''
                                    elif pp == 1:
                                           wvar[ff-1,:,:] = q
                                           dwvar[ff-1,:,:] = dqdt
@@ -1168,14 +1175,27 @@ def runModel(TestName):
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
                             
                             # Compute residual
-                            dqdt = (0.5 / TOPT[0]) * (3.0 * fields - 4.0 * prevFields + old2Fields)
-                            resVec = dqdt - 0.5 * (rhsVec + prevRhsVec)
+                            if R_DynSGS:
+                                   dqdt = (0.5 / TOPT[0]) * (3.0 * fields - 4.0 * prevFields + old2Fields)
+                                   resVec = dqdt - 0.5 * (rhsVec + prevRhsVec)
+                            
+                            if T_DynSGS:
+                                   resVec = np.array(rhsVec)
                             
                             # Compute DynSGS or Flow Dependent diffusion coefficients
-                            Q = fields# + hydroState
-                            QS = Q - bn.nanmean(Q, axis=0)
-                            QM = bn.nanmax(np.abs(QS), axis=0)
-                            newDiff = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
+                            #Q = fields# + hydroState
+                            #QS = Q - bn.nanmean(Q, axis=0)
+                            #QM = bn.nanmax(np.abs(QS), axis=0)
+                            QM = bn.nanmax(np.abs(fields), axis=0)
+                            
+                            if DynSGS_E:
+                                   # implementation with local image filter
+                                   filtType = 'maximum'
+                                   newDiff = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2, filtType)
+                            
+                            if DynSGS_N:
+                                   newDiff = rescf.computeResidualViscCoeffs2(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2)
+                            
                             DCF[0][:,0] = newDiff[0]
                             DCF[1][:,0] = newDiff[1]
                             del(newDiff)
@@ -1191,7 +1211,7 @@ def runModel(TestName):
                             # Update the local time step
                             thisTime += TOPT[0]
                             TOPT[0] = DTN
-                     except Exception as e:
+                     except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             m_fid.close() 
                             makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)

@@ -11,7 +11,7 @@ import numpy as np
 import bottleneck as bn
 from scipy import ndimage
 
-def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS):
+def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, filtType):
        #'''
        # Compute magnitude of flow speed
        vel = np.stack((UD, WD),axis=1)
@@ -26,7 +26,8 @@ def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
        OPS = DIMS[5]
        
        # Pixel size for image filter
-       MFS = (3,3) 
+       MFS = (3,3)
+       GFS = (1,1)
        
        # Compute absolute value of residuals
        ARES = np.abs(RES)
@@ -34,8 +35,17 @@ def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
        for vv in range(4):
               if QM[vv] > 0.0:
                      # Apply image filter to each residual to a pixel neigborhood
-                     ARES_XZ = ndimage.maximum_filter(np.reshape(ARES[:,vv], (NZ, NX), order='F'), \
-                                                         size=MFS, mode='nearest')
+                     ARES_IM = np.reshape(ARES[:,vv], (NZ, NX), order='F')
+                     
+                     if filtType == 'maximum':
+                            ARES_XZ = ndimage.maximum_filter(ARES_IM, size=MFS, mode='nearest')
+                     elif filtType == 'median':
+                            ARES_XZ = ndimage.median_filter(ARES_IM, size=MFS, mode='nearest')
+                     elif filtType == 'mean':
+                            ARES_XZ = ndimage.uniform_filter(ARES_IM, size=MFS, mode='nearest')
+                     else:
+                            ARES_XZ = ndimage.gaussian_filter(ARES_IM, sigma=GFS, mode='nearest')
+                            
                      ARES[:,vv] = np.reshape(ARES_XZ, (OPS,), order='F')
                      # Normalize the residuals
                      ARES[:,vv] *= (1.0 / QM[vv])
@@ -47,7 +57,16 @@ def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
        #'''
        # Compute upper bound on coefficients
        QMAXF = np.reshape(0.5 * DL * VFLW, (NZ, NX), order='F')
-       QMAXF_FL = ndimage.maximum_filter(QMAXF, size=MFS, mode='nearest')
+       
+       if filtType == 'maximum':
+              QMAXF_FL = ndimage.maximum_filter(QMAXF, size=MFS, mode='nearest')
+       elif filtType == 'median':
+              QMAXF_FL = ndimage.median_filter(QMAXF, size=MFS, mode='nearest')
+       elif filtType == 'mean':
+              QMAXF_FL = ndimage.uniform_filter(QMAXF, size=MFS, mode='nearest')
+       else:
+              QMAXF_FL = ndimage.gaussian_filter(QMAXF, sigma=GFS, mode='nearest')
+       
        QMAX = np.reshape(QMAXF_FL, (OPS,), order='F')
        #'''
        
@@ -60,7 +79,7 @@ def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS)
        #return (np.expand_dims(CRES,1), np.expand_dims(QMAX,1))
        return (CRES1, CRES2)
 
-def computeResidualViscCoeffs2(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, DynSGS):
+def computeResidualViscCoeffs2(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2):
        #'''
        # Compute magnitude of flow speed
        vel = np.stack((UD, WD),axis=1)

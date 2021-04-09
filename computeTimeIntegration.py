@@ -95,6 +95,8 @@ def computeTimeIntegrationNL2(PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
               # Compute dynamics update
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
+              # Update diffusion coefficients here at the FIRST stage only
+              
               # Compute the diffusion update
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
               
