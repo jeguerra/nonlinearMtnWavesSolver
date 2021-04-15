@@ -649,9 +649,8 @@ def runModel(TestName):
               # Smallest physical grid spacing in the 2D mesh
               DX = DX_min
               DZ = DZ_min
-              DLS = 1.5 * min(DX, DZ)
-              #'''
-              
+              DLS = 2.0 * min(DX, DZ)
+              #'''              
        del(DDXMS); del(DDXM_D4); del(DDXM_CS)
        del(DDZMS); del(DDZM_D4); del(DDZM_CS)
        del(DZDX)
@@ -1082,7 +1081,7 @@ def runModel(TestName):
               OTI = int(TOPT[5] / DT0)
               ITI = int(TOPT[6] / DT0)
               #'''
-              import computeResidualViscCoeffs as rescf
+              #import computeResidualViscCoeffs as rescf
               while thisTime <= TOPT[4]:
                      
                      if ti == 0:
@@ -1096,18 +1095,24 @@ def runModel(TestName):
                             error = [np.linalg.norm(rhsVec)]
                             
                             prevFields = np.array(fields)
-                            old2Fields = np.array(fields)
-                            prevRhsVec = np.array(rhsVec)
+                            #old2Fields = np.array(fields)
+                            #prevRhsVec = np.array(rhsVec)
                             resVec = np.zeros(fields.shape)
-                            del(fields)
-                            del(rhsVec)
                      else:
                             isFirstStep = False
                             
+                     if ti % OTI == 0 or ti % ITI == 0:
+                            DqDx, DqDz = \
+                            eqs.computeFieldDerivatives(prevFields, REFS[13][0], REFS[13][1])
+                            rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
+                                                                       REFS[15], REFS[9][0], prevFields, UD, WD, ebcDex, zeroDex)
+       
+                            resVec = (1.0 / TOPT[0]) * (fields - prevFields) - rhsVec
+                                 
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
                             message = ''
-                            err = displayResiduals(message, np.reshape(prevRhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
+                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                      
                      if ti % ITI == 0:
@@ -1116,8 +1121,7 @@ def runModel(TestName):
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    q = np.reshape(prevFields[:,pp], (NZ+1, NX+1), order='F')
-                                   dqdt = np.reshape(prevRhsVec[:,pp], (NZ+1, NX+1), order='F')
-                                   #dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
+                                   dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
                                    
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
@@ -1145,14 +1149,14 @@ def runModel(TestName):
                             dvar1[ff-1,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
                                           
                             if makePlots:
-                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, prevFields, prevRhsVec, resVec, NX, NZ, numVar)
+                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, prevFields, rhsVec, resVec, NX, NZ, numVar)
                                    
                             ff += 1
                             
                      # Compute the solution within a time step
                      try:
                             # Compute a time step
-                            fields, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
+                            fields, DCF = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
                                                                     DX2, DZ2, DXZ,\
                                                                     TOPT, prevFields, hydroState, \
                                                                     zeroDex, ebcDex, \
@@ -1166,7 +1170,7 @@ def runModel(TestName):
                             T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
                             RdT = REFS[9][0] * (1.0 + T_ratio)
                             VSND = np.sqrt(PHYS[6] * RdT)
-                            
+                            '''
                             # Compute the RHS at the new time level
                             DqDx, DqDz = \
                                    eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
@@ -1199,14 +1203,14 @@ def runModel(TestName):
                             DCF[0][:,0] = newDiff[0]
                             DCF[1][:,0] = newDiff[1]
                             del(newDiff)
-                            
+                            '''
                             # Compute new time step based on updated sound speed
                             DTN = DLS / bn.nanmax(VSND)
                             
                             # Store the new solution
-                            old2Fields = prevFields
+                            #old2Fields = prevFields
                             prevFields = fields
-                            prevRhsVec = rhsVec
+                            #prevRhsVec = rhsVec
                             
                             # Update the local time step
                             thisTime += TOPT[0]
@@ -1354,7 +1358,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       TestName = 'CustomTest'
+       #TestName = '3LayerTest'
+       TestName = 'UniformTest'
        
        # Run the model in a loop if needed...
        for ii in range(1):

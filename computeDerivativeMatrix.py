@@ -13,6 +13,8 @@ from HerfunChebNodesWeights import chebpolym, cheblb
 from HerfunChebNodesWeights import lgfuncm, lgfunclb
 from HerfunChebNodesWeights import legpolym, leglb
 
+ZTOL = 1.0E-14
+
 def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex):
        # D2A is the operator to adjust
        # DOG is the original operator to adjust (unadjusted)
@@ -110,7 +112,14 @@ def computeCubicSplineDerivativeMatrix(DIMS, dom, isClamped):
               AIB = np.zeros((N,N))
               AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:N-1,1:N-1], B[1:N-1,1:N-1])
               
+       # Compute the first derivative matrix
        DDM = C.dot(AIB) + D
+       
+       # Clean up numerical zeros
+       for ii in range(N):
+              for jj in range(N):
+                     if abs(DDM[ii,jj]) <= ZTOL:
+                            DDM[ii,jj] = 0.0
        
        return DDM, AIB
 
@@ -169,7 +178,7 @@ def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):
        # Clean up numerical zeros
        for ii in range(N):
               for jj in range(N):
-                     if abs(DDM1[ii,jj]) <= 1.0E-15:
+                     if abs(DDM1[ii,jj]) <= ZTOL:
                             DDM1[ii,jj] = 0.0
        
        return DDM1
@@ -232,7 +241,7 @@ def computeCompactFiniteDiffDerivativeMatrix2(DIMS, dom):
        # Clean up numerical zeros
        for ii in range(N):
               for jj in range(N):
-                     if abs(DDM2[ii,jj]) <= 1.0E-15:
+                     if abs(DDM2[ii,jj]) <= ZTOL:
                             DDM2[ii,jj] = 0.0
        
        return DDM2
@@ -270,6 +279,13 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        temp = (HTD.T).dot(SDIFF)
        temp = temp.dot(STR_H)
        DDM = b * temp
+       
+       # Clean up numerical zeros
+       N = DDM.shape
+       for ii in range(N[0]):
+              for jj in range(N[1]):
+                     if abs(DDM[ii,jj]) <= ZTOL:
+                            DDM[ii,jj] = 0.0
 
        return DDM, STR_H
 
@@ -321,6 +337,13 @@ def computeChebyshevDerivativeMatrix(DIMS):
        temp = (CT).dot(SDIFF)
        DDM = -(2.0 / ZH) * temp.dot(STR_C)
        
+       # Clean up numerical zeros
+       N = DDM.shape
+       for ii in range(N[0]):
+              for jj in range(N[1]):
+                     if abs(DDM[ii,jj]) <= ZTOL:
+                            DDM[ii,jj] = 0.0
+       
        #print(xi)
        #print(DDM[0,0], -(2.0 * NZ**2 + 1) / 3.0 / ZH)
        #print(DDM[-1,-1], (2.0 * NZ**2 + 1) / 3.0 / ZH)
@@ -338,6 +361,13 @@ def computeFourierDerivativeMatrix(DIMS):
        KDM = np.diag(kxf, k=0)
        DFT = np.fft.fft(np.eye(NX+1), axis=0)
        DDM = np.fft.ifft(1j * KDM.dot(DFT), axis=0)
+       
+       # Clean up numerical zeros
+       N = DDM.shape
+       for ii in range(N[0]):
+              for jj in range(N[1]):
+                     if abs(DDM[ii,jj]) <= ZTOL:
+                            DDM[ii,jj] = 0.0
        
        return DDM, DFT
 
@@ -371,6 +401,13 @@ def computeLaguerreDerivativeMatrix(DIMS):
        temp = (LT.T).dot(SDIFF)
        temp = temp.dot(STR_L)
        DDM = b * temp
+       
+       # Clean up numerical zeros
+       N = DDM.shape
+       for ii in range(N[0]):
+              for jj in range(N[1]):
+                     if abs(DDM[ii,jj]) <= ZTOL:
+                            DDM[ii,jj] = 0.0
 
        return DDM, STR_L
 
@@ -409,9 +446,15 @@ def computeLegendreDerivativeMatrix(DIMS):
        STR_L = S.dot(temp)
        # Legendre spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       #-(2.0 / ZH) * 
        temp = (LT.T).dot(SDIFF)
        DDM = (2.0 / ZH) * temp.dot(STR_L)
+       
+       # Clean up numerical zeros
+       N = DDM.shape
+       for ii in range(N[0]):
+              for jj in range(N[1]):
+                     if abs(DDM[ii,jj]) <= ZTOL:
+                            DDM[ii,jj] = 0.0
        
        #print(DDM[0,0], -NZ * (NZ + 1) / 2.0 / ZH)
        #print(DDM[-1,-1], NZ * (NZ + 1) / 2.0 / ZH)

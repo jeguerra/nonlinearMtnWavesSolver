@@ -11,13 +11,14 @@ import numpy as np
 import bottleneck as bn
 from scipy import ndimage
 
-def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DXD, DZD, DX2, DZ2, filtType):
+def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DX2, DZ2, DXZ, filtType):
        #'''
        # Compute magnitude of flow speed
        vel = np.stack((UD, WD),axis=1)
        VFLW = np.linalg.norm(vel, axis=1)
        # Compute a filter length...
-       DXZ = DXD * DZD
+       #
+       #DXZ = DXD * DZD
        DL = np.sqrt(DXZ)
        #'''
        # Get the dimensions

@@ -75,8 +75,8 @@ class TestCase:
                                       7000.0, 15000.0, 1.0, \
                                       25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
               
-              elif TestName == "CustomTest":
-                     # Used for... testing purposes =)
+              elif TestName == "3LayerTest":
+                     # Wave breaking in 3 layer stratified atmosphere
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
@@ -87,7 +87,19 @@ class TestCase:
                      self.setUserData(563, 112, 150.0, 42.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
                                       2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
-                     
+              
+              elif TestName == "UniformTest":
+                     # Wave breaking in uniform stratification
+                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
+                                'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                            
+                     # STRATIFICATION BY TEMPERATURE SOUNDING
+                     self.setUserData(563, 112, 150.0, 35.0, 300.0, \
+                                      10000.0, 30000.0, 5.0, \
+                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
@@ -147,7 +159,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 1.0 # hours
+              HR = 10.0 # hours
               rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator
