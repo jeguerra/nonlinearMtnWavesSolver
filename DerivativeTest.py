@@ -25,7 +25,7 @@ NZ = 109
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS, True, False, True)
+REFS = computeGrid(DIMS, True, False, True, False)
 
 #% Compute the raw derivative matrix operators in alpha-xi computational space
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)

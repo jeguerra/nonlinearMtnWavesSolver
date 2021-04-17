@@ -105,7 +105,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
                      
                      # Compute DynSGS or Flow Dependent diffusion coefficients
                      QM = bn.nanmax(np.abs(solA), axis=0)
-                     filtType = 'maximum'
+                     filtType = 'mean'
                      newDiff = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, QM, UD, WD, DX2, DZ2, DXZ, filtType)
                      
                      DCF[0][:,0] = newDiff[0]

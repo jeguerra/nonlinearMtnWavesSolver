@@ -551,11 +551,6 @@ def runModel(TestName):
        del(DIM0)
        
        #%% DIFFERENTIATION OPERATORS
-       #'''
-       # Quality control on derivative matrices
-       #DDX_1D[np.isclose(DDX_1D, 0.0, atol=1.0E-14)] = 0.0
-       #DDZ_1D[np.isclose(DDZ_1D, 0.0, atol=1.0E-14)] = 0.0
-       
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        # 4th order compact finite difference (Gamet, 1999)
        DDXM_D4, DDZM_D4 = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_D4, DDZ_D4)
@@ -1358,8 +1353,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       #TestName = '3LayerTest'
-       TestName = 'UniformTest'
+       TestName = '3LayerTest'
+       #TestName = 'UniformTest'
        
        # Run the model in a loop if needed...
        for ii in range(1):

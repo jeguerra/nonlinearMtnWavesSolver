@@ -97,7 +97,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(563, 112, 150.0, 35.0, 300.0, \
+                     self.setUserData(563, 100, 150.0, 35.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
                                       2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
               else:

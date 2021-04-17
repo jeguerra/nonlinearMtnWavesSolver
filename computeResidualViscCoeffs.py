@@ -48,8 +48,10 @@ def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DX2, DZ2, DXZ, filtType):
                             ARES_XZ = ndimage.gaussian_filter(ARES_IM, sigma=GFS, mode='nearest')
                             
                      ARES[:,vv] = np.reshape(ARES_XZ, (OPS,), order='F')
+                     
                      # Normalize the residuals
-                     ARES[:,vv] *= (1.0 / QM[vv])
+                     if vv < 4:
+                            ARES[:,vv] *= (1.0 / QM[vv])
               else:
                      ARES[:,vv] *= 0.0
                      
