@@ -91,10 +91,6 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
               else:
                      DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
               
-              # Compute 2nd derivatives
-              P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
-              
               # Compute dynamics update
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
@@ -105,13 +101,20 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
                      
                      # Compute DynSGS or Flow Dependent diffusion coefficients
                      QM = bn.nanmax(np.abs(solA), axis=0)
-                     filtType = 'mean'
+                     filtType = 'maximum'
                      newDiff = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, QM, UD, WD, DX2, DZ2, DXZ, filtType)
                      
                      DCF[0][:,0] = newDiff[0]
                      DCF[1][:,0] = newDiff[1]
                      del(newDiff)
                      firstStage = False
+                     
+              # Compute 2nd derivatives
+              P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+                     tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
+                     
+              #P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+              #       tendency.computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDXM_CFD, DDZM_CFD, DZDX)
               
               # Compute the diffusion update
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
@@ -149,14 +152,11 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
        
        def computeRHSUpdate_diffusion(fields, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz):
               
-              '''# Compute sound speed
-              T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
-              RdT = RdT_bar * (1.0 + T_ratio)
-              PZ = np.exp(fields[:,2] + init0[:,2])
-              RHOI = np.expand_dims(RdT * np.reciprocal(PZ), axis=1)
-              '''
               rhs = tendency.computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                       REFS, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS)
+                     
+              #rhs = tendency.computeDiffusiveFluxTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+              #                                        REFS, ebcDex, zeroDex, DX2, DZ2, DXZ, DynSGS)
        
               return rhs
        

@@ -37,11 +37,32 @@ def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
        D2qDx2 = dvdx[:,0:4] #DDX.dot(PqPx)
        
        P2qPzx = dvdz[:,0:4] #DDZ.dot(PqPx)
-       P2qPxz = dvdx[:,4:] - DZDX * D2qDz2 #DDX.dot(DqDz)
+       P2qPxz = dvdx[:,4:] - DZDX * P2qPz2 #DDX.dot(DqDz)
        
        P2qPx2 = D2qDx2 - DZDX * P2qPzx
        
        return P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz
+
+def computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDX, DDZ, DZDX):
+       
+       DQDZ = REFG[2]
+       #D2QDZ2 = REFG[-1]
+       
+       # Compute first partial in X (on CPU)
+       xFlux = DCF[0] * (DqDx - DZDX * DqDz)
+       #zFlux = DCF[1] * (DqDz + DQDZ)
+       zFlux = DCF[1] * DqDz
+       
+       vd = np.hstack((xFlux, zFlux))
+       DxFlux = DDX.dot(vd)
+       DzFlux = DDZ.dot(vd)
+       
+       PxxFlux = DxFlux[:,0:4] - DZDX * DzFlux[:,0:4]
+       PxzFlux = DzFlux[:,0:4]
+       PzzFlux = DzFlux[:,4:]
+       PzxFlux = DxFlux[:,4:] - DZDX * PzzFlux
+              
+       return PxxFlux, PzzFlux, PxzFlux, PzxFlux, xFlux, zFlux
 
 def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        
@@ -397,11 +418,9 @@ def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, R
        S2 = dhx2 + 1.0
        S4 = np.power(S2, 2.0)
        S = np.power(S2, -0.5)
-       #DCB = DC1[bdex]
        DCB = S * np.linalg.norm(np.stack((DC1[bdex], dhx * DC2[bdex])), axis=0)
        
        DqDt[bdex,0] = DCB * S * (2.0 * P2qPx2[bdex,0])
-       #DqDt[bdex,0] *= S
        DqDt[bdex,1] = np.zeros(len(bdex))
        
        DqDt[bdex,2] = DCB * S2 * (P2qPx2[bdex,2] + 2.0 * dhx * P2qPzx[bdex,2] + dhx2 * P2qPz2[bdex,2])
@@ -409,6 +428,57 @@ def computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, R
        
        DqDt[bdex,3] = DCB * S2 * (P2qPx2[bdex,3] + 2.0 * dhx * P2qPzx[bdex,3] + dhx2 * P2qPz2[bdex,3])
        DqDt[bdex,3] += DCB * S4 * d2hx * (dhx * PqPx[bdex,3] + (1.0 + 2.0 * dhx) * PqPz[bdex,3])
+       
+       # Scale and apply coefficients
+       Pr = 0.71 / 0.4
+       DqDt[:,3] *= 1.0*Pr
+       
+       # Fix essential boundary condition
+       DqDt[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
+       DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
+       DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
+       DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
+       #DqDt[bdex,1] = dhx * DqDt[bdex,0]
+              
+       return DqDt
+
+def computeDiffusiveFluxTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DX2, DZ2, DXZ, DynSGS):
+       
+       DZDX = REFS[15]
+       DZDX2 = REFS[16]
+       DqDt = np.zeros(P2qPx2.shape)
+            
+       #%% INTERIOR DIFFUSION
+       # Diffusion of u-w vector
+       DqDt[:,0] = (2.0 * P2qPx2[:,0]) + (P2qPz2[:,0] + P2qPzx[:,1])      
+       DqDt[:,1] = (P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1])
+       # Diffusion of scalars (broken up into anisotropic components
+       DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
+       DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
+                   
+       #%% TOP DIFFUSION (flow along top edge)
+       tdex = ebcDex[2]
+       DqDt[tdex,0] = 2.0 * P2qPx2[tdex,0]
+       DqDt[tdex,2] = P2qPx2[tdex,2]
+       DqDt[tdex,3] = P2qPx2[tdex,3]
+       
+       #%% BOTTOM DIFFUSION (flow along the terrain surface)
+       bdex = ebcDex[1]
+       dhx = DZDX[bdex,0]
+       d2hx = DZDX2[bdex,0]
+       dhx2 = np.power(dhx, 2.0)
+       S2 = dhx2 + 1.0
+       S4 = np.power(S2, 2.0)
+       S = np.power(S2, -0.5)
+       
+       DqDt[bdex,0] = S * (2.0 * P2qPx2[bdex,0])
+       DqDt[bdex,1] = np.zeros(len(bdex))
+       
+       DqDt[bdex,2] = S2 * (P2qPx2[bdex,2] + 2.0 * dhx * P2qPzx[bdex,2] + dhx2 * P2qPz2[bdex,2])
+       DqDt[bdex,2] += S4 * d2hx * (dhx * PqPx[bdex,2] + (1.0 + 2.0 * dhx) * PqPz[bdex,2])
+       
+       DqDt[bdex,3] = S2 * (P2qPx2[bdex,3] + 2.0 * dhx * P2qPzx[bdex,3] + dhx2 * P2qPz2[bdex,3])
+       DqDt[bdex,3] += S4 * d2hx * (dhx * PqPx[bdex,3] + (1.0 + 2.0 * dhx) * PqPz[bdex,3])
        
        # Scale and apply coefficients
        Pr = 0.71 / 0.4

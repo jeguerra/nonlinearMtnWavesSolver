@@ -82,12 +82,9 @@ def computeCubicSplineDerivativeMatrix(DIMS, dom, isClamped):
               h0 = dom[1] - dom[0]
               A[0,0] = -2.0 * h0 / 3.0
               A[0,1] = h0 / 6.0
-              # Use derivative by CFD
+              
+              # Use derivative by CFD to set boundary condition
               B[0,:] = DDM_CFD[0,:]
-              # Use derivative by O1 diff
-              #B[0,:] = np.zeros(N)
-              #B[0,0] = -1.0 / h0
-              #B[0,1] = 1.0 / h0
               
               B[0,0] -= -1.0 / h0
               B[0,1] -= 1.0 / h0
@@ -96,19 +93,16 @@ def computeCubicSplineDerivativeMatrix(DIMS, dom, isClamped):
               hn = dom[N-1] - dom[N-2]
               A[N-1,N-2] = -hn / 6.0
               A[N-1,N-1] = 2.0 * hn / 3.0
-              # Use derivative by CFD
+              
+              # Use derivative by CFD to set boundary condition
               B[N-1,:] = DDM_CFD[N-1,:]
-              # Use derivative by O1 diff
-              #B[N-1,:] = np.zeros(N)
-              #B[N-1,N-2] = -1.0 / hn
-              #B[N-1,N-1] = 1.0 / hn
               
               B[N-1,N-2] -= -1.0 / hn
               B[N-1,N-1] -= 1.0 / hn
               
-       if isClamped:
               AIB = np.linalg.solve(A, B)
        else:
+              # NATURAL cubic spline.
               AIB = np.zeros((N,N))
               AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:N-1,1:N-1], B[1:N-1,1:N-1])
               

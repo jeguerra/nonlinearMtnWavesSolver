@@ -417,8 +417,8 @@ def runModel(TestName):
        else:
               DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
               
-       DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-       #DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+       #DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
        #DDZ_1D, CH_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
          
        # Turn on compact finite difference...
@@ -598,7 +598,7 @@ def runModel(TestName):
        REFG.append(D2QDZ2)
        
        if not StaticSolve:
-              NL = 5 # Number of eigenvalues to inspect...
+              NL = 6 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
               minDex = np.argmax(REFS[7][0,:])

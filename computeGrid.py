@@ -19,8 +19,8 @@ def computeGrid(DIMS, HermCheb, FourCheb, ChebCol, LagCol):
        
        if ChebCol:
               # Compute the Chebyshev/Legendre native grids
-              xi, wcp = qxw.cheblb(NZ) #[-1 +1]
-              #xi, wcp = qxw.leglb(NZ) #[-1 +1]
+              #xi, wcp = qxw.cheblb(NZ) #[-1 +1]
+              xi, wcp = qxw.leglb(NZ) #[-1 +1]
               z = 0.5 * ZH * (1.0 + xi)
        elif LagCol:
               # Compute the Laguerre native grid
