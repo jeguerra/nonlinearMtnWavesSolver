@@ -47,7 +47,7 @@ def plotRHS(time, rhs, ebcDex):
        
        return
 
-def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
+def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
                               sol0, init0, zeroDex, ebcDex, \
                               DynSGS, DCF, thisTime, isFirstStep):
        
@@ -69,6 +69,8 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
        #DQDZ = GMLZ.dot(REFG[2])
        DZDX = REFS[15]
        #DZDX2 = REFS[16]
+       
+       diffusiveFlux = False
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
@@ -102,7 +104,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
                      # Compute DynSGS or Flow Dependent diffusion coefficients
                      QM = bn.nanmax(np.abs(solA), axis=0)
                      filtType = 'maximum'
-                     newDiff = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, QM, UD, WD, DX2, DZ2, DXZ, filtType)
+                     newDiff = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, QM, UD, WD, DLD, DLD2, filtType)
                      
                      DCF[0][:,0] = newDiff[0]
                      DCF[1][:,0] = newDiff[1]
@@ -110,21 +112,17 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
                      firstStage = False
                      
               # Compute 2nd derivatives
-              P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+              if diffusiveFlux:
+                     P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+                     tendency.computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDXM_CFD, DDZM_CFD, DZDX)
+              else:
+                     P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
                      tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
-                     
-              #P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-              #       tendency.computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDXM_CFD, DDZM_CFD, DZDX)
               
               # Compute the diffusion update
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
-              
-              # Dynamics and diffusive update
-              rhsUpdate = rhsDyn + rhsDif
-              
               # Apply update
-              dsol = coeff * DT * rhsUpdate
-              solB = sol2Update + dsol
+              solB = sol2Update + (coeff * DT * (rhsDyn + rhsDif))
               
               # Enforce essential boundary conditions
               solB[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
@@ -152,11 +150,12 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
        
        def computeRHSUpdate_diffusion(fields, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz):
               
-              rhs = tendency.computeDiffusionTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      REFS, ebcDex, zeroDex, DX2, DZ2, DXZ, DCF, DynSGS)
-                     
-              #rhs = tendency.computeDiffusiveFluxTendency(PHYS, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-              #                                        REFS, ebcDex, zeroDex, DX2, DZ2, DXZ, DynSGS)
+              if diffusiveFlux:
+                     rhs = tendency.computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      REFS, ebcDex, zeroDex, DynSGS)
+              else:
+                     rhs = tendency.computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      REFS, ebcDex, zeroDex, DCF, DynSGS)
        
               return rhs
        
@@ -285,4 +284,4 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DX2, DZ2, DXZ, TOPT, \
               print('Invalid time integration order. Going with 2.')
               solB = ketcheson62(sol0)
        
-       return solB, DCF
+       return (solB - sol0), DCF

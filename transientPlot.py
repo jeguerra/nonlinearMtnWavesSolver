@@ -14,8 +14,7 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-#fname = 'transient_R-DynSGS-E_04Hour.nc'
-fname = 'transient_T-DynSGS-E_08Hour.nc'
+fname = 'Lagrange_T-DynSGS-E_04Hour.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['t'][:]

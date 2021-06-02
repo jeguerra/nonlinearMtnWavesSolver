@@ -436,11 +436,11 @@ def computeLegendreDerivativeMatrix(DIMS):
               SDIFF[rr-1,:] += (A / B) * SDIFF[rr+1,:]
               
        # Legendre spectral transform in matrix form
-       temp = LT.dot(W)
+       temp = (LT.T).dot(W)
        STR_L = S.dot(temp)
        # Legendre spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       temp = (LT.T).dot(SDIFF)
+       temp = (LT).dot(SDIFF)
        DDM = (2.0 / ZH) * temp.dot(STR_L)
        
        # Clean up numerical zeros

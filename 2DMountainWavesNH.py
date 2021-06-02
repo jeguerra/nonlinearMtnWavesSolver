@@ -377,10 +377,14 @@ def runModel(TestName):
        Z_in = thisTest.Z_in
        T_in = thisTest.T_in
        
+       #%% Define the computational and physical grids+
+       verticalChebGrid = True
+       verticalLagrGrid = False
+       
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION CHEBYSHEV
        DIM0 = (DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5])
-       REF0 = computeGrid(DIM0, HermCheb, FourCheb, True, False)
-       DDZP, CHT = derv.computeChebyshevDerivativeMatrix(DIM0)
+       REF0 = computeGrid(DIM0, HermCheb, FourCheb, verticalChebGrid, verticalLagrGrid)
+       DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
        REF0.append(DDZP)
        REF0.append(DDZP)
        DDXC, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIM0, REF0[0], False)
@@ -404,9 +408,6 @@ def runModel(TestName):
        uz, duz = computeShearProfileOnGrid(REF0, JETOPS, PHYS[1], pz, dlpz, uniformWind, linearShear)
        
        #%% SET UP THE GRID AND INDEX VECTORS
-       #% Define the computational and physical grids+
-       verticalChebGrid = True
-       verticalLagrGrid = False
        REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLagrGrid)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
@@ -557,17 +558,9 @@ def runModel(TestName):
        # Cubic Spline first derivative matrix
        DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
        
-       '''
-       DDXM = sps.bmat([[DDXMS, None, None, None], \
-                     [None, DDXMS, None, None], \
-                     [None, None, DDXMS, None], \
-                     [None, None, None, DDXMS]], format='csr')
-              
-       DDZM = sps.bmat([[DDZMS, None, None, None], \
-                     [None, DDZMS, None, None], \
-                     [None, None, DDZMS, None], \
-                     [None, None, None, DDZMS]], format='csr')
-       '''
+       # Make the TF operators
+       DZDX = np.reshape(DZT, (OPS,1), order='F')
+       
        REFS.append(DDXMS) # index 10
        REFS.append(DDZMS) # index 11
        
@@ -587,7 +580,6 @@ def runModel(TestName):
               
        # Store the terrain profile
        REFS.append(DZT)
-       DZDX = np.reshape(DZT, (OPS,1), order='F')
        REFS.append(DZDX)
        REFS.append(DDXM_CS.dot(DZDX))
        
@@ -603,43 +595,40 @@ def runModel(TestName):
               print('Computing spectral radii of derivative operators...')
               minDex = np.argmax(REFS[7][0,:])
               SIGMA = sps.diags(REFS[7][:,minDex])
-              PPXMS = (DDXMS - DZDX[:,0] * DDZMS).astype(dtype=np.double)
-              PPZMS = SIGMA.dot(DDZ_1D.astype(dtype=np.double))
+              DXE = (DDX_1D).astype(dtype=np.double)
+              DZE = (SIGMA.dot(DDZ_1D)).astype(dtype=np.double)
               
-              DX_eig = spl.eigs(PPXMS[np.ix_(ubdex,ubdex)], k=2, which='LM', return_eigenvectors=False)
-              #DX_eig = spl.eigs(DDX_1D.astype(dtype=np.double), k=10, which='LM', return_eigenvectors=False)
-              DZ_eig = spl.eigs(PPZMS, k=NL, which='LM', return_eigenvectors=False)
+              DX_eig = spl.eigs(DXE, k=NL, which='LM', return_eigenvectors=False)
+              DZ_eig = spl.eigs(DZE, k=NL, which='LM', return_eigenvectors=False)
               
               print('Eigenvalues (largest magnitude) of derivative matrices:')
               print('X: ', DX_eig)
               print('Z: ', DZ_eig)
               
               print('Eigenvalues with largest real part:')
-              DZ_eig = spl.eigs(PPZMS, k=NL, which='LR', return_eigenvectors=False)
+              DZ_eig = spl.eigs(DZE, k=NL, which='LR', return_eigenvectors=False)
               print('Z: ', DZ_eig)
               
-              DX_spr = np.reciprocal(np.abs(DX_eig))
-              DZ_spr = np.reciprocal(np.abs(DZ_eig))
+              # Minimum magnitude eigenvalues to "cover" smallest resolved scale 
+              DX_rho = np.amin(np.abs(DX_eig))
+              DZ_rho = np.amin(np.abs(DZ_eig))
               
-              print('Singular values of derivative matrices:')
-              ss = sps.linalg.svds(PPXMS[np.ix_(ubdex,ubdex)], k=NL, return_singular_vectors=False)
-              print('X: ', ss)
-              ss = sps.linalg.svds(PPZMS, k=NL, return_singular_vectors=False)
-              print('Z: ', ss)
+              print('Derivative matrix spectral radii (1/m):')
+              print('X: ', DX_rho)
+              print('Z: ', DZ_rho)
+              
+              DX_spr = 1.0 / DX_rho
+              DZ_spr = 1.0 / DZ_rho
               
               print('Grid resolution based on 1st derivative matrices: ')
               print('X: ', DX_spr)
               print('Z: ', DZ_spr)
-              # Diffusion grid lengths based on resolution power
-              DXD = 1.0 * DX_spr[0]
-              DZD = 1.0 * DZ_spr[0]
-              #'''
               
-              del(PPXMS); del(PPZMS)
-              
-              DX2 = DXD * DXD
-              DZ2 = DZD * DZD
-              DXZ = DXD * DZD
+              # Diffusion filter grid length based on resolution powers
+              DF = 1.0 # Factor on lengths
+              DLD = (DF * DX_spr, 1.5 * DZ_spr)
+              DLD2 = DLD[0] * DLD[1]
+              del(DXE); del(DZE)
               
               # Smallest physical grid spacing in the 2D mesh
               DX = DX_min
@@ -980,11 +969,6 @@ def runModel(TestName):
        #%% Transient solutions       
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
-              
-              T_DynSGS = True
-              R_DynSGS = False
-              DynSGS_E = True
-              DynSGS_N = False
                             
               # Reshape main solution vectors and initialize
               hydroState = np.reshape(INIT, (OPS, numVar), order='F')
@@ -1003,11 +987,11 @@ def runModel(TestName):
               # Initialize netcdf output
               from netCDF4 import Dataset
               
-              isRestartFromNC = False
+              isRestartFromNC = True
               if isRestartFromNC:
                      try:
-                            rdex = 140
-                            fname = 'transientNL0.nc'
+                            rdex = -1
+                            fname = 'transientNL21588.nc'
                             m_fid = Dataset(fname, 'r', format="NETCDF4")
                             thisTime = m_fid.variables['t'][rdex]
                             fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
@@ -1089,20 +1073,10 @@ def runModel(TestName):
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
                             error = [np.linalg.norm(rhsVec)]
                             
-                            prevFields = np.array(fields)
-                            #old2Fields = np.array(fields)
-                            #prevRhsVec = np.array(rhsVec)
+                            deltaFields = np.array(fields)
                             resVec = np.zeros(fields.shape)
                      else:
                             isFirstStep = False
-                            
-                     if ti % OTI == 0 or ti % ITI == 0:
-                            DqDx, DqDz = \
-                            eqs.computeFieldDerivatives(prevFields, REFS[13][0], REFS[13][1])
-                            rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
-                                                                       REFS[15], REFS[9][0], prevFields, UD, WD, ebcDex, zeroDex)
-       
-                            resVec = (1.0 / TOPT[0]) * (fields - prevFields) - rhsVec
                                  
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
@@ -1115,8 +1089,9 @@ def runModel(TestName):
                             tmvar[ff-1] = thisTime
                             # Check the fields or tendencies
                             for pp in range(numVar):
-                                   q = np.reshape(prevFields[:,pp], (NZ+1, NX+1), order='F')
-                                   dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
+                                   q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
+                                   #dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
+                                   dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
                                    
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
@@ -1144,19 +1119,22 @@ def runModel(TestName):
                             dvar1[ff-1,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
                                           
                             if makePlots:
-                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, prevFields, rhsVec, resVec, NX, NZ, numVar)
+                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
                                    
                             ff += 1
                             
                      # Compute the solution within a time step
                      try:
                             # Compute a time step
-                            fields, DCF = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
-                                                                    DX2, DZ2, DXZ,\
-                                                                    TOPT, prevFields, hydroState, \
+                            deltaFields, DCF = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
+                                                                    DLD, DLD2,\
+                                                                    TOPT, fields, hydroState, \
                                                                     zeroDex, ebcDex, \
                                                                     DynSGS, DCF, thisTime, isFirstStep)
                             
+                            # Update fields
+                            fields += deltaFields
+                                   
                             # Compute flow speed
                             UD = fields[:,0] + hydroState[:,0]
                             WD = fields[:,1]
@@ -1165,47 +1143,18 @@ def runModel(TestName):
                             T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
                             RdT = REFS[9][0] * (1.0 + T_ratio)
                             VSND = np.sqrt(PHYS[6] * RdT)
-                            '''
-                            # Compute the RHS at the new time level
-                            DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
-                            rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
-                                                                       REFS[15], REFS[9][0], fields, UD, WD, ebcDex, zeroDex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
                             
-                            # Compute residual
-                            if R_DynSGS:
-                                   dqdt = (0.5 / TOPT[0]) * (3.0 * fields - 4.0 * prevFields + old2Fields)
-                                   resVec = dqdt - 0.5 * (rhsVec + prevRhsVec)
-                            
-                            if T_DynSGS:
-                                   resVec = np.array(rhsVec)
-                            
-                            # Compute DynSGS or Flow Dependent diffusion coefficients
-                            #Q = fields# + hydroState
-                            #QS = Q - bn.nanmean(Q, axis=0)
-                            #QM = bn.nanmax(np.abs(QS), axis=0)
-                            QM = bn.nanmax(np.abs(fields), axis=0)
-                            
-                            if DynSGS_E:
-                                   # implementation with local image filter
-                                   filtType = 'maximum'
-                                   newDiff = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2, filtType)
-                            
-                            if DynSGS_N:
-                                   newDiff = rescf.computeResidualViscCoeffs2(DIMS, resVec, QM, UD, WD, DXD, DZD, DX2, DZ2)
-                            
-                            DCF[0][:,0] = newDiff[0]
-                            DCF[1][:,0] = newDiff[1]
-                            del(newDiff)
-                            '''
                             # Compute new time step based on updated sound speed
                             DTN = DLS / bn.nanmax(VSND)
                             
-                            # Store the new solution
-                            #old2Fields = prevFields
-                            prevFields = fields
-                            #prevRhsVec = rhsVec
+                            if ti % OTI == 0 or ti % ITI == 0:
+                                   DqDx, DqDz = \
+                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
+                                   rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
+                                                                              REFS[15], REFS[9][0], fields, UD, WD, ebcDex, zeroDex)
+                                   rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
+              
+                                   resVec = (1.0 / TOPT[0]) * (deltaFields) - rhsVec
                             
                             # Update the local time step
                             thisTime += TOPT[0]

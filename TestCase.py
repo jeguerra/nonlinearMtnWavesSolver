@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(563, 112, 150.0, 42.0, 300.0, \
+                     self.setUserData(599, 112, 180.0, 42.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
                                       2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
               
@@ -129,8 +129,6 @@ class TestCase:
               
               # Background temperature profile
               self.Z_in = [0.0, 1.1E4, 2.5E4, ZH]
-              #GAMS = 0.003 # Lapse rate in the stratosphere
-              #GAMT = 0.0065 # Lapse rate in the troposphere
               TTP = T0 - GAMT * (self.Z_in[1] - self.Z_in[0])
               TH = TTP + GAMS * (self.Z_in[3] - self.Z_in[2])
               self.T_in = (T0, TTP, TTP, TH)
@@ -159,7 +157,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 4.0 # hours
+              HR = 8.1 # hours
               rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator

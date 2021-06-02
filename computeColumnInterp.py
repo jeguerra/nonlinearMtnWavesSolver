@@ -35,8 +35,8 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      xi = 1.0 * ((2.0 / zpan * thisZ) - 1.0)
                      
                      # Get the inverse matrix for this column
-                     CTM = hcnw.chebpolym(NZ, -xi)
-                     #CTM, DTM = hcnw.legpolym(NZ-1, xi, True)
+                     #CTM = hcnw.chebpolym(NZ, -xi)
+                     CTM, DTM = hcnw.legpolym(NZ-1, xi, True)
                      
                      # Apply the interpolation
                      temp = CTM.dot(fcoeffs)

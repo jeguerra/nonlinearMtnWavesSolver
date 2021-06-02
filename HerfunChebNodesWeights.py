@@ -190,11 +190,11 @@ def legpolym(NM, xi, fullMat):
        # Initialize the output matrices if needed
        if fullMat:
               LTM = np.zeros((NX,NM+1))
-              LTM[0,:] = poly0
-              LTM[1,:] = poly1
+              LTM[:,0] = poly0
+              LTM[:,1] = poly1
               DLTM = np.zeros((NX,NM+1))
-              DLTM[0,:] = dpoly0
-              DLTM[1,:] = dpoly1
+              DLTM[:,0] = dpoly0
+              DLTM[:,0] = dpoly1
        
        for nn in range(1,NM):
               # Compute the new polynomial
@@ -213,8 +213,8 @@ def legpolym(NM, xi, fullMat):
               dpoly1 = dpolyn
               # Put the new function in its matrix place
               if fullMat:
-                     LTM[nn+1,:] = polyn
-                     DLTM[nn+1,:] = dpolyn
+                     LTM[:,nn+1] = polyn
+                     DLTM[:,nn+1] = dpolyn
               else:
                      LTM = polyn
                      DLTM = dpolyn
