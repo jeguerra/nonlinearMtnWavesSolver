@@ -157,7 +157,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 8.1 # hours
+              HR = 3.0 # hours
               rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator

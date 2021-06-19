@@ -48,7 +48,7 @@ def plotRHS(time, rhs, ebcDex):
        return
 
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
-                              sol0, init0, zeroDex, ebcDex, \
+                              sol0, dsol0, init0, zeroDex, ebcDex, \
                               DynSGS, DCF, thisTime, isFirstStep):
        
        DT = TOPT[0]
@@ -84,33 +84,31 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               DDZM_CPU = REFS[12][1]
               DDXM_CFD = REFS[13][0]
               DDZM_CFD = REFS[13][1]
+              
+       def updateDiffusionCoefficients(sol, rhsDyn):
+              
+              UD = sol[:,0] + init0[:,0]
+              WD = sol[:,1]
+              
+              # Compute the current residual
+              #resDyn = (1.0 / DT) * dsol0 - rhsDyn
+              resDyn = rhsDyn
+              
+              # Compute DynSGS or Flow Dependent diffusion coefficients
+              QM = bn.nanmax(np.abs(sol), axis=0)
+              filtType = 'maximum'
+              newDiff = rescf.computeResidualViscCoeffs(DIMS, resDyn, QM, UD, WD, DLD, DLD2, filtType)
+                            
+              return newDiff, resDyn
                      
-       def computeUpdate(coeff, solA, sol2Update, firstStage):
+       def computeUpdate(coeff, solA, sol2Update):
               
-              # Compute 1st derivatives
-              if firstStage:
-                     DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CFD, DDZM_CFD)
-              else:
-                     DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
+              # Compute 1st derivative
+              DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
               
-              # Compute dynamics update
+              # Compute dynamics RHS
               rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz)
               
-              # Update diffusion coefficients here at the FIRST stage only
-              if firstStage:
-                     UD = solA[:,0] + init0[:,0]
-                     WD = solA[:,1]
-                     
-                     # Compute DynSGS or Flow Dependent diffusion coefficients
-                     QM = bn.nanmax(np.abs(solA), axis=0)
-                     filtType = 'maximum'
-                     newDiff = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, QM, UD, WD, DLD, DLD2, filtType)
-                     
-                     DCF[0][:,0] = newDiff[0]
-                     DCF[1][:,0] = newDiff[1]
-                     del(newDiff)
-                     firstStage = False
-                     
               # Compute 2nd derivatives
               if diffusiveFlux:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
@@ -119,8 +117,9 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
                      tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
               
-              # Compute the diffusion update
+              # Compute the diffusion RHS
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
+              
               # Apply update
               solB = sol2Update + (coeff * DT * (rhsDyn + rhsDif))
               
@@ -175,18 +174,18 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        def ssprk53_Opt(sol):
               # Optimized truncation error to SSP coefficient method from Higueras, 2019
               # Stage 1
-              sol1 = computeUpdate(0.377268915331368, sol, sol, True)
+              sol1 = computeUpdate(0.377268915331368, sol, sol)
               # Stage 2
-              sol2 = computeUpdate(0.377268915331368, sol1, sol1, False)
+              sol2 = computeUpdate(0.377268915331368, sol1, sol1)
               # Stage 3
               sol3 = np.array(0.426988976571684 * sol + 0.5730110234283154 * sol2)
-              sol2 = computeUpdate(0.216179247281718, sol2, sol3, False)
+              sol2 = computeUpdate(0.216179247281718, sol2, sol3)
               # Stage 4
               sol3 = np.array(0.193245318771018 * sol + 0.199385926238509 * sol1 + 0.607368754990473 * sol2)
-              sol2 = computeUpdate(0.229141351401419, sol2, sol3, False)
+              sol2 = computeUpdate(0.229141351401419, sol2, sol3)
               # Stage 5
               sol3 = np.array(0.108173740702208 * sol1 + 0.891826259297792 * sol2)
-              sol = computeUpdate(0.336458325509300, sol2, sol3, False)
+              sol = computeUpdate(0.336458325509300, sol2, sol3)
               
               return sol
        
@@ -271,6 +270,15 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
 
        #%% THE MAIN TIME INTEGRATION STAGES
        
+       # Compute dynamics RHS
+       DqDx, DqDz = tendency.computeFieldDerivatives(sol0, DDXM_CPU, DDZM_CPU)
+       rhsDyn = computeRHSUpdate_dynamics(sol0, DqDx, DqDz)
+       
+       # Update diffusion coefficients here at the FIRST stage only
+       newDCF, resDyn = updateDiffusionCoefficients(sol0, rhsDyn)
+       DCF[0][:,0] = newDCF[0]
+       DCF[1][:,0] = newDCF[1]
+       
        # Compute dynamics update
        if order == 2:
               solB = ketcheson62(sol0)
@@ -284,4 +292,4 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               print('Invalid time integration order. Going with 2.')
               solB = ketcheson62(sol0)
        
-       return (solB - sol0), DCF
+       return (solB - sol0), rhsDyn, resDyn, DCF

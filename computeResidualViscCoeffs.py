@@ -23,7 +23,7 @@ def computeResidualViscCoeffs(DIMS, RES, QM, UD, WD, DLD, DLD2, filtType):
        OPS = DIMS[5]
        
        # Pixel size for image filter
-       MFS = (4,4)
+       MFS = (6,6)
        GFS = (2,2)
        
        # Compute absolute value of residuals

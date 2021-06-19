@@ -426,7 +426,7 @@ def runModel(TestName):
        DDX_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
        # Turn on cubic spline derivatives...
-       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], False)
+       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
        DDZ_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
        
        # Update the REFS collection
@@ -590,7 +590,7 @@ def runModel(TestName):
        REFG.append(D2QDZ2)
        
        if not StaticSolve:
-              NL = 6 # Number of eigenvalues to inspect...
+              NL = 8 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
               minDex = np.argmax(REFS[7][0,:])
@@ -626,7 +626,7 @@ def runModel(TestName):
               
               # Diffusion filter grid length based on resolution powers
               DF = 1.0 # Factor on lengths
-              DLD = (DF * DX_spr, 1.5 * DZ_spr)
+              DLD = (DF * DX_spr, DF * DZ_spr)
               DLD2 = DLD[0] * DLD[1]
               del(DXE); del(DZE)
               
@@ -991,7 +991,7 @@ def runModel(TestName):
               if isRestartFromNC:
                      try:
                             rdex = -1
-                            fname = 'transientNL21588.nc'
+                            fname = 'transientNL3587.nc'
                             m_fid = Dataset(fname, 'r', format="NETCDF4")
                             thisTime = m_fid.variables['t'][rdex]
                             fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
@@ -1070,9 +1070,7 @@ def runModel(TestName):
                                    eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
                             error = [np.linalg.norm(rhsVec)]
-                            
                             deltaFields = np.array(fields)
                             resVec = np.zeros(fields.shape)
                      else:
@@ -1089,9 +1087,10 @@ def runModel(TestName):
                             tmvar[ff-1] = thisTime
                             # Check the fields or tendencies
                             for pp in range(numVar):
+                                   #DqDx, DqDz = eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                                    q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
-                                   #dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
-                                   dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
+                                   dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
+                                   #dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
                                    
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
@@ -1126,9 +1125,9 @@ def runModel(TestName):
                      # Compute the solution within a time step
                      try:
                             # Compute a time step
-                            deltaFields, DCF = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
+                            deltaFields, rhsVec, resVec, DCF = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, DLD2,\
-                                                                    TOPT, fields, hydroState, \
+                                                                    TOPT, fields, deltaFields, hydroState, \
                                                                     zeroDex, ebcDex, \
                                                                     DynSGS, DCF, thisTime, isFirstStep)
                             
@@ -1146,15 +1145,6 @@ def runModel(TestName):
                             
                             # Compute new time step based on updated sound speed
                             DTN = DLS / bn.nanmax(VSND)
-                            
-                            if ti % OTI == 0 or ti % ITI == 0:
-                                   DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
-                                   rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
-                                                                              REFS[15], REFS[9][0], fields, UD, WD, ebcDex, zeroDex)
-                                   rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
-              
-                                   resVec = (1.0 / TOPT[0]) * (deltaFields) - rhsVec
                             
                             # Update the local time step
                             thisTime += TOPT[0]
