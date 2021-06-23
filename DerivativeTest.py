@@ -20,8 +20,8 @@ import computeTopographyOnGrid as top
 L2 = 1.0E4 * 3.0 * mt.pi
 L1 = -L2
 ZH = 42000.0
-NX = 511
-NZ = 109
+NX = 256
+NZ = 128
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
@@ -33,10 +33,11 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
 
 #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-DDX_CFD, DDX2A_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], False)
+DDX_CFD, DDX2A_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
 
 #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
 DDZ_CFD, DDZ2A_CFD = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
+DDZ2A_CFD = DDZ_CFD.dot(DDZ_CFD)
 DDZ2B_CFD = derv.computeCompactFiniteDiffDerivativeMatrix2(DIMS, REFS[1])
 
 #%% COMPACT FINITE DIFF DERIVATIVE TEST
@@ -146,10 +147,10 @@ plt.savefig("DerivativeTestZ_Laguerre.png")
 #%% Report eigenvalues
 import scipy.sparse.linalg as spl
 DDZM = DDZ_LG.astype(dtype=np.double)
-DZ_eig = spl.eigs(DDZM, k=12, which='LM', return_eigenvectors=False)
+DZ_eig = spl.eigs(DDZM, k=8, which='LM', return_eigenvectors=False)
 print('Laguerre vertical derivative eigenvalues', DZ_eig)
 DDZM = DDZ_1D.astype(dtype=np.double)
-DZ_eig = spl.eigs(DDZM, k=12, which='LM', return_eigenvectors=False)
+DZ_eig = spl.eigs(DDZM, k=8, which='LM', return_eigenvectors=False)
 print('Chebyshev vertical derivative eigenvalues', DZ_eig)
 
 #%% LEGENDRE FUNCTION DERIVATIVE TEST
@@ -187,5 +188,5 @@ plt.savefig("DerivativeTestZ_Legendre.png")
 #%% Report eigenvalues
 import scipy.sparse.linalg as spl
 DDZM = DDZ_LG.astype(dtype=np.double)
-DZ_eig = spl.eigs(DDZM, k=12, which='LM', return_eigenvectors=False)
+DZ_eig = spl.eigs(DDZM, k=8, which='LM', return_eigenvectors=False)
 print('Legendre vertical derivative eigenvalues', DZ_eig)

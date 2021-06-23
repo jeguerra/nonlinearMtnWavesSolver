@@ -19,8 +19,26 @@ def computeFieldDerivatives(q, DDX, DDZ):
        return DqDx, DqDz
        #return DqDx, np.reshape(DqDz, q.shape, order='F')
        #return np.reshape(DqDx, q.shape, order='F'), np.reshape(DqDz, q.shape, order='F')
+       
+def computeFieldDerivatives2(q, DqDx, DqDz, DDX, DDZ, DDX2, DDZ2, DDZX, REFG, DZDX, D2ZDX2, DZDX2):
+       
+       DQDZ = REFG[2]
+       D2QDZ2 = REFG[-1]
+       
+       #DqDz = DDZ.dot(q)
+       PqPz = DqDz + DQDZ
+       PqPx = DqDx - DZDX * DqDz
+       D2qDx2 = DDX2.dot(q)
+       D2qDz2 = DDZ2.dot(q) + D2QDZ2
+       D2qDzx = DDZX.dot(q)
+       
+       P2qPx2 = D2qDx2 - D2ZDX2 * PqPz - 2.0 * DZDX * D2qDzx + DZDX2 * D2qDz2
+       P2qPz2 = D2qDz2
+       P2qPzx = D2qDzx - DZDX * D2qDz2
+       
+       return P2qPx2, P2qPz2, P2qPzx, P2qPzx, PqPx, PqPz
 
-def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
+def computeFieldDerivatives2A(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
        
        DQDZ = REFG[2]
        D2QDZ2 = REFG[-1]

@@ -68,7 +68,8 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        #DQDZ = REFG[2]
        #DQDZ = GMLZ.dot(REFG[2])
        DZDX = REFS[15]
-       #DZDX2 = REFS[16]
+       D2ZDX2 = REFS[16]
+       DZDX2 = REFS[17]
        
        diffusiveFlux = False
        #'''
@@ -76,14 +77,16 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               # Use SciPY sparse for dynamics
               DDXM_CPU = REFS[10]
               DDZM_CPU = REFS[11]
-              DDXM_CFD = REFS[13][0]
-              DDZM_CFD = REFS[13][1]
        else:
               # Use multithreading on CPU and GPU
               DDXM_CPU = REFS[12][0]
               DDZM_CPU = REFS[12][1]
-              DDXM_CFD = REFS[13][0]
-              DDZM_CFD = REFS[13][1]
+       
+       DDXM_CFD = REFS[13][0]
+       DDZM_CFD = REFS[13][1]
+       DDX2_CFD = REFS[13][2]
+       DDZ2_CFD = REFS[13][3]
+       DDZX_CFD = REFS[13][4]
               
        def updateDiffusionCoefficients(sol, rhsDyn):
               
@@ -115,8 +118,13 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
                      tendency.computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDXM_CFD, DDZM_CFD, DZDX)
               else:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
-              
+                     tendency.computeFieldDerivatives2A(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
+                     '''                     
+                     P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+                     tendency.computeFieldDerivatives2(solA, DqDx, DqDz, \
+                                                       DDXM_CFD, DDZM_CFD, DDX2_CFD, DDZ2_CFD, DDZX_CFD, \
+                                                       REFG, DZDX, D2ZDX2, DZDX2)
+                     '''
               # Compute the diffusion RHS
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
               

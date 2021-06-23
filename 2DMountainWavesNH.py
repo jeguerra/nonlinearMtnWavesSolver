@@ -558,6 +558,12 @@ def runModel(TestName):
        # Cubic Spline first derivative matrix
        DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
        
+       # Second derivatives:
+       DDXM2 = DDXM_CS.dot(DDXM_CS)
+       DDZM2 = DDZM_CS.dot(DDZM_CS)
+       #DDXZM = DDXM_CS.dot(DDZM_CS)
+       DDZXM = DDZM_CS.dot(DDXM_CS)
+       
        # Make the TF operators
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        
@@ -568,11 +574,11 @@ def runModel(TestName):
               from rsb import rsb_matrix
               # Multithreaded enabled for transient solution
               REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZMS)))
-              REFS.append((rsb_matrix(DDXM_CS), rsb_matrix(DDZM_CS)))
+              REFS.append((rsb_matrix(DDXM_CS), rsb_matrix(DDZM_CS), rsb_matrix(DDXM2), rsb_matrix(DDZM2), rsb_matrix(DDZXM)))
        elif not StaticSolve and not RSBops:
-              # Native sparsr
+              # Native sparse
               REFS.append((DDXMS, DDZMS))
-              REFS.append((DDXM_CS, DDZM_CS))
+              REFS.append((DDXM_CS, DDZM_CS, DDXM2, DDZM2, DDZXM))
        else: 
               # Matrix operators for Jacobian assembly
               REFS.append(DDXM_CS)
@@ -582,6 +588,7 @@ def runModel(TestName):
        REFS.append(DZT)
        REFS.append(DZDX)
        REFS.append(DDXM_CS.dot(DZDX))
+       REFS.append(np.power(DZDX, 2.0))
        
        # Compute and store the 2nd derivatives of background quantities
        D2QDZ2 = DDZM_CS.dot(DQDZ)
