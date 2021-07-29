@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-fname = 'Lagrange_T-DynSGS-E_04Hour.nc'
+fname = 'DynSGS_01_06Hour.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['t'][:]
@@ -63,7 +63,7 @@ runSGS = True
 if runPertb:
        imglist = []
        for tt in range(len(times)):
-              fig = plt.figure(figsize=(12.0, 8.0))
+              fig = plt.figure(figsize=(16.0, 8.0))
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
               cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
               
@@ -119,7 +119,7 @@ if runSGS:
                      
               qSGS = norm * q
               
-              fig = plt.figure(figsize=(12.0, 8.0))
+              fig = plt.figure(figsize=(16.0, 8.0))
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
               
               cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, qSGS[:,:], 101, cmap=cm.seismic, vmin=-1.0, vmax=1.0)

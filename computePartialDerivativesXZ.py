@@ -47,7 +47,7 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
 def computePartialDerivativesXZ_BC(DIMS, REFS, DDX_1D, DDZ_1D, DDX_BC, DDZ_BC):
        # Get the dimensions
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NZ = DIMS[4] + 1
        OPS = NX * NZ
        
        # Get REFS data
@@ -75,7 +75,7 @@ def computePartialDerivativesXZ_BC(DIMS, REFS, DDX_1D, DDZ_1D, DDX_BC, DDZ_BC):
        for rr in range(NZ):
               ddex = np.array(range(0,OPS,NZ)) + rr
               # Advanced slicing used to get submatrix
-              if rr == 0 or cc == NZ-1:
+              if rr == 0 or rr == NZ-1:
                      DDX_OP[np.ix_(ddex,ddex)] = DDX_BC
               else:
                      DDX_OP[np.ix_(ddex,ddex)] = DDX_1D

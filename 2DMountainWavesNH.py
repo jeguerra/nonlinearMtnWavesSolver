@@ -172,13 +172,14 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
                      clim = np.abs(residual.min())
               else:
                      clim = np.abs(residual.max())
-              
+              '''
               if clim > 0.0:
                      normr = 1.0 / clim
               else:
                      normr = 1.0
-                     
-              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, normr * residual, 101, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
+              '''       
+              normr = 1.0
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, normr * residual, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
               plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               if pp < (numVar - 1):
@@ -189,13 +190,13 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               plt.colorbar(ccheck, format='%.2e')
               
               if pp == 0:
-                     plt.title('SGS: u')
+                     plt.title('Residual: u')
               elif pp == 1:
-                     plt.title('SGS: w')
+                     plt.title('Residual: w')
               elif pp == 2:
-                     plt.title('SGS: ' + '(ln$p$)\'')
+                     plt.title('Residual: ' + '(ln$p$)\'')
               else:
-                     plt.title('SGS: ' + r'(ln$\theta$)' + '\'')
+                     plt.title('Residual: ' + r'(ln$\theta$)' + '\'')
                      
               plt.xlim(-50.0, 50.0)
               plt.ylim(0.0, 25.0)
@@ -378,19 +379,42 @@ def runModel(TestName):
        T_in = thisTest.T_in
        
        #%% Define the computational and physical grids+
-       verticalChebGrid = True
+       verticalChebGrid = False
+       verticalLegdGrid = True
        verticalLagrGrid = False
        
-       #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION CHEBYSHEV
-       DIM0 = (DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5])
-       REF0 = computeGrid(DIM0, HermCheb, FourCheb, verticalChebGrid, verticalLagrGrid)
-       DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
-       REF0.append(DDZP)
-       REF0.append(DDZP)
-       DDXC, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIM0, REF0[0], False)
-       hx, dhx = computeTopographyOnGrid(REF0, HOPT, DDXC)
-       zRay = DIMS[2] - RLOPT[0]
+       #%% FLAG FOR SCSE TESTING...
+       testSCSE = True
+       NE = 8 # Interior order for SCS elements
+       if testSCSE:
+              HermCheb = True
+              FourCheb = False
        
+       #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
+       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
+       REF0 = computeGrid(DIM0, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid, verticalLagrGrid)
+       
+       DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
+       if testSCSE:
+              DDXP, REF0[0] = derv.computeSCSElementDerivativeMatrix(REF0[0], NE)
+              DIM0[3] = len(REF0[0]) - 1
+       else:
+              DDXP, HHT = derv.computeHermiteFunctionDerivativeMatrix(DIM0)
+              
+       #DDXP, DDXP2 = derv.computeCubicSplineDerivativeMatrix(DIM0, REF0[0], False, True, None)
+       
+       REF0.append(DDXP)
+       REF0.append(DDZP)
+       
+       hx, dhx = computeTopographyOnGrid(REF0, HOPT, DDXP)
+       zRay = DIMS[2] - RLOPT[0]
+       '''
+       plt.plot(REF0[0], hx)
+       plt.figure()
+       plt.plot(REF0[0], dhx)
+       plt.show()
+       input()
+       '''
        xl, ztl, dzt, sig, ZRL, DXM, DZM = \
               coords.computeGuellrichDomain2D(DIM0, REF0, zRay, hx, dhx, StaticSolve)
        
@@ -408,26 +432,51 @@ def runModel(TestName):
        uz, duz = computeShearProfileOnGrid(REF0, JETOPS, PHYS[1], pz, dlpz, uniformWind, linearShear)
        
        #%% SET UP THE GRID AND INDEX VECTORS
-       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLagrGrid)
+       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid, verticalLagrGrid)
       
        # Compute the raw derivative matrix operators in alpha-xi computational space
        if HermCheb and not FourCheb:
-              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+              if testSCSE:
+                     DDX_1D, REFS[0] = derv.computeSCSElementDerivativeMatrix(REFS[0], NE)
+                     DIMS[3] = len(REFS[0]) - 1
+                     NX = DIMS[3]
+                     OPS = (NX + 1) * (NZ + 1)
+                     DIMS[5] = OPS
+                     udex = np.arange(OPS)
+                     wdex = np.add(udex, OPS)
+                     pdex = np.add(wdex, OPS)
+                     tdex = np.add(pdex, OPS)
+              else:
+                     DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        elif FourCheb and not HermCheb:
-              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
+              if testSCSE:
+                     DDX_1D, REFS[0] = derv.computeSCSElementDerivativeMatrix(REFS[0], NE)
+                     DIMS[3] = len(REFS[0]) - 1
+                     NX = DIMS[3]
+                     OPS = (NX + 1) * (NZ + 1)
+                     DIMS[5] = OPS
+                     udex = np.arange(OPS)
+                     wdex = np.add(udex, OPS)
+                     pdex = np.add(wdex, OPS)
+                     tdex = np.add(pdex, OPS)
+              else:
+                     DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
               DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
-              
+                            
        #DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
        DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
        #DDZ_1D, CH_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
-         
+       
        # Turn on compact finite difference...
        DDX_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        DDZ_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-       # Turn on cubic spline derivatives...
-       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
-       DDZ_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
+       # Turn on cubic spline derivatives
+       if testSCSE:
+              DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, False, False, None)
+       else:
+              DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
+       DDZ_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
        
        # Update the REFS collection
        REFS.append(DDX_1D)
@@ -479,15 +528,6 @@ def runModel(TestName):
        # Map the sounding to the computational vertical 2D grid [0 H]
        TZ, DTDZ, D2TDZ2 = \
               computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
-
-       '''
-       # Compute background fields on the reference column
-       dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], 'sensible', uniformStrat)
-       
-       # Read in or compute background horizontal wind profile
-       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, PHYS[1], PZ, dlnPdz, uniformWind, linearShear)
-       '''              
        
        interpolationType = '1DtoTerrainFollowingCheb'
        #% Compute the background gradients in physical 2D space
@@ -553,32 +593,27 @@ def runModel(TestName):
        
        #%% DIFFERENTIATION OPERATORS
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
+       #DDXMS, DDZMS = devop.computePartialDerivativesXZ_BC(DIMS, REFS, DDX_CS, DDZ_CS, DDX_1D, DDZ_1D)
        # 4th order compact finite difference (Gamet, 1999)
        DDXM_D4, DDZM_D4 = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_D4, DDZ_D4)
        # Cubic Spline first derivative matrix
        DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
        
-       # Second derivatives:
-       DDXM2 = DDXM_CS.dot(DDXM_CS)
-       DDZM2 = DDZM_CS.dot(DDZM_CS)
-       #DDXZM = DDXM_CS.dot(DDZM_CS)
-       DDZXM = DDZM_CS.dot(DDXM_CS)
-       
        # Make the TF operators
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        
-       REFS.append(DDXMS) # index 10
-       REFS.append(DDZMS) # index 11
+       REFS.append((DDXMS, DDZMS)) # index 10
+       REFS.append((DDXMS, DDZM_CS)) # index 11
        
        if not StaticSolve and RSBops:
               from rsb import rsb_matrix
               # Multithreaded enabled for transient solution
               REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZMS)))
-              REFS.append((rsb_matrix(DDXM_CS), rsb_matrix(DDZM_CS), rsb_matrix(DDXM2), rsb_matrix(DDZM2), rsb_matrix(DDZXM)))
+              REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZM_CS)))
        elif not StaticSolve and not RSBops:
               # Native sparse
               REFS.append((DDXMS, DDZMS))
-              REFS.append((DDXM_CS, DDZM_CS, DDXM2, DDZM2, DDZXM))
+              REFS.append((DDXM_CS, DDZM_CS))
        else: 
               # Matrix operators for Jacobian assembly
               REFS.append(DDXM_CS)
@@ -605,16 +640,16 @@ def runModel(TestName):
               DXE = (DDX_1D).astype(dtype=np.double)
               DZE = (SIGMA.dot(DDZ_1D)).astype(dtype=np.double)
               
-              DX_eig = spl.eigs(DXE, k=NL, which='LM', return_eigenvectors=False)
-              DZ_eig = spl.eigs(DZE, k=NL, which='LM', return_eigenvectors=False)
+              DX_eig = spl.eigs(DXE, k=NL, which='LI', return_eigenvectors=False)
+              DZ_eig = spl.eigs(DZE, k=NL, which='LR', return_eigenvectors=False)
               
               print('Eigenvalues (largest magnitude) of derivative matrices:')
               print('X: ', DX_eig)
               print('Z: ', DZ_eig)
               
-              print('Eigenvalues with largest real part:')
-              DZ_eig = spl.eigs(DZE, k=NL, which='LR', return_eigenvectors=False)
-              print('Z: ', DZ_eig)
+              print('Eigenvalues size (largest magnitude) of derivative matrices:')
+              print('X: ', np.abs(DX_eig))
+              print('Z: ', np.abs(DZ_eig))
               
               # Minimum magnitude eigenvalues to "cover" smallest resolved scale 
               DX_rho = np.amin(np.abs(DX_eig))
@@ -632,8 +667,7 @@ def runModel(TestName):
               print('Z: ', DZ_spr)
               
               # Diffusion filter grid length based on resolution powers
-              DF = 1.0 # Factor on lengths
-              DLD = (DF * DX_spr, DF * DZ_spr)
+              DLD = (1.0 * DX_spr, 1.0 * DZ_spr)
               DLD2 = DLD[0] * DLD[1]
               del(DXE); del(DZE)
               
@@ -712,8 +746,8 @@ def runModel(TestName):
               #'''
               # Compute the RHS for this iteration
               DqDx, DqDz = \
-                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
+                     eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
+              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, \
                                                          REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
               rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
               
@@ -961,8 +995,8 @@ def runModel(TestName):
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               DqDx, DqDz = \
-                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
+                     eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
+              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, \
                                                          REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
               rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
               RHS = np.reshape(rhs, (physDOF,), order='F')
@@ -1067,22 +1101,22 @@ def runModel(TestName):
               OTI = int(TOPT[5] / DT0)
               ITI = int(TOPT[6] / DT0)
               #'''
-              #import computeResidualViscCoeffs as rescf
+              import computeResidualViscCoeffs as rescf
               while thisTime <= TOPT[4]:
                      
                      if ti == 0:
                             isFirstStep = True
                                    
                             DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
-                            rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
+                                   eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
+                            rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
                             error = [np.linalg.norm(rhsVec)]
                             deltaFields = np.array(fields)
                             resVec = np.zeros(fields.shape)
                      else:
                             isFirstStep = False
-                                 
+                             
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
                             message = ''
@@ -1094,23 +1128,18 @@ def runModel(TestName):
                             tmvar[ff-1] = thisTime
                             # Check the fields or tendencies
                             for pp in range(numVar):
-                                   #DqDx, DqDz = eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
                                    q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
-                                   dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
-                                   #dqdt = np.reshape(DqDz[:,pp], (NZ+1, NX+1), order='F')
+                                   #dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
+                                   dqdt = np.reshape(DqDx[:,pp], (NZ+1, NX+1), order='F')
+                                   
+                                   if pp == 3:
+                                          PqPx = DqDx - REFS[15] * DqDz
+                                          div = PqPx[:,0] + DqDz[:,1]
+                                          dqdt = np.reshape(div, (NZ+1, NX+1), order='F')
                                    
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
-                                          '''
-                                          fig = plt.figure(figsize=(6.0, 4.0)) 
-                                          plt.plot(1.0E-3*XL[0,:], q[0,:], 'k')
-                                          plt.xlim(-25.0, 25.0)
-                                          plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-                                          plt.title('Minimum: {:.2f}'.format(np.amin(q[0,:])))
-                                          plt.show()
-                                          del(fig)
-                                          '''
                                    elif pp == 1:
                                           wvar[ff-1,:,:] = q
                                           dwvar[ff-1,:,:] = dqdt
@@ -1132,19 +1161,46 @@ def runModel(TestName):
                      # Compute the solution within a time step
                      try:
                             # Compute a time step
-                            deltaFields, rhsVec, resVec, DCF = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
+                            deltaFields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, DLD2,\
                                                                     TOPT, fields, deltaFields, hydroState, \
                                                                     zeroDex, ebcDex, \
-                                                                    DynSGS, DCF, thisTime, isFirstStep)
+                                                                    DynSGS, DCF, isFirstStep)
                             
-                            # Update fields
+                            # Apply update
                             fields += deltaFields
+                            thisTime += TOPT[0]
+                            Q = fields + hydroState
                                    
                             # Compute flow speed
-                            UD = fields[:,0] + hydroState[:,0]
-                            WD = fields[:,1]
+                            UD = Q[:,0]
+                            WD = Q[:,1]
+                            #'''
+                            vel = np.stack((UD, WD),axis=1)
+                            VFLW = np.linalg.norm(vel, axis=1)
                             
+                            rhsVec0 = np.array(rhsVec)
+                            # Update the diffusion coefficients
+                            DqDx, DqDz = \
+                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
+                            rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
+                                                                          fields, UD, WD, ebcDex, zeroDex)
+                            rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
+                            
+                            # Compute the current residual
+                            resVec = (1.0 / TOPT[0]) * deltaFields - 0.5 * (rhsVec0 + rhsVec)
+                            del(rhsVec0)
+                            
+                            # Compute DynSGS or Flow Dependent diffusion coefficients
+                            QM = bn.nanmax(np.abs(fields), axis=0)
+                            #filtType = 'maximum'
+                            #DQ = Q - np.mean(Q)
+                            #QM = bn.nanmax(np.abs(DQ), axis=0)
+                            newDiff = rescf.computeResidualViscCoeffs4(DIMS, resVec, QM, VFLW, DLD, DLD2)
+                            
+                            DCF[0][:,0] = newDiff[0]
+                            DCF[1][:,0] = newDiff[1]
+                            #'''
                             # Compute sound speed
                             T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
                             RdT = REFS[9][0] * (1.0 + T_ratio)

@@ -27,6 +27,7 @@ def computeTopographyOnGrid(REFS, opt, DDX):
        # Make width for the Kaiser window
        r2 = 1.0 * kC
        r1 = -r2
+       L = abs(r2 - r1)
                      
        # Make a window function so that dhdx = 0 inside Rayleigh layers
        condition1 = (xh > r1)
@@ -35,14 +36,18 @@ def computeTopographyOnGrid(REFS, opt, DDX):
        
        for ii in range(NP):
               condition[ii] = condition1[ii] == 1 and condition2[ii] == 1
-              
-       WP = len(np.extract(condition, xh))
-       kaiserWin = signal.kaiser(WP, beta=10.0)
+       
+       XW = np.extract(condition, xh)
+       WP = len(XW)
+       
+       kaiserWin = 1.0 - np.power(np.sin(mt.pi / L * XW), 2.0)
+       #kaiserWin = signal.windows.kaiser(WP, beta=10.0)
+       
        padP = NP - WP
        padZ = np.zeros(int(padP / 2))
        kaiserDom = np.concatenate((padZ, kaiserWin, padZ))
        #plt.figure()
-       #plt.plot(x, kaiserDom)
+       #plt.plot(xh, kaiserDom)
        
        # Evaluate the function with different options
        if profile == 1:
@@ -66,9 +71,10 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               ht = hf * h0 * kaiserDom * ht2
               ht[0] = 0.0; ht[-1] = 0.0
               # Take the derivative (DO NOT USE NATIVE DERIVATIVE OPERATOR)
-              #dhdx_native = DDX.dot(ht)
-              cs = CubicSpline(xh, ht, bc_type='clamped')
-              dhdx = (cs.derivative())(xh)[:]
+              dhdx = DDX.dot(ht)
+              #cs = CubicSpline(xh, ht, bc_type='clamped')
+              #dhdx = (cs.derivative())(xh)[:]
+              
               # Monotonic filter
               dhdx[0] = 0.0; dhdx[-1] = 0.0
               for dd in range(1,len(dhdx)-1):

@@ -36,9 +36,9 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        urdex2 = np.array(range(ubdex[-1]+1, OPS))
        
        # Index all boundary DOF that can be diffused on
-       latDex = np.unique(np.concatenate((uldex2,urdex2)))
+       latDex = np.unique(np.concatenate((uldex1,urdex1)))
        #vrtDex = np.unique(np.concatenate((ubdex,utdex)))
-       extDex = np.unique(np.concatenate((urdex2,uldex2,ubdex,utdex)))
+       extDex = np.unique(np.concatenate((urdex1,uldex1,ubdex,utdex)))
        diffDex = (latDex, ubdex, utdex, extDex)
        
        # BC indices for static solution (per variable)
@@ -52,19 +52,20 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
               left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
               top = utdex + iW*OPS
               rowsOutBC_static = set(np.concatenate((left, top)))
+              #'''
        elif bcType == 2:
               # Inflow condition on UWPT TRANSIENT SOLUTION
-              rowsOutU = set(uldex1)
-              rowsOutW = set(np.concatenate((uldex1,utdex)))
-              rowsOutP = set(uldex1)
-              rowsOutT = set(uldex1)
-              #rowsOutP = set(np.concatenate((uldex1,urdex1)))
-              #rowsOutT = set(np.concatenate((uldex1,urdex1)))
+              rowsOutU = set()
+              rowsOutW = set(utdex)
+              rowsOutP = set()
+              rowsOutT = set()
+       
                # Indexing for static solver
-              left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+              #left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
               #right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iP*OPS, urdex1 + iT*OPS))
               top = utdex + iW*OPS
-              rowsOutBC_static = set(np.concatenate((left, top)))
+              #rowsOutBC_static = set(np.concatenate((left, top)))
+              rowsOutBC_static = set(top)
        
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)

@@ -10,9 +10,9 @@ Multithreading acceleration test
 """
 import time
 import numpy as np
+import torch
 import scipy.sparse as sps
 from joblib import Parallel, delayed
-from oct2py import Oct2Py
 from rsb import rsb_matrix
 
 import math as mt
@@ -21,48 +21,22 @@ from computeGrid import computeGrid
 import computeDerivativeMatrix as derv
 import computeTopographyOnGrid as top
                      
-def computeMatVecDotParfor(aCSRmat, aDenseVec, runParFor):
-       
-       N = aCSRmat.shape[0]
-       resVec = np.zeros((N,))
-       
-       def innerLoop(ii):
-              c1 = aCSRmat.indptr[ii]
-              c2 = aCSRmat.indptr[ii+1]
-              cdex = np.arange(c1,c2)
-              
-              # vectorized inner loop
-              res = (aCSRmat.data[cdex]).dot(aDenseVec[aCSRmat.indices[cdex]])
-              
-              #for cc in range(c1,c2):
-              #       res += aCSRmat.data[cc] * aDenseVec[aCSRmat.indices[cc]]
-              
-              return res
-                            
-       if runParFor:
-              resLst = Parallel(n_jobs=4, prefer='threads')(delayed(innerLoop)(rr) for rr in range(N))
-              resVec = np.array(resLst)
-       else:
-              for rr in range(N):
-                     resVec[rr] = innerLoop(rr)
-
-       return resVec
-
 if __name__ == '__main__':
        
         # Set grid dimensions and order
        L2 = 1.0E4 * 3.0 * mt.pi
        L1 = -L2
        ZH = 36000.0
-       NX = 347
+       NX = 583
        NZ = 92
        DIMS = [L1, L2, ZH, NX, NZ]
        
        # Define the computational and physical grids+
-       REFS = computeGrid(DIMS, True, False, True)
+       REFS = computeGrid(DIMS, True, False, True, False)
        
        #% Compute the raw derivative matrix operators in alpha-xi computational space
        A, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       A = A.astype(float)
        #A, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        #A = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
        #A = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], True)
@@ -85,22 +59,16 @@ if __name__ == '__main__':
        end = time.time()
        print('PyRSB SpMV: ', end - start, ' sec')
        
+       # Test native sparse pytorch dot product
+       APT = torch.tensor(A)
+       APST = APT._to_sparse_csr()
+       start = time.time()
+       R2 = torch.sparse.mm(APST, torch.tensor(V))
+       end = time.time()
+       print('PyTorch SpMV: ', end - start, ' sec')
+       
        # Test SpMV serial implementation
        start = time.time()
-       R3 = computeMatVecDotParfor(ACSR, V, False)
+       R3 = ACSR.dot(V)
        end = time.time()
-       print('Serial SpMV: ', end - start, ' sec')
-       
-       # Test SpMV parallel implementation
-       start = time.time()
-       R4 = computeMatVecDotParfor(ACSR, V, True)
-       end = time.time()
-       print('Parallel SpMV: ', end - start, ' sec')
-       
-       # Test SpMV from Octave bridge
-       oc = Oct2Py(temp_dir='/dev/shm/')
-       start = time.time()
-       R5 = oc.mtimes(A,V)
-       end = time.time()
-       print('Octave SpMV: ', end - start, ' sec')
-       
+       print('SciPy SpMV: ', end - start, ' sec')

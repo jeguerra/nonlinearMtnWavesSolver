@@ -9,7 +9,7 @@ Created on Wed Jul 17 14:12:01 2019
 import numpy as np
 import HerfunChebNodesWeights as qxw
 
-def computeGrid(DIMS, HermCheb, FourCheb, ChebCol, LagCol):
+def computeGrid(DIMS, HermCheb, FourCheb, ChebCol, LegCol, LagCol):
        # Get the domain dimensions
        L1 = DIMS[0]
        L2 = DIMS[1]
@@ -18,8 +18,11 @@ def computeGrid(DIMS, HermCheb, FourCheb, ChebCol, LagCol):
        NZ = DIMS[4]
        
        if ChebCol:
-              # Compute the Chebyshev/Legendre native grids
-              #xi, wcp = qxw.cheblb(NZ) #[-1 +1]
+              # Compute the Chebyshev native grids
+              xi, wcp = qxw.cheblb(NZ) #[-1 +1]
+              z = 0.5 * ZH * (1.0 + xi)
+       elif LegCol:
+              # Compute the Legendre native grids
               xi, wcp = qxw.leglb(NZ) #[-1 +1]
               z = 0.5 * ZH * (1.0 + xi)
        elif LagCol:

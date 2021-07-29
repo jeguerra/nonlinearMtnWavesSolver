@@ -44,3 +44,7 @@ SchurOps
 *.nc
 
 animations/
+
+*.dump
+
+*.gif

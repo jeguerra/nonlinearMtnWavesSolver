@@ -27,7 +27,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
               zpan = np.amax(zdata) - np.min(zdata)
               # Apply forward transform on the nominal column
               fcoeffs = CH_TRANS.dot(fdata)
-              
+                            
               # Loop over each column
               for cc in range(NX):
                      # Convert to the reference grid at this column
