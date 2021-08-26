@@ -43,11 +43,11 @@ class TestCase:
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 86, 70.0, 22.0, 280.0, \
+                     self.setUserData(199, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0, \
                                       25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(583, 108, 180.0, 42.0, 300.0, \
+                     self.setUserData(583, 128, 180.0, 42.0, 300.0, \
                                       10000.0, 30000.0, 5.0, \
                                       2000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
               
@@ -94,12 +94,12 @@ class TestCase:
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': False, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(61, 92, 150.0, 32.0, 300.0, \
-                                      7000.0, 25000.0, 5.0, \
-                                      2000.0, 0.01, 0.0065, 0.003, 1, 1.5E+4, 'uwpt_transient')
+                     self.setUserData(583, 83, 205.0, 32.0, 300.0, \
+                                      7000.0, 45000.0, 5.0, \
+                                      2000.0, 0.01, 0.0065, 0.003, 3, 2.5E+4, 'uwpt_transient')
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
@@ -151,19 +151,27 @@ class TestCase:
               EXPPOL = 4 # Even exponential and even polynomial product
               INFILE = 5 # Data from a file (equally spaced points)
               '''
-              aC = 5000.0
-              lC = 4000.0
+              if Mountain == 2:
+                     aC = 5000.0
+                     lC = 4000.0
+              elif Mountain == 3:
+                     aC = 10000.0
+                     lC = 12000.0
+              else:
+                     aC = 5000.0
+                     lC = 4000.0
+                     
               self.HOPT = [h0, aC, lC, kC, withWindow, Mountain]
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 0.5 # hours
+              HR = 4.0 # hours              
               rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 5.0 # Time for diagnostic output
-              ITI = 5.0 # Time for image output
+              OTI = 60.0 # Time for diagnostic output
+              ITI = 15.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]

@@ -10,7 +10,7 @@ import warnings
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
-def fixEssentialBC(DqDt, zeroDex, ebcDex):
+def fixEssentialBC(DqDt, zeroDex, ebcDex, DZDX):
        
        bdex = ebcDex[1]
        tdex = ebcDex[2]
@@ -19,20 +19,73 @@ def fixEssentialBC(DqDt, zeroDex, ebcDex):
        DqDt[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
        DqDt[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
        DqDt[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
-       DqDt[bdex,1] = np.zeros(len(bdex))
+       DqDt[bdex,1] = DZDX[bdex,0] * DqDt[bdex,0]
        DqDt[tdex,1] = np.zeros(len(bdex))
        
        return DqDt
 
+def adjustDlnPforVerticalBC(Uadvect, Wadvect, PqPx, DqDz, U, W, DQDZ, RdT, T_ratio, gc, ebcDex):
+       
+       ldex = ebcDex[0]
+       bdex = ebcDex[1]
+       tdex = ebcDex[2]
+       
+       # Boundary condition adjustments to pressure derivatives
+       PqPx[ldex,2] *= 0.0
+       RdTI1 = np.reciprocal(RdT[bdex])
+       RdTI2 = np.reciprocal(RdT[tdex])
+       DqDz[bdex,2] = RdTI1 * (gc * T_ratio[bdex] - Uadvect[bdex,1] - Wadvect[bdex,1])
+       DqDz[tdex,2] = RdTI2 * (gc * T_ratio[tdex])
+       
+       Uadvect[:,2] = U * PqPx[:,2]
+       Wadvect[:,2] = W * (DqDz[:,2] + DQDZ[:,2])
+       
+       return Uadvect, Wadvect
+
+def computeRdT(q, RdT_bar, kap):
+       
+       # Compute pressure gradient force scaling (buoyancy)
+       with warnings.catch_warnings():
+              np.seterr(all='raise')
+              
+              earg = kap * q[:,2] + q[:,3]
+              try:
+                     #'''
+                     T_ratio = np.expm1(earg)
+                     RdT = RdT_bar * (T_ratio + 1.0)
+                     #'''
+                     '''
+                     p_hat = np.exp(kap * fields[:,2], dtype=np.longdouble)
+                     RdT_hat = p_hat * np.exp(fields[:,3], dtype=np.longdouble)
+                     RdT = RdT_bar * RdT_hat
+                     T_ratio = RdT_hat - 1.0
+                     '''
+              except FloatingPointError:
+                     earg_max = np.amax(earg)
+                     earg_min = np.amin(earg)
+                     print('In argument to local T ratio: ', earg_min, earg_max)
+                     pmax = np.amax(q[:,2])
+                     pmin = np.amin(q[:,2])
+                     print('Min/Max log pressures: ', pmin, pmax)
+                     tmax = np.amax(q[:,3])
+                     tmin = np.amin(q[:,3])
+                     print('Min/Max log potential temperature: ', tmin, tmax)
+                     # Compute buoyancy by approximation...
+                     T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
+                     RdT_hat = 1.0 + T_ratio
+                     RdT = RdT_bar * RdT_hat
+                     
+       return RdT, T_ratio
+
 def computeFieldDerivatives(q, DDX, DDZ):
        
-       #qv = np.reshape(q, (q.shape[0] * q.shape[1],1), order='F')
+       #print(DDX.shape)
+       #print(DDZ.shape)
+       
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
        
        return DqDx, DqDz
-       #return DqDx, np.reshape(DqDz, q.shape, order='F')
-       #return np.reshape(DqDx, q.shape, order='F'), np.reshape(DqDz, q.shape, order='F')
 
 def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
        
@@ -121,7 +174,6 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DDZM = REFS[10][1]
        DZDX = REFS[15].flatten()
        
-       GML = REFG[0]
        DLTDZ = REFG[1]
        DQDZ = REFG[2]
        
@@ -284,8 +336,8 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        
        return DOPS
 
-# Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
+# Fully explicit evaluation of the non linear equations
+def computeEulerEquationsLogPLogT_StaticResidual(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -293,61 +345,17 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar
        
        # Get the Background fields
        DQDZ = REFG[2]
-       
+              
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(U,1)
        WM = np.expand_dims(W,1)
        
        # Compute pressure gradient force scaling (buoyancy)
-       with warnings.catch_warnings():
-              np.seterr(all='raise')
-              try:
-                     #'''
-                     earg = kap * fields[:,2] + fields[:,3]
-                     T_ratio = np.expm1(earg)
-                     RdT = RdT_bar * (T_ratio + 1.0)
-                     #'''
-                     '''
-                     p_hat = np.exp(kap * fields[:,2], dtype=np.longdouble)
-                     RdT_hat = p_hat * np.exp(fields[:,3], dtype=np.longdouble)
-                     RdT = RdT_bar * RdT_hat
-                     T_ratio = RdT_hat - 1.0
-                     '''
-              except FloatingPointError:
-                     earg = kap * fields[:,2] + fields[:,3]
-                     earg_max = np.amax(earg)
-                     earg_min = np.amin(earg)
-                     print('In argument to local T ratio: ', earg_min, earg_max)
-                     pmax = np.amax(fields[:,2])
-                     pmin = np.amin(fields[:,2])
-                     print('Min/Max log pressures: ', pmin, pmax)
-                     tmax = np.amax(fields[:,3])
-                     tmin = np.amin(fields[:,3])
-                     print('Min/Max log potential temperature: ', tmin, tmax)
-                     # Compute buoyancy by approximation...
-                     T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
-                     RdT_hat = 1.0 + T_ratio
-                     RdT = RdT_bar * RdT_hat
-       
-       ldex = ebcDex[0]
-       bdex = ebcDex[1]
-       tdex = ebcDex[2]
-       
-       #'''
-       # Compute W partial and advection
-       PwPx = DqDx[:,1] - DZDX[:,0] * DqDz[:,1]
-       Uadvect = UM[:,0] * PwPx
-       Wadvect = WM[:,0] * DqDz[:,1]
-       
-       # Adjust vertical pressure derivatives (top and bottom boundaries)
-       RdTI1 = np.reciprocal(RdT[bdex])
-       RdTI2 = np.reciprocal(RdT[tdex])
-       DqDz[bdex,2] = RdTI1 * (gc * T_ratio[bdex] - Uadvect[bdex] - Wadvect[bdex])
-       DqDz[tdex,2] = RdTI2 * (gc * T_ratio[tdex])
-       #'''
+       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
        # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
+       #PqPx[ebcDex[0],:] *= 0.0
        
        # Compute advection
        Uadvect = UM * PqPx
@@ -360,10 +368,54 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar
        pgradx = RdT * PqPx[:,2]
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
-       # Lateral boundary condition
-       pgradx[ldex] *= 0.0
-       #pgradz[ldex] *= 0.0
-       #divergence[ldex] *= 0.0
+       DqDt = -(Uadvect + Wadvect)
+       # Horizontal momentum equation
+       DqDt[:,0] -= pgradx
+       # Vertical momentum equation
+       DqDt[:,1] -= pgradz
+       # Pressure (mass) equation
+       DqDt[:,2] -= gam * divergence
+       # Potential Temperature equation (transport only)
+       
+       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex, DZDX)
+                               
+       return DqDt
+
+# Fully explicit evaluation of the non linear equations (dynamic components)
+def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
+       # Get physical constants
+       gc = PHYS[0]
+       kap = PHYS[4]
+       gam = PHYS[6]
+       
+       # Get the Background fields
+       DQDZ = REFG[2]
+              
+       # Compute advective (multiplicative) operators
+       UM = np.expand_dims(U,1)
+       WM = np.expand_dims(W,1)
+       
+       # Compute pressure gradient force scaling (buoyancy)
+       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
+       
+       # Compute partial and advection
+       PqPx = DqDx - DZDX * DqDz
+       #PqPx[ebcDex[0],:] *= 0.0
+       
+       # Compute advection
+       Uadvect = UM * PqPx
+       Wadvect = WM * (DqDz + DQDZ)
+       
+       # Boundary condition adjustments to pressure derivatives
+       args = [Uadvect, Wadvect, PqPx, DqDz, U, W, DQDZ, RdT, T_ratio, gc, ebcDex]
+       Uadvect, Wadvect = adjustDlnPforVerticalBC(*args)
+       
+       # Compute local divergence
+       divergence = PqPx[:,0] + DqDz[:,1]
+       
+       # Compute pressure gradient forces
+       pgradx = RdT * PqPx[:,2]
+       pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
        DqDt = -(Uadvect + Wadvect)
        # Horizontal momentum equation
@@ -374,7 +426,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
        
-       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex)
+       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex, DZDX)
                         
        return DqDt
 
@@ -387,117 +439,46 @@ def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFG, DZDX, RdT_ba
        # Get the Background fields
        DQDZ = REFG[2]
        
-       # Compute advective (multiplicative) operators
-       UM = np.expand_dims(U,1)
-       WM = np.expand_dims(W,1)
-       
        # Compute pressure gradient force scaling (buoyancy)
-       with warnings.catch_warnings():
-              np.seterr(all='raise')
-              try:
-                     earg = kap * fields[:,2] + fields[:,3]
-                     T_ratio = np.expm1(earg)
-                     RdT = RdT_bar * (T_ratio + 1.0)
-              except FloatingPointError:
-                     earg = kap * fields[:,2] + fields[:,3]
-                     earg_max = np.amax(earg)
-                     earg_min = np.amin(earg)
-                     print('In argument to local T ratio: ', earg_min, earg_max)
-                     pmax = np.amax(fields[:,2])
-                     pmin = np.amin(fields[:,2])
-                     print('Min/Max log pressures: ', pmin, pmax)
-                     tmax = np.amax(fields[:,3])
-                     tmin = np.amin(fields[:,3])
-                     print('Min/Max log potential temperature: ', tmin, tmax)
-                     # Compute buoyancy by approximation...
-                     T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
-                     RdT_hat = 1.0 + T_ratio
-                     RdT = RdT_bar * RdT_hat
-       
-       bdex = ebcDex[1]
-       tdex = ebcDex[2]
-       
-       #'''
-       # Compute W partial and advection
-       PwPx = DqDx[:,1] - DZDX[:,0] * DqDz[:,1]
-       Uadvect = UM[:,0] * PwPx
-       Wadvect = WM[:,0] * DqDz[:,1]
-       
-       # Adjust vertical pressure derivatives (top and bottom boundaries)
-       RdTI1 = np.reciprocal(RdT[bdex])
-       RdTI2 = np.reciprocal(RdT[tdex])
-       DqDz[bdex,2] = RdTI1 * (gc * T_ratio[bdex] - Uadvect[bdex] - Wadvect[bdex])
-       DqDz[tdex,2] = RdTI2 * (gc * T_ratio[tdex])
-       #'''
+       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
        # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
+       #PqPx[ebcDex[0],:] *= 0.0
        
        # Compute advection
+       UM = np.expand_dims(U,1)
+       WM = np.expand_dims(W,1)
+       
        Uadvect = UM * PqPx
        Wadvect = WM * (DqDz + DQDZ)
+       
+       # Boundary condition adjustments to pressure derivatives
+       args = [Uadvect, Wadvect, PqPx, DqDz, U, W, DQDZ, RdT, T_ratio, gc, ebcDex]
+       Uadvect, Wadvect = adjustDlnPforVerticalBC(*args)
+       
        DqDt = -(Uadvect + Wadvect)
        
-       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex)
+       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex, DZDX)
                         
        return DqDt
 
 # Semi-implicit internal force evaluation
-def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, ebcDex, zeroDex):
+def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDt_adv, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, ebcDex, zeroDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
        
        # Compute pressure gradient force scaling (buoyancy)
-       with warnings.catch_warnings():
-              np.seterr(all='raise')
-              try:
-                     #'''
-                     earg = kap * fields[:,2] + fields[:,3]
-                     T_ratio = np.expm1(earg)
-                     RdT = RdT_bar * (T_ratio + 1.0)
-                     #'''
-                     '''
-                     p_hat = np.exp(kap * fields[:,2], dtype=np.longdouble)
-                     RdT_hat = p_hat * np.exp(fields[:,3], dtype=np.longdouble)
-                     RdT = RdT_bar * RdT_hat
-                     T_ratio = RdT_hat - 1.0
-                     '''
-              except FloatingPointError:
-                     earg = kap * fields[:,2] + fields[:,3]
-                     earg_max = np.amax(earg)
-                     earg_min = np.amin(earg)
-                     print('In argument to local T ratio: ', earg_min, earg_max)
-                     pmax = np.amax(fields[:,2])
-                     pmin = np.amin(fields[:,2])
-                     print('Min/Max log pressures: ', pmin, pmax)
-                     tmax = np.amax(fields[:,3])
-                     tmin = np.amin(fields[:,3])
-                     print('Min/Max log potential temperature: ', tmin, tmax)
-                     # Compute buoyancy by approximation...
-                     T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
-                     RdT_hat = 1.0 + T_ratio
-                     RdT = RdT_bar * RdT_hat
+       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
-       ldex = ebcDex[0]
-       '''
        bdex = ebcDex[1]
        tdex = ebcDex[2]
-       # Compute W partial and advection
-       PwPx = DqDx[:,1] - DZDX[:,0] * DqDz[:,1]
-       Uadvect = UM[:,0] * PwPx
-       Wadvect = WM[:,0] * DqDz[:,1]
-       
-       # Adjust vertical pressure derivatives (top and bottom boundaries)
-       RdTI1 = np.reciprocal(RdT[bdex])
-       RdTI2 = np.reciprocal(RdT[tdex])
-       DqDz[bdex,2] = RdTI1 * (gc * T_ratio[bdex] - Uadvect[bdex] - Wadvect[bdex])
-       DqDz[tdex,2] = RdTI2 * (gc * T_ratio[tdex])
-       '''
        
        # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
+       #PqPx[ebcDex[0],:] *= 0.0
        
        # Compute local divergence
        divergence = PqPx[:,0] + DqDz[:,1]
@@ -506,10 +487,9 @@ def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFG, DZDX, Rd
        pgradx = RdT * PqPx[:,2]
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
-       # Lateral boundary condition
-       pgradx[ldex] *= 0.0
-       #pgradz[ldex] *= 0.0
-       #divergence[ldex] *= 0.0
+       # Boundary condition adjustments to PGF_x and PGF_z
+       pgradz[bdex] = gc * T_ratio[bdex] + DqDt_adv[bdex,1]
+       pgradz[tdex] = gc * T_ratio[tdex]
        
        DqDt = np.zeros(fields.shape)
        # Horizontal momentum equation
@@ -520,7 +500,7 @@ def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFG, DZDX, Rd
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
        
-       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex)
+       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex, DZDX)
                         
        return DqDt
 
@@ -548,7 +528,6 @@ def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, e
        
        DC1 = DCF[0][:,0] # XX
        DC2 = DCF[1][:,0] # ZZ
-       #DC3 = DCF[2][:,0] # XZ
             
        #%% INTERIOR DIFFUSION
        # Diffusion of u-w vector
@@ -597,7 +576,7 @@ def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, e
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr
        
-       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex)
+       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex, DZDX)
        
        return DqDt
 
@@ -652,6 +631,6 @@ def computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REF
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr
        
-       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex)
+       DqDt = fixEssentialBC(DqDt, zeroDex, ebcDex, DZDX)
               
        return DqDt

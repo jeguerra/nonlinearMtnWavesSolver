@@ -39,7 +39,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      CTM, DTM = hcnw.legpolym(NZ-1, xi, True)
                      
                      # Apply the interpolation
-                     temp = CTM.dot(fcoeffs)
+                     temp = (CTM.T).dot(fcoeffs)
                      FLDI[:,cc] = np.ravel(temp)
                      
               return FLDI

@@ -15,7 +15,7 @@ from scipy.special import roots_legendre
 #from scipy import linalg as las
 
 def lgfunclb(NX):
-       #'''
+       
        # Compute gauss-laguerre nodes and weights
        xi, dum = roots_genlaguerre(NX, 1)
        
@@ -26,7 +26,7 @@ def lgfunclb(NX):
        # Compute the Hermite function weights
        lf = lgfuncm(NX, xir, False)
        w = 1.0 / (NX+1) * np.power(lf, -2.0, dtype=np.longdouble)
-       #'''     
+
        return xir, w
 
 def lgfuncm(NX, xi, fullMat):
@@ -53,14 +53,14 @@ def lgfuncm(NX, xi, fullMat):
        elif NX == 1:
               return poly1
        
-       for nn in range(1,NX):
-              polyn = (2 * nn + 1 - xi) / (nn+1) * poly1
-              polyn -= nn / (nn+1) * poly0
+       for nn in range(2,NX+1):
+              polyn = (2 * (nn - 1) - xi + 1) / nn * poly1
+              polyn -= (nn - 1) / nn * poly0
               poly0 = poly1; 
               poly1 = polyn;
               # Put the new function in its matrix place
               if fullMat:
-                     LFM[nn+1,:] = polyn
+                     LFM[nn,:] = polyn
               else:
                      LFM = polyn
        #'''
@@ -151,7 +151,7 @@ def leglb(NZ):
        
        #print('Zeros of LP:', xlz)
        
-       NI = 10
+       NI = 100
        kk = 1
        # Compute interior zeros of DLP for LGL
        for ii in range(1,len(xlz)):
@@ -174,7 +174,7 @@ def leglb(NZ):
        
        return xi, wl
 
-def legpolym(NM, xi, fullMat):
+def legpolym(ND, xi, fullMat):
        
        try:
               NX = len(xi)
@@ -189,22 +189,19 @@ def legpolym(NM, xi, fullMat):
                         
        # Initialize the output matrices if needed
        if fullMat:
-              LTM = np.zeros((NX,NM+1))
-              LTM[:,0] = poly0
-              LTM[:,1] = poly1
-              DLTM = np.zeros((NX,NM+1))
-              DLTM[:,0] = dpoly0
-              DLTM[:,0] = dpoly1
+              LTM = np.zeros((ND+1,NX))
+              LTM[0,:] = poly0
+              LTM[1,:] = poly1
+              DLTM = np.zeros((ND+1,NX))
+              DLTM[0,:] = dpoly0
+              DLTM[1,:] = dpoly1
        
-       for nn in range(1,NM):
+       for nn in range(2,ND+1):
               # Compute the new polynomial
-              polyn = (2 * nn + 1) / (nn + 1) * xi * poly1
-              polyn -= nn / (nn + 1) * poly0
+              polyn = (2 * (nn-1) + 1) / nn * xi * poly1
+              polyn -= (nn-1) / nn * poly0
               # Compute the new polynomial derivative
-              dpolyn = (2 * nn + 1) * poly1 + dpoly0
-              # Set boundaries of derivative
-              #dpolyn[0] = 0.5 * (-1.0**(nn-1)) * nn * (nn + 1)
-              #dpolyn[-1] = 0.5 * (+1.0**(nn-1)) * nn * (nn + 1)
+              dpolyn = (2 * (nn-1) + 1) * poly1 + dpoly0
               # Update polynomials
               poly0 = poly1
               poly1 = polyn
@@ -213,8 +210,8 @@ def legpolym(NM, xi, fullMat):
               dpoly1 = dpolyn
               # Put the new function in its matrix place
               if fullMat:
-                     LTM[:,nn+1] = polyn
-                     DLTM[:,nn+1] = dpolyn
+                     LTM[nn,:] = polyn
+                     DLTM[nn,:] = dpolyn
               else:
                      LTM = polyn
                      DLTM = dpolyn

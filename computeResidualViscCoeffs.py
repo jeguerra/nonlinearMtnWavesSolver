@@ -195,7 +195,7 @@ def computeResidualViscCoeffs3(DIMS, RES, QM, VFLW, DLD, DLD2):
        
        return (CRES1, CRES2)
 
-def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2):
+def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2, NEX):
        
        # Get the dimensions
        NX = DIMS[3] + 1
@@ -203,7 +203,10 @@ def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2):
        OPS = DIMS[5]
        
        # Pixel size for image filter
-       MFS = (3,3)
+       if NEX == None:
+              MFS = (4,4)
+       else:
+              MFS = (int(NEX/2) + 1, 4)
        
        # Compute absolute value of residuals
        ARES = np.abs(RES)

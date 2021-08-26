@@ -161,8 +161,8 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               else:
                      plt.title(r'd(ln$\theta$)' + '\'/dt' + ' (K/s)')
                      
-              plt.xlim(-50.0, 50.0)
-              plt.ylim(0.0, 25.0)
+              #plt.xlim(-50.0, 50.0)
+              #plt.ylim(0.0, 25.0)
                      
               #%% Plot the full residuals
               plt.subplot(4,3,rowDex + 2)
@@ -198,8 +198,8 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               else:
                      plt.title('Residual: ' + r'(ln$\theta$)' + '\'')
                      
-              plt.xlim(-50.0, 50.0)
-              plt.ylim(0.0, 25.0)
+              #plt.xlim(-50.0, 50.0)
+              #plt.ylim(0.0, 25.0)
                      
        plt.tight_layout()
        #plt.show(block=False)
@@ -384,19 +384,43 @@ def runModel(TestName):
        verticalLagrGrid = False
        
        #%% FLAG FOR SCSE TESTING...
-       testSCSE = True
-       NE = 8 # Interior order for SCS elements
-       if testSCSE:
+       isSEM_X = True
+       isSEM_Z = False
+       NEX = 12
+       NEZ = 12
+       if isSEM_X and isSEM_Z:
+              isLaguerreEnds = False
+              DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
+              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEX / 2))
               HermCheb = True
               FourCheb = False
+       elif isSEM_X and not isSEM_Z:
+              isLaguerreEnds = False
+              DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
+              resx = (1.0, 1.0)
+              HermCheb = True
+              FourCheb = False
+       elif not isSEM_X and isSEM_Z:
+              isLaguerreEnds = False
+              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2))
+              HermCheb = True
+              FourCheb = False
+              
+       if isSEM_X:
+              print('@@ USING ' + str(DIMS[3]) + ' ELEMENTS IN X @@')
+              print('@@ INTERIOR ORDER: ' + str(NEX) + ' @@')
+              
+       if isSEM_Z:
+              print('@@ USING ' + str(DIMS[4]) + ' ELEMENTS IN Z @@')
+              print('@@ INTERIOR ORDER: ' + str(NEZ) + ' @@')
        
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
        REF0 = computeGrid(DIM0, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid, verticalLagrGrid)
        
        DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
-       if testSCSE:
-              DDXP, REF0[0] = derv.computeSCSElementDerivativeMatrix(REF0[0], NE)
+       if isSEM_X:
+              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isLaguerreEnds, resx)
               DIM0[3] = len(REF0[0]) - 1
        else:
               DDXP, HHT = derv.computeHermiteFunctionDerivativeMatrix(DIM0)
@@ -413,7 +437,7 @@ def runModel(TestName):
        plt.figure()
        plt.plot(REF0[0], dhx)
        plt.show()
-       input()
+       input("TOPOGRAPHY CHECK...")
        '''
        xl, ztl, dzt, sig, ZRL, DXM, DZM = \
               coords.computeGuellrichDomain2D(DIM0, REF0, zRay, hx, dhx, StaticSolve)
@@ -434,10 +458,10 @@ def runModel(TestName):
        #%% SET UP THE GRID AND INDEX VECTORS
        REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid, verticalLagrGrid)
       
-       # Compute the raw derivative matrix operators in alpha-xi computational space
+       #%% Compute the raw derivative matrix operators in alpha-xi computational space
        if HermCheb and not FourCheb:
-              if testSCSE:
-                     DDX_1D, REFS[0] = derv.computeSCSElementDerivativeMatrix(REFS[0], NE)
+              if isSEM_X:
+                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isLaguerreEnds, resx)
                      DIMS[3] = len(REFS[0]) - 1
                      NX = DIMS[3]
                      OPS = (NX + 1) * (NZ + 1)
@@ -449,8 +473,8 @@ def runModel(TestName):
               else:
                      DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        elif FourCheb and not HermCheb:
-              if testSCSE:
-                     DDX_1D, REFS[0] = derv.computeSCSElementDerivativeMatrix(REFS[0], NE)
+              if isSEM_X:
+                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isLaguerreEnds, resx)
                      DIMS[3] = len(REFS[0]) - 1
                      NX = DIMS[3]
                      OPS = (NX + 1) * (NZ + 1)
@@ -464,23 +488,57 @@ def runModel(TestName):
        else:
               DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
                             
-       #DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-       DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
-       #DDZ_1D, CH_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
+       if isSEM_Z:
+              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(REFS[1], NEZ, False, None)
+              DIMS[4] = len(REFS[1]) - 1
+              NZ = DIMS[4]
+              OPS = (NX + 1) * (NZ + 1)
+              DIMS[5] = OPS
+              udex = np.arange(OPS)
+              wdex = np.add(udex, OPS)
+              pdex = np.add(wdex, OPS)
+              tdex = np.add(pdex, OPS)
+       else:
+              DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+              
+       #%% APPLY BOUNDARY CONDITIONS TO OPERATORS
+       if isSEM_X:
+              # SEM Advection and diffusion operator periodic in X
+              DDX_1D = derv.computeAdjustedOperatorPeriodic(DDX_1D)
+              #DDX_CS = derv.computeAdjustedOperatorPeriodic(DDX_CS)
+              '''
+              # Derivative operator for diffusion has Neumann BC
+              DDX_CS1 = derv.computeAdjustedOperatorNBC(DDX_CS, DDX_CS, DDX_CS, 0)
+              DDX_CS2 = derv.computeAdjustedOperatorNBC(DDX_CS1, DDX_CS, DDX_CS, -1)
+              DDX_CS = np.copy(DDX_CS2)
+              del(DDX_CS2)
+              
+              # Derivative operator for diffusion has Neumann BC
+              DDZ_CS1 = derv.computeAdjustedOperatorNBC(DDZ_CS, DDZ_CS, DDZ_CS, 0)
+              DDZ_CS2 = derv.computeAdjustedOperatorNBC(DDZ_CS1, DDZ_CS, DDZ_CS, -1)
+              DDZ_CS = np.copy(DDZ_CS2)
+              del(DDZ_CS2)
+              '''
        
-       # Turn on compact finite difference...
-       DDX_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       DDZ_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-       # Turn on cubic spline derivatives
-       if testSCSE:
-              DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, False, False, None)
+       #%% Set derivative operators for diffusion
+       if isSEM_X and isSEM_Z:
+              DDX_CS = np.copy(DDX_1D); DDX2_CS = DDX_CS.dot(DDX_CS)
+              DDZ_CS = np.copy(DDZ_1D); DDZ2_CS = DDZ_CS.dot(DDZ_CS)
+       elif isSEM_X and not isSEM_Z:
+              DDX_CS = np.copy(DDX_1D)
+              DDX2_CS = DDX_CS.dot(DDX_CS)
+              DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
+       elif not isSEM_X and isSEM_Z:
+              DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
+              DDZ_CS = np.copy(DDZ_1D)
+              DDZ2_CS = DDZ_CS.dot(DDZ_CS)
        else:
               DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
-       DDZ_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
-       
-       # Update the REFS collection
-       REFS.append(DDX_1D)
-       REFS.append(DDZ_1D)
+              DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
+              
+       #%% Update the REFS collection
+       REFS.append(DDX_1D) # index 2
+       REFS.append(DDZ_1D) # index 3
        
        #% Read in topography profile or compute from analytical function
        HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_1D)
@@ -593,27 +651,30 @@ def runModel(TestName):
        
        #%% DIFFERENTIATION OPERATORS
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       #DDXMS, DDZMS = devop.computePartialDerivativesXZ_BC(DIMS, REFS, DDX_CS, DDZ_CS, DDX_1D, DDZ_1D)
-       # 4th order compact finite difference (Gamet, 1999)
-       DDXM_D4, DDZM_D4 = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_D4, DDZ_D4)
-       # Cubic Spline first derivative matrix
+       
+       # Cubic Spline first derivative matrix (Neumann BC for diffusion)
        DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
        
        # Make the TF operators
        DZDX = np.reshape(DZT, (OPS,1), order='F')
        
+       # Prepare derivative operators for diffusion
+       from rsb import rsb_matrix
+       diffOps1 = (DDXM_CS, DDZM_CS)
+       diffOps2 = (rsb_matrix(DDXM_CS), rsb_matrix(DDZM_CS))
+       
        REFS.append((DDXMS, DDZMS)) # index 10
-       REFS.append((DDXMS, DDZM_CS)) # index 11
+       REFS.append(diffOps1) # index 11
        
        if not StaticSolve and RSBops:
-              from rsb import rsb_matrix
               # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZMS)))
-              REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZM_CS)))
+              REFS.append((rsb_matrix(DDXMS,shape=DDXMS.shape), \
+                           rsb_matrix(DDZMS,shape=DDZMS.shape)))
+              REFS.append(diffOps2)
        elif not StaticSolve and not RSBops:
               # Native sparse
               REFS.append((DDXMS, DDZMS))
-              REFS.append((DDXM_CS, DDZM_CS))
+              REFS.append(diffOps1)
        else: 
               # Matrix operators for Jacobian assembly
               REFS.append(DDXM_CS)
@@ -632,7 +693,7 @@ def runModel(TestName):
        REFG.append(D2QDZ2)
        
        if not StaticSolve:
-              NL = 8 # Number of eigenvalues to inspect...
+              NL = 6 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
               minDex = np.argmax(REFS[7][0,:])
@@ -640,8 +701,8 @@ def runModel(TestName):
               DXE = (DDX_1D).astype(dtype=np.double)
               DZE = (SIGMA.dot(DDZ_1D)).astype(dtype=np.double)
               
-              DX_eig = spl.eigs(DXE, k=NL, which='LI', return_eigenvectors=False)
-              DZ_eig = spl.eigs(DZE, k=NL, which='LR', return_eigenvectors=False)
+              DX_eig = spl.eigs(DXE, k=NL, which='LM', return_eigenvectors=False)
+              DZ_eig = spl.eigs(DZE, k=NL, which='LM', return_eigenvectors=False)
               
               print('Eigenvalues (largest magnitude) of derivative matrices:')
               print('X: ', DX_eig)
@@ -667,7 +728,16 @@ def runModel(TestName):
               print('Z: ', DZ_spr)
               
               # Diffusion filter grid length based on resolution powers
-              DLD = (1.0 * DX_spr, 1.0 * DZ_spr)
+              if isSEM_X and isSEM_Z:
+                     fx = 1.0; fz = 1.0
+              elif isSEM_X and not isSEM_Z:
+                     fx = 1.0; fz = 1.0
+              elif not isSEM_X and isSEM_Z:
+                     fx = 1.0; fz = 1.0
+              else:
+                     fx = 1.0; fz = 1.0
+                     
+              DLD = (fx * DX_spr, fz * DZ_spr)
               DLD2 = DLD[0] * DLD[1]
               del(DXE); del(DZE)
               
@@ -676,8 +746,8 @@ def runModel(TestName):
               DZ = DZ_min
               DLS = 2.0 * min(DX, DZ)
               #'''              
-       del(DDXMS); del(DDXM_D4); del(DDXM_CS)
-       del(DDZMS); del(DDZM_D4); del(DDZM_CS)
+       del(DDXMS); del(DDXM_CS)
+       del(DDZMS); del(DDZM_CS)
        del(DZDX)
        del(GMLOP)
        
@@ -747,7 +817,7 @@ def runModel(TestName):
               # Compute the RHS for this iteration
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
-              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, \
+              rhs = eqs.computeEulerEquationsLogPLogT_StaticResidual(PHYS, DqDx, DqDz, REFG, \
                                                          REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
               rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
               
@@ -996,7 +1066,7 @@ def runModel(TestName):
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
-              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, \
+              rhs = eqs.computeEulerEquationsLogPLogT_StaticResidual(PHYS, DqDx, DqDz, REFG, \
                                                          REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
               rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
               RHS = np.reshape(rhs, (physDOF,), order='F')
@@ -1028,11 +1098,11 @@ def runModel(TestName):
               # Initialize netcdf output
               from netCDF4 import Dataset
               
-              isRestartFromNC = True
+              isRestartFromNC = False
               if isRestartFromNC:
                      try:
                             rdex = -1
-                            fname = 'transientNL3587.nc'
+                            fname = 'DynSGS_SEM-Legendre_02Hour.nc'
                             m_fid = Dataset(fname, 'r', format="NETCDF4")
                             thisTime = m_fid.variables['t'][rdex]
                             fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
@@ -1122,21 +1192,25 @@ def runModel(TestName):
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
+                            
+                            if makePlots:
+                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
                      
                      if ti % ITI == 0:
-                            # Store current time
+                            # Store current time to NC file
                             tmvar[ff-1] = thisTime
+                            PqPx = DqDx - REFS[15] * DqDz
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
-                                   #dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
-                                   dqdt = np.reshape(DqDx[:,pp], (NZ+1, NX+1), order='F')
-                                   
+                                   dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
+                                   #dqdt = np.reshape(PqPx[:,pp], (NZ+1, NX+1), order='F')
+                                   '''
                                    if pp == 3:
                                           PqPx = DqDx - REFS[15] * DqDz
                                           div = PqPx[:,0] + DqDz[:,1]
                                           dqdt = np.reshape(div, (NZ+1, NX+1), order='F')
-                                   
+                                   '''
                                    if pp == 0:
                                           uvar[ff-1,:,:] = q
                                           duvar[ff-1,:,:] = dqdt
@@ -1152,10 +1226,6 @@ def runModel(TestName):
                                           
                             dvar0[ff-1,:,:] = np.reshape(DCF[0], (NZ+1, NX+1), order='F')
                             dvar1[ff-1,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
-                                          
-                            if makePlots:
-                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
-                                   
                             ff += 1
                             
                      # Compute the solution within a time step
@@ -1182,7 +1252,7 @@ def runModel(TestName):
                             rhsVec0 = np.array(rhsVec)
                             # Update the diffusion coefficients
                             DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
+                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
@@ -1196,7 +1266,7 @@ def runModel(TestName):
                             #filtType = 'maximum'
                             #DQ = Q - np.mean(Q)
                             #QM = bn.nanmax(np.abs(DQ), axis=0)
-                            newDiff = rescf.computeResidualViscCoeffs4(DIMS, resVec, QM, VFLW, DLD, DLD2)
+                            newDiff = rescf.computeResidualViscCoeffs4(DIMS, resVec, QM, VFLW, DLD, DLD2, NEX)
                             
                             DCF[0][:,0] = newDiff[0]
                             DCF[1][:,0] = newDiff[1]
@@ -1210,8 +1280,8 @@ def runModel(TestName):
                             DTN = DLS / bn.nanmax(VSND)
                             
                             # Update the local time step
-                            thisTime += TOPT[0]
                             TOPT[0] = DTN
+                            
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             m_fid.close() 
@@ -1355,8 +1425,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'SmoothStratScharIter'
        #TestName = 'DiscreteStratScharIter'
-       TestName = '3LayerTest'
-       #TestName = 'UniformTest'
+       #TestName = '3LayerTest'
+       TestName = 'UniformTest'
        
        # Run the model in a loop if needed...
        for ii in range(1):

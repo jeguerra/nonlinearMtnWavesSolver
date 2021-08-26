@@ -22,25 +22,30 @@ def function0(x):
 
 def function1(x):
        
-       x2 = np.multiply(x, x)
-       Y = 5.0 * np.exp(-5.0 * x) + \
-       np.cos(4.0 * mt.pi * x2)
+       A = 5.0
+       B = 8.0
+       C = 5.0
        
-       DY = -25.0 * np.exp(-5.0 * x)
-       term1 = 8.0 * mt.pi * x
-       term2 = np.sin(4.0 * mt.pi * x2)
+       x2 = np.multiply(x, x)
+       
+       Y = A * np.exp(-C * x) + \
+       np.cos(B * mt.pi * x2)
+       
+       DY = -(A*C) * np.exp(-C * x)
+       term1 = (2*B) * mt.pi * x
+       term2 = np.sin(B * mt.pi * x2)
        DY -= np.multiply(term1, term2)
 
        return Y, DY
 
-def function2(x):
+def function2(x, L):
        
-       A = 5.0
-       B = 3.0
+       A = 4.0
+       B = 2.0
        C = 4.0
-       Y = C * np.exp(-A / ZH * x) * np.sin(B * mt.pi / ZH * x)
-       DY = -(A * C) / ZH * np.exp(-A / ZH * x) * np.sin(B * mt.pi / ZH * x)
-       DY += (B * C) * mt.pi / ZH * np.exp(-A / ZH * x) * np.cos(B * mt.pi / ZH * x)
+       Y = C * np.exp(-A / L * x) * np.sin(B * mt.pi / L * x)
+       DY = -(A * C) / L * np.exp(-A / L * x) * np.sin(B * mt.pi / L * x)
+       DY += (B * C) * mt.pi / L * np.exp(-A / L * x) * np.cos(B * mt.pi / L * x)
        
        return Y, DY
 
@@ -48,30 +53,40 @@ L2 = 1.0E4 * 3.0
 L1 = -L2
 ZH = 42000.0
 
-#%% SCSE DIFF DERIVATIVE TEST
-NX = 30
+NX = 123
 NZ = 16
-NE = 6
-DIMS = [L1, L2, ZH, NX, NZ]
+NN = 10
+NE = 10
 
+DIMS = [L1, L2, ZH, NX, NZ]
+DIMS_EL = [L1, L2, ZH, NN, NZ]
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS, False, False, False, True, False)
+REFS = computeGrid(DIMS, True, False, False, True, False)
+REFS_EL = computeGrid(DIMS_EL, True, False, False, True, False)
+
+#%% SCSE VS SPECTRAL TEST Z DIRECTION
 
 # NEW Spectral Cubic Spline Derivative matrix
-DDZ_SCS, ZE = derv.computeSCSElementDerivativeMatrix(REFS[0], NE)
-DDZ2_SCS = DDZ_SCS.dot(DDZ_SCS)
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(ZE, False, True, False, False, None)
+DDZ_SCSE, ZE = derv.computeSCSElementDerivativeMatrix(REFS_EL[0], NE, False, (1.0, 1.0))
+DDZ2_SCSE = DDZ_SCSE.dot(DDZ_SCSE)
+DDZ_SEM, ZE = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NE, False, (1.0, 1.0))
+DDZ2_SEM = DDZ_SEM.dot(DDZ_SEM)
+#DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(ZE, False, True, False, False, None)
 
 zv = (1.0 / ZH) * ZE
 Y1, DY1 = function1(zv)
 
-DYD1 = ZH * DDZ_SCS.dot(Y1)
-DYD2 = ZH**2 * DDZ2_SCS.dot(Y1)
+DYD1_SEM = ZH * DDZ_SEM.dot(Y1)
+DYD1_SCSE = ZH * DDZ_SCSE.dot(Y1)
+DYD2_SEM = ZH**2 * DDZ2_SEM.dot(Y1)
+DYD2_SCSE = ZH**2 * DDZ2_SCSE.dot(Y1)
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(zv, Y1, label='Function')
 plt.plot(zv, DY1, 'r-', label='Analytical Derivative')
-plt.plot(zv, DYD1, 'ko--', label='SCSE 1st Derivative')
-plt.plot(zv, DYD2, 'go--', label='SCSE 2nd Derivative')
+plt.plot(zv, DYD1_SEM, 'ko--', label='SEM 1st Derivative')
+plt.plot(zv, DYD1_SCSE, 'ks--', label='SCSE 1st Derivative')
+plt.plot(zv, DYD2_SEM, 'g+--', label='SEM 2nd Derivative')
+plt.plot(zv, DYD2_SCSE, 'b+--', label='SCSE 2nd Derivative')
 plt.xlabel('Domain')
 plt.ylabel('Functions')
 plt.title('Spectral Cubic Spline Elements')
@@ -80,7 +95,8 @@ plt.legend()
 #plt.savefig("DerivativeTestZ_SCSE.png")
 
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(zv, (DY1 - DYD1), 'ko-', label='SCSE 1st Derivative')
+plt.plot(zv, np.abs(DYD1_SEM - DY1), 'bo-', label='SEM |Error|')
+plt.plot(zv, np.abs(DYD1_SCSE - DY1), 'gs-', label='SCSE |Error|')
 plt.xlabel('Domain')
 plt.ylabel('Derivative Error')
 plt.title('Spectral Cubic Spline Elements')
@@ -88,11 +104,63 @@ plt.grid(b=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeErrorTestZ_SCSE.png")
 
+#%% SCSE VS SPECTRAL TEST X DIRECTION
+xv = REFS[0]
+# Set the terrain options0
+h0 = 2000.0
+aC = 10000.0
+lC = 12000.0
+kC = 2.5E+4
+HOPT = [h0, aC, lC, kC, False, 3]
+
+DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+DDX_SCS, DDX2A_SCS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
+
+HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT, DDX_1D)
+DYD_SPT = DDX_1D.dot(HofX)    
+DYD_SCS = DDX_SCS.dot(HofX)
+
+#DDX_SEM, xe = derv.computeSCSElementDerivativeMatrix(REFS_EL[0], NE, False, (1.0, 1.0))
+DDX_SEM, xe = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NE, False, (1.0, 1.0))
+DDX_CSN, temp = derv.computeCubicSplineDerivativeMatrix(xe, False, True, False, False, None)
+REFS[0] = xe
+HofX1, dHdX1 = top.computeTopographyOnGrid(REFS, HOPT, DDX_SEM)
+DYD_SEM = DDX_SEM.dot(HofX1)
+DYD_CSN = DDX_CSN.dot(HofX1)
+
+plt.figure(figsize=(8, 6), tight_layout=True)
+plt.plot(xe, dHdX1, 'r-', label='Analytical Derivative')
+plt.plot(xv, DYD_SPT, 'r--', label='Spectral Derivative')
+plt.plot(xv, DYD_SCS, 'bs--', label='Spectral Cubic Spline Derivative')
+plt.plot(xe, DYD_SEM, 'go--', label='Spectral Element Derivative')
+plt.plot(xe, DYD_CSN, 'k+--', label='Natural Cubic Spline Derivative')
+#plt.xlim(-12500.0, 12500.0)
+plt.xlabel('Domain')
+plt.ylabel('Slope')
+plt.title('Hermite Function Derivative Test')
+plt.grid(b=True, which='both', axis='both')
+plt.legend()
+#plt.savefig("DerivativeTestX.png")
+
+plt.figure(figsize=(8, 6), tight_layout=True)
+plt.plot(xv, np.abs(DYD_SPT - dHdX), 'r--', label='Spectral Derivative')
+plt.plot(xv, np.abs(DYD_SCS - dHdX), 'bs-', label='Spectral CS Derivative')
+plt.plot(xe, np.abs(DYD_SEM - dHdX1), 'go-', label='SEM Derivative')
+plt.plot(xe, np.abs(DYD_CSN - dHdX1), 'k+-', label='CSN Derivative')
+plt.grid(b=True, which='both', axis='both')
+plt.legend()
+#plt.savefig("DerivativeErrorTestX.png")
+
+print('Spectral Derivative: ', np.count_nonzero(DDX_1D))
+print('Spectral CS Derivative: ', np.count_nonzero(DDX_SCS))
+print('Natural Cubic Spline Derivative: ', np.count_nonzero(DDX_CSN))
+print('Spectral Element Derivative: ', np.count_nonzero(DDX_SEM))
+
 #%% SPECTRAL TRANSFORM TESTS
 
 # Set grid dimensions and order
-NX = 128
-NZ = 64
+NX = 48
+NZ = 48
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
@@ -112,7 +180,6 @@ DDZ_CFD, DDZ2A_CFD = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, Fals
 DDZ2A_CFD = DDZ_CFD.dot(DDZ_CFD)
 DDZ2B_CFD = derv.computeCompactFiniteDiffDerivativeMatrix2(DIMS, REFS[1])
 
-#%% COMPACT FINITE DIFF DERIVATIVE TEST
 zv = (1.0 / ZH) * REFS[1]
 Y, DY = function1(zv)
 
@@ -136,74 +203,29 @@ plt.grid(b=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeTestZ_CFD.png")
 
-#%% HERMITE FUNCTION DERIVATIVE TEST
-xv = REFS[0]
-# Set the terrain options0
-h0 = 2000.0
-aC = 5000.0
-lC = 4000.0
-kC = 1.5E+4
-HOPT = [h0, aC, lC, kC, False, 1]
-
-HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT, DDX_1D)
-DYD_SPT = DDX_1D.dot(HofX)    
-DYD_CFD = DDX_CFD.dot(HofX)
-
-#NX = 16
-NZ = 25
-NE = 5
-DIMS = [L1, L2, ZH, NX, NZ]
-
-# Define the computational and physical grids+
-REFS = computeGrid(DIMS, True, False, False, True, False)
-DDX_SCS, xe = derv.computeSCSElementDerivativeMatrix(REFS[0], NE)
-DDX_CSN, temp = derv.computeCubicSplineDerivativeMatrix(xe, False, True, False, False, None)
-REFS[0] = xe
-HofX1, dHdX1 = top.computeTopographyOnGrid(REFS, HOPT, DDX_SCS)
-DYD_CSN = DDX_CSN.dot(HofX1)
-
-plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(xv, DYD_SPT, 'r-', label='Spectral Derivative')
-plt.plot(xv, DYD_CFD, 'bs--', label='Cubic Spline Derivative')
-plt.plot(xe, dHdX1, 'go--', label='Spectral CS Element Derivative')
-plt.plot(xe, DYD_CSN, 'k+--', label='Natural Cubic Spline Derivative')
-#plt.xlim(-12500.0, 12500.0)
-plt.xlabel('Domain')
-plt.ylabel('Slope')
-plt.title('Hermite Function Derivative Test')
-plt.grid(b=True, which='both', axis='both')
-plt.legend()
-#plt.savefig("DerivativeTestX.png")
-
-plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(xv, (DYD_SPT - DYD_CFD), 'ko-', label='Hermite Sample')
-plt.grid(b=True, which='both', axis='both')
-plt.legend()
-#plt.savefig("DerivativeErrorTestX.png")
-
 #%% LAGUERRE FUNCTION DERIVATIVE TEST
-NZ = 64
+NZ = 24
 DIMS[-1] = NZ
 import HerfunChebNodesWeights as hcl
 
 xi, whf = hcl.lgfunclb(NZ) #[0 inf]
 zv1 = 1.0 / np.amax(xi) * xi
-Y1, DY1 = function1(zv1)
-DDZ_LG, LG_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
+Y1, DY1 = function2(zv1, 1.0)
+DDZ_LG, LG_TRANS, scale, wlg = derv.computeLaguerreDerivativeMatrix(DIMS)
 DYD_LG = ZH * DDZ_LG.dot(Y1)
 
 xi, whf = hcl.leglb(NZ) #[-1 1]
 zv2 = (0.5 * (xi + 1.0))
-Y2, DY2 = function1(zv2)
+Y2, DY2 = function2(zv2, 1.0)
 DDZ_LD, LD_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
 DYD_LD = ZH * DDZ_LD.dot(Y2)
 
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(zv2, Y2, label='Function')
+#plt.plot(zv2, Y2, label='Function')
 plt.plot(zv2, DY2, 'rs-', label='Analytical Derivative')
-plt.plot(zv1, DYD_LG, 'k--', label='Laguerre Derivative')
-plt.plot(zv2, DYD_LD, 'b--', label='Legendre Derivative')
-plt.ylim([1.5*min(DY2), 1.5*max(DY2)])
+plt.plot(zv1, DYD_LG, 'ko--', label='Laguerre Derivative')
+plt.plot(zv2, DYD_LD, 'bo--', label='Legendre Derivative')
+#plt.ylim([1.5*min(DY2), 1.5*max(DY2)])
 plt.xlabel('Domain')
 plt.ylabel('Functions')
 plt.title('Spectral Derivative Test')

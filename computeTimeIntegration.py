@@ -41,19 +41,23 @@ def plotRHS(x, rhs, ebcDex, label):
 def enforceEssentialBC(sol, init, zeroDex, ebcDex, DZDX):
        
        # Enforce essential boundary conditions
-       bdex = ebcDex[1]
        sol[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
        sol[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
        sol[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
        sol[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
-       U = sol[:,0] + init[:,0]
-       sol[bdex,1] = np.array(DZDX[bdex,0] * U[bdex])
+       
+       #bdex = ebcDex[1]
+       #U = sol[:,0] + init[:,0]
+       #sol[bdex,1] = np.array(DZDX[bdex,0] * U[bdex])
        
        return sol
 
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
                               sol0, dsol0, init0, zeroDex, ebcDex, \
                               DynSGS, DCF, isFirstStep):
+       
+       NX = DIMS[3] + 1
+       NZ = DIMS[4] + 1
        
        DT = TOPT[0]
        order = TOPT[3]
@@ -67,109 +71,87 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
-              DDXM_CPU = REFS[10][0]
-              DDZM_CPU = REFS[10][1]
+              DDXM_A = REFS[10][0]
+              DDZM_A = REFS[10][1]
        else:
               # Use multithreading on CPU and GPU
-              DDXM_CPU = REFS[12][0]
-              DDZM_CPU = REFS[12][1]
+              DDXM_A = REFS[12][0]
+              DDZM_A = REFS[12][1]
        
-       DDXM_CFD = REFS[13][0]
-       DDZM_CFD = REFS[13][1]
-              
-       def updateDiffusionCoefficients(sol, dsol, rhsDyn):
-              
-              # Compute sound speed
-              #T_ratio = np.expm1(PHYS[4] * sol[:,2] + sol[:,3])
-              #RdT = REFS[9][0] * (1.0 + T_ratio)
-              #VSND = np.sqrt(PHYS[6] * RdT)
-              
-              UD = sol[:,0] + init0[:,0]
-              WD = sol[:,1]
-              
-              # Compute the current residual
-              resDyn = (1.0 / DT) * dsol - rhsDyn
-              #resDyn = rhsDyn
-              
-              # Compute DynSGS or Flow Dependent diffusion coefficients
-              #DQ = sol - np.mean(sol)
-              QM = bn.nanmax(np.abs(sol), axis=0)
-              #newDiff = rescf.computeResidualViscCoeffs2(DIMS, resDyn, QM, np.abs(UD), np.abs(WD), DLD, DLD2)
-              
-              vel = np.stack((UD, WD),axis=1)
-              VFLW = np.linalg.norm(vel, axis=1)# + VSND
-              newDiff = rescf.computeResidualViscCoeffs3(DIMS, resDyn, QM, VFLW, DLD, DLD2)
-                            
-              return newDiff
+       DDXM_B = REFS[13][0]
+       DDZM_B = REFS[13][1]
                      
-       def computeUpdate(coeff, solA, sol2Update, useDerivativeCS):
+       def computeUpdate(coeff, solA, sol2Update):
               tol = 1.0E-15
+              DF = coeff * DT
               
-              if useDerivativeCS:
-                     # Use the Cubic Spline derivatives (as a kind of filter)
-                     DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CFD, DDZM_CFD)
-              else:
-                     # Use the spectral derivatives
-                     DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_CPU, DDZM_CPU)
+              RayDamp = np.reciprocal(1.0 + (mu * DF) * RLM.data)
+              
+              # Append log perturbation u and w... for advection
+              U = solA[:,0] + init0[:,0]
+              W = solA[:,1]
+              
+              # Compute first derivatives
+              DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
               
               # Numerical "clean up" here
               DqDx[np.abs(DqDx) < tol] = 0.0
               DqDz[np.abs(DqDz) < tol] = 0.0
               
-              # Compute dynamics update
-              rhsDyn = computeRHSUpdate_dynamics(solA, DqDx, DqDz, coeff * DT)
+              # Compute advective update (explicit)
+              #rhsDyn = computeRHSUpdate_dynamics(solA, U, W, DqDx, DqDz, coeff * DT)
+              args1 = [PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
+              rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
               
+              # Apply explicit part of the update
+              solAdv = solA + DF * rhsAdv
+              
+              # Compute internal forces (semi implicit)
+              args2 = [PHYS, rhsAdv, DqDx, DqDz, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
+              rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
+              
+              solB = sol2Update + DF * (rhsAdv + rhsFrc)
+              #'''
               # Compute 2nd derivatives
               if diffusiveFlux:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDXM_CFD, DDZM_CFD, DZDX)
+                     tendency.computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDXM_B, DDZM_B, DZDX)
               else:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_CFD, DDZM_CFD, DZDX)
+                     tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_B, DDZM_B, DZDX)
                      
-              # Compute the diffusion RHS
+              # Compute diffusive update (explicit)
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
               
-              # Compute density scaling
-              '''
-              T_ratio = np.expm1(PHYS[4] * solA[:,2] + solA[:,3])
-              RdT = REFS[9][0] * (1.0 + T_ratio)
-              P = np.exp(solA[:,2] + init0[:,2])
-              irho = np.expand_dims(RdT * np.reciprocal(P),1)
-              '''
-              # Apply update
-              solB = sol2Update + (coeff * DT * (rhsDyn + rhsDif))
+              # Apply diffusion update
+              solB += DF * rhsDif
               
               # Apply Rayleigh layer implicitly
-              propagator = np.reciprocal(1.0 + (mu * coeff * DT) * RLM.data)
-              solB = propagator.T * solB
-              
-              solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)
+              solB = (RayDamp.T) * solB
+              #'''
+              #solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)
               
               # Filter the solution to prevent underflow
               solB[np.abs(solB) < tol] = 0.0
               
               return solB
        
-       def computeRHSUpdate_dynamics(fields, DqDx, DqDz, DT):
-              U = fields[:,0] + init0[:,0]
-              W = fields[:,1]
+       def computeRHSUpdate_dynamics(sol, U, W, DqDx, DqDz, DT):
               
               # Compute dynamical tendencies
-              #rhs = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex)
-              
-              args1 = [PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex]
+              #rhs = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, sol, U, W, ebcDex, zeroDex)
+              #'''
+              args1 = [PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, sol, U, W, ebcDex, zeroDex]
               rhsAdvection = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
               
-              solAdv = fields + DT * rhsAdvection
-              solAdv = enforceEssentialBC(solAdv, init0, zeroDex, ebcDex, DZDX)
-              #DqDx, DqDz = tendency.computeFieldDerivatives(solAdv, DDXM_CPU, DDZM_CPU)
+              solAdv = sol + DT * rhsAdvection
+              #DqDx, DqDz = tendency.computeFieldDerivatives(solAdv, DDXM_A, DDZM_A)
               
-              args2 = [PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
+              args2 = [PHYS, rhsAdvection, DqDx, DqDz, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
               rhsInternalF = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
               
               rhs = rhsAdvection + rhsInternalF
-              
+              #'''
               return rhs
        
        def computeRHSUpdate_diffusion(fields, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz):
@@ -185,32 +167,32 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        
        def ssprk43(sol):
               # Stage 1
-              sol1 = computeUpdate(0.5, sol, sol, False)
+              sol1 = computeUpdate(0.5, sol, sol)
               # Stage 2
-              sol2 = computeUpdate(0.5, sol1, sol1, False)
+              sol2 = computeUpdate(0.5, sol1, sol1)
               # Stage 3
               sol = np.array(2.0 / 3.0 * sol + 1.0 / 3.0 * sol2)
-              sol1 = computeUpdate(1.0 / 6.0, sol, sol, False)
+              sol1 = computeUpdate(1.0 / 6.0, sol, sol)
               # Stage 4
-              sol = computeUpdate(0.5, sol, sol, False)
+              sol = computeUpdate(0.5, sol, sol)
               
               return sol
        
        def ssprk53_Opt(sol):
               # Optimized truncation error to SSP coefficient method from Higueras, 2019
               # Stage 1
-              sol1 = computeUpdate(0.377268915331368, sol, sol, False)
+              sol1 = computeUpdate(0.377268915331368, sol, sol)
               # Stage 2
-              sol2 = computeUpdate(0.377268915331368, sol1, sol1, False)
+              sol2 = computeUpdate(0.377268915331368, sol1, sol1)
               # Stage 3
               sol3 = np.array(0.426988976571684 * sol + 0.5730110234283154 * sol2)
-              sol2 = computeUpdate(0.216179247281718, sol2, sol3, False)
+              sol2 = computeUpdate(0.216179247281718, sol2, sol3)
               # Stage 4
               sol3 = np.array(0.193245318771018 * sol + 0.199385926238509 * sol1 + 0.607368754990473 * sol2)
-              sol2 = computeUpdate(0.229141351401419, sol2, sol3, False)
+              sol2 = computeUpdate(0.229141351401419, sol2, sol3)
               # Stage 5
               sol3 = np.array(0.108173740702208 * sol1 + 0.891826259297792 * sol2)
-              sol = computeUpdate(0.336458325509300, sol2, sol3, False)
+              sol = computeUpdate(0.336458325509300, sol2, sol3)
               
               return sol
        

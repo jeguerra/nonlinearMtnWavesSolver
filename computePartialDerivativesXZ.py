@@ -21,7 +21,7 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
        # Unwrap the 1D derivative matrices into 2D operators
        
        #%% Vertical derivative and diffusion operators
-       DDZ_OP = np.empty((OPS,OPS))
+       DDZ_OP = sps.lil_matrix((OPS,OPS))
        for cc in range(NX):
               # Advanced slicing used to get submatrix
               ddex = np.array(range(NZ)) + cc * NZ
@@ -30,17 +30,17 @@ def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
               DDZ_OP[np.ix_(ddex,ddex)] = SIGMA.dot(DDZ_1D)
               
        # Make the operators sparse
-       DDZM = sps.csr_matrix(DDZ_OP); del(DDZ_OP)
+       DDZM = DDZ_OP.tocsr()
            
        #%% Horizontal Derivative
-       DDX_OP = np.empty((OPS,OPS))
+       DDX_OP = sps.lil_matrix((OPS,OPS))
        for rr in range(NZ):
               ddex = np.array(range(0,OPS,NZ)) + rr
               # Advanced slicing used to get submatrix
               DDX_OP[np.ix_(ddex,ddex)] = DDX_1D
               
        # Make the operators sparse
-       DDXM = sps.csr_matrix(DDX_OP); del(DDX_OP)
+       DDXM = DDX_OP.tocsr()
 
        return DDXM, DDZM
 

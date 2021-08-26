@@ -15,8 +15,6 @@ from HerfunChebNodesWeights import chebpolym, cheblb
 from HerfunChebNodesWeights import lgfuncm, lgfunclb
 from HerfunChebNodesWeights import legpolym, leglb
 
-ZTOL = 1.0E-13
-
 def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex):
        # D2A is the operator to adjust
        # DOG is the original operator to adjust (unadjusted)
@@ -38,13 +36,201 @@ def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex):
        
        return DOP
 
-# Compute Spectral Cubic Spline Element 1st derivative matrix
-def computeSCSElementDerivativeMatrix(dom, NE):
+def computeAdjustedOperatorPeriodic(D2A):
+       # D2A is the operator to adjust
+       print('@@ PERIODIC BC @@')
+       DOP = np.copy(D2A)
+       
+       # Connect leading and trailing equations
+       DOP[0,:] += D2A[-1,:]
+       DOP[-1,:] += D2A[0,:]
+       DOP[0,:] *= 0.5
+       DOP[-1,:] *= 0.5
+       
+       return DOP
+
+def computeAdjustedOperatorNBC2(D2A, DOG, DD, tdex, isGivenValue, DP):
+       # D2A is the operator to adjust
+       # DOG is the original operator to adjust (unadjusted)
+       # DD is the 1st derivative operator
+       DOP = np.zeros(DD.shape)
+       # Get the column span size
+       NZ = DD.shape[1]
+       cdex = range(NZ)
+       cdex = np.delete(cdex, tdex)
+       
+       # For prescribed value:
+       if isGivenValue:
+              scale = -DD[tdex,tdex]
+       # For matching at infinity
+       else:
+              scale = (DP - DD[tdex,tdex])
+              
+       # Loop over columns of the operator and adjust for BC at z = H (tdex)
+       for jj in cdex:
+              factor = DD[tdex,jj] / scale
+              v1 = (D2A[:,jj]).flatten()
+              v2 = (DOG[:,tdex]).flatten()
+              nvector = v1 + factor * v2
+              DOP[:,jj] = nvector
+       
+       # Here DP works as the coefficient to the prescribed derivative
+       if not isGivenValue and abs(DP) > 0.0:
+              DOP[tdex,tdex] += DP
+       
+       return DOP
+
+def numericalCleanUp(DDM):
+       
+       N = DDM.shape
+       ZTOL = 1.0E-16
+       DDMC = np.copy(DDM)
+       # Clean up numerical zeros
+       for ii in range(N[0]):
+              for jj in range(N[1]):
+                     if abs(DDM[ii,jj]) <= ZTOL:
+                            DDMC[ii,jj] = 0.0
+       return DDMC
+
+# Compute Spectral Element 1st derivative matrix
+def computeSpectralElementDerivativeMatrix(dom, NE, isLaguerreEnds, resolutions):
        N = len(dom)
-       EF1 = 1.5
-       EF2 = 2.0 # Additive order adjustment to boundary elements
+       
+       # Get the resolution multipliers
+       if resolutions != None:
+              EF0 = resolutions[0]
+              EF1 = resolutions[1]
+       else:
+              EF0 = 1.0; EF1 = 1.0
+              
+       if isLaguerreEnds:
+              print('@@ USING Laguerre SEM at BC @@')
+
+       # Master grid
+       isLegendre = True
+       isChebyshev = False
+       if isLegendre:
+              print("@@ LEGENDRE SEM @@")
+              grid = [True, False, False, True, False]
+       
+       if isChebyshev:
+              print('@@ CHEBYSHEV SEM @@')
+              grid = [True, False, True, False, False]
+       
+       endGrid = [True, False, False, False, True]
+       
+       emats = []
+       MS = []
+       LE = []
+       
+       # Loop over each element in dom (N-1 in 1D)
+       for ee in range(N-1):
+              # Get the element coordinates
+              xa = dom[ee]
+              xb = dom[ee+1]
+              LE += [abs(xb - xa)]
+              
+              # Compute the local cubic-spline derivative matrix
+              if ee == 0:
+                     MS += [int(EF1 * NE)]
+                     SDIMS = [xa, xb, LE[ee], MS[ee], MS[ee]]
+                     if isLaguerreEnds:
+                            SREFS = computeGrid(SDIMS, *endGrid)
+                            sdom = -1.0 * np.flip(SREFS[1] + abs(xb))
+                            DMB, CMB, scale, wlg1 = computeLaguerreDerivativeMatrix(SDIMS)
+                            DMS = -1.0 * np.flip(np.flip(DMB,axis=0), axis=1)
+                     else:
+                            SREFS = computeGrid(SDIMS, *grid)
+                            sdom = SREFS[1] + xa
+                            if isLegendre:
+                                   DMS, CMB = computeLegendreDerivativeMatrix(SDIMS)
+                            if isChebyshev:
+                                   DMS, CMB = computeChebyshevDerivativeMatrix(SDIMS)
+                     
+              elif ee == N-2:
+                     MS += [int(EF1 * NE)]
+                     SDIMS = [xa, xb, LE[ee], MS[ee], MS[ee]]                     
+                     if isLaguerreEnds:
+                            SREFS = computeGrid(SDIMS, *endGrid)
+                            sdom = SREFS[1] + xa
+                            DMB, CMB, scale, wlg2 = computeLaguerreDerivativeMatrix(SDIMS)
+                            DMS = 1.0 * DMB
+                     else:
+                            SREFS = computeGrid(SDIMS, *grid)
+                            sdom = SREFS[1] + xa
+                            if isLegendre:
+                                   DMS, CMB = computeLegendreDerivativeMatrix(SDIMS)
+                            if isChebyshev:
+                                   DMS, CMB = computeChebyshevDerivativeMatrix(SDIMS)
+              else:
+                     MS += [int(EF0 * NE)]
+                     SDIMS = [xa, xb, LE[ee], MS[ee], MS[ee]]
+                     SREFS = computeGrid(SDIMS, *grid)
+                     sdom = SREFS[1] + xa
+                     if isLegendre:
+                            DMS, CMB = computeLegendreDerivativeMatrix(SDIMS)
+                     if isChebyshev:
+                            DMS, CMB = computeChebyshevDerivativeMatrix(SDIMS)
+              
+              # Make a list of element matrices
+              emats += [DMS]
+              
+              if ee == 0:
+                     edom = sdom
+              else:
+                     edom = np.append(edom, sdom[1:])
+                     
+       # Loop over each dof and assemble the global matrix
+       for ee in range(N-1):
+                     
+              bdex = -(MS[ee]+2)
+              tdex = -(MS[ee]+1)
+                            
+              if ee == 0:
+                     DDMS = emats[ee]
+              else:
+                     # Append the next matrix
+                     DDMS = scl.block_diag(DDMS, emats[ee])
+                     
+                     # Combine coincident row/col
+                     acol = np.delete(DDMS[:,bdex], tdex)
+                     bcol = np.delete(DDMS[:,tdex], bdex)
+                     arow = np.delete(DDMS[bdex,:], tdex)
+                     brow = np.delete(DDMS[tdex,:], bdex)
+                     # Scaling of matched coefficients here
+                     LM = (LE[ee-1] + LE[ee])
+                     asc = LE[ee-1] / LM
+                     bsc = LE[ee] / LM
+                     
+                     mrow = (asc * arow + bsc * brow)
+                     #mrow = 0.5 * (arow + brow)
+                     mcol = (1.0 * acol + 1.0 * bcol)
+                     
+                     # Delete redundant row/col
+                     DDMS = np.delete(DDMS, tdex, axis=0)
+                     DDMS = np.delete(DDMS, tdex, axis=1)
+                     
+                     # Set the merged row/col
+                     DDMS[:,tdex] = mcol
+                     DDMS[tdex,:] = mrow
+       
+       DDMSA = numericalCleanUp(DDMS)
+       
+       return DDMSA, edom
+
+# Compute Spectral Cubic Spline Element 1st derivative matrix
+def computeSCSElementDerivativeMatrix(dom, NE, isLaguerreEnds, resolutions):
+       N = len(dom)
+       
+       # Get the resolution multipliers
+       if resolutions != None:
+              EF0 = resolutions[0]
+              EF1 = resolutions[1]
+       else:
+              EF0 = 1.0; EF1 = 1.0
        
        isClampedEnds = True
+       
        if isClampedEnds:
               rightEnd = [True, False, False, False]
               leftEnd = [True, False, False, False]
@@ -56,49 +242,61 @@ def computeSCSElementDerivativeMatrix(dom, NE):
        interior = [True, False, False, False]
        # Master grid
        grid = [True, False, False, True, False]
+       endGrid = [True, False, False, False, True]
        
        emats = []
+       MS = []
+       LE = []
+       
        # Loop over each element in dom (N-1 in 1D)
        for ee in range(N-1):
               # Get the element coordinates
               xa = dom[ee]
               xb = dom[ee+1]
+              LE += [abs(xb - xa)]
               
               # Compute the local cubic-spline derivative matrix
               if ee == 0:
-                     NB = int(EF2 * NE)
-                     SDIMS = [xa, xb, abs(xb - xa), NB, NB]
-                     SREFS = computeGrid(SDIMS, *grid)
-                     sdom = SREFS[1] + xa
-                     DMB, CMB = computeLegendreDerivativeMatrix(SDIMS)
-                     DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *leftEnd, DMB)
+                     MS += [int(EF1 * NE)]
+                     SDIMS = [xa, xb, LE[ee], MS[ee], MS[ee]]
+                     if isLaguerreEnds:
+                            SREFS = computeGrid(SDIMS, *endGrid)
+                            sdom = -1.0 * np.flip(SREFS[1] + abs(xb))
+                            DMB, CMB, scale, wlg1 = computeLaguerreDerivativeMatrix(SDIMS)
+                            DMB_back = -1.0 * np.flip(np.flip(DMB,axis=0), axis=1)
+                            DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *interior, DMB_back)
+                     else:
+                            SREFS = computeGrid(SDIMS, *grid)
+                            sdom = SREFS[1] + xa
+                            DMB, CMB = computeLegendreDerivativeMatrix(SDIMS)
+                            DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *interior, DMB)
+                     
               elif ee == N-2:
-                     NB = int(EF2 * NE)
-                     SDIMS = [xa, xb, abs(xb - xa), NB, NB]
-                     SREFS = computeGrid(SDIMS, *grid)
-                     sdom = SREFS[1] + xa
-                     DMB, CMB = computeLegendreDerivativeMatrix(SDIMS)
-                     DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *rightEnd, DMB)
-              elif ee == 1 or ee == N-3:
-                     NB = int(EF1 * NE)
-                     SDIMS = [xa, xb, abs(xb - xa), NB, NB]
-                     SREFS = computeGrid(SDIMS, *grid)
-                     sdom = SREFS[1] + xa
-                     DMB, CMB = computeLegendreDerivativeMatrix(SDIMS)
-                     DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *interior, DMB)
+                     MS += [int(EF1 * NE)]
+                     SDIMS = [xa, xb, LE[ee], MS[ee], MS[ee]]                     
+                     if isLaguerreEnds:
+                            SREFS = computeGrid(SDIMS, *endGrid)
+                            sdom = SREFS[1] + xa
+                            DMB, CMB, scale, wlg2 = computeLaguerreDerivativeMatrix(SDIMS)
+                            DMB_fwrd = 1.0 * DMB
+                            DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *interior, DMB_fwrd)
+                     else:
+                            SREFS = computeGrid(SDIMS, *grid)
+                            sdom = SREFS[1] + xa
+                            DMB, CMB = computeLegendreDerivativeMatrix(SDIMS)
+                            DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *interior, DMB)
               else:
-                     NB = int(1 * NE)
-                     SDIMS = [xa, xb, abs(xb - xa), NB, NB]
+                     MS += [int(EF0 * NE)]
+                     SDIMS = [xa, xb, LE[ee], MS[ee], MS[ee]]
                      SREFS = computeGrid(SDIMS, *grid)
                      sdom = SREFS[1] + xa
-                     DMB, CMB = computeLegendreDerivativeMatrix(SDIMS)
+                     DMB, CMS = computeLegendreDerivativeMatrix(SDIMS)
                      DMS, DMS2 = computeCubicSplineDerivativeMatrix(sdom, *interior, DMB)
               
               # Make a list of element matrices
+              #print(DMS)
               emats += [DMS]
               
-              #print(DMS)
-                            
               if ee == 0:
                      edom = sdom
               else:
@@ -106,17 +304,10 @@ def computeSCSElementDerivativeMatrix(dom, NE):
                      
        # Loop over each dof and assemble the global matrix
        for ee in range(N-1):
-              
-              if ee == 0 or ee == N-2:
-                     NB = int(EF2 * NE)
-              elif ee == 1 or ee == N-3:
-                     NB = int(EF1 * NE)
-              else:
-                     NB = 1 * NE
                      
-              bdex = -(NB+2)
-              tdex = -(NB+1)
-              
+              bdex = -(MS[ee]+2)
+              tdex = -(MS[ee]+1)
+                            
               if ee == 0:
                      DDMS = emats[ee]
               else:
@@ -124,25 +315,28 @@ def computeSCSElementDerivativeMatrix(dom, NE):
                      DDMS = scl.block_diag(DDMS, emats[ee])
                      
                      # Combine coincident row/col
-                     arow = np.delete(DDMS[bdex,:], tdex)
-                     brow = np.delete(DDMS[tdex,:], bdex)
-                     mrow = (arow + brow)
                      acol = np.delete(DDMS[:,bdex], tdex)
                      bcol = np.delete(DDMS[:,tdex], bdex)
                      mcol = (acol + bcol)
+                     arow = np.delete(DDMS[bdex,:], tdex)
+                     brow = np.delete(DDMS[tdex,:], bdex)
+                     # Scaling of matched coefficients here
+                     LM = (LE[ee-1] + LE[ee])
+                     asc = LE[ee-1] / LM
+                     bsc = LE[ee] / LM
+                     mrow = (asc * arow + bsc * brow)
                      
                      # Delete redundant row/col
                      DDMS = np.delete(DDMS, tdex, axis=0)
                      DDMS = np.delete(DDMS, tdex, axis=1)
                      
                      # Set the merged row/col
-                     DDMS[tdex,:] = mrow 
                      DDMS[:,tdex] = mcol
+                     DDMS[tdex,:] = mrow
                      
-                     # Scale the connecting fluxes
-                     DDMS[tdex,:] *= 0.5
-              
-       return DDMS, edom
+       DDMSA = numericalCleanUp(DDMS)
+       
+       return DDMSA, edom
 
 # Computes Cubic Spline 1st derivative matrix
 def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
@@ -176,25 +370,27 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               D[ii,ii] = -1.0 / hp
               D[ii,ii+1] = 1.0 / hp
               
+       # Compute BC adjustments
+       h0 = abs(dom[1] - dom[0])
+       hn = abs(dom[N-1] - dom[N-2])
+       
        if isClamped:
               # Left end
-              h0 = abs(dom[1] - dom[0])
               A[0,0] = -2.0 * h0 / 3.0
               A[0,1] = h0 / 6.0
               
               # Use derivative by CFD to set boundary condition
               B[0,:] = DDM_BC[0,:]
-              B[0,0] -= -1.0 / h0
+              B[0,0] += 1.0 / h0
               B[0,1] -= 1.0 / h0
               
               # Right end
-              hn = abs(dom[N-1] - dom[N-2])
               A[N-1,N-2] = -hn / 6.0
               A[N-1,N-1] = 2.0 * hn / 3.0
               
               # Use derivative by CFD to set boundary condition
               B[N-1,:] = DDM_BC[N-1,:]
-              B[N-1,N-2] -= -1.0 / hn
+              B[N-1,N-2] += 1.0 / hn
               B[N-1,N-1] -= 1.0 / hn
               #'''
               
@@ -208,13 +404,11 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               
        elif isEssential:
               # Left end
-              h0 = abs(dom[1] - dom[0])
               A[0,0] = -1.0 / h0
               A[0,1] = 1.0 / h0
               B[0,:] = np.zeros(N)
               
               # Right end
-              hn = abs(dom[N-1] - dom[N-2])
               A[N-1,N-2] = 1.0 / hn
               A[N-1,N-1] = -1.0 / hn
               B[N-1,:] = np.zeros(N)
@@ -224,31 +418,27 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               DDM = C.dot(AIB) + D
               
               # Adjust the ends
-              h0 = abs(dom[1] - dom[0])
               DDM[0,:] = h0 / 6.0 * AIB[1,:] - 2.0 * h0 / 3.0 * AIB[0,:]
               DDM[0,0] -= 1.0 / h0
               DDM[0,1] += 1.0 / h0
               
-              hn = dom[N-1] - dom[N-2]
               DDM[N-1,:] = -h0 / 6.0 * AIB[N-2,:] + 2.0 * hn / 3.0 * AIB[N-1,:]
-              DDM[N-1,N-2] += 1.0 / hn
-              DDM[N-1,N-1] -= 1.0 / hn
+              DDM[N-1,N-2] -= 1.0 / hn
+              DDM[N-1,N-1] += 1.0 / hn
        
        elif isLeftEssentialRightClamped:
               # Left end
-              h0 = abs(dom[1] - dom[0])
               A[0,0] = -1.0 / h0
               A[0,1] = 1.0 / h0
               B[0,:] = np.zeros(N)
               
               # Right end
-              hn = abs(dom[N-1] - dom[N-2])
               A[N-1,N-2] = -hn / 6.0
               A[N-1,N-1] = 2.0 * hn / 3.0
               
               # Use derivative by CFD to set boundary condition
               B[N-1,:] = DDM_BC[N-1,:]
-              B[N-1,N-2] -= -1.0 / hn
+              B[N-1,N-2] += 1.0 / hn
               B[N-1,N-1] -= 1.0 / hn
               
               # Compute the first derivative matrix
@@ -256,7 +446,6 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               DDM = C.dot(AIB) + D
               #'''
               # Adjust ends
-              h0 = abs(dom[1] - dom[0])
               DDM[0,:] = h0 / 6.0 * AIB[1,:] - 2.0 * h0 / 3.0 * AIB[0,:]
               DDM[0,0] -= 1.0 / h0
               DDM[0,1] += 1.0 / h0
@@ -265,17 +454,15 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               #'''
        elif isLeftClampedRightEssential:
               # Left end
-              h0 = abs(dom[1] - dom[0])
               A[0,0] = -2.0 * h0 / 3.0
               A[0,1] = h0 / 6.0
               
               # Use derivative by CFD to set boundary condition
               B[0,:] = DDM_BC[0,:]
-              B[0,0] -= -1.0 / h0
+              B[0,0] += 1.0 / h0
               B[0,1] -= 1.0 / h0
               
               # Right end
-              hn = abs(dom[N-1] - dom[N-2])
               A[N-1,N-2] = 1.0 / hn
               A[N-1,N-1] = -1.0 / hn
               B[N-1,:] = np.zeros(N)
@@ -287,7 +474,6 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               # Adjust ends
               DDM[0,:] = 1.0 * DDM_BC[0,:]
               
-              hn = dom[N-1] - dom[N-2]
               DDM[N-1,:] = -h0 / 6.0 * AIB[N-2,:] + 2.0 * hn / 3.0 * AIB[N-1,:]
               DDM[N-1,N-2] -= 1.0 / hn
               DDM[N-1,N-1] += 1.0 / hn
@@ -299,24 +485,17 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               DDM = C.dot(AIB) + D
               
               # Adjust the ends
-              h0 = abs(dom[1] - dom[0])
               DDM[0,:] = h0 / 6.0 * AIB[1,:]
               DDM[0,0] -= 1.0 / h0
               DDM[0,1] += 1.0 / h0
               
-              hn = dom[N-1] - dom[N-2]
               DDM[N-1,:] = -h0 / 6.0 * AIB[N-2,:]
               DDM[N-1,N-2] -= 1.0 / hn
-              DDM[N-1,N-1] += 1.0 / hn
+              DDM[N-1,N-1] += 1.0 / hn      
               
-       
-       # Clean up numerical zeros
-       for ii in range(N):
-              for jj in range(N):
-                     if abs(DDM[ii,jj]) <= ZTOL:
-                            DDM[ii,jj] = 0.0
-       
-       return DDM, AIB
+       DDMC = numericalCleanUp(DDM)
+
+       return DDMC, AIB
 
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):
@@ -370,13 +549,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(DIMS, dom):
        # Get the derivative matrix
        DDM1 = np.linalg.solve(LDM, RDM)
        
-       # Clean up numerical zeros
-       for ii in range(N):
-              for jj in range(N):
-                     if abs(DDM1[ii,jj]) <= ZTOL:
-                            DDM1[ii,jj] = 0.0
+       DDM1C = numericalCleanUp(DDM1)
        
-       return DDM1
+       return DDM1C
 
 # Computes standard 4th order compact finite difference 2nd derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix2(DIMS, dom):
@@ -433,13 +608,9 @@ def computeCompactFiniteDiffDerivativeMatrix2(DIMS, dom):
        # Get the derivative matrix
        DDM2 = np.linalg.solve(LDM, RDM)
        
-       # Clean up numerical zeros
-       for ii in range(N):
-              for jj in range(N):
-                     if abs(DDM2[ii,jj]) <= ZTOL:
-                            DDM2[ii,jj] = 0.0
-       
-       return DDM2
+       DDM2C = numericalCleanUp(DDM2)
+
+       return DDM2C
 
 def computeHermiteFunctionDerivativeMatrix(DIMS):
        
@@ -475,14 +646,9 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        temp = temp.dot(STR_H)
        DDM = b * temp
        
-       # Clean up numerical zeros
-       N = DDM.shape
-       for ii in range(N[0]):
-              for jj in range(N[1]):
-                     if abs(DDM[ii,jj]) <= ZTOL:
-                            DDM[ii,jj] = 0.0
-
-       return DDM, STR_H
+       DDMC = numericalCleanUp(DDM)
+       
+       return DDMC.astype(np.float64), STR_H
 
 def computeChebyshevDerivativeMatrix(DIMS):
        
@@ -529,21 +695,16 @@ def computeChebyshevDerivativeMatrix(DIMS):
        STR_C = S.dot(temp)
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       temp = (CT).dot(SDIFF)
+       temp = (CT.T).dot(SDIFF)
        DDM = -(2.0 / ZH) * temp.dot(STR_C)
        
-       # Clean up numerical zeros
-       N = DDM.shape
-       for ii in range(N[0]):
-              for jj in range(N[1]):
-                     if abs(DDM[ii,jj]) <= ZTOL:
-                            DDM[ii,jj] = 0.0
+       DDMC = numericalCleanUp(DDM)
        
        #print(xi)
        #print(DDM[0,0], -(2.0 * NZ**2 + 1) / 3.0 / ZH)
        #print(DDM[-1,-1], (2.0 * NZ**2 + 1) / 3.0 / ZH)
 
-       return DDM, STR_C
+       return DDMC, STR_C
 
 def computeFourierDerivativeMatrix(DIMS):
        
@@ -557,14 +718,9 @@ def computeFourierDerivativeMatrix(DIMS):
        DFT = np.fft.fft(np.eye(NX+1), axis=0)
        DDM = np.fft.ifft(1j * KDM.dot(DFT), axis=0)
        
-       # Clean up numerical zeros
-       N = DDM.shape
-       for ii in range(N[0]):
-              for jj in range(N[1]):
-                     if abs(DDM[ii,jj]) <= ZTOL:
-                            DDM[ii,jj] = 0.0
+       DDMC = numericalCleanUp(DDM)
        
-       return DDM, DFT
+       return DDMC, DFT
 
 def computeLaguerreDerivativeMatrix(DIMS):
        
@@ -574,7 +730,7 @@ def computeLaguerreDerivativeMatrix(DIMS):
        
        xi, wlf = lgfunclb(NZ)
        LT = lgfuncm(NZ, xi, True)
-       
+              
        # Get the scale factor
        b = np.amax(xi) / abs(ZH)
        
@@ -586,25 +742,26 @@ def computeLaguerreDerivativeMatrix(DIMS):
        SDIFF[NZ,NZ] = -0.5
                    
        for rr in reversed(range(NZ)):
-              SDIFF[rr,rr+1] = -0.5
-              SDIFF[rr,rr] = -0.5
-              SDIFF[rr,:] += SDIFF[rr+1,:]
+              SDIFF[rr,:] = SDIFF[rr+1,:]
+              SDIFF[rr,rr+1] -= 0.5
+              SDIFF[rr,rr] -= 0.5
               
        # Hermite function spectral transform in matrix form
-       STR_L = LT.dot(W)
+       STR_L = (LT).dot(W)
        # Hermite function spatial derivative based on spectral differentiation
        temp = (LT.T).dot(SDIFF)
        temp = temp.dot(STR_L)
+       #print(temp[0,0], -NZ / 2 - 0.5)
+       
+       lead = -NZ / 2 - 0.5
+       if temp[0,0] != lead:
+              temp[0,0] = lead
+       
        DDM = b * temp
        
-       # Clean up numerical zeros
-       N = DDM.shape
-       for ii in range(N[0]):
-              for jj in range(N[1]):
-                     if abs(DDM[ii,jj]) <= ZTOL:
-                            DDM[ii,jj] = 0.0
-
-       return DDM, STR_L
+       DDMC = numericalCleanUp(DDM)
+       
+       return DDMC.astype(np.float64), STR_L, b, wlf
 
 def computeLegendreDerivativeMatrix(DIMS):
        
@@ -637,23 +794,18 @@ def computeLegendreDerivativeMatrix(DIMS):
               SDIFF[rr-1,:] += (A / B) * SDIFF[rr+1,:]
               
        # Legendre spectral transform in matrix form
-       temp = (LT.T).dot(W)
+       temp = (LT).dot(W)
        STR_L = S.dot(temp)
        # Legendre spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       temp = (LT).dot(SDIFF)
+       temp = (LT.T).dot(SDIFF)
        DDM = (2.0 / ZH) * temp.dot(STR_L)
        
-       # Clean up numerical zeros
-       N = DDM.shape
-       for ii in range(N[0]):
-              for jj in range(N[1]):
-                     if abs(DDM[ii,jj]) <= ZTOL:
-                            DDM[ii,jj] = 0.0
+       DDMC = numericalCleanUp(DDM)
        
        #print(DDM[0,0], -NZ * (NZ + 1) / 2.0 / ZH)
        #print(DDM[-1,-1], NZ * (NZ + 1) / 2.0 / ZH)
        
-       return DDM, STR_L
+       return DDMC, STR_L
        
        

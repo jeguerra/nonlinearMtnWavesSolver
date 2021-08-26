@@ -40,59 +40,46 @@ def computeTopographyOnGrid(REFS, opt, DDX):
        XW = np.extract(condition, xh)
        WP = len(XW)
        
-       kaiserWin = 1.0 - np.power(np.sin(mt.pi / L * XW), 2.0)
+       sinwin = np.sin(mt.pi / L * XW)
+       sin2win = 1.0 - np.power(sinwin, 2.0)
+       coswin = np.cos(mt.pi / L * XW)
        #kaiserWin = signal.windows.kaiser(WP, beta=10.0)
        
        padP = NP - WP
        padZ = np.zeros(int(padP / 2))
-       kaiserDom = np.concatenate((padZ, kaiserWin, padZ))
-       #plt.figure()
-       #plt.plot(xh, kaiserDom)
+       sinDom = np.concatenate((padZ, sinwin, padZ))
+       sin2Dom = np.concatenate((padZ, sin2win, padZ))
+       cosDom = np.concatenate((padZ, coswin, padZ))
        
        # Evaluate the function with different options
        if profile == 1:
               # Kaiser bell curve
-              ht = h0 * kaiserDom
+              ht = h0 * sin2Dom
               # Take the derivative
-              dhdx = DDX.dot(ht)
+              dhdx = -(2.0 * mt.pi / L) * h0 * sinDom * cosDom
        elif profile == 2:
               # Schar mountain with analytical slope
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * xh), 2.0);
               ht = ht1 * ht2
+              # Take the derivative
               dhdx = -2.0 * ht
               dhdx *= (1.0 / aC**2.0) * xh + (mt.pi / lC) * np.tan(mt.pi / lC * xh)
+              dhdx[np.abs(dhdx) < 1.0E-14] = 0.0
        elif profile == 3:
               # General Kaiser window times a cosine series
               ps = 2.0 # polynomial order of cosine factor
               hs = 0.5 # relative height of cosine wave part
               hf = 1.0 / (1.0 + hs) # scale for composite profile to have h = 1
-              ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps);
-              ht = hf * h0 * kaiserDom * ht2
-              ht[0] = 0.0; ht[-1] = 0.0
-              # Take the derivative (DO NOT USE NATIVE DERIVATIVE OPERATOR)
-              dhdx = DDX.dot(ht)
-              #cs = CubicSpline(xh, ht, bc_type='clamped')
-              #dhdx = (cs.derivative())(xh)[:]
+              ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps)
+              ht = hf * h0 * sin2Dom * ht2
               
-              # Monotonic filter
-              dhdx[0] = 0.0; dhdx[-1] = 0.0
-              for dd in range(1,len(dhdx)-1):
-                     if ht[dd] == 0.0 and ht[dd+1] == 0.0 and ht[dd-1] == 0:
-                            dhdx[dd] = 0.0
-              #print(dhdx)
-              '''
-              plt.plot(xh, dhdx_native, xh, dhdx_cubic)
-              plt.xlim(-25000, 25000)
-              plt.figure()
-              plt.plot(xh, dhdx_native - dhdx_cubic)
-              plt.xlim(-25000, 25000)
-              plt.show()
-              print(ht)
-              #print(dhdx_native)
-              print(dhdx_cubic)
-              input(
-              '''
+              dhdx1 = -(2.0 * mt.pi / L) * sinDom * cosDom
+              dhdx2 = -hs * (ps * mt.pi / lC) * np.cos(mt.pi / lC * xh) * np.sin(mt.pi / lC * xh)
+              
+              # Take the derivative (DO NOT USE NATIVE DERIVATIVE OPERATOR)
+              dhdx = hf * h0 * (dhdx1 * ht2 + sin2Dom * dhdx2)
+              dhdx[np.abs(dhdx) < 1.0E-14] = 0.0
        elif profile == 4:
               # General even power exponential times a polynomial series
               ht = np.zeros(len(xh))
@@ -133,9 +120,16 @@ def computeTopographyOnGrid(REFS, opt, DDX):
        dhdx = np.dot(FIM, DHDX)
        '''
        
-       # Fix h and dhdx to be zero at both ends
-       ht[0] = 0.0; dhdx[0] = 0.0
-       ht[-1] = 0.0; dhdx[-1] = 0.0
-       #return np.real(ht), np.real(dhdx)
+       '''
+       fc = 1.25
+       plt.figure()
+       plt.plot(xh, ht, 'k', linewidth=2.0)
+       plt.xlim(-fc*kC, fc*kC)
+       plt.figure()
+       plt.plot(xh, dhdx, 'k', linewidth=2.0)
+       plt.xlim(-fc*kC, fc*kC)
+       plt.show()
+       input()
+       '''
        return ht, dhdx
               
