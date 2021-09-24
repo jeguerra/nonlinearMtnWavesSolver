@@ -251,7 +251,7 @@ def storeColumnChunks(MM, Mname, dbName):
        mdb = shelve.open(dbName, flag='n')
        # Get the number of cpus
        import multiprocessing as mtp
-       NCPU = mtp.cpu_count()
+       NCPU = int(1.5 * mtp.cpu_count())
        # Partition CS into NCPU column wise chuncks
        NC = MM.shape[1] # Number of columns in MM
        RC = NC % NCPU # Remainder of columns when dividing by NCPU
@@ -383,28 +383,41 @@ def runModel(TestName):
        verticalLegdGrid = True
        verticalLagrGrid = False
        
+       if verticalChebGrid:
+              interpolationType = '1DtoTerrainFollowingCheb'
+              
+       if verticalLegdGrid:
+              interpolationType = '1DtoTerrainFollowingLegr'
+       
        #%% FLAG FOR SCSE TESTING...
        isSEM_X = True
-       isSEM_Z = False
-       NEX = 12
-       NEZ = 12
+       isSEM_Z = True
+       isAdjusted = False
        if isSEM_X and isSEM_Z:
-              isLaguerreEnds = False
+              NEZ = 12 #int(np.ceil(NZ / 3))
+              NEX = 10
               DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
-              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEX / 2))
+              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2)) #2
               HermCheb = True
               FourCheb = False
+              xnf = max(4, int(NEX/4) + 1)
+              znf = max(4, int(NEZ/4) + 1)
+              NE = (xnf, znf)
+              print('DynSGS filter size: ', NE)
        elif isSEM_X and not isSEM_Z:
-              isLaguerreEnds = False
+              NEX = 24
               DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
-              resx = (1.0, 1.0)
               HermCheb = True
               FourCheb = False
+              NE = (NEX, 4)
        elif not isSEM_X and isSEM_Z:
-              isLaguerreEnds = False
-              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2))
+              DIMS[4] = 2
+              NEZ = int(np.ceil(NZ / 2))
               HermCheb = True
               FourCheb = False
+              NE = (4, NEZ)
+       else:
+              NE = (4,4)
               
        if isSEM_X:
               print('@@ USING ' + str(DIMS[3]) + ' ELEMENTS IN X @@')
@@ -418,27 +431,23 @@ def runModel(TestName):
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
        REF0 = computeGrid(DIM0, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid, verticalLagrGrid)
        
-       DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
+       if verticalChebGrid:
+              DDZP, CHT = derv.computeChebyshevDerivativeMatrix(DIM0)
+              
+       if verticalLegdGrid:
+              DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
+       
        if isSEM_X:
-              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isLaguerreEnds, resx)
+              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isAdjusted)
               DIM0[3] = len(REF0[0]) - 1
        else:
               DDXP, HHT = derv.computeHermiteFunctionDerivativeMatrix(DIM0)
-              
-       #DDXP, DDXP2 = derv.computeCubicSplineDerivativeMatrix(DIM0, REF0[0], False, True, None)
-       
+                     
        REF0.append(DDXP)
        REF0.append(DDZP)
        
        hx, dhx = computeTopographyOnGrid(REF0, HOPT, DDXP)
        zRay = DIMS[2] - RLOPT[0]
-       '''
-       plt.plot(REF0[0], hx)
-       plt.figure()
-       plt.plot(REF0[0], dhx)
-       plt.show()
-       input("TOPOGRAPHY CHECK...")
-       '''
        xl, ztl, dzt, sig, ZRL, DXM, DZM = \
               coords.computeGuellrichDomain2D(DIM0, REF0, zRay, hx, dhx, StaticSolve)
        
@@ -461,7 +470,7 @@ def runModel(TestName):
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
        if HermCheb and not FourCheb:
               if isSEM_X:
-                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isLaguerreEnds, resx)
+                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isAdjusted)
                      DIMS[3] = len(REFS[0]) - 1
                      NX = DIMS[3]
                      OPS = (NX + 1) * (NZ + 1)
@@ -474,7 +483,7 @@ def runModel(TestName):
                      DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        elif FourCheb and not HermCheb:
               if isSEM_X:
-                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isLaguerreEnds, resx)
+                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isAdjusted)
                      DIMS[3] = len(REFS[0]) - 1
                      NX = DIMS[3]
                      OPS = (NX + 1) * (NZ + 1)
@@ -489,7 +498,8 @@ def runModel(TestName):
               DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
                             
        if isSEM_Z:
-              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(REFS[1], NEZ, False, None)
+              domz = np.copy(REFS[1])
+              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(domz, NEZ, isAdjusted)
               DIMS[4] = len(REFS[1]) - 1
               NZ = DIMS[4]
               OPS = (NX + 1) * (NZ + 1)
@@ -498,32 +508,20 @@ def runModel(TestName):
               wdex = np.add(udex, OPS)
               pdex = np.add(wdex, OPS)
               tdex = np.add(pdex, OPS)
+              del(domz)
        else:
-              DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+              if verticalChebGrid:
+                     DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
               
-       #%% APPLY BOUNDARY CONDITIONS TO OPERATORS
-       if isSEM_X:
-              # SEM Advection and diffusion operator periodic in X
-              DDX_1D = derv.computeAdjustedOperatorPeriodic(DDX_1D)
-              #DDX_CS = derv.computeAdjustedOperatorPeriodic(DDX_CS)
-              '''
-              # Derivative operator for diffusion has Neumann BC
-              DDX_CS1 = derv.computeAdjustedOperatorNBC(DDX_CS, DDX_CS, DDX_CS, 0)
-              DDX_CS2 = derv.computeAdjustedOperatorNBC(DDX_CS1, DDX_CS, DDX_CS, -1)
-              DDX_CS = np.copy(DDX_CS2)
-              del(DDX_CS2)
-              
-              # Derivative operator for diffusion has Neumann BC
-              DDZ_CS1 = derv.computeAdjustedOperatorNBC(DDZ_CS, DDZ_CS, DDZ_CS, 0)
-              DDZ_CS2 = derv.computeAdjustedOperatorNBC(DDZ_CS1, DDZ_CS, DDZ_CS, -1)
-              DDZ_CS = np.copy(DDZ_CS2)
-              del(DDZ_CS2)
-              '''
+              if verticalLegdGrid:
+                     DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
        
        #%% Set derivative operators for diffusion
        if isSEM_X and isSEM_Z:
               DDX_CS = np.copy(DDX_1D); DDX2_CS = DDX_CS.dot(DDX_CS)
               DDZ_CS = np.copy(DDZ_1D); DDZ2_CS = DDZ_CS.dot(DDZ_CS)
+              #DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
+              #DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
        elif isSEM_X and not isSEM_Z:
               DDX_CS = np.copy(DDX_1D)
               DDX2_CS = DDX_CS.dot(DDX_CS)
@@ -587,7 +585,6 @@ def runModel(TestName):
        TZ, DTDZ, D2TDZ2 = \
               computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
        
-       interpolationType = '1DtoTerrainFollowingCheb'
        #% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(duz, axis=1)
        DUDZ = np.tile(dUdz, NX+1)
@@ -676,9 +673,9 @@ def runModel(TestName):
               REFS.append((DDXMS, DDZMS))
               REFS.append(diffOps1)
        else: 
-              # Matrix operators for Jacobian assembly
-              REFS.append(DDXM_CS)
-              REFS.append(DDZM_CS)
+              # Matrix operators for staggered method...
+              REFS.append(DDXMS)
+              REFS.append(DDZMS)
               
        # Store the terrain profile
        REFS.append(DZT)
@@ -696,25 +693,26 @@ def runModel(TestName):
               NL = 6 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
-              minDex = np.argmax(REFS[7][0,:])
-              SIGMA = sps.diags(REFS[7][:,minDex])
-              DXE = (DDX_1D).astype(dtype=np.double)
-              DZE = (SIGMA.dot(DDZ_1D)).astype(dtype=np.double)
+              PPXM = (DDXMS - sps.diags(DZDX[:,0]).dot(DDZMS)).tolil()
+              DXE = PPXM[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
+              DZE = HOPT[0] / DIMS[2] * DDZMS[np.ix_(ebcDex[0],ebcDex[0])].tocsr()
               
-              DX_eig = spl.eigs(DXE, k=NL, which='LM', return_eigenvectors=False)
-              DZ_eig = spl.eigs(DZE, k=NL, which='LM', return_eigenvectors=False)
+              DX_eig = spl.eigs(DXE[1:-1,1:-1], k=NL, which='LM', return_eigenvectors=False)
+              DZ_eig = spl.eigs(DZE[0:-1,0:-1], k=NL, which='LM', return_eigenvectors=False)
               
               print('Eigenvalues (largest magnitude) of derivative matrices:')
               print('X: ', DX_eig)
               print('Z: ', DZ_eig)
               
+              DXI = np.imag(DX_eig)
+              DZI = np.imag(DZ_eig)
               print('Eigenvalues size (largest magnitude) of derivative matrices:')
-              print('X: ', np.abs(DX_eig))
-              print('Z: ', np.abs(DZ_eig))
+              print('X: ', np.abs(DXI))
+              print('Z: ', np.abs(DZI))
               
               # Minimum magnitude eigenvalues to "cover" smallest resolved scale 
-              DX_rho = np.amin(np.abs(DX_eig))
-              DZ_rho = np.amin(np.abs(DZ_eig))
+              DX_rho = np.amax(np.abs(DXI))
+              DZ_rho = np.amax(np.abs(DZI))
               
               print('Derivative matrix spectral radii (1/m):')
               print('X: ', DX_rho)
@@ -729,27 +727,32 @@ def runModel(TestName):
               
               # Diffusion filter grid length based on resolution powers
               if isSEM_X and isSEM_Z:
-                     fx = 1.0; fz = 1.0
+                     DLD = (1.0 * DX_max, 1.0 * DZ_max)
+                     DX = DX_min; DZ = DZ_min
               elif isSEM_X and not isSEM_Z:
-                     fx = 1.0; fz = 1.0
+                     DLD = (2.0 * DX_avg, 2.0 * DZ_spr)
+                     DX = DX_min; DZ = DZ_min
               elif not isSEM_X and isSEM_Z:
-                     fx = 1.0; fz = 1.0
+                     DLD = (2.0 * DX_spr, 2.0 * DZ_avg)
+                     DX = DX_min; DZ = DZ_min
               else:
-                     fx = 1.0; fz = 1.0
+                     DLD = (2.0 * DX_spr, 2.0 * DZ_spr)
+                     DX = DX_min; DZ = DZ_min
                      
-              DLD = (fx * DX_spr, fz * DZ_spr)
               DLD2 = DLD[0] * DLD[1]
+              
+              print('Diffusion lengths: ', DLD[0], DLD[1])
+              
+              del(PPXM); #del(PPZM)
               del(DXE); del(DZE)
               
               # Smallest physical grid spacing in the 2D mesh
-              DX = DX_min
-              DZ = DZ_min
-              DLS = 2.0 * min(DX, DZ)
+              DLS = 1.0 * min(DX, DZ)
               #'''              
        del(DDXMS); del(DDXM_CS)
        del(DDZMS); del(DDZM_CS)
-       del(DZDX)
-       del(GMLOP)
+       del(DZDX); del(GMLOP)
+       #input('STOP')
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
@@ -1090,6 +1093,14 @@ def runModel(TestName):
               # Initialize vertical velocity
               fields[ubdex,1] = -dWBC
               
+              # Initialize a PT bubble...
+              PTR = np.power(np.power((XL + 100.0E3) / 30.0E3, 2.0) + \
+                     np.power((ZTL - 10.0E3) / 5.0E3, 2.0), 0.5)
+              PTF = np.power(np.cos(0.5 * mt.pi * PTR), 2.0)
+              PTF = np.where(PTR <= 1.0, PTF, 0.0)
+              
+              fields[:,3] = np.reshape(PTF, (OPS,), order='F')
+              
               # Initialize time constants
               ti = 0
               ff = 1
@@ -1102,7 +1113,7 @@ def runModel(TestName):
               if isRestartFromNC:
                      try:
                             rdex = -1
-                            fname = 'DynSGS_SEM-Legendre_02Hour.nc'
+                            fname = 'transientNL0.nc'
                             m_fid = Dataset(fname, 'r', format="NETCDF4")
                             thisTime = m_fid.variables['t'][rdex]
                             fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
@@ -1249,10 +1260,10 @@ def runModel(TestName):
                             vel = np.stack((UD, WD),axis=1)
                             VFLW = np.linalg.norm(vel, axis=1)
                             
-                            rhsVec0 = np.array(rhsVec)
+                            rhsVec0 = np.copy(rhsVec)
                             # Update the diffusion coefficients
                             DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
+                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
@@ -1262,11 +1273,10 @@ def runModel(TestName):
                             del(rhsVec0)
                             
                             # Compute DynSGS or Flow Dependent diffusion coefficients
-                            QM = bn.nanmax(np.abs(fields), axis=0)
-                            #filtType = 'maximum'
-                            #DQ = Q - np.mean(Q)
-                            #QM = bn.nanmax(np.abs(DQ), axis=0)
-                            newDiff = rescf.computeResidualViscCoeffs4(DIMS, resVec, QM, VFLW, DLD, DLD2, NEX)
+                            #QM = bn.nanmax(np.abs(fields), axis=0)
+                            DQ = fields - np.mean(fields, axis=0)
+                            QM = bn.nanmax(np.abs(DQ), axis=0)
+                            newDiff = rescf.computeResidualViscCoeffs3(DIMS, resVec, QM, VFLW, DLD, DLD2, NE)
                             
                             DCF[0][:,0] = newDiff[0]
                             DCF[1][:,0] = newDiff[1]
@@ -1330,42 +1340,41 @@ def runModel(TestName):
        txz = np.reshape(SOLT[tdex,0], (NZ+1,NX+1), order='F')
        
        #%% Make some plots for static or transient solutions
-       if makePlots:
-              if StaticSolve:
-                     fig = plt.figure(figsize=(12.0, 6.0))
-                     # 1 X 3 subplot of W for linear, nonlinear, and difference
-                     
-                     plt.subplot(2,2,1)
-                     ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, uxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-                     fig.colorbar(ccheck)
-                     plt.xlim(-30.0, 50.0)
-                     plt.ylim(0.0, 1.0E-3*DIMS[2])
-                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-                     plt.title('Change U - (m/s)')
-                     
-                     plt.subplot(2,2,3)
-                     ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, wxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-                     fig.colorbar(ccheck)
-                     plt.xlim(-30.0, 50.0)
-                     plt.ylim(0.0, 1.0E-3*DIMS[2])
-                     plt.title('Change W - (m/s)')
-                     
-                     flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[uBotDex] + uxz[0,:]))
-                     slopeAngle = np.arctan(dHdX)
-                     
-                     plt.subplot(2,2,2)
-                     plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
-                     plt.xlim(-20.0, 20.0)
-                     plt.title('Flow vector angle and terrain angle')
-                     
-                     plt.subplot(2,2,4)
-                     plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
-                     plt.title('Boundary Constraint |Delta| - (m/s)')
-                     
-                     plt.tight_layout()
-                     #plt.savefig('IterDelta_BoundaryCondition.png')
-                     plt.show()
-                     
+       if makePlots and StaticSolve:
+              fig = plt.figure(figsize=(12.0, 6.0))
+              # 1 X 3 subplot of W for linear, nonlinear, and difference
+              
+              plt.subplot(2,2,1)
+              ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, uxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              fig.colorbar(ccheck)
+              plt.xlim(-30.0, 50.0)
+              plt.ylim(0.0, 1.0E-3*DIMS[2])
+              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+              plt.title('Change U - (m/s)')
+              
+              plt.subplot(2,2,3)
+              ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, wxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              fig.colorbar(ccheck)
+              plt.xlim(-30.0, 50.0)
+              plt.ylim(0.0, 1.0E-3*DIMS[2])
+              plt.title('Change W - (m/s)')
+              
+              flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[uBotDex] + uxz[0,:]))
+              slopeAngle = np.arctan(dHdX)
+              
+              plt.subplot(2,2,2)
+              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
+              plt.xlim(-20.0, 20.0)
+              plt.title('Flow vector angle and terrain angle')
+              
+              plt.subplot(2,2,4)
+              plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
+              plt.title('Boundary Constraint |Delta| - (m/s)')
+              
+              plt.tight_layout()
+              #plt.savefig('IterDelta_BoundaryCondition.png')
+              plt.show()
+              
               fig = plt.figure(figsize=(12.0, 6.0))
               # 2 X 2 subplot with all fields at the final time
               for pp in range(4):

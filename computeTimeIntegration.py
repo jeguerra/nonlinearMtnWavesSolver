@@ -38,13 +38,13 @@ def plotRHS(x, rhs, ebcDex, label):
        
        return
 
-def enforceEssentialBC(sol, init, zeroDex, ebcDex, DZDX):
+def enforceEssentialBC(sol, init, zeroDex, DZDX):
        
        # Enforce essential boundary conditions
-       sol[zeroDex[0],0] = np.zeros(len(zeroDex[0]))
-       sol[zeroDex[1],1] = np.zeros(len(zeroDex[1]))
-       sol[zeroDex[2],2] = np.zeros(len(zeroDex[2]))
-       sol[zeroDex[3],3] = np.zeros(len(zeroDex[3]))
+       sol[zeroDex[0],0] = 0.0
+       sol[zeroDex[1],1] = 0.0
+       sol[zeroDex[2],2] = 0.0
+       sol[zeroDex[3],3] = 0.0
        
        #bdex = ebcDex[1]
        #U = sol[:,0] + init[:,0]
@@ -92,22 +92,34 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               W = solA[:,1]
               
               # Compute first derivatives
-              DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
               
               # Numerical "clean up" here
-              DqDx[np.abs(DqDx) < tol] = 0.0
-              DqDz[np.abs(DqDz) < tol] = 0.0
-              
-              # Compute advective update (explicit)
-              #rhsDyn = computeRHSUpdate_dynamics(solA, U, W, DqDx, DqDz, coeff * DT)
+              DqDxA[np.abs(DqDxA) < tol] = 0.0
+              DqDzA[np.abs(DqDzA) < tol] = 0.0
+              '''
               args1 = [PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
+              rhs = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+              solB = sol2Update + DF * rhs
+              '''
+              #'''
+              # Compute advective update (explicit)
+              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
               rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
               
               # Apply explicit part of the update
-              solAdv = solA + DF * rhsAdv
-              
+              solAdv = sol2Update + DF * rhsAdv
+              #solB = np.copy(solAdv)
               # Compute internal forces (semi implicit)
-              args2 = [PHYS, rhsAdv, DqDx, DqDz, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
+              
+              # Compute first derivatives
+              DqDxB, DqDzB = tendency.computeFieldDerivatives(solAdv, DDXM_A, DDZM_A)
+              
+              # Numerical "clean up" here
+              DqDxB[np.abs(DqDxB) < tol] = 0.0
+              DqDzB[np.abs(DqDzB) < tol] = 0.0
+              
+              args2 = [PHYS, rhsAdv, DqDxB, DqDzB, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
               rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
               
               solB = sol2Update + DF * (rhsAdv + rhsFrc)
@@ -115,10 +127,10 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               # Compute 2nd derivatives
               if diffusiveFlux:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDXM_B, DDZM_B, DZDX)
+                     tendency.computeFieldDerivativesFlux(DqDxB, DqDzB, DCF, REFG, DDXM_B, DDZM_B, DZDX)
               else:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDx, DqDz, REFG, DDXM_B, DDZM_B, DZDX)
+                     tendency.computeFieldDerivatives2(DqDxB, DqDzB, REFG, DDXM_B, DDZM_B, DZDX)
                      
               # Compute diffusive update (explicit)
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
@@ -128,31 +140,14 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               
               # Apply Rayleigh layer implicitly
               solB = (RayDamp.T) * solB
-              #'''
-              #solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)
+              
+              # Enforce the essential BC in the final solution
+              solB = enforceEssentialBC(solB, init0, zeroDex, DZDX)
               
               # Filter the solution to prevent underflow
               solB[np.abs(solB) < tol] = 0.0
               
               return solB
-       
-       def computeRHSUpdate_dynamics(sol, U, W, DqDx, DqDz, DT):
-              
-              # Compute dynamical tendencies
-              #rhs = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, sol, U, W, ebcDex, zeroDex)
-              #'''
-              args1 = [PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, sol, U, W, ebcDex, zeroDex]
-              rhsAdvection = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
-              
-              solAdv = sol + DT * rhsAdvection
-              #DqDx, DqDz = tendency.computeFieldDerivatives(solAdv, DDXM_A, DDZM_A)
-              
-              args2 = [PHYS, rhsAdvection, DqDx, DqDz, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
-              rhsInternalF = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
-              
-              rhs = rhsAdvection + rhsInternalF
-              #'''
-              return rhs
        
        def computeRHSUpdate_diffusion(fields, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz):
               

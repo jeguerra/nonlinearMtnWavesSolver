@@ -36,14 +36,11 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        urdex2 = np.array(range(ubdex[-1]+1, OPS))
        
        # Index all boundary DOF that can be diffused on
-       #latDex = np.unique(uldex1)
-       latDex = np.unique(np.concatenate((uldex1,urdex1)))
-       #vrtDex = np.unique(np.concatenate((ubdex,utdex)))
-       extDex = np.unique(np.concatenate((urdex1,uldex1,ubdex,utdex)))
-       diffDex = (latDex, ubdex, utdex, extDex)
+       diffDex = (uldex1, urdex1, ubdex, utdex)
        
        # BC indices for static solution (per variable)
        if bcType == 1:
+              '''
               # Inflow condition on UWPT STATIC SOLUTION
               rowsOutU = set(uldex2)
               rowsOutW = set(np.concatenate((uldex2,utdex)))
@@ -53,6 +50,19 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
               left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
               top = utdex + iW*OPS
               rowsOutBC_static = set(np.concatenate((left, top)))
+              '''
+              #'''
+              # Inflow condition on UWPT TRANSIENT SOLUTION
+              rowsOutU = set(np.concatenate((uldex2,urdex2)))
+              rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
+              rowsOutP = set(np.concatenate((uldex2,urdex2)))
+              rowsOutT = set(np.concatenate((uldex2,urdex2)))
+       
+               # Indexing for static solver
+              left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
+              right = np.concatenate((urdex2, urdex2 + iW*OPS, urdex2 + iP*OPS, urdex2 + iT*OPS))
+              top = utdex + iW*OPS
+              rowsOutBC_static = set(np.concatenate((left, right, top)))
               #'''
        elif bcType == 2:
               '''

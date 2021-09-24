@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-fname = 'DynSGS_SEM-Legendre_04Hour.nc'
+fname = 'SEM_Test01.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['t'][:]
@@ -56,8 +56,8 @@ THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = True
-runSGS = False
+runPertb = False
+runSGS = True
 
 #%% Contour animation of perturbation potential temperatures
 if runPertb:
