@@ -98,7 +98,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               DqDxA[np.abs(DqDxA) < tol] = 0.0
               DqDzA[np.abs(DqDzA) < tol] = 0.0
               '''
-              args1 = [PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
+              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
               rhs = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
               solB = sol2Update + DF * rhs
               '''
@@ -111,33 +111,36 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               solAdv = sol2Update + DF * rhsAdv
               #solB = np.copy(solAdv)
               # Compute internal forces (semi implicit)
-              
+              #'''
+              '''
               # Compute first derivatives
-              DqDxB, DqDzB = tendency.computeFieldDerivatives(solAdv, DDXM_A, DDZM_A)
+              DqDxB, DqDzB = tendency.computeFieldDerivatives(solAdv, DDXM_B, DDZM_B)
               
               # Numerical "clean up" here
               DqDxB[np.abs(DqDxB) < tol] = 0.0
               DqDzB[np.abs(DqDzB) < tol] = 0.0
-              
-              args2 = [PHYS, rhsAdv, DqDxB, DqDzB, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
+              '''
+              #'''
+              args2 = [PHYS, rhsAdv, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
               rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
               
               solB = sol2Update + DF * (rhsAdv + rhsFrc)
               #'''
+              #'''
               # Compute 2nd derivatives
               if diffusiveFlux:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivativesFlux(DqDxB, DqDzB, DCF, REFG, DDXM_B, DDZM_B, DZDX)
+                     tendency.computeFieldDerivativesFlux(DqDxA, DqDzA, DCF, REFG, DDXM_B, DDZM_B, DZDX)
               else:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDxB, DqDzB, REFG, DDXM_B, DDZM_B, DZDX)
+                     tendency.computeFieldDerivatives2(DqDxA, DqDzA, REFG, DDXM_B, DDZM_B, DZDX)
                      
               # Compute diffusive update (explicit)
               rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
               
               # Apply diffusion update
               solB += DF * rhsDif
-              
+              #'''
               # Apply Rayleigh layer implicitly
               solB = (RayDamp.T) * solB
               

@@ -43,7 +43,7 @@ class TestCase:
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
@@ -94,12 +94,12 @@ class TestCase:
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': False, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(647, 108, 205.0, 35.0, 300.0, \
                                       10000.0, 45000.0, 5.0, \
-                                      3000.0, 0.01, 0.0065, 0.003, 3, 2.0E+4, 'uwpt_transient')
+                                      2000.0, 0.01, 0.0065, 0.003, 3, 2.0E+4, 'uwpt_transient')
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
@@ -165,13 +165,13 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 6.0 # hours              
+              HR = 1.0 # hours              
               rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 240.0 # Time for diagnostic output
-              ITI = 5.0 # Time for image output
+              OTI = 10.0 # Time for diagnostic output
+              ITI = 10.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]

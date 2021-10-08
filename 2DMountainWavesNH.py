@@ -251,7 +251,7 @@ def storeColumnChunks(MM, Mname, dbName):
        mdb = shelve.open(dbName, flag='n')
        # Get the number of cpus
        import multiprocessing as mtp
-       NCPU = int(1.5 * mtp.cpu_count())
+       NCPU = int(1.25 * mtp.cpu_count())
        # Partition CS into NCPU column wise chuncks
        NC = MM.shape[1] # Number of columns in MM
        RC = NC % NCPU # Remainder of columns when dividing by NCPU
@@ -389,13 +389,14 @@ def runModel(TestName):
        if verticalLegdGrid:
               interpolationType = '1DtoTerrainFollowingLegr'
        
-       #%% FLAG FOR SCSE TESTING...
-       isSEM_X = True
-       isSEM_Z = True
+       #%% FLAGS FOR SEM TESTING...
+       isSEM_X = False
+       isSEM_Z = False
        isAdjusted = False
+       isNonCoincident = True
        if isSEM_X and isSEM_Z:
-              NEZ = 12 #int(np.ceil(NZ / 3))
-              NEX = 10
+              NEZ = 24#int(np.ceil(NZ / 2))
+              NEX = 36#int(np.ceil(NX / 9))
               DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
               DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2)) #2
               HermCheb = True
@@ -405,17 +406,19 @@ def runModel(TestName):
               NE = (xnf, znf)
               print('DynSGS filter size: ', NE)
        elif isSEM_X and not isSEM_Z:
-              NEX = 24
+              NEX = 2 * NZ
               DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
               HermCheb = True
               FourCheb = False
-              NE = (NEX, 4)
+              xnf = max(4, int(NEX/4) + 1)
+              NE = (xnf, 4)
        elif not isSEM_X and isSEM_Z:
-              DIMS[4] = 2
-              NEZ = int(np.ceil(NZ / 2))
+              NEZ = 24
+              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2))
               HermCheb = True
               FourCheb = False
-              NE = (4, NEZ)
+              znf = max(4, int(NEZ/4) + 1)
+              NE = (4, znf)
        else:
               NE = (4,4)
               
@@ -438,7 +441,7 @@ def runModel(TestName):
               DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
        
        if isSEM_X:
-              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isAdjusted)
+              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isAdjusted, True)
               DIM0[3] = len(REF0[0]) - 1
        else:
               DDXP, HHT = derv.computeHermiteFunctionDerivativeMatrix(DIM0)
@@ -468,38 +471,28 @@ def runModel(TestName):
        REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid, verticalLagrGrid)
       
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
-       if HermCheb and not FourCheb:
-              if isSEM_X:
-                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isAdjusted)
-                     DIMS[3] = len(REFS[0]) - 1
-                     NX = DIMS[3]
-                     OPS = (NX + 1) * (NZ + 1)
-                     DIMS[5] = OPS
-                     udex = np.arange(OPS)
-                     wdex = np.add(udex, OPS)
-                     pdex = np.add(wdex, OPS)
-                     tdex = np.add(pdex, OPS)
+       if isSEM_X:
+              domx = REFS[0]
+              DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(domx, NEX, isAdjusted, isNonCoincident)
+              DIMS[3] = len(REFS[0]) - 1
+              NX = DIMS[3]
+              OPS = (NX + 1) * (NZ + 1)
+              DIMS[5] = OPS
+              udex = np.arange(OPS)
+              wdex = np.add(udex, OPS)
+              pdex = np.add(wdex, OPS)
+              tdex = np.add(pdex, OPS)
+       else:
+              if HermCheb and not FourCheb:
+                     DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+              elif FourCheb and not HermCheb:
+                     DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
               else:
                      DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
-       elif FourCheb and not HermCheb:
-              if isSEM_X:
-                     DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(REFS[0], NEX, isAdjusted)
-                     DIMS[3] = len(REFS[0]) - 1
-                     NX = DIMS[3]
-                     OPS = (NX + 1) * (NZ + 1)
-                     DIMS[5] = OPS
-                     udex = np.arange(OPS)
-                     wdex = np.add(udex, OPS)
-                     pdex = np.add(wdex, OPS)
-                     tdex = np.add(pdex, OPS)
-              else:
-                     DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
-       else:
-              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
                             
        if isSEM_Z:
               domz = np.copy(REFS[1])
-              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(domz, NEZ, isAdjusted)
+              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(domz, NEZ, isAdjusted, isNonCoincident)
               DIMS[4] = len(REFS[1]) - 1
               NZ = DIMS[4]
               OPS = (NX + 1) * (NZ + 1)
@@ -508,7 +501,6 @@ def runModel(TestName):
               wdex = np.add(udex, OPS)
               pdex = np.add(wdex, OPS)
               tdex = np.add(pdex, OPS)
-              del(domz)
        else:
               if verticalChebGrid:
                      DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
@@ -516,12 +508,18 @@ def runModel(TestName):
               if verticalLegdGrid:
                      DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
        
+       #DDX_1D = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+       #DDX_1D = derv.computeAdjustedOperatorNBC_ends(DDX_1D, DDX_1D)
+       #DDX_1D = derv.computeAdjustedOperatorNBC(DDX_1D, DDX_1D, -1)
+       #DDZ_1D = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       #DDZ_1D = derv.computeAdjustedOperatorNBC(DDZ_1D, DDZ_1D, -1)
+       
        #%% Set derivative operators for diffusion
        if isSEM_X and isSEM_Z:
-              DDX_CS = np.copy(DDX_1D); DDX2_CS = DDX_CS.dot(DDX_CS)
-              DDZ_CS = np.copy(DDZ_1D); DDZ2_CS = DDZ_CS.dot(DDZ_CS)
-              #DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
-              #DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
+              DDX_CS = np.copy(DDX_1D)
+              DDZ_CS = np.copy(DDZ_1D)
+              DDX2_CS = DDX_CS.dot(DDX_CS)
+              DDZ2_CS = DDZ_CS.dot(DDZ_CS)
        elif isSEM_X and not isSEM_Z:
               DDX_CS = np.copy(DDX_1D)
               DDX2_CS = DDX_CS.dot(DDX_CS)
@@ -533,6 +531,10 @@ def runModel(TestName):
        else:
               DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
               DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
+              #DDX_CS = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+              #DDZ_CS = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+              #DDX2_CS = DDX_CS.dot(DDX_CS)
+              #DDZ2_CS = DDZ_CS.dot(DDZ_CS)
               
        #%% Update the REFS collection
        REFS.append(DDX_1D) # index 2
@@ -658,7 +660,8 @@ def runModel(TestName):
        # Prepare derivative operators for diffusion
        from rsb import rsb_matrix
        diffOps1 = (DDXM_CS, DDZM_CS)
-       diffOps2 = (rsb_matrix(DDXM_CS), rsb_matrix(DDZM_CS))
+       diffOps2 = (rsb_matrix(DDXM_CS, shape=DDXM_CS.shape), 
+                   rsb_matrix(DDZM_CS, shape=DDZM_CS.shape))
        
        REFS.append((DDXMS, DDZMS)) # index 10
        REFS.append(diffOps1) # index 11
@@ -730,13 +733,13 @@ def runModel(TestName):
                      DLD = (1.0 * DX_max, 1.0 * DZ_max)
                      DX = DX_min; DZ = DZ_min
               elif isSEM_X and not isSEM_Z:
-                     DLD = (2.0 * DX_avg, 2.0 * DZ_spr)
+                     DLD = (1.0 * DX_max, 1.0 * DZ_spr)
                      DX = DX_min; DZ = DZ_min
               elif not isSEM_X and isSEM_Z:
-                     DLD = (2.0 * DX_spr, 2.0 * DZ_avg)
+                     DLD = (1.0 * DX_spr, 1.0 * DZ_max)
                      DX = DX_min; DZ = DZ_min
               else:
-                     DLD = (2.0 * DX_spr, 2.0 * DZ_spr)
+                     DLD = (1.0 * DX_spr, 1.0 * DZ_spr)
                      DX = DX_min; DZ = DZ_min
                      
               DLD2 = DLD[0] * DLD[1]
@@ -1094,12 +1097,14 @@ def runModel(TestName):
               fields[ubdex,1] = -dWBC
               
               # Initialize a PT bubble...
-              PTR = np.power(np.power((XL + 100.0E3) / 30.0E3, 2.0) + \
+              PTR = np.power(np.power((XL + 0.0E3) / 30.0E3, 2.0) + \
                      np.power((ZTL - 10.0E3) / 5.0E3, 2.0), 0.5)
               PTF = np.power(np.cos(0.5 * mt.pi * PTR), 2.0)
-              PTF = np.where(PTR <= 1.0, PTF, 0.0)
+              PTF = 10.0 * np.where(PTR <= 1.0, PTF, 0.0)
               
-              fields[:,3] = np.reshape(PTF, (OPS,), order='F')
+              LPTF = np.log(1.0 + PTF * np.reciprocal(np.exp(LOGT)) )
+              
+              fields[:,3] = np.reshape(LPTF, (OPS,), order='F')
               
               # Initialize time constants
               ti = 0
@@ -1263,7 +1268,7 @@ def runModel(TestName):
                             rhsVec0 = np.copy(rhsVec)
                             # Update the diffusion coefficients
                             DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
+                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
@@ -1294,6 +1299,7 @@ def runModel(TestName):
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
+                            
                             m_fid.close() 
                             makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
                             import traceback

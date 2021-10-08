@@ -54,10 +54,11 @@ L1 = -L2
 ZH = 42000.0
 
 NZ = 2
-NNX = 20
+NNX = 10
 NNZ = 10
 NEX = 9
 NEZ = 9
+
 NX = NNX * NEX
 isAdjusted = True
 
@@ -65,45 +66,53 @@ DIMS = [L1, L2, ZH, NX, NZ]
 DIMS_EL = [L1, L2, ZH, NNZ, NZ]
 # Define the computational and physical grids+
 REFS = computeGrid(DIMS, True, False, False, True, False)
-REFS_EL = computeGrid(DIMS_EL, False, True, False, True, False)
+REFS_EL = computeGrid(DIMS_EL, True, False, False, True, False)
 
 #%% SCSE VS SPECTRAL TEST Z DIRECTION
 
 # NEW Spectral Cubic Spline Derivative matrix
-DDZ_SCSE, ZE = derv.computeSCSElementDerivativeMatrix(REFS_EL[0], NEZ, False, (1.0,1.0))
-DDZ2_SCSE = DDZ_SCSE.dot(DDZ_SCSE)
-DDZ_SEM, ZE = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEZ, isAdjusted)
-DDZ2_SEM = DDZ_SEM.dot(DDZ_SEM)
-#DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(ZE, False, True, False, False, None)
+DDZ_SEM1, ZE1 = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEZ, True, True)
+DDZ_SEM2, ZE2 = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEZ, False, False)
+DDZ_SEM3, ZE3 = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEZ, True, False)
+DDZ_SEM4, ZE4 = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEZ, False, True)
+DDZ_SEMA = 0.5 * (DDZ_SEM1 + DDZ_SEM4)
 
 DL = abs(L2)
-zv = (1.0 / DL) * ZE
-Y1, DY1 = function1(zv)
+zv1 = (1.0 / DL) * ZE1
+Y1, DY1 = function1(zv1)
 
-DYD1_SEM = DL * DDZ_SEM.dot(Y1)
-#DYD1_SCSE = DL * DDZ_SCSE.dot(Y1)
-DYD2_SEM = DL**2 * DDZ2_SEM.dot(Y1)
-#DYD2_SCSE = DL**2 * DDZ2_SCSE.dot(Y1)
+zv2 = (1.0 / DL) * ZE2
+Y2, DY2 = function1(zv2)
+
+DYD1_SEM1 = DL * DDZ_SEM1.dot(Y1)
+DYD1_SEM2 = DL * DDZ_SEM2.dot(Y2)
+DYD1_SEM3 = DL * DDZ_SEM3.dot(Y2)
+DYD1_SEM4 = DL * DDZ_SEM4.dot(Y1)
+DYD1_SEMA = DL * DDZ_SEMA.dot(Y1)
+
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(zv, Y1, label='Function')
-plt.plot(zv, DY1, 'r-', label='Analytical Derivative')
-plt.plot(zv, DYD1_SEM, 'ko--', label='SEM 1st Derivative')
-#plt.plot(zv, DYD1_SCSE, 'ks--', label='SCSE 1st Derivative')
-plt.plot(zv, DYD2_SEM, 'g+--', label='SEM 2nd Derivative')
-#plt.plot(zv, DYD2_SCSE, 'b+--', label='SCSE 2nd Derivative')
+plt.plot(zv1, Y1, label='Function')
+plt.plot(zv1, DY1, 'r-', label='Analytical Derivative')
+plt.plot(zv1, DYD1_SEM1, 'gs--', label='SEM 1 1st Derivative')
+plt.plot(zv2, DYD1_SEM2, 'bo--', label='SEM 2 1st Derivative')
+plt.plot(zv2, DYD1_SEM3, 'md--', label='SEM 3 1st Derivative')
+#plt.plot(zv1, DYD1_SEM4, 'rp--', label='SEM 4 1st Derivative')
 plt.xlabel('Domain')
 plt.ylabel('Functions')
-plt.title('Spectral Cubic Spline Elements')
+plt.title('Spectral Elements')
 plt.grid(b=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeTestZ_SCSE.png")
 
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(zv, np.abs(DYD1_SEM - DY1), 'bo-', label='SEM |Error|')
-#plt.plot(zv, np.abs(DYD1_SCSE - DY1), 'gs-', label='SCSE |Error|')
+plt.plot(zv1, np.abs(DYD1_SEM1 - DY1), 'gs-', label='SEM 1 |Error|')
+plt.plot(zv2, np.abs(DYD1_SEM2 - DY2), 'bo--', label='SEM 2 |Error|')
+plt.plot(zv2, np.abs(DYD1_SEM3 - DY2), 'md--', label='SEM 3 |Error|')
+#plt.plot(zv1, np.abs(DYD1_SEM4 - DY1), 'rd--', label='SEM 4 |Error|')
+#plt.plot(zv1, np.abs(DYD1_SEMA / DY1 - 1.0), 'kh--', label='SEM A |Error|')
 plt.xlabel('Domain')
 plt.ylabel('Derivative Error')
-plt.title('Spectral Cubic Spline Elements')
+plt.title('Spectral Element Coupling Error')
 plt.grid(b=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeErrorTestZ_SCSE.png")
@@ -122,25 +131,23 @@ DDX_SCS, DDX2A_SCS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, Fals
 
 HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT, DDX_1D)
 DYD_SPT = DDX_1D.dot(HofX)    
-DYD_SCS1 = DDX_SCS.dot(HofX)
 
-#DDX_SCSE, xe = derv.computeSCSElementDerivativeMatrix(REFS_EL[0], NEX, False, (1.0, 1.0))
-DDX_SEM, xe = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEX, isAdjusted)
-DDX_CSN, temp = derv.computeCubicSplineDerivativeMatrix(xe, False, True, False, False, None)
-DDX_SCS, DDX2A_SCS = derv.computeCubicSplineDerivativeMatrix(xe, True, False, False, False, DDX_SEM)
-REFS[0] = xe
-HofX1, dHdX1 = top.computeTopographyOnGrid(REFS, HOPT, DDX_SEM)
-DYD_SEM = DDX_SEM.dot(HofX1)
-DYD_CSN = DDX_CSN.dot(HofX1)
-DYD_SCS2 = DDX_SCS.dot(HofX1)
+DDX_SEM1, xe1 = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEX, isAdjusted, True)
+DDX_SEM2, xe2 = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEX, isAdjusted, False)
+
+REFS[0] = xe1
+HofX1, dHdX1 = top.computeTopographyOnGrid(REFS, HOPT, None)
+DYD_SEM1 = DDX_SEM1.dot(HofX1)
+
+REFS[0] = xe2
+HofX2, dHdX2 = top.computeTopographyOnGrid(REFS, HOPT, None)
+DYD_SEM2 = DDX_SEM2.dot(HofX2)
 
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(xe, dHdX1, 'r-', label='Analytical Derivative')
+plt.plot(xe1, dHdX1, 'r-', label='Analytical Derivative')
 plt.plot(xv, DYD_SPT, 'r--', label='Spectral Derivative')
-#plt.plot(xv, DYD_SCS1, 'bH--', label='Spectral Cubic Spline Derivative')
-#plt.plot(xe, DYD_SCS2, 'bD--', label='Spectral Cubic Spline Derivative')
-plt.plot(xe, DYD_SEM, 'go--', label='Spectral Element Derivative')
-plt.plot(xe, DYD_CSN, 'k+--', label='Natural Cubic Spline Derivative')
+plt.plot(xe1, DYD_SEM1, 'gs-', label='SEM 1 Derivative')
+plt.plot(xe2, DYD_SEM2, 'md--', label='SEM 2 Derivative')
 #plt.xlim(-12500.0, 12500.0)
 plt.xlabel('Domain')
 plt.ylabel('Slope')
@@ -151,18 +158,15 @@ plt.legend()
 
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(xv, np.abs(DYD_SPT - dHdX), 'r--', label='Spectral Derivative')
-#plt.plot(xv, np.abs(DYD_SCS1 - dHdX), 'bH-', label='Spectral CS Derivative 1')
-#plt.plot(xe, np.abs(DYD_SCS2 - dHdX1), 'bD-', label='Spectral CS Derivative 2')
-plt.plot(xe, np.abs(DYD_SEM - dHdX1), 'go-', label='SEM Derivative')
-plt.plot(xe, np.abs(DYD_CSN - dHdX1), 'k+-', label='CSN Derivative')
+plt.plot(xe1, np.abs(DYD_SEM1 - dHdX1), 'gs-', label='SEM 1 Derivative Error')
+plt.plot(xe2, np.abs(DYD_SEM2 - dHdX2), 'md--', label='SEM 2 Derivative Error')
 plt.grid(b=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeErrorTestX.png")
 
 print('Spectral Derivative: ', np.count_nonzero(DDX_1D))
 print('Spectral CS Derivative: ', np.count_nonzero(DDX_SCS))
-print('Natural Cubic Spline Derivative: ', np.count_nonzero(DDX_CSN))
-print('Spectral Element Derivative: ', np.count_nonzero(DDX_SEM))
+print('Spectral Element Derivative: ', np.count_nonzero(DDX_SEM1))
 
 #%% SPECTRAL TRANSFORM TESTS
 
@@ -180,33 +184,29 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
 DDZ2C = DDZ_1D.dot(DDZ_1D)
 
-#DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-DDX_CFD, DDX2A_CFD = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
-
-#DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-DDZ_CFD, DDZ2A_CFD = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False,DDZ_1D)
-DDZ2A_CFD = DDZ_CFD.dot(DDZ_CFD)
-DDZ2B_CFD = derv.computeCompactFiniteDiffDerivativeMatrix2(DIMS, REFS[1])
+DDZ_CFD1 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
+DDZ2A_CFD = DDZ_CFD1.dot(DDZ_CFD1)
 
 zv = (1.0 / ZH) * REFS[1]
 Y, DY = function1(zv)
 
-DYD1 = ZH * DDZ_CFD.dot(Y)
-DYD2 = ZH * DDZ_1D.dot(Y)
+DYD1 = ZH * DDZ_CFD1.dot(Y)
+DYD2 = ZH * DDZ_CFD2.dot(Y)
+DYD3 = ZH * DDZ_1D.dot(Y)
 DYD2_1 = ZH**2 * DDZ2A_CFD.dot(Y)
-DYD2_2 = ZH**2 * DDZ2B_CFD.dot(Y)
 DYD2_3 = ZH**2 * DDZ2C.dot(Y)
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(zv, Y, label='Function')
 plt.plot(zv, DY, 'r-', label='Analytical Derivative')
-plt.plot(zv, DYD1, 'ro', label='Cubic Spline Derivative')
-plt.plot(zv, DYD2, 'r+', label='Chebyshev Derivative')
-plt.plot(zv, DYD2_1, 'go', label='Cubic Spline 2nd Derivative')
-plt.plot(zv, DYD2_2, 'g+', label='Compact FD 2nd Derivative')
-plt.plot(zv, DYD2_3, 'g-', label='Chebyshev 2nd Derivative')
+plt.plot(zv, DYD1, 'bo--', label='Compact FD6 1st Derivative')
+plt.plot(zv, DYD3, 'gp-', label='Compact FD8 1st Derivative')
+plt.plot(zv, DYD3, 'rs--', label='Chebyshev Derivative')
+#plt.plot(zv, DYD2_1, 'go--', label='Compact FD8 2nd Derivative')
+#plt.plot(zv, DYD2_3, 'g-', label='Chebyshev 2nd Derivative')
 plt.xlabel('Domain')
 plt.ylabel('Functions')
-plt.title('4th Order CFD Derivative Test')
+plt.title('Compact Finite Difference Derivative Test')
 plt.grid(b=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeTestZ_CFD.png")
@@ -215,12 +215,6 @@ plt.legend()
 NZ = 16
 DIMS[-1] = NZ
 import HerfunChebNodesWeights as hcl
-
-xi, whf = hcl.lgfunclb(NZ) #[0 inf]
-zv1 = 1.0 / np.amax(xi) * xi
-Y1, DY1 = function2(zv1, 1.0)
-DDZ_LG, LG_TRANS, scale = derv.computeLaguerreDerivativeMatrix(DIMS)
-DYD_LG = ZH * DDZ_LG.dot(Y1)
 
 xi2, whf = hcl.leglb(NZ) #[-1 1]
 zv2 = (0.5 * (xi2 + 1.0))
@@ -234,6 +228,13 @@ xi3, whf = hcl.cheblb(NZC) #[-1 1]
 zv3 = (0.5 * (xi3 + 1.0))
 Y3, DY3 = function2(zv3, 1.0)
 DDZ_CH, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+
+xi, whf = hcl.lgfunclb(2*NZ) #[0 inf]
+DIMS[-1] = 2*NZ
+zv1 = 1.0 / np.amax(xi) * xi
+Y1, DY1 = function2(zv1, 1.0)
+DDZ_LG, LG_TRANS, scale = derv.computeLaguerreDerivativeMatrix(DIMS)
+DYD_LG = ZH * DDZ_LG.dot(Y1)
 
 CTM = hcl.chebpolym(NZC+1, -xi2) # interpolate to legendre grid
 LTM, dummy = hcl.legpolym(NZ, xi3, True) # interpolate to chebyshev grid

@@ -28,28 +28,21 @@ def computeTopographyOnGrid(REFS, opt, DDX):
        r2 = 1.0 * kC
        r1 = -r2
        L = abs(r2 - r1)
-                     
-       # Make a window function so that dhdx = 0 inside Rayleigh layers
-       condition1 = (xh > r1)
-       condition2 = (xh < r2)
-       condition = np.zeros(NP)
        
-       for ii in range(NP):
-              condition[ii] = condition1[ii] == 1 and condition2[ii] == 1
-       
-       XW = np.extract(condition, xh)
-       WP = len(XW)
-       
-       sinwin = np.sin(mt.pi / L * XW)
-       sin2win = 1.0 - np.power(sinwin, 2.0)
-       coswin = np.cos(mt.pi / L * XW)
-       #kaiserWin = signal.windows.kaiser(WP, beta=10.0)
-       
-       padP = NP - WP
-       padZ = np.zeros(int(padP / 2))
-       sinDom = np.concatenate((padZ, sinwin, padZ))
-       sin2Dom = np.concatenate((padZ, sin2win, padZ))
-       cosDom = np.concatenate((padZ, coswin, padZ))
+       sinDom = np.zeros(NP)
+       sin2Dom = np.zeros(NP)
+       cosDom = np.zeros(NP)
+       ii = 0
+       for xx in xh:
+              if xx < r2 and xx > r1:
+                     sinDom[ii] = mt.sin(mt.pi / L * xx)
+                     sin2Dom[ii] = 1.0 - np.power(sinDom[ii], 2.0)
+                     cosDom[ii] = mt.cos(mt.pi / L * xx)
+              else:
+                     sinDom[ii] = 0.0
+                     sin2Dom[ii] = 0.0
+                     cosDom[ii] = 0.0
+              ii += 1
        
        # Evaluate the function with different options
        if profile == 1:
@@ -62,10 +55,11 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * xh), 2.0);
               ht = ht1 * ht2
+              ht[np.abs(ht) < 1.0E-15] = 0.0
               # Take the derivative
               dhdx = -2.0 * ht
               dhdx *= (1.0 / aC**2.0) * xh + (mt.pi / lC) * np.tan(mt.pi / lC * xh)
-              dhdx[np.abs(dhdx) < 1.0E-14] = 0.0
+              dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
        elif profile == 3:
               # General Kaiser window times a cosine series
               ps = 2.0 # polynomial order of cosine factor
@@ -79,7 +73,7 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               
               # Take the derivative (DO NOT USE NATIVE DERIVATIVE OPERATOR)
               dhdx = hf * h0 * (dhdx1 * ht2 + sin2Dom * dhdx2)
-              dhdx[np.abs(dhdx) < 1.0E-14] = 0.0
+              dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
        elif profile == 4:
               # General even power exponential times a polynomial series
               ht = np.zeros(len(xh))
