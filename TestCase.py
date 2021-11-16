@@ -86,7 +86,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(647, 128, 205.0, 42.0, 300.0, \
                                       10000.0, 45000.0, 5.0, \
-                                      3000.0, 0.01, 0.006, 0.002, 3, 2.0E+4, 'uwpt_transient')
+                                      2500.0, 0.01, 0.006, 0.002, 3, 2.0E+4, 'uwpt_transient')
               
               elif TestName == "UniformTest":
                      # Wave breaking in uniform stratification
@@ -97,9 +97,9 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(647, 108, 205.0, 35.0, 300.0, \
+                     self.setUserData(683, 96, 205.0, 35.0, 300.0, \
                                       10000.0, 45000.0, 5.0, \
-                                      2000.0, 0.01, 0.0065, 0.003, 3, 2.0E+4, 'uwpt_transient')
+                                      2500.0, 0.01, 0.0065, 0.003, 3, 2.0E+4, 'uwpt_transient')
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
@@ -156,7 +156,7 @@ class TestCase:
                      lC = 4000.0
               elif Mountain == 3:
                      aC = 5000.0
-                     lC = 10000.0
+                     lC = 7500.0
               else:
                      aC = 5000.0
                      lC = 4000.0
@@ -165,7 +165,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 1.0 # hours              
+              HR = 4.0 # hours              
               rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
               intMethodOrder = 3
               # 3rd or 4th order time integrator

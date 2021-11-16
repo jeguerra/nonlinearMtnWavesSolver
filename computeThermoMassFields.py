@@ -10,6 +10,7 @@ import sys
 import math as mt
 import numpy as np
 from numpy import linalg as lan
+import computeDerivativeMatrix as derv
 
 def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex, isGivenValue, DP):
        # D2A is the operator to adjust
@@ -54,7 +55,8 @@ def computePfromSensibleT(DDZ, TZ, AC, P0):
        # Specify the derivative at the model top
        dpdZ_H = AC * tempBarI[N-1]
        # Compute adjustment to the derivative matrix operator
-       DOP = computeAdjustedOperatorNBC(DDZ, DDZ, DDZ, N-1, True, None)
+       #DOP = computeAdjustedOperatorNBC(DDZ, DDZ, DDZ, N-1, True, None)
+       DOP = derv.computeAdjustedOperatorNBC(DDZ, DDZ, -1)
 
        # Impose resulting Neumann/Dirichlet conditions lnP top and bottom
        NE = N-1
@@ -93,7 +95,8 @@ def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
        # Specify the derivative at the model top
        dpdZ_H = Kp * AC * thetaBarI[N-1]
        # Compute adjustment to the derivative matrix operator
-       DOP = computeAdjustedOperatorNBC(DDZ, DDZ, DDZ, N-1, True, None)
+       #DOP = computeAdjustedOperatorNBC(DDZ, DDZ, DDZ, N-1, True, None)
+       DOP = derv.computeAdjustedOperatorNBC(DDZ, DDZ, -1)
 
        # Impose resulting Dirichlet conditions p^K top and bottom
        NE = N-1

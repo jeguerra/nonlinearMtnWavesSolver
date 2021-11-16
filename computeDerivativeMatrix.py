@@ -20,12 +20,15 @@ from HerfunChebNodesWeights import legpolym, leglb
 def computeAdjustedOperatorNBC(D2A, DD, tdex):
        # D2A is the operator to adjust
        # DD is the 1st derivative operator
-       R = -DD[tdex,tdex]
-       DA = (1.0 / R) * np.outer(DD[:,tdex], DD[tdex,:])
-       
+       R = DD[tdex,tdex]
+       dv = DD[tdex,:]; dv[tdex] = 0.0
+       DA = (1.0 / R) * np.outer(DD[:,tdex], -dv)
+              
+       D2A[:,tdex] = 0.0
+       D2A[tdex,:] = 0.0
        DOP = D2A + DA
-       
-       DOP[tdex,:] = 0.0; DOP[:,tdex] = 0.0
+
+       #DOP[tdex,:] = 0.0; 
 
        DOPC = numericalCleanUp(DOP)
        
@@ -37,50 +40,22 @@ def computeAdjustedOperatorNBC_ends(D2A, DD):
        
        R = (DD[0,0] * DD[-1,-1] - DD[0,-1] * DD[-1,0])
        
-       V1 = (DD[-1,0] / R) * DD[:,-1] - (DD[-1,-1] / R) * DD[:,0] 
-       DA1 = np.outer(V1, DD[0,:])
+       lv = DD[0,:]; lv[0] = 0.0
+       rv = DD[-1,:]; rv[-1] = 0.0
        
-       V2 = (DD[0,-1] / R) * DD[:,0] - (DD[0,0] / R) * DD[:,-1] 
-       DA2 = np.outer(V2, DD[-1,:])
+       V1 = (DD[-1,-1] / R) * (-lv) + (DD[0,-1] / R) * rv 
+       DA1 = np.outer(DD[:,0], V1)
+       
+       V2 = (DD[-1,0] / R) * lv - (DD[0,0] / R) * (-rv) 
+       DA2 = np.outer(DD[:,-1], V2)
+       
+       D2A[:,0] = 0.0; D2A[:,-1] = 0.0
+       D2A[0,:] = 0.0; D2A[-1,:] = 0.0
        
        DOP = D2A + DA1 + DA2
        
-       DOP[0,:] = 0.0; DOP[:,0] = 0.0
-       DOP[-1,:] = 0.0; DOP[:,-1] = 0.0
-       
-       DOPC = numericalCleanUp(DOP)
-       
-       return DOPC
-
-def computeAdjustedOperatorNBC_ends2(D2A, DD):
-       # D2A is the operator to adjust
-       # DD is the 1st derivative operator
-       
-       R = (DD[0,0] * DD[-1,-1] - DD[0,-1] * DD[-1,0])
-       
-       V1 = (DD[-1,0] / R) * DD[:,-1] - (DD[-1,-1] / R) * DD[:,0] 
-       #DA1 = np.outer(V1, DD[0,:])
-       #'''
-       SM1 = sps.diags(DD[0,:])
-       CM1 = V1
-       for cc in range(1,SM1.shape[1]):
-              CM1 = np.column_stack((CM1,V1))
-       #'''
-       V2 = (DD[0,-1] / R) * DD[:,0] - (DD[0,0] / R) * DD[:,-1] 
-       #DA2 = np.outer(V2, DD[-1,:])
-       #'''
-       SM2 = sps.diags(DD[-1,:])
-       CM2 = V2
-       for cc in range(1,SM2.shape[1]):
-              CM2 = np.column_stack((CM2,V2))
-       
-       DA1 = SM1.dot(CM1)
-       DA2 = SM2.dot(CM2)
-       #'''
-       DOP = D2A + DA1 + DA2
-       
-       DOP[0,:] = 0.0; DOP[:,0] = 0.0
-       DOP[-1,:] = 0.0; DOP[:,-1] = 0.0
+       #DOP[0,:] = 0.0; DOP[:,0] = 0.0
+       #DOP[-1,:] = 0.0; DOP[:,-1] = 0.0
        
        DOPC = numericalCleanUp(DOP)
        
@@ -108,41 +83,10 @@ def computeAdjustedOperatorPeriodic(D2A):
        
        return DOP
 
-def computeAdjustedOperatorNBC2(D2A, DOG, DD, tdex, isGivenValue, DP):
-       # D2A is the operator to adjust
-       # DOG is the original operator to adjust (unadjusted)
-       # DD is the 1st derivative operator
-       DOP = np.zeros(DD.shape)
-       # Get the column span size
-       NZ = DD.shape[1]
-       cdex = range(NZ)
-       cdex = np.delete(cdex, tdex)
-       
-       # For prescribed value:
-       if isGivenValue:
-              scale = -DD[tdex,tdex]
-       # For matching at infinity
-       else:
-              scale = (DP - DD[tdex,tdex])
-              
-       # Loop over columns of the operator and adjust for BC at z = H (tdex)
-       for jj in cdex:
-              factor = DD[tdex,jj] / scale
-              v1 = (D2A[:,jj]).flatten()
-              v2 = (DOG[:,tdex]).flatten()
-              nvector = v1 + factor * v2
-              DOP[:,jj] = nvector
-       
-       # Here DP works as the coefficient to the prescribed derivative
-       if not isGivenValue and abs(DP) > 0.0:
-              DOP[tdex,tdex] += DP
-       
-       return DOP
-
 def numericalCleanUp(DDM):
        
        N = DDM.shape
-       ZTOL = 1.0E-15
+       ZTOL = 1.0E-16
        DDMC = np.copy(DDM)
        # Clean up numerical zeros
        for ii in range(N[0]):
@@ -152,108 +96,62 @@ def numericalCleanUp(DDM):
        return DDMC
 
 # Compute Spectral Element 1st derivative matrix (2 sided coupling)
-def computeSpectralElementDerivativeMatrix(dom, NE, adjustedMethod, nonCoincident):
-              
+def computeSpectralElementDerivativeMatrix5E(dom, NE, nonCoincident, ORDER):
+       
        N = len(dom)
+       
+       if (N-1) != 5:
+              print('@@ 5 ELEMENT C1 ONLY! @@')
+              return
+       
        # Master grid
        gridLG = [True, False, False, True, False]
        endGrid = [True, False, False, False, True]
        gridCH = [False, True, True, False, False]
        
        isLegendre = False
-       isLaguerreEnd1 = False
-       isLaguerreEnd2 = False
-       nativeInterface = True
-       CFDInterface = False
-       ORDER = 6
-       OFFSET = 1
+       isCSEInterface = False
+       isCFDInterface = True
+       OFFSET = 0
        
        sdom = []
        dmats = []
-       emats = []
        LE = []
        NEL = []
        
-       # Loop over each element in dom (N-1 in 1D)
-       for ee in range(N-1):
-              # Get the element coordinates
-              xa = dom[ee]
-              xb = dom[ee+1]
-              LE += [abs(xb - xa)]
-              NEL += [NE]
-              SDIMS = [xa, xb, LE[ee], NE, NE]
+       def function2(x, L):
+       
+              A = 4.0
+              B = 2.0
+              C = 4.0
+              Y = C * np.exp(-A / L * x) * np.sin(B * mt.pi / L * x)
+              DY = -(A * C) / L * np.exp(-A / L * x) * np.sin(B * mt.pi / L * x)
+              DY += (B * C) * mt.pi / L * np.exp(-A / L * x) * np.cos(B * mt.pi / L * x)
               
-              if ee == 0:
-                     if isLaguerreEnd1:
-                            SREFS = computeGrid(SDIMS, *endGrid)
-                            sdom += [-1.0 * np.flip(SREFS[1] + abs(xb))]
-                            DMB, CMB, scale = computeLaguerreDerivativeMatrix(SDIMS)
-                            RDMS = -1.0 * np.flip(np.flip(DMB,axis=0), axis=1)
-                     else:
-                            if not isLegendre:
-                                   SREFS = computeGrid(SDIMS, *gridLG)
-                                   sdom += [SREFS[1] + xa]
-                                   RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
-                            else:
-                                   SREFS = computeGrid(SDIMS, *gridCH)
-                                   sdom += [SREFS[1] + xa]
-                                   RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
-                                   
-                     if adjustedMethod:
-                            ADMS = np.copy(RDMS)
-                            ADMS[:,-1] = 0.0
-                     else:
-                            ADMS = np.copy(RDMS)
-                            
-              elif ee == N-2:
-                     if isLaguerreEnd2:
-                            SREFS = computeGrid(SDIMS, *endGrid)
-                            sdom += [SREFS[1] + xa]
-                            DMB, CMB, scale = computeLaguerreDerivativeMatrix(SDIMS)
-                            RDMS = 1.0 * DMB
-                     else:
-                            if not isLegendre:
-                                   SREFS = computeGrid(SDIMS, *gridLG)
-                                   sdom += [SREFS[1] + xa]
-                                   RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
-                            else:
-                                   SREFS = computeGrid(SDIMS, *gridCH)
-                                   sdom += [SREFS[1] + xa]
-                                   RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
-                     
-                     if adjustedMethod:
-                            ADMS = np.copy(RDMS)
-                            ADMS[:,0] = 0.0
-                     else:
-                            ADMS = np.copy(RDMS)
+              return Y, DY
+       
+       def getInterfaceDerivativeCSE(x, cdex):
+              if OFFSET == 0:
+                     ddm0 = computeCompactFiniteDiffDerivativeMatrix1(x, ORDER)
+                     ddm1, d2 = computeCubicSplineDerivativeMatrix(x, True, False, False, False, ddm0)
               else:
-                     # Compute the local derivative matrix
-                     if isLegendre:
-                            SREFS = computeGrid(SDIMS, *gridLG)
-                            sdom += [SREFS[1] + xa]
-                            RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
-                     else:
-                            SREFS = computeGrid(SDIMS, *gridCH)
-                            sdom += [SREFS[1] + xa]
-                            RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
-                            
-                     if adjustedMethod:
-                            ADMS = np.copy(RDMS)
-                            ADMS[:,0] = 0.0
-                            ADMS[:,-1] = 0.0
-                     else:
-                            ADMS = np.copy(RDMS)
+                     xo = x[OFFSET:-OFFSET]
+                     ddm0 = computeCompactFiniteDiffDerivativeMatrix1(xo, ORDER)
+                     ddm1, d2 = computeCubicSplineDerivativeMatrix(xo, True, False, False, False, ddm0)
               
-              # Make a list of element matrices
-              dmats += [RDMS] # Raw derivative matrix
-              emats += [ADMS] # Adjusted derivative matrix
+              cdex -= OFFSET
               
-              if ee == 0:
-                     edom = sdom[ee]
-                     gdom = sdom[ee]
-              else:
-                     edom = np.append(edom, sdom[ee][0:])
-                     gdom = np.append(gdom, sdom[ee][1:])
+              df = 0.5
+              di = ddm1[cdex,:]
+              di[cdex] *= df
+              dic = np.insert(di, cdex+1, di[cdex])
+              
+              padz = np.zeros(OFFSET)
+              dic = np.concatenate((padz, dic, padz), axis=0)
+              
+              return dic
+              
+              return dic
        
        def getInterfaceDerivativeCFD(x, cdex):
               
@@ -273,169 +171,584 @@ def computeSpectralElementDerivativeMatrix(dom, NE, adjustedMethod, nonCoinciden
               dic = np.concatenate((padz, dic, padz), axis=0)
               
               return dic
-
-       # Loop over each dof and assemble the global matrix
-       odexr = []
-       odexc = []
-       asc = []
-       bsc = []
-       csc = []
-       GDMS = scl.block_diag(emats[0], emats[1])
        
-       tdexr = -(NEL[1]+1)
-       tdexc = -(NEL[1]+1)
-       odexr += [GDMS.shape[0] + tdexr]
-       odexc += [GDMS.shape[1] + tdexc]
+       # Loop over each element in dom (N-1 in 1D)
+       for ee in range(N-1):
+              # Get the element coordinates
+              xa = dom[ee]
+              xb = dom[ee+1]
+              LE += [abs(xb - xa)]
+              NEL += [NE]
+              SDIMS = [xa, xb, LE[ee], NE, NE]
+              
+              if ee == 0:
+                     if isLegendre:
+                            SREFS = computeGrid(SDIMS, *gridLG)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
+                     else:
+                            SREFS = computeGrid(SDIMS, *gridCH)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
+                            #RDMS = computeCompactFiniteDiffDerivativeMatrix1(sdom[-1], ORDER)
+                            #RDMS, d2 = computeCubicSplineDerivativeMatrix(sdom[-1], True, False, False, False, ADMS)
+                            
+              elif ee == N-2:
+                     if isLegendre:
+                            SREFS = computeGrid(SDIMS, *gridLG)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
+                     else:
+                            SREFS = computeGrid(SDIMS, *gridCH)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
+                            #RDMS = computeCompactFiniteDiffDerivativeMatrix1(sdom[-1], ORDER)
+                            #RDMS, d2 = computeCubicSplineDerivativeMatrix(sdom[-1], True, False, False, False, ADMS)
+              else:
+                     # Compute the local derivative matrix
+                     if isLegendre:
+                            SREFS = computeGrid(SDIMS, *gridLG)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
+                     else:
+                            SREFS = computeGrid(SDIMS, *gridCH)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
+                            #RDMS = computeCompactFiniteDiffDerivativeMatrix1(sdom[-1], ORDER)
+                                          
+              # Make a list of element matrices
+              dmats += [RDMS] # Raw derivative matrix
+              
+              if ee == 0:
+                     edom = sdom[ee]
+                     gdom = sdom[ee]
+              else:
+                     edom = np.append(edom, sdom[ee][0:])
+                     gdom = np.append(gdom, sdom[ee][1:])
+                     
+      # Assemble the raw matrix
+       odexr = [0]
+       odexc = [0]
+       GDMS = np.copy(dmats[0])
+       for ee in range(1,N-1):
+              # Append the next diagonal block
+              GDMS = scl.block_diag(GDMS, dmats[ee])
+              
+              # Get the indices of coincident interfaces (left)
+              tdexr = -(NEL[ee]+1)
+              tdexc = -(NEL[ee]+1)
+              odexr += [GDMS.shape[0] + tdexr]
+              odexc += [GDMS.shape[1] + tdexc]
+              
+       odexr += [GDMS.shape[0] - 1]
+       odexc += [GDMS.shape[1] - 1]
        
-       asc += [0.5]
-       bsc += [LE[0]]
-       csc += [LE[1]]
+       # Compute the continuous common derivatives
+       dr = [0, 0, 0, 0, 0]
+       dl = [0, 0, 0, 0, 0]
+       pr = [0, 0, 0, 0, 0]
+       pl = [0, 0, 0, 0, 0]
        
-       if adjustedMethod:
+       # Get intra-element interface derivatives for this element (dl and dr)
+       for ee in range(N-1):
+              dl[ee] = np.copy(dmats[ee][0,:])
+              dr[ee] = np.copy(dmats[ee][-1,:])
               
-              # One sided adjust on first block
-              pad0 = np.zeros(NEL[0]+1)
-              pad1 = np.zeros(NEL[1]+1)
-              rv = np.copy(dmats[0][:,-1])
-              
-              dr = np.copy(dmats[0][-1,:]); dr[-1] = 0.0
-              dr = np.concatenate((dr, pad1))
-              
-              #pr = np.copy(dmats[1][0,:])
-              #pr = np.concatenate((pad0, pr))
-              
-              LM = (LE[0] + LE[1])
-              pr = np.concatenate((bsc[-1] / LM * dmats[0][-1,:], \
-                                   csc[-1] / LM * dmats[1][0,:]))
-              
-              qc1 = (1.0 / dmats[0][-1,-1]) * (pr - dr)
-              
-              Er = np.outer(rv, qc1)
-              GDMS[0:NEL[0]+1,:] += Er
-              
-              for ee in range(2,N-1):
-                     ii = ee - 1
-                     tdexr = -(NEL[ee]+1)
-                     tdexc = -(NEL[ee]+1)
+              if ee == 0:
                      
-                     # Append the next diagonal block
-                     GDMS = scl.block_diag(GDMS, emats[ee])
+                     dr[ee][-1] = 0.0
+                     pad_right = np.zeros(GDMS.shape[1] - len(dr[ee]))
+                     dr[ee] = np.concatenate((dr[ee], pad_right))
                      
-                     odexr += [GDMS.shape[0] + tdexr]
-                     odexc += [GDMS.shape[1] + tdexc]
+              elif ee == N-2:
                      
-                     # Scaling of matched coefficients here
-                     LM1 = (LE[ii-1] + LE[ii])
-                     LM2 = (LE[ii] + LE[ii+1])
-                     asc += [LE[ii-1]]
-                     bsc += [LE[ii]]
-                     csc += [LE[ii+1]]
+                     dl[ee][0] = 0.0
+                     pad_left = np.zeros(GDMS.shape[1] - len(dl[ee]))
+                     dl[ee] = np.concatenate((pad_left, dl[ee]))
                      
-                     pad0 = np.zeros(NEL[ii-1]+1)
-                     pad1 = np.zeros(NEL[ii]+1)
-                     pad2 = np.zeros(NEL[ii+1]+1)
+              else:
                      
-                     # Inter-element common interface derivatives (left and right)
-                     #pl = np.copy(dmats[ii-1][-1,:])
-                     #pl = np.concatenate((pl, pad1, pad2))
-                     pl = np.concatenate((asc[-1] / LM1 * dmats[ii-1][-1,:], \
-                                          bsc[-1] / LM1 * dmats[ii][0,:], pad2))
+                     dl[ee][0] = 0.0; dl[ee][-1] = 0.0
+                     pad_left = np.zeros(odexc[ee])
+                     pad_right = np.zeros(GDMS.shape[1] - len(pad_left) - len(dl[ee]))
+                     dl[ee] = np.concatenate((pad_left, dl[ee], pad_right))
                      
-                     #pr = np.copy(dmats[ii+1][0,:])
-                     #pr = np.concatenate((pad0, pad1, pr))
-                     pr = np.concatenate((pad0, bsc[-1] / LM2 * dmats[ii][-1,:], \
-                                          csc[-1] / LM2 * dmats[ii+1][0,:]))
+                     dr[ee][0] = 0.0; dr[ee][-1] = 0.0
+                     pad_left = np.zeros(odexc[ee])
+                     pad_right = np.zeros(GDMS.shape[1] - len(pad_left) - len(dr[ee]))
+                     dr[ee] = np.concatenate((pad_left, dr[ee], pad_right))
+       
+       # Set the interior interface of the boundary elements
+       pl[0] = np.zeros(1)
+       pr[-1] = np.zeros(1)
+       
+       if isCFDInterface:
+              pr[0] = getInterfaceDerivativeCFD(np.concatenate((sdom[0], sdom[1][1:])), NEL[1])
+              pl[-1] = getInterfaceDerivativeCFD(np.concatenate((sdom[-2], sdom[-1][1:])), NEL[-1])
+       
+       if isCSEInterface:
+              pr[0] = getInterfaceDerivativeCSE(np.concatenate((sdom[0], sdom[1][1:])), NEL[1])
+              pl[-1] = getInterfaceDerivativeCSE(np.concatenate((sdom[-2], sdom[-1][1:])), NEL[-1])
                      
-                     # Intra-element native interface derivatives
-                     dl = np.copy(dmats[ii][0,:]); dl[0] = 0.0; dl[-1] = 0.0
-                     dl = np.concatenate((pad0, dl, pad2))
-                     
-                     dr = np.copy(dmats[ii][-1,:]); dr[0] = 0.0; dr[-1] = 0.0
-                     dr = np.concatenate((pad0, dr, pad2))
-                     
-                     # Scale factor
-                     R = dmats[ii][0,0] * dmats[ii][-1,-1] - dmats[ii][0,-1] * dmats[ii][-1,0]
-                     
-                     # Right adjust
-                     rv = np.copy(dmats[ii][:,-1])                            
-                     qc1 = (dmats[ii][0,0] / R) * (pr - dr) - \
-                            (dmats[ii][-1,0] / R) * (pl - dl)
-                     E1 = np.outer(rv, qc1)
-                     
-                     # Left adjust 
-                     lv = np.copy(dmats[ii][:,0])                            
-                     qc2 = (dmats[ii][-1,-1] / R) * (pl - dl) - \
-                            (dmats[ii][0,-1] / R) * (pr - dr)
-                     E2 = np.outer(lv, qc2)
-                     
-                     bdex = NEL[ii+1] + 1
-                     tdex = (NEL[ii] + NEL[ii+1]) + 2
-                     ldex = (NEL[ii-1] + NEL[ii] + NEL[ii+1]) + 3
-                     GDMS[-tdex:-bdex,-ldex:] += E1
-                     GDMS[-tdex:-bdex,-ldex:] += E2
-              
-              # One sided adjust on last block
-              pad0 = np.zeros(NEL[-2]+1)
-              pad1 = np.zeros(NEL[-1]+1)
-              lv = np.copy(dmats[-1][:,0])
-              
-              dl = np.copy(dmats[-1][0,:]); dl[0] = 0.0
-              dl = np.concatenate((pad0, dl))
-              
-              #pl = np.copy(dmats[-2][-1,:])
-              #pl = np.concatenate((pl, pad1))
-              
-              LM = (LE[-2] + LE[-1])
-              pl = np.concatenate((bsc[-1] / LM * dmats[-2][-1,:], \
-                                   csc[-1] / LM * dmats[-1][0,:]))
-              
-              qc = (1.0 / dmats[-1][0,0]) * (pl - dl)
-              
-              El = np.outer(lv, qc)
-              ldex = (NEL[-2] + NEL[-1]) + 2
-              GDMS[-(NEL[-1]+1):,-ldex:] += El
-       else:
-              for ee in range(2,N-1):
-                     # Append the next diagonal block
-                     GDMS = scl.block_diag(GDMS, emats[ee])
-                     
-                     odexr += [GDMS.shape[0] + tdexr]
-                     odexc += [GDMS.shape[1] + tdexc]
-                     
-                     # Scaling of matched coefficients here
-                     LM = (LE[ee-1] + LE[ee])
-                     asc += [LE[ee-1] / LM]
-                     bsc += [LE[ee] / LM]
-                     
+       pad_right = np.zeros(GDMS.shape[1] - len(pr[0]))
+       pr[0] = np.concatenate((pr[0], pad_right))
+       
+       pad_left = np.zeros(GDMS.shape[1] - len(pl[-1]))
+       pl[-1] = np.concatenate((pad_left, pl[-1]))
+       
+       # Set the interior interface of the first interior elements
+       pl[1] = np.copy(pr[0])
+       pr[-2] = np.copy(pl[-1])
+       
+       EE = 2
+       
+       # Solve the middle element EE = 2
+       R1 = dmats[EE-1][0,0] * dmats[EE-1][-1,-1] - dmats[EE-1][0,-1] * dmats[EE-1][-1,0]
+       R2 = dmats[EE][0,0] * dmats[EE][-1,-1] - dmats[EE][0,-1] * dmats[EE][-1,0]
+       R3 = dmats[EE+1][0,0] * dmats[EE+1][-1,-1] - dmats[EE+1][0,-1] * dmats[EE+1][-1,0]
+       
+       # Right hand side 1
+       RHS1 = -(dmats[EE-1][-1,0] / R1) * (pr[0] - dl[EE-1]) - (dmats[EE-1][0,0] / R1) * dr[EE-1] 
+       RHS1 += (dmats[EE][-1,-1] / R2) * dl[EE] - (dmats[EE][0,-1] / R2) * dr[EE] 
+       
+       # Right hand side 2
+       RHS2 = -(dmats[EE+1][0,-1] / R3) * (pl[-1] - dr[EE+1]) - (dmats[EE+1][-1,-1] / R3) * dl[EE+1]
+       RHS2 += (dmats[EE][0,0] / R2) * dr[EE] - (dmats[EE][-1,0] / R2) * dl[EE]
+       
+       RHS = np.vstack((np.expand_dims(RHS1, axis=0), np.expand_dims(RHS2, axis=0)))
+       
+       AM = np.zeros((2,2))
+       AM[0,0] = (dmats[EE][-1,-1] / R2) - (dmats[EE-1][0,0] / R1)
+       AM[0,1] = -(dmats[EE][0,-1] / R2)
+       AM[1,0] = -(dmats[EE][-1,0] / R2)
+       AM[1,1] = (dmats[EE][0,-0] / R2) - (dmats[EE+1][-1,-1] / R3)
+       
+       # Solve for the interior common derivatives
+       PDI = np.linalg.solve(AM, RHS)
+       pl[EE] = PDI[0,:]
+       pr[EE] = PDI[1,:]
+       
+       pr[1] = np.copy(pl[EE])
+       pl[-2] = np.copy(pr[EE])
+       
+       # Go over each element and couple interfaces
+       for ee in range(N-1):
+              # Set common derivatives
+              if ee > 0 and ee < N-2:
+                     GDMS[odexr[ee]-1,:] = pl[ee]
+                     GDMS[odexr[ee],:] = pl[ee]
+                     GDMS[odexr[ee+1]-1,:] = pr[ee]
+                     GDMS[odexr[ee+1],:] = pr[ee]
+                    
        if nonCoincident:
               # Linear combination of columns
-              for ii in range(len(odexr)):
+              for ii in range(1,len(odexr)-1):
+                     rdex = odexr[ii]
                      cdex = odexc[ii]
                      
                      # merge rows and columns
                      GDMS[:,cdex-1] += GDMS[:,cdex]
-                     GDMS[:,cdex] = 0.0
                      
-              GDMS = np.delete(GDMS, odexc, axis=1)
+                     GDMS[:,rdex] += GDMS[:,rdex-1]
+                     
+              GDMS = np.delete(GDMS, odexc[1:-1], axis=1)
               domain = gdom
               
-              if nativeInterface:
-                     # Delete redundant row/col
-                     GDMS1 = 0.5 * np.copy(GDMS)
-                     GDMS2 = 0.5 * np.copy(GDMS)
-                     #GDMS1[np.array(odexr)-1,:] *= 2.0 * np.expand_dims(bsc, axis=1)
-                     #GDMS2[np.array(odexr),:] *= 2.0 * np.expand_dims(asc, axis=1)
-                     GDMS1 = np.delete(GDMS1, np.array(odexr), axis=0)
-                     GDMS2 = np.delete(GDMS2, np.array(odexr)-1, axis=0)              
-                     GDMS = GDMS1 + GDMS2
-              else:
-                     GDMS = np.delete(GDMS, np.array(odexr), axis=0)
+              deldex = np.copy(odexr[1:-1])
+              deldex[1] -= 1
+              GDMS = np.delete(GDMS, np.array(odexr[1:-1]), axis=0)
        else:
               domain = edom
                      
        DDMSA = numericalCleanUp(GDMS)
        
        return DDMSA, domain
+
+# Compute Spectral Element 1st derivative matrix (2 sided coupling)
+def computeSpectralElementDerivativeMatrix(dom, NE, nonCoincident, endsLaguerre, ORDER):
+              
+       N = len(dom)
+       # Master grid
+       gridLG = [True, False, False, True, False]
+       endGrid = [True, False, False, False, True]
+       gridCH = [False, True, True, False, False]
+       
+       isLegendre = True
+       isChebyshev = False
+       isCompactFD10 = False
+       isLaguerreEnd1 = endsLaguerre[0]
+       isLaguerreEnd2 = endsLaguerre[1]
+       
+       CSD_interface = False
+       CFD_interface = True
+       
+       idex = []
+       cdex1 = []
+       cdex2 = []
+       sdom = []
+       dmats = []
+       NEL = []
+       
+       def getInterfaceDerivativeCFD(ddm1, cdex):
+              
+              df = 0.5
+              di = ddm1[cdex,:]
+              di[cdex] *= df
+              dic = np.insert(di, cdex+1, di[cdex])
+              
+              return dic
+       
+       # Loop over each element in dom (N-1 in 1D)
+       for ee in range(N-1):
+              # Get the element coordinates
+              xa = dom[ee]
+              xb = dom[ee+1]
+              LE = abs(xb - xa)
+              NEL += [NE]
+              SDIMS = [xa, xb, LE, NE, NE]
+              
+              if ee == 0:
+                     if isLaguerreEnd1:
+                            SREFS = computeGrid(SDIMS, *endGrid)
+                            sdom += [-1.0 * np.flip(SREFS[1] + abs(xb))]
+                            DMB, CMB, scale = computeLaguerreDerivativeMatrix(SDIMS)
+                            RDMS = -1.0 * np.flip(np.flip(DMB,axis=0), axis=1)
+                     else:
+                            if isLegendre:
+                                   SREFS = computeGrid(SDIMS, *gridLG)
+                                   sdom += [SREFS[1] + xa]
+                                   RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
+                            if isChebyshev:
+                                   SREFS = computeGrid(SDIMS, *gridCH)
+                                   sdom += [SREFS[1] + xa]
+                                   RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
+                            if isCompactFD10:
+                                   SREFS = computeGrid(SDIMS, *gridCH)
+                                   sdom += [SREFS[1] + xa]
+                                   RDMS = computeCompactFiniteDiffDerivativeMatrix1(sdom[ee], ORDER)
+                            
+              elif ee == N-2:
+                     if isLaguerreEnd2:
+                            SREFS = computeGrid(SDIMS, *endGrid)
+                            sdom += [SREFS[1] + xa]
+                            DMB, CMB, scale = computeLaguerreDerivativeMatrix(SDIMS)
+                            RDMS = 1.0 * DMB
+                     else:
+                            if isLegendre:
+                                   SREFS = computeGrid(SDIMS, *gridLG)
+                                   sdom += [SREFS[1] + xa]
+                                   RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
+                            if isChebyshev:
+                                   SREFS = computeGrid(SDIMS, *gridCH)
+                                   sdom += [SREFS[1] + xa]
+                                   RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
+                            if isCompactFD10:
+                                   SREFS = computeGrid(SDIMS, *gridCH)
+                                   sdom += [SREFS[1] + xa]
+                                   RDMS = computeCompactFiniteDiffDerivativeMatrix1(sdom[ee], ORDER)
+              else:
+                     # Compute the local derivative matrix
+                     if isLegendre:
+                            SREFS = computeGrid(SDIMS, *gridLG)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeLegendreDerivativeMatrix(SDIMS)
+                     if isChebyshev:
+                            SREFS = computeGrid(SDIMS, *gridCH)
+                            sdom += [SREFS[1] + xa]
+                            RDMS, LTR = computeChebyshevDerivativeMatrix(SDIMS)
+                     if isCompactFD10:
+                            SREFS = computeGrid(SDIMS, *gridCH)
+                            sdom += [SREFS[1] + xa]
+                            RDMS = computeCompactFiniteDiffDerivativeMatrix1(sdom[ee], ORDER)
+              
+              # Make a list of element matrices
+              dmats += [RDMS] # Raw derivative matrix
+              
+              if ee == 0:
+                     edom = sdom[ee]
+                     gdom = sdom[ee]
+              else:
+                     edom = np.append(edom, sdom[ee][0:])
+                     gdom = np.append(gdom, sdom[ee][1:])
+              
+              # Store indices of interface dofs
+              if ee >= 0 and ee < N-2:
+                     idex += [len(gdom) - 1]
+                     cdex1 += [len(edom) - 1]
+                     cdex2 += [len(edom)]
+                     
+       # Assemble the raw matrix
+       odexr = [0]
+       odexc = [0]
+       GDMS = np.copy(dmats[0])
+       for ee in range(1,N-1):
+              # Append the next diagonal block
+              GDMS = scl.block_diag(GDMS, dmats[ee])
+              
+              # Get the indices of coincident interfaces (left)
+              tdexr = -(NEL[ee]+1)
+              tdexc = -(NEL[ee]+1)
+              odexr += [GDMS.shape[0] + tdexr]
+              odexc += [GDMS.shape[1] + tdexc]
+              
+       odexr += [GDMS.shape[0] - 1]
+       odexc += [GDMS.shape[1] - 1]
+       
+       # Compute the continuous common derivatives
+       if CSD_interface:
+              DDMB = computeCompactFiniteDiffDerivativeMatrix1(gdom, 6)
+              DDMC, temp = computeCubicSplineDerivativeMatrix(gdom, True, False, False, False, DDMB)
+              
+       elif CFD_interface:
+              DDMC = computeCompactFiniteDiffDerivativeMatrix1(gdom, ORDER)
+       
+       DDMC = np.insert(DDMC, idex, 0.0, axis=1)
+       
+       # Couple derivatives at the interfaces
+       GDMS[cdex1,:] = DDMC[idex,:]
+       GDMS[cdex2,:] = DDMC[idex,:]
+       
+       #'''
+       if nonCoincident:
+              # Linear combination of columns
+              for ii in range(1,len(odexr)-1):
+                     cdex = odexc[ii]
+                     
+                     # merge rows and columns
+                     GDMS[:,cdex-1] += GDMS[:,cdex]
+                     
+              GDMS = np.delete(GDMS, odexc[1:-1], axis=1)
+              domain = gdom
+              
+              #print(odexr)
+              odexr[0] -= 1
+              GDMS = np.delete(GDMS, odexr[1:-1], axis=0)
+       else:
+              domain = edom
+                     
+       DDMSA = numericalCleanUp(GDMS)
+       
+       return DDMSA, domain
+
+# Computes Clamped Quintic Spline 1st derivative matrix
+def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
+       
+       DM2 = DDM_BC.dot(DDM_BC)
+       DM3 = DDM_BC.dot(DM2)
+       DM4 = DDM_BC.dot(DM3)
+       
+       # Initialize matrix blocks
+       N = len(dom)
+       A = np.zeros((N,N)) # coefficients to 4th derivatives
+       B = np.zeros((N,N)) # coefficients to RHS of 4th derivatives
+       C = np.zeros((N,N)) # coefficients to 1st derivatives
+       D = np.zeros((N,N)) # coefficients to additive part of 1st derivatives
+       
+       def computeIntegratalConstantMatrices(ii, x):
+              
+              x = np.array(x, dtype=np.longdouble)
+              
+              hp = abs(x[ii+1] - x[ii])
+              hp1 = abs(x[ii+2] - x[ii+1])
+              hm = abs(x[ii] - x[ii-1])
+              
+              V = np.zeros((9,9), dtype=np.longdouble)
+              
+              a0 = 0.5
+              a1 = 1.0 / 6.0
+              a2 = 1.0 / 24.0
+              a3 = 1.0 / 120.0
+              
+              xim = x[ii-1]
+              xi = x[ii]
+              xi2 = a0*xi**2
+              xip = x[ii+1]
+              xip2 = a0*xip**2
+              xir = x[ii+2]
+              
+              xqm = a1 * (xim**2 + xi * xim + xi**2)
+              xqp = a1 * (xi**2 + xip * xi + xip**2)
+              xqr = a1 * (xip**2 + xir * xip + xir**2)
+              
+              # A_j-1, B_j-1, C_j-1, A_j, B_j, C_j, A_j+1, B_j+1, C_j+1 
+              V[0,:] = np.array([-1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+              V[1,:] = np.array([-xi, -1.0, 0.0, xi, 1.0, 0.0, 0.0, 0.0, 0.0])
+              V[2,:] = np.array([-xi2, -xi, -1.0, xi2, xi, 1.0, 0.0, 0.0, 0.0])
+              V[3,:] = np.array([xqm, a0 * (xi + xim), 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+              V[4,:] = np.array([0.0, 0.0, 0.0, xqp, a0 * (xip + xi), 1.0, 0.0, 0.0, 0.0])
+              V[5,:] = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, xqr, a0 * (xir + xip), 1.0])
+              V[6,:] = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0])
+              V[7,:] = np.array([0.0, 0.0, 0.0, xip, 1.0, 0.0, -xip, -1.0, 0.0])
+              V[8,:] = np.array([0.0, 0.0, 0.0, xip2, xip, 1.0, -xip2, -xip, -1.0])
+              
+              rho = np.zeros((9,4), dtype=np.longdouble)
+              rho[0,1] = a0 * (hp + hm)
+              rho[1,1] = a1 * (hm**2 - hp**2)
+              rho[2,1] = a2 * (hm**3 + hp**3)
+              rho[3,0] = a3 * hm**3
+              rho[3,1] = -a3 * hm**3
+              rho[4,1] = a3 * hp**3
+              rho[4,2] = -a3 * hp**3
+              rho[5,2] = a3 * hp1**3
+              rho[5,3] = -a3 * hp1**3
+              rho[6,2] = -a0 * (hp + hp1)
+              rho[7,2] = a1 * (hp1**2 - hp**2)
+              rho[8,2] = -a2 * (hp**3 + hp1**3)
+              
+              eta = np.zeros((9,4), dtype=np.longdouble)
+              eta[3,:] = 1.0 / hm * np.array([-1.0, 1.0, 0.0, 0.0])
+              eta[4,:] = 1.0 / hp * np.array([0.0, -1.0, 1.0, 0.0])
+              eta[5,:] = 1.0 / hp1 *np.array([0.0, 0.0, -1.0, 1.0])
+              
+              PLU = scl.lu_factor(V)
+              VI = scl.lu_solve(PLU, np.eye(9))
+              
+              OM = VI.dot(rho)
+              ET = VI.dot(eta)
+              '''
+              thisTol = 1.0E-15
+              for ii in range(4):
+                     OM[:,ii], es1 = sps.linalg.lgmres(sps.csc_matrix(V, dtype=np.float64), rho[:,ii], x0=OM[:,ii], M=VI, tol=thisTol, maxiter=10000)
+                     ET[:,ii], es2 = sps.linalg.lgmres(sps.csc_matrix(V, dtype=np.float64), eta[:,ii], x0=ET[:,ii], M=VI, tol=thisTol, maxiter=10000)
+              '''                     
+              #OM = VIS.dot(rho)
+              #ET = VIS.dot(eta)
+                            
+              return OM, ET
+                     
+       # Loop over each interior point in the irregular grid
+       for ii in range(1,N-1):
+              hp = abs(dom[ii+1] - dom[ii])
+              hm = abs(dom[ii] - dom[ii-1])
+              
+              #%% LHS matrix
+              a0 = 0.5
+              a1 = 1.0 / 6.0
+              a2 = 1.0 / 24.0
+              hc = hp + hm              
+              
+              #'''
+              if ii == 1:                     
+                     # Compute and store left element integral coefficients
+                     OM1 = np.zeros((3,4))
+                     OM1[0,0] += a0 * hm
+                     OM1[1,0] += -(a1 * hm**2 + a0 * hm * dom[0])
+                     OM1[2,0] += (a2 * hm**3 + a1 * hm**2 * dom[0] + 0.25 * hm * dom[0]**2)
+                     
+                     ET1 = np.zeros((3,N))
+                     ET1[0,:] = DM3[0,:]
+                     ET1[1,:] = DM2[0,:] - dom[0] * DM3[0,:]
+                     ET1[2,:] = DDM_BC[0,:] - dom[0] * DM2[0,:] + a0 * dom[0]**2 * DM3[0,:]
+                     
+                     # Compute the right EIC
+                     OM2, ET2 = computeIntegratalConstantMatrices(ii, dom)
+                     
+                     # Assemble to the equation for Z
+                     A[ii,ii] = -a0 * hc
+                     A[ii,ii-1:ii+3] -= -(OM2[3,:])# * dom[ii] + OM2[1,:])
+                     A[ii,0:4] -= +(OM1[0,:])# * dom[ii] + OM1[1,:])
+                     
+                     B[ii,ii-1:ii+3] += -(ET2[3,:])# * dom[ii] + ET2[1,:])
+                     B[ii,:] += +ET1[0,:]
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     C[ii,ii] = -a2 * hp**3
+                     C[ii,ii-1:ii+3] += a0 * dom[ii]**2 * OM2[3,:] + dom[ii] * OM2[4,:] + OM2[5,:]
+                     
+                     # Compute the D matrix (coefficients to Q)
+                     D[ii,ii-1:ii+3] += a0 * dom[ii]**2 * ET2[3,:] + dom[ii] * ET2[4,:] + ET2[5,:]
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     C[0,0] = -a2 * hm**3
+                     C[0,0] += a0 * dom[0]**2 * OM1[0,0] + dom[0] * OM1[1,0] + OM1[2,0]
+                     
+                     # Compute the D matrix (coefficients to Q)
+                     D[0,:] += a0 * dom[0]**2 * ET1[0,:] + dom[0] * ET1[1,:] + ET1[2,:]
+                     
+              elif ii == N-2:
+                     # Compute the left EIC
+                     OM1, ET1 = computeIntegratalConstantMatrices(ii-1, dom)
+                                          
+                     # Compute and store right element integral coefficients
+                     OM2 = np.zeros((3,4))
+                     OM2[0,-1] += -a0 * hp
+                     OM2[1,-1] += -(a1 * hp**2 - a0 * hp * dom[-1])
+                     OM2[2,-1] += (-a2 * hp**3 + a1 * hp**2 * dom[-1] - 0.25 * hp * dom[-1]**2)
+                     
+                     ET2 = np.zeros((3,N))
+                     ET2[0,:] = DM3[-1,:]
+                     ET2[1,:] = DM2[-1,:] - dom[-1] * DM3[-1,:]
+                     ET2[2,:] = DDM_BC[-1,:] - dom[-1] * DM2[-1,:] + a0 * dom[-1]**2 * DM3[-1,:]
+                     
+                     # Assemble to the equation for Z
+                     A[ii,ii] = a0 * hc
+                     A[ii, N-4:N] -= -(OM2[0,:])# * dom[ii] + OM2[1,:])
+                     A[ii, ii-2:ii+2] -= +(OM1[3,:])# * dom[ii] + OM1[1,:])
+                     
+                     B[ii,:] += -ET2[0,:]
+                     B[ii, ii-2:ii+2] += +(ET1[3,:])# * dom[ii] + ET1[1,:])
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     C[ii,ii] = a2 * hm**3
+                     C[ii,ii-2:ii+2] += a0 * dom[ii]**2 * OM1[3,:] + dom[ii] * OM1[4,:] + OM1[5,:]
+                     
+                     # Compute the D matrix (coefficients to Z)
+                     D[ii,ii-2:ii+2] += a0 * dom[ii]**2 * ET1[3,:] + dom[ii] * ET1[4,:] + ET1[5,:]
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     C[-1,-1] = a2 * hp**3
+                     C[-1,-1] += a0 * dom[-1]**2 * OM2[0,-1] + dom[-1] * OM2[1,-1] + OM2[2,-1]
+                     
+                     # Compute the D matrix (coefficients to Z)
+                     D[-1,:] += a0 * dom[-1]**2 * ET2[0,:] + dom[-1] * ET2[1,:] + ET2[2,:]
+              else:
+                     # Compute adjacent EIC and assemble to internal equations for Z
+                     OM1, ET1 = computeIntegratalConstantMatrices(ii-1, dom)
+                     OM2, ET2 = computeIntegratalConstantMatrices(ii, dom)
+                     
+                     A[ii,ii] = -a0 * hc
+                     A[ii, ii-1:ii+3] -= -(OM2[3,:])# * dom[ii] + OM2[1,:])
+                     A[ii, ii-2:ii+2] -= +(OM1[3,:])# * dom[ii] + OM1[1,:])
+                     
+                     B[ii, ii-1:ii+3] += -(ET2[3,:])# * dom[ii] + ET2[1,:])
+                     B[ii, ii-2:ii+2] += +(ET1[3,:])# * dom[ii] + ET1[1,:])
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     C[ii,ii] = -a2 * hp**3
+                     C[ii,ii-1:ii+3] += a0 * dom[ii]**2 * OM2[3,:] + dom[ii] * OM2[4,:] + OM2[5,:]
+                     
+                     # Compute the D matrix (coefficients to Q)
+                     D[ii,ii-1:ii+3] += a0 * dom[ii]**2 * ET2[3,:] + dom[ii] * ET2[4,:] + ET2[5,:]
+              #'''
+              
+       # Left end natural S^(5) = 0
+       #A[0,0] = 1.0 * dom[1] / (dom[1] - dom[0]) 
+       #A[0,1] = -1.0 * dom[0] / (dom[1] - dom[0])
+       #B[0,:] = np.zeros(N)
+       # Left end known S^(4)
+       A[0,0] = 1.0
+       B[0,:] = DM4[0,:]
+       
+       # Right end natural S^(5) = 0
+       #A[N-1,N-2] = 1.0 * dom[-1] / (dom[-1] - dom[-2])
+       #A[N-1,N-1] = -1.0 * dom[-2] / (dom[-1] - dom[-2])
+       #B[N-1,:] = np.zeros(N)
+       # Right end known S^(4)
+       A[-1,-1] = 1.0
+       B[-1,:] = DM4[-1,:]
+              
+       # Compute the 4th derivative matrix
+       PLU = scl.lu_factor(A)
+       AIB = scl.lu_solve(PLU,B)
+       
+       # Compute the 1st derivative matrix
+       DM1 = C.dot(AIB) + D
+       
+       #DM1[0,:] = DDM_BC[0,:]
+       #DM1[-1,:] = DDM_BC[-1,:]
+       DM1C = numericalCleanUp(DM1)
+                     
+       return DM1C, AIB
 
 # Computes Cubic Spline 1st derivative matrix
 def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
@@ -499,7 +812,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               
               # Adjust ends
               DDM[0,:] = DDM_BC[0,:]
-              DDM[N-1,:] = DDM_BC[N-1,:]
+              DDM[-1,:] = DDM_BC[-1,:]
               
        elif isEssential:
               # Left end
@@ -598,302 +911,225 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
 
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
+       
+       end3 = False
+       end6 = True
+       
        # Initialize the left and right derivative matrices
        N = len(dom)
        LDM = np.zeros((N,N)) # tridiagonal
        RDM = np.zeros((N,N)) # centered difference
        
-       if order == 4:
-              '''
-              # Loop over each interior point in the irregular grid
-              for ii in range(1,N-1):
-                     # Get the metric weights
-                     hp = abs(dom[ii+1] - dom[ii])
-                     hm = abs(dom[ii] - dom[ii-1])
-                     
-                     # Compute the stencil coefficients
-                     hr = (hm / hp)
-                     d = 0.25
-                     c = d * hr**4
-                     b = 0.5 * hr**3 * c + 2.5 * d 
-                     a = (2.0 * d - b) * hr**2 - 2.0 * c
-                     
-                     # Write the right equation
-                     RDM[ii,ii-1] = b
-                     RDM[ii,ii] = -(a + b)
-                     RDM[ii,ii+1] = a
-                     # Write the left equation
-                     LDM[ii,ii-1] = -d * hm
-                     LDM[ii,ii] = (hp * (a + c) + hm * (d - b))
-                     LDM[ii,ii+1] = -c * hp
-              '''       
-              # Loop over each interior point in the irregular grid
-              for ii in range(1,N-1):
-                     # Get the metric weights
-                     hp1 = abs(dom[ii+1] - dom[ii])
-                     hm1 = abs(dom[ii] - dom[ii-1])
-                     
-                     # Compute the stencil coefficients
-                     ND = 4
-                     CM4 = np.ones((ND,ND))
-                     c1 = hp1; c2 = hm1
-                     CM4[0,:] = [c1, -c2, -1.0, -1.0]
-                     CM4[1,:] = [c1**2, +c2**2, +2.0 * c2, -2.0 * c1]
-                     CM4[2,:] = [c1**5, -c2**5, -5.0 * c2**4, -5.0 * c1**4]
-                     CM4[3,:] = [c1**6, +c2**6, +6.0 * c2**5, -6.0 * c1**5]
-                     
-                     CMV = np.zeros(ND)
-                     CMV[0] = 1.0
-                     
-                     '''
-                     CF = np.linalg.solve(CM4, CMV)
-                     alpha = CF[2]
-                     beta = CF[3]
-                     CFE = -np.sum(CF[0:ND-2])
-                     '''
-                     # Constraint alpha = beta
-                     CM4[:,-2] += CM4[:,-1]
-                     CF = np.linalg.solve(CM4[0:-1,0:-1], CMV[0:-1])
-                     alpha = CF[2]
-                     beta = CF[2]
-                     CFE = -np.sum(CF[0:ND-2])
-                     
-                     # Write the right equation
-                     RDM[ii,ii-1] = CF[1]
-                     RDM[ii,ii] = CFE
-                     RDM[ii,ii+1] = CF[0]
-                     
-                     # Write the left equation
-                     LDM[ii,ii-1] = alpha
-                     LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = beta
+       def p2Matrix6(hm1, hp1, hp2, hp3, hp4, hp5, ND):
+              CM = np.ones((ND,ND))
+              c1 = hp1; c2 = hm1
+              c3 = hp2 + hp1
+              c5 = hp3 + hp2 + hp1
+              c7 = hp4 + hp3 + hp2 + hp1
+              #c9 = hp5 + hp4 + hp3 + hp2 + hp1
+
+              # One sided boundary scheme (2 forward derivatives)
+              CM[0,:] = [+c1, -c2, +c3, +c5, +c7, -2.0]
+              CM[1,:] = [c1**2, +c2**2, +c3**2, +c5**2, +c7**2, -2.0 * (hp1 - hm1)]
+              CM[2,:] = [c1**3, -c2**3, +c3**3, +c5**3, +c7**3, -3.0 * (hp1**2 + hm1**2)]
+              CM[3,:] = [c1**4, +c2**4, +c3**4, +c5**4, +c7**4, -4.0 * (hp1**3 - hm1**3)]
+              CM[4,:] = [c1**5, -c2**5, +c3**5, +c5**5, +c7**5, -5.0 * (hp1**4 + hm1**4)]
+              CM[5,:] = [c1**6, +c2**6, +c3**6, +c5**6, +c7**6, -6.0 * (hp1**5 - hm1**5)]
+
+              return CM
+       
+       def endMatrix6(hp1, hp2, hp3, hp4, hp5, ND):
+              CM = np.ones((ND,ND))
+              c1 = hp1
+              c3 = hp2 + hp1
+              c5 = hp3 + hp2 + hp1
+              c7 = hp4 + hp3 + hp2 + hp1
+              c9 = hp5 + hp4 + hp3 + hp2 + hp1
+
+              # One sided boundary scheme (2 forward derivatives)
+              CM[0,:] = [+c1, +c3, +c5, +c7, +c9, -1.0]
+              CM[1,:] = [c1**2, +c3**2, +c5**2, +c7**2, +c9**2, -2.0 * c1]
+              CM[2,:] = [c1**3, +c3**3, +c5**3, +c7**3, +c9**3, -3.0 * c1**2]
+              CM[3,:] = [c1**4, +c3**4, +c5**4, +c7**4, +c9**4, -4.0 * c1**3]
+              CM[4,:] = [c1**5, +c3**5, +c5**5, +c7**5, +c9**5, -5.0 * c1**4]
+              CM[5,:] = [c1**6, +c3**6, +c5**6, +c7**6, +c9**6, -6.0 * c1**5]
+
+              return CM
+       
+       def interiorMatrix10(hm3, hm2, hm1, hp1, hp2, hp3, ND):
+              CM = np.ones((ND,ND))
+              c1 = hp1; c2 = hm1
+              c3 = hp2 + hp1; c4 = hm1 + hm2
+              c5 = hp3 + hp2 + hp1; c6 = hm1 + hm2 + hm3
+
+              #''' Pentadiagonal left, Septadiagonal right
+              CM[0,:] = [c1, -c2, +c3, -c4, c5, -c6, -1.0, -1.0, -1.0, -1.0]
+              CM[1,:] = [c1**2, +c2**2, +c3**2, +c4**2, +c5**2, +c6**2, +2.0 * c2, -2.0 * c1, +2.0 * c4, -2.0 * c3]
+              CM[2,:] = [c1**3, -c2**3, +c3**3, -c4**3, +c5**3, -c6**3, -3.0 * c2**2, -3.0 * c1**2, -3.0 * c4**2, -3.0 * c3**2]
+              CM[3,:] = [c1**4, +c2**4, +c3**4, +c4**4, +c5**4, +c6**4, +4.0 * c2**3, -4.0 * c1**3, +4.0 * c4**3, -4.0 * c3**3]
+              CM[4,:] = [c1**5, -c2**5, +c3**5, -c4**5, +c5**5, -c6**5, -5.0 * c2**4, -5.0 * c1**4, -5.0 * c4**4, -5.0 * c3**4]
+              CM[5,:] = [c1**6, +c2**6, +c3**6, +c4**6, +c5**6, +c6**6, +6.0 * c2**5, -6.0 * c1**5, +6.0 * c4**5, -6.0 * c3**5]
+              CM[6,:] = [c1**7, -c2**7, +c3**7, -c4**7, +c5**7, -c6**7, -7.0 * c2**6, -7.0 * c1**6, -7.0 * c4**6, -7.0 * c3**6]
+              CM[7,:] = [c1**8, +c2**8, +c3**8, +c4**8, +c5**8, +c6**8, +8.0 * c2**7, -8.0 * c1**7, +8.0 * c4**7, -8.0 * c3**7]
+              CM[8,:] = [c1**9, -c2**9, +c3**9, -c4**9, +c5**9, -c6**9, -9.0 * c2**8, -9.0 * c1**8, -9.0 * c4**8, -9.0 * c3**8]
+              CM[9,:] = [c1**10, +c2**10, +c3**10, +c4**10, +c5**10, +c6**10, +10.0 * c2**9, -10.0 * c1**9, +10.0 * c4**9, -10.0 * c3**9]
+                            
+              return CM
               
-       if order == 6:
-              # Loop over each interior point in the irregular grid
-              for ii in [1, N-2]:
-                     # Get the metric weights
-                     hp1 = abs(dom[ii+1] - dom[ii])
-                     hm1 = abs(dom[ii] - dom[ii-1])
-                     
-                     # Compute the stencil coefficients
-                     ND = 4
-                     CM4 = np.ones((ND,ND))
-                     c1 = hp1; c2 = hm1
-                     CM4[0,:] = [c1, -c2, -1.0, -1.0]
-                     CM4[1,:] = [c1**2, +c2**2, +2.0 * c2, -2.0 * c1]
-                     CM4[2,:] = [c1**5, -c2**5, -5.0 * c2**4, -5.0 * c1**4]
-                     CM4[3,:] = [c1**6, +c2**6, +6.0 * c2**5, -6.0 * c1**5]
-                     
-                     CMV = np.zeros(ND)
-                     CMV[0] = 1.0
-                     '''
-                     CF = np.linalg.solve(CM4, CMV)
-                     alpha = CF[2]
-                     beta = CF[3]
-                     CFE = -np.sum(CF[0:ND-2])
-                     '''
-                     # Constraint alpha = beta
-                     CM4[:,-2] += CM4[:,-1]
-                     CF = np.linalg.solve(CM4[0:-1,0:-1], CMV[0:-1])
-                     alpha = CF[2]
-                     beta = CF[2]
-                     CFE = -np.sum(CF[0:ND-2])
-                     
-                     # Write the right equation
-                     RDM[ii,ii-1] = CF[1]
-                     RDM[ii,ii] = CFE
-                     RDM[ii,ii+1] = CF[0]
-                     
-                     # Write the left equation
-                     LDM[ii,ii-1] = alpha
-                     LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = beta
+       for ii in range(1,N-1):
+              # Get the metric weights
+              hp1 = abs(dom[ii+1] - dom[ii])
+              hm1 = abs(dom[ii] - dom[ii-1])
               
-              # Loop over each interior point in the irregular grid
-              for ii in range(2,N-2):
-                     # Get the metric weights
-                     hp1 = abs(dom[ii+1] - dom[ii])
-                     hm1 = abs(dom[ii] - dom[ii-1])
+              if (order == 10 and ii in [2,N-3]) or \
+                 (order == 6 and ii in range(2,N-2)):
                      hp2 = abs(dom[ii+2] - dom[ii+1])
                      hm2 = abs(dom[ii-1] - dom[ii-2])
-                     
-                     # Compute the stencil coefficients
-                     ND = 6
-                     CM6 = np.ones((ND,ND))
-                     c1 = hp1; c2 = hm1; c3 = hp2 + hp1; c4 = hm1 + hm2
-                     CM6[0,:] = [c1, -c2, +c3, -c4, -1.0, -1.0]
-                     CM6[1,:] = [c1**2, +c2**2, +c3**2, +c4**2, +2.0 * c2, -2.0 * c1]
-                     CM6[2,:] = [c1**3, -c2**3, +c3**3, -c4**3, -3.0 * c2**2, -3.0 * c1**2]
-                     CM6[3,:] = [c1**4, +c2**4, +c3**4, +c4**4, +4.0 * c2**3, -4.0 * c1**3]
-                     CM6[4,:] = [c1**5, -c2**5, +c3**5, -c4**5, -5.0 * c2**4, -5.0 * c1**4]
-                     CM6[5,:] = [c1**6, +c2**6, +c3**6, +c4**6, +6.0 * c2**5, -6.0 * c1**5]
-                     
-                     CMV = np.zeros(ND)
-                     CMV[0] = 1.0
-                     
-                     # Constraint alpha = beta
-                     CM6[:,-2] += CM6[:,-1]
-                     CF = np.linalg.solve(CM6[0:-1,0:-1], CMV[0:-1])
-                     alpha = CF[4]
-                     beta = CF[4]
-                     CFE = -np.sum(CF[0:ND-2])
-                     
-                     # Write the right equation
-                     RDM[ii,ii-2] = CF[3]
-                     RDM[ii,ii-1] = CF[1]
-                     RDM[ii,ii] = CFE
-                     RDM[ii,ii+1] = CF[0]
-                     RDM[ii,ii+2] = CF[2]
-                     
-                     # Write the left equation
-                     LDM[ii,ii-1] = alpha
-                     LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = beta
-                     
-       if order == 8:
-              # Loop over each interior point in the irregular grid
-              for ii in [1,N-2]:
-                     # Get the metric weights
-                     hp1 = abs(dom[ii+1] - dom[ii])
-                     hm1 = abs(dom[ii] - dom[ii-1])
-                     
-                     # Compute the stencil coefficients
-                     ND = 4
-                     CM4 = np.ones((ND,ND))
-                     c1 = hp1; c2 = hm1
-                     CM4[0,:] = [c1, -c2, -1.0, -1.0]
-                     CM4[1,:] = [c1**2, +c2**2, +2.0 * c2, -2.0 * c1]
-                     CM4[2,:] = [c1**5, -c2**5, -5.0 * c2**4, -5.0 * c1**4]
-                     CM4[3,:] = [c1**6, +c2**6, +6.0 * c2**5, -6.0 * c1**5]
-                     
-                     CMV = np.zeros(ND)
-                     CMV[0] = 1.0
-                     
-                     '''
-                     CF = np.linalg.solve(CM4, CMV)
-                     alpha = CF[2]
-                     beta = CF[3]
-                     CFE = -np.sum(CF[0:ND-2])
-                     '''
-                     # Constraint alpha = beta
-                     CM4[:,-2] += CM4[:,-1]
-                     CF = np.linalg.solve(CM4[0:-1,0:-1], CMV[0:-1])
-                     alpha = CF[2]
-                     beta = CF[2]
-                     CFE = -np.sum(CF[0:ND-2])
-                     
-                     # Write the right equation
-                     RDM[ii,ii-1] = CF[1]
-                     RDM[ii,ii] = CFE
-                     RDM[ii,ii+1] = CF[0]
-                     
-                     # Write the left equation
-                     LDM[ii,ii-1] = alpha
-                     LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = beta
+              else:
+                     hp2 = 0.0; hm2 = 0.0
               
-              # Loop over each interior point in the irregular grid
-              for ii in [2,N-3]:
-                     # Get the metric weights
-                     hp1 = abs(dom[ii+1] - dom[ii])
-                     hm1 = abs(dom[ii] - dom[ii-1])
-                     hp2 = abs(dom[ii+2] - dom[ii+1])
-                     hm2 = abs(dom[ii-1] - dom[ii-2])
-                     
-                     # Compute the stencil coefficients
-                     ND = 6
-                     CM6 = np.ones((ND,ND))
-                     c1 = hp1; c2 = hm1; c3 = hp2 + hp1; c4 = hm1 + hm2
-                     CM6[0,:] = [c1, -c2, +c3, -c4, -1.0, -1.0]
-                     CM6[1,:] = [c1**2, +c2**2, +c3**2, +c4**2, +2.0 * c2, -2.0 * c1]
-                     CM6[2,:] = [c1**3, -c2**3, +c3**3, -c4**3, -3.0 * c2**2, -3.0 * c1**2]
-                     CM6[3,:] = [c1**4, +c2**4, +c3**4, +c4**4, +4.0 * c2**3, -4.0 * c1**3]
-                     CM6[4,:] = [c1**5, -c2**5, +c3**5, -c4**5, -5.0 * c2**4, -5.0 * c1**4]
-                     CM6[5,:] = [c1**6, +c2**6, +c3**6, +c4**6, +6.0 * c2**5, -6.0 * c1**5]
-                     
-                     CMV = np.zeros(ND)
-                     CMV[0] = 1.0
-                     '''
-                     CF = np.linalg.solve(CM6, CMV)
-                     alpha = CF[4]
-                     beta = CF[5]
-                     '''
-                     CM6[:,-2] += CM6[:,-1]
-                     CF = np.linalg.solve(CM6[0:-1,0:-1], CMV[0:-1])
-                     alpha = CF[4]
-                     beta = CF[4]
-              
-                     CFE = -np.sum(CF[0:ND-2])
-                     
-                     # Write the right equation
-                     RDM[ii,ii-2] = CF[3]
-                     RDM[ii,ii-1] = CF[1]
-                     RDM[ii,ii] = CFE
-                     RDM[ii,ii+1] = CF[0]
-                     RDM[ii,ii+2] = CF[2]
-                     
-                     # Write the left equation
-                     LDM[ii,ii-1] = alpha
-                     LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = beta
-                     
-              # Loop over each interior point in the irregular grid
-              for ii in range(3,N-3):
-                     # Get the metric weights
-                     hp1 = abs(dom[ii+1] - dom[ii])
-                     hm1 = abs(dom[ii] - dom[ii-1])
+              if (order == 10 and ii in range(3,N-3)):
                      hp2 = abs(dom[ii+2] - dom[ii+1])
                      hm2 = abs(dom[ii-1] - dom[ii-2])
                      hp3 = abs(dom[ii+3] - dom[ii+2])
-                     hm3 = abs(dom[ii-2] - dom[ii-3])
-                     
-                     # Compute the stencil coefficients
-                     ND = 10
-                     CM8 = np.ones((ND,ND))
-                     c1 = hp1; c2 = hm1
-                     c3 = hp2 + hp1; c4 = hm1 + hm2
-                     c5 = hp3 + hp2 + hp1; c6 = hm1 + hm2 + hm3
-                     ''' Tridiagonal left, Septadiagonal right
-                     CM8[0,:] = [c1, -c2, +c3, -c4, c5, -c6, -1.0, -1.0]
-                     CM8[1,:] = [c1**2, +c2**2, +c3**2, +c4**2, +c5**2, +c6**2, +2.0 * c2, -2.0 * c1]
-                     CM8[2,:] = [c1**3, -c2**3, +c3**3, -c4**3, +c5**3, -c6**3, -3.0 * c2**2, -3.0 * c1**2]
-                     CM8[3,:] = [c1**4, +c2**4, +c3**4, +c4**4, +c5**4, +c6**4, +4.0 * c2**3, -4.0 * c1**3]
-                     CM8[4,:] = [c1**5, -c2**5, +c3**5, -c4**5, +c5**5, -c6**5, -5.0 * c2**4, -5.0 * c1**4]
-                     CM8[5,:] = [c1**6, +c2**6, +c3**6, +c4**6, +c5**6, +c6**6, +6.0 * c2**5, -6.0 * c1**5]
-                     CM8[6,:] = [c1**7, -c2**7, +c3**7, -c4**7, +c5**7, -c6**7, -7.0 * c2**6, -7.0 * c1**6]
-                     CM8[7,:] = [c1**8, +c2**8, +c3**8, +c4**8, +c5**8, +c6**8, +8.0 * c2**7, -8.0 * c1**7]
-                     '''
-                     #''' Pentadiagonal left, Septadiagonal right
-                     CM8[0,:] = [c1, -c2, +c3, -c4, c5, -c6, -1.0, -1.0, -1.0, -1.0]
-                     CM8[1,:] = [c1**2, +c2**2, +c3**2, +c4**2, +c5**2, +c6**2, +2.0 * c2, -2.0 * c1, +2.0 * c4, -2.0 * c3]
-                     CM8[2,:] = [c1**3, -c2**3, +c3**3, -c4**3, +c5**3, -c6**3, -3.0 * c2**2, -3.0 * c1**2, -3.0 * c4**2, -3.0 * c3**2]
-                     CM8[3,:] = [c1**4, +c2**4, +c3**4, +c4**4, +c5**4, +c6**4, +4.0 * c2**3, -4.0 * c1**3, +4.0 * c4**3, -4.0 * c3**3]
-                     CM8[4,:] = [c1**5, -c2**5, +c3**5, -c4**5, +c5**5, -c6**5, -5.0 * c2**4, -5.0 * c1**4, -5.0 * c4**4, -5.0 * c3**4]
-                     CM8[5,:] = [c1**6, +c2**6, +c3**6, +c4**6, +c5**6, +c6**6, +6.0 * c2**5, -6.0 * c1**5, +6.0 * c4**5, -6.0 * c3**5]
-                     CM8[6,:] = [c1**7, -c2**7, +c3**7, -c4**7, +c5**7, -c6**7, -7.0 * c2**6, -7.0 * c1**6, -7.0 * c4**6, -7.0 * c3**6]
-                     CM8[7,:] = [c1**8, +c2**8, +c3**8, +c4**8, +c5**8, +c6**8, +8.0 * c2**7, -8.0 * c1**7, +8.0 * c4**7, -8.0 * c3**7]
-                     CM8[8,:] = [c1**9, -c2**9, +c3**9, -c4**9, +c5**9, -c6**9, -9.0 * c2**8, -9.0 * c1**8, -9.0 * c4**8, -9.0 * c3**8]
-                     CM8[9,:] = [c1**10, +c2**10, +c3**10, +c4**10, +c5**10, +c6**10, +10.0 * c2**9, -10.0 * c1**9, +10.0 * c4**9, -10.0 * c3**9]
-                     #'''
-                     CMV = np.zeros(ND)
-                     CMV[0] = 1.0
-                     '''
-                     CF = np.linalg.solve(CM8, CMV)
-                     alpha = CF[4]
-                     beta = CF[5]
-                     theta = CF[6]
-                     rho = CF[7]
-                     '''
-                     CM8[:,-2] += CM8[:,-1]
-                     CM8[:,-4] += CM8[:,-3]
-                     sdex = np.array([0, 1, 2, 3, 4, 5, 6, 8])
-                     CF = np.linalg.solve(CM8[np.ix_(sdex,sdex)], CMV[sdex])
-                     alpha = CF[6]
-                     beta = CF[6]
-                     theta = CF[7]
-                     rho = CF[7]
+                     hm3 = abs(dom[ii-3] - dom[ii-2])
+              else:
+                     hp3 = 0.0; hm3 = 0.0
               
-                     CFE = -np.sum(CF[0:ND-4])
+              ND = 10
+              CM10 = interiorMatrix10(hm3, hm2, hm1, hp1, hp2, hp3, ND)
+              CMV = np.zeros(ND)
+              CMV[0] = 1.0
+       
+              if (order == 4 and ii in range(1,N-1)):
+                     
+                     alpha = 0.25
+                     beta = 0.25
+                     
+                     # Delete columns
+                     ddex = [2, 3, 4, 5, 8, 9]
+                     CM4 = np.delete(CM10, ddex, axis=1)
+                                     
+                     # Delete rows to 4th order
+                     ddex = [4, 5, 6, 7, 8, 9]
+                     CM4 = np.delete(CM4, ddex, axis=0)
+                     CM4_V = np.delete(CMV, ddex, axis=0)
+                     
+                     # Constraint alpha = beta = 0.25
+                     CM4[:,-2] += CM4[:,-1]
+                     CM4_V -= alpha * CM4[:,-2]
+                     CMS = CM4[0:-2,0:-2]
+                     
+                     PLU = scl.lu_factor(CMS)
+                     CF = scl.lu_solve(PLU, CM4_V[0:-2])
+                     
+                     CFE = -np.sum(CF[0:2])
+                     
+                     # Write the right equation
+                     RDM[ii,ii-1] = CF[1]
+                     RDM[ii,ii] = CFE
+                     RDM[ii,ii+1] = CF[0]
+                     
+                     # Write the left equation
+                     LDM[ii,ii-1] = alpha
+                     LDM[ii,ii] = 1.0
+                     LDM[ii,ii+1] = beta
+                     
+              if (order > 4 and ii in [1,N-2]):
+                     hm1 = dom[1] - dom[0]
+                     hp1 = dom[2] - dom[1]
+                     hp2 = dom[3] - dom[2]
+                     hp3 = dom[4] - dom[3]
+                     hp4 = dom[5] - dom[4]
+                     hp5 = dom[6] - dom[5]
+                     
+                     CME = p2Matrix6(hm1, hp1, hp2, hp3, hp4, hp5, 6)
+                                     
+                     CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                     
+                     PLU = scl.lu_factor(CME)
+                     CF = scl.lu_solve(PLU, CME_V)
+                     
+                     CFE = -np.sum(CF[0:-1])
+                     
+                     # Write the right equation
+                     if ii == 1:
+                            RDM[ii,ii-1] = CF[1]
+                            RDM[ii,ii] = CFE
+                            RDM[ii,ii+1] = CF[0]
+                            RDM[ii,ii+2] = CF[2]
+                            RDM[ii,ii+3] = CF[3]
+                            RDM[ii,ii+4] = CF[4]
+                     elif ii == N-2:
+                            RDM[ii,ii+1] = -CF[1]
+                            RDM[ii,ii] = -CFE
+                            RDM[ii,ii-1] = -CF[0]
+                            RDM[ii,ii-2] = -CF[2]
+                            RDM[ii,ii-3] = -CF[3]
+                            RDM[ii,ii-4] = -CF[4]
+                     
+                     # Write the left equation
+                     LDM[ii,ii-1] = CF[-1]
+                     LDM[ii,ii] = 1.0
+                     LDM[ii,ii+1] = CF[-1]
+              
+              # Loop over each interior point in the irregular grid
+              if (order == 10 and ii in [2,N-3]) or \
+                 (order == 6 and ii in range(2,N-2)):   
+                        
+                     alpha = 1.0 / 3.0 
+                     beta = 1.0 / 3.0
+                     
+                     # Delete columns
+                     ddex = [4, 5, 8, 9]
+                     CM6 = np.delete(CM10, ddex, axis=1) 
+                     
+                     # Delete rows to 4th order
+                     ddex = [6, 7, 8, 9]
+                     CM6 = np.delete(CM6, ddex, axis=0)
+                     CM6_V = np.delete(CMV, ddex, axis=0)
+                     
+                     # Constraint alpha = beta = 1/3
+                     CM6[:,-2] += CM6[:,-1]
+                     CM6_V -= alpha * CM6[:,-2]
+                     CMS = CM6[0:-2,0:-2]
+                     
+                     PLU = scl.lu_factor(CMS)
+                     CF = scl.lu_solve(PLU, CM6_V[0:-2])
+                     
+                     CFE = -np.sum(CF[0:4])
+                     
+                     # Write the right equation
+                     RDM[ii,ii-2] = CF[3]
+                     RDM[ii,ii-1] = CF[1]
+                     RDM[ii,ii] = CFE
+                     RDM[ii,ii+1] = CF[0]
+                     RDM[ii,ii+2] = CF[2]
+                     
+                     # Write the left equation
+                     LDM[ii,ii-1] = alpha
+                     LDM[ii,ii] = 1.0
+                     LDM[ii,ii+1] = beta
+                     
+              # Loop over each interior point in the irregular grid
+              if (order == 10 and ii in range(3,N-3)):
+                     
+                     alpha = 0.5
+                     beta = 0.5
+                     theta = 0.05
+                     rho = 0.05
+                     
+                     CMI = np.copy(CM10)
+                     CMI[:,-2] += CMI[:,-1]
+                     CMI[:,-4] += CMI[:,-3]
+                     CM10_V = CMV - (alpha * CMI[:,-4] + theta * CMI[:,-2])
+                     
+                     sdex = np.array([0, 1, 2, 3, 4, 5])
+                     CMS = CMI[np.ix_(sdex,sdex)]
+                     
+                     PLU = scl.lu_factor(CMS)
+                     CF = scl.lu_solve(PLU, CM10_V[sdex])
+                     CFE = -np.sum(CF[0:6])
                      
                      # Write the right equation
                      RDM[ii,ii-3] = CF[5]
@@ -911,77 +1147,60 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      LDM[ii,ii+1] = beta
                      LDM[ii,ii+2] = rho
        
-       '''
-       # Coefficients for 4th order compact one-sided schemes
-       hp1 = dom[1] - dom[0]
-       hm1 = dom[-2] - dom[-1]
-       hp2 = dom[2] - dom[1]
-       hm2 = dom[-3] - dom[-2]
-       hp3 = dom[3] - dom[2]
-       hm3 = dom[-4] - dom[-3]
-
-       # Compute the stencil coefficients
-       ND = 8
-       CM8 = np.ones((ND,ND))
-       c1 = hp1; c2 = hm1
-       c3 = hp2 + hp1; c4 = hm1 + hm2
-       c5 = hp3 + hp2 + hp1; c6 = hm1 + hm2 + hm3
-       CM8[0,:] = [c1, -c2, +c3, -c4, c5, -c6, -1.0, -1.0]
-       CM8[1,:] = [c1**2, +c2**2, +c3**2, +c4**2, +c5**2, +c6**2, +2.0 * c2, -2.0 * c1]
-       CM8[2,:] = [c1**3, -c2**3, +c3**3, -c4**3, +c5**3, -c6**3, -3.0 * c2**2, -3.0 * c1**2]
-       CM8[3,:] = [c1**4, +c2**4, +c3**4, +c4**4, +c5**4, +c6**4, +4.0 * c2**3, -4.0 * c1**3]
-       CM8[4,:] = [c1**5, -c2**5, +c3**5, -c4**5, +c5**5, -c6**5, -5.0 * c2**4, -5.0 * c1**4]
-       CM8[5,:] = [c1**6, +c2**6, +c3**6, +c4**6, +c5**6, +c6**6, +6.0 * c2**5, -6.0 * c1**5]
-       CM8[6,:] = [c1**7, -c2**7, +c3**7, -c4**7, +c5**7, -c6**7, -7.0 * c2**6, -7.0 * c1**6]
-       CM8[7,:] = [c1**8, +c2**8, +c3**8, +c4**8, +c5**8, +c6**8, +8.0 * c2**7, -8.0 * c1**7]
+       if end6: 
+              # Coefficients for 6th order compact one-sided schemes
+              hp1 = dom[1] - dom[0]
+              hp2 = dom[2] - dom[1]
+              hp3 = dom[3] - dom[2]
+              hp4 = dom[4] - dom[3]
+              hp5 = dom[5] - dom[4]
        
-       CMV = np.zeros(ND)
-       CMV[0] = 1.0
+              # Compute the stencil coefficients
+              ND = 6
+              CME = endMatrix6(hp1, hp2, hp3, hp4, hp5, 6)
+              CME_V = np.zeros(ND)
+              CME_V[0] = 1.0
+              
+              PLU = scl.lu_factor(CME)
+              CF_F = scl.lu_solve(PLU, CME_V)
+              beta = CF_F[-1]
+              
+              LDM[0,0] = 1.0
+              LDM[0,1] = beta
+              RDM[0,0] = -np.sum(CF_F[0:-1])
+              RDM[0,1] = CF_F[0]
+              RDM[0,2] = CF_F[1]
+              RDM[0,3] = CF_F[2]
+              RDM[0,4] = CF_F[3]
+              RDM[0,5] = CF_F[4]
+              
+              LDM[N-1,N-1] = 1.0
+              LDM[N-1,N-2] = beta
+              RDM[N-1,N-1] = np.sum(CF_F[0:-1])
+              RDM[N-1,N-2] = -CF_F[0]
+              RDM[N-1,N-3] = -CF_F[1]
+              RDM[N-1,N-4] = -CF_F[2]
+              RDM[N-1,N-5] = -CF_F[3]
+              RDM[N-1,N-6] = -CF_F[4]
        
-       ford = [1, 3, 5, -2]
-       CMF = np.delete(CM8, ford, axis=0)
-       CMF = np.delete(CMF, ford, axis=1)
-       
-       CMF_V = np.delete(CMV, ford, axis=0)
-       
-       CF_F = np.linalg.solve(CMF, CMF_V)
-       beta = CF_F[-1]
-       '''
-       '''
-       LDM[0,0] = 1.0
-       LDM[0,1] = beta
-       RDM[0,0] = -np.sum(CF_F[0:-1])
-       RDM[0,1] = CF_F[0]
-       RDM[0,2] = CF_F[1]
-       RDM[0,3] = CF_F[2]
-       print(LDM[0,1], RDM[0,0], (RDM[0,1] + RDM[0,2] + RDM[0,3]))
-       #'''
-       '''
-       LDM[N-1,N-1] = 1.0
-       LDM[N-1,N-2] = beta
-       RDM[N-1,N-1] = np.sum(CF_F[0:-1])
-       RDM[N-1,N-2] = -CF_F[0]
-       RDM[N-1,N-3] = -CF_F[1]
-       RDM[N-1,N-4] = -CF_F[2]
-       '''
-       #'''
-       hp2 = dom[1] - dom[0]
-       hp3 = dom[2] - dom[1]
-       LDM[0,0] = 1.0
-       LDM[0,1] = (hp2 + hp3) / hp3
-       RDM[0,0] = -(3.0 * hp2 + 2.0 * hp3) / (hp2 * (hp2 + hp3))
-       RDM[0,1] = (hp2 + hp3) * (2.0 * hp3 - hp2) / (hp2 * hp3**2)
-       RDM[0,2] = (hp2**2) / (hp3**2 * (hp2 + hp3))
-       #'''
-       #'''
-       hp2 = dom[N-2] - dom[N-1]
-       hp3 = dom[N-3] - dom[N-2]
-       LDM[N-1,N-1] = 1.0
-       LDM[N-1,N-2] = (hp2 + hp3) / hp3
-       RDM[N-1,N-1] = -(3.0 * hp2 + 2.0 * hp3) / (hp2 * (hp2 + hp3))
-       RDM[N-1,N-2] = (hp2 + hp3) * (2.0 * hp3 - hp2) / (hp2 * hp3**2)
-       RDM[N-1,N-3] = (hp2**2) / (hp3**2 * (hp2 + hp3))
-       #'''
+       if end3:
+              hp2 = dom[1] - dom[0]
+              hp3 = dom[2] - dom[1]
+              LDM[0,0] = 1.0
+              LDM[0,1] = (hp2 + hp3) / hp3
+              RDM[0,0] = -(3.0 * hp2 + 2.0 * hp3) / (hp2 * (hp2 + hp3))
+              RDM[0,1] = (hp2 + hp3) * (2.0 * hp3 - hp2) / (hp2 * hp3**2)
+              RDM[0,2] = (hp2**2) / (hp3**2 * (hp2 + hp3))
+              '''
+              '''
+              hp2 = dom[N-2] - dom[N-1]
+              hp3 = dom[N-3] - dom[N-2]
+              LDM[N-1,N-1] = 1.0
+              LDM[N-1,N-2] = (hp2 + hp3) / hp3
+              RDM[N-1,N-1] = -(3.0 * hp2 + 2.0 * hp3) / (hp2 * (hp2 + hp3))
+              RDM[N-1,N-2] = (hp2 + hp3) * (2.0 * hp3 - hp2) / (hp2 * hp3**2)
+              RDM[N-1,N-3] = (hp2**2) / (hp3**2 * (hp2 + hp3))
+              
        # Get the derivative matrix
        DDM = np.linalg.solve(LDM, RDM)
        
@@ -1094,6 +1313,8 @@ def computeChebyshevDerivativeMatrix(DIMS):
        
        # Initialize grid and make column vector
        xi, wcp = cheblb(NZ)
+       
+       b = 2.0 / ZH
    
        # Get the Chebyshev transformation matrix
        CT = chebpolym(NZ+1, -xi)
@@ -1132,10 +1353,10 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
        temp = (CT.T).dot(SDIFF)
-       DDM = -(2.0 / ZH) * temp.dot(STR_C)
+       DDM = -b * temp.dot(STR_C)
        
        DDMC = numericalCleanUp(DDM)
-       
+              
        #print(xi)
        #print(DDM[0,0], -(2.0 * NZ**2 + 1) / 3.0 / ZH)
        #print(DDM[-1,-1], (2.0 * NZ**2 + 1) / 3.0 / ZH)
@@ -1163,9 +1384,10 @@ def computeLaguerreDerivativeMatrix(DIMS):
        # Get data from DIMS
        ZH = DIMS[2]
        NZ = DIMS[4]
+       NM = NZ+1
        
        xi, wlf = lgfunclb(NZ)
-       LT = lgfuncm(NZ, xi, True)
+       LT = lgfuncm(NM-1, xi, True)
               
        # Get the scale factor
        lg = np.amax(xi)
@@ -1174,26 +1396,26 @@ def computeLaguerreDerivativeMatrix(DIMS):
        # Make a diagonal matrix of weights
        W = np.diag(wlf, k=0)
        
+       # Compute scaling for the forward transform
+       S = np.eye(NM)
+   
+       for ii in range(NM):
+              S[ii,ii] = mt.factorial(ii) / mt.gamma(ii+1)
+                     
        # Compute the spectral derivative coefficients
-       SDIFF = np.zeros((NZ+1,NZ+1))
-       SDIFF[NZ,NZ] = -0.5
-                   
-       for rr in reversed(range(NZ)):
-              SDIFF[rr,:] = SDIFF[rr+1,:]
-              SDIFF[rr,rr+1] -= 0.5
-              SDIFF[rr,rr] -= 0.5
-              
+       SDIFF = np.zeros((NM,NM))
+         
+       for rr in range(NM):
+              SDIFF[rr,rr] = 0.5
+              for cc in range(rr,NM):
+                     SDIFF[rr,cc] -= 1.0
        # Hermite function spectral transform in matrix form
-       STR_L = (LT).dot(W)
+       temp = (LT).dot(W)
+       STR_L = S.dot(temp)
        # Hermite function spatial derivative based on spectral differentiation
        temp = (LT.T).dot(SDIFF)
        temp = temp.dot(STR_L)
-       #print(temp[0,0], -NZ / 2 - 0.5)
-       
-       lead = -NZ / 2 - 0.5
-       if temp[0,0] != lead:
-              temp[0,0] = lead
-       
+              
        DDM = b * temp
        
        DDMC = numericalCleanUp(DDM)

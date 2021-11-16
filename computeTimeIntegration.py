@@ -67,7 +67,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        RLM = REFG[4]
        DZDX = REFS[15]
        
-       diffusiveFlux = False
+       diffusiveFlux = True
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
@@ -97,11 +97,6 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               # Numerical "clean up" here
               DqDxA[np.abs(DqDxA) < tol] = 0.0
               DqDzA[np.abs(DqDzA) < tol] = 0.0
-              '''
-              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
-              rhs = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
-              solB = sol2Update + DF * rhs
-              '''
               #'''
               # Compute advective update (explicit)
               args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
@@ -109,17 +104,8 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               
               # Apply explicit part of the update
               solAdv = sol2Update + DF * rhsAdv
-              #solB = np.copy(solAdv)
               # Compute internal forces (semi implicit)
               #'''
-              '''
-              # Compute first derivatives
-              DqDxB, DqDzB = tendency.computeFieldDerivatives(solAdv, DDXM_B, DDZM_B)
-              
-              # Numerical "clean up" here
-              DqDxB[np.abs(DqDxB) < tol] = 0.0
-              DqDzB[np.abs(DqDzB) < tol] = 0.0
-              '''
               #'''
               args2 = [PHYS, rhsAdv, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
               rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
@@ -172,7 +158,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               sol = np.array(2.0 / 3.0 * sol + 1.0 / 3.0 * sol2)
               sol1 = computeUpdate(1.0 / 6.0, sol, sol)
               # Stage 4
-              sol = computeUpdate(0.5, sol, sol)
+              sol = computeUpdate(0.5, sol1, sol1)
               
               return sol
        
@@ -183,41 +169,15 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               # Stage 2
               sol2 = computeUpdate(0.377268915331368, sol1, sol1)
               # Stage 3
-              sol3 = np.array(0.426988976571684 * sol + 0.5730110234283154 * sol2)
-              sol2 = computeUpdate(0.216179247281718, sol2, sol3)
+              sol3 = np.array(0.568582304164742 * sol + 0.431417695835258 * sol2)
+              sol3 = computeUpdate(0.162760486162526, sol2, sol3)
               # Stage 4
-              sol3 = np.array(0.193245318771018 * sol + 0.199385926238509 * sol1 + 0.607368754990473 * sol2)
-              sol2 = computeUpdate(0.229141351401419, sol2, sol3)
+              sol4 = np.array(0.088796463619276 * sol + 0.000050407140024 * sol1 + 0.9111531292407 * sol3)
+              sol4 = computeUpdate(0.343749752769421, sol3, sol4)
               # Stage 5
-              sol3 = np.array(0.108173740702208 * sol1 + 0.891826259297792 * sol2)
-              sol = computeUpdate(0.336458325509300, sol2, sol3)
+              sol5 = np.array(0.210401429751688 * sol1 + 0.789598570248313 * sol4)
+              sol = computeUpdate(0.29789099614478, sol4, sol5)
               
-              return sol
-       
-       def RK64_NL(sol):
-              # Stage 1
-              omega = computeUpdate(0.032918605146, sol, 0.0)
-              sol += omega
-              # Stage 2
-              omega = computeUpdate(1.0, sol, -0.737101392796 * omega)
-              sol += 0.8232569982 * omega
-              # Stage 3
-              omega = computeUpdate(1.0, sol, -1.634740794341 * omega)
-              sol += 0.3815309489 * omega
-              # Stage 4
-              omega = computeUpdate(1.0, sol, -0.744739003780 * omega)
-              sol += 0.200092213184 * omega
-              # Stage 5
-              omega = computeUpdate(1.0, sol, -1.469897351522 * omega)
-              sol += 1.718581042715 * omega
-              # Stage 6
-              omega = computeUpdate(1.0, sol, -2.813971388035 * omega)
-              sol += 0.27 * omega
-              # Stage 7
-              sol = computeUpdate(1.0 - 0.847252983783, sol, sol)
-              
-              # third output is a factor on DT: T_new = T_old + 0.85 * DT
-              # this integrator does not move a whole time step...
               return sol
        
        def ketcheson62(sol):
@@ -239,18 +199,18 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               c1 = 1.0 / 6.0
               c2 = 1.0 / 15.0
               
-              sol = computeUpdate(c1, sol, sol, False)
+              sol = computeUpdate(c1, sol, sol)
               sol1 = np.array(sol)
                      
               for ii in range(4):
-                     sol = computeUpdate(c1, sol, sol, False)
+                     sol = computeUpdate(c1, sol, sol)
                      
               # Compute stage 6 with linear combination
               sol1 = np.array(0.6 * sol1 + 0.4 * sol)
-              sol = computeUpdate(c2, sol, sol1, False)
+              sol = computeUpdate(c2, sol, sol1)
               
               for ii in range(3):
-                     sol= computeUpdate(c1, sol, sol, False)
+                     sol= computeUpdate(c1, sol, sol)
                      
               return sol
        
@@ -279,9 +239,9 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        if order == 2:
               solB = ketcheson62(sol0)
        elif order == 3:
-              #solB = ketcheson93(sol0)
+              solB = ketcheson93(sol0)
               #solB = ssprk43(sol0)
-              solB = ssprk53_Opt(sol0)
+              #solB = ssprk53_Opt(sol0)
        elif order == 4:
               solB = ketcheson104(sol0)
        else:

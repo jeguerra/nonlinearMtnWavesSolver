@@ -37,7 +37,6 @@ from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeRayleighEquations import computeRayleighEquations
-from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
 import computeDerivativeMatrix as derv
@@ -45,6 +44,8 @@ import computeEulerEquationsLogPLogT as eqs
 import computeTimeIntegration as tint
 
 import faulthandler; faulthandler.enable()
+
+from netCDF4 import Dataset
 
 # Disk settings
 #localDir = '/scratch/opbuffer/' # NOAA laptop
@@ -298,6 +299,52 @@ def computeSchurBlock(dbName, blockName):
 
        return SB.toarray()
 
+def initializeNetCDF(thisTime, NX, NZ, XL, ZTL, hydroState):
+       # Rename output file to the current time for subsequent storage
+       fname = 'transientNL' + str(int(thisTime)) + '.nc'
+       try:
+              m_fid = Dataset(fname, 'w', format="NETCDF4")
+       except PermissionError:
+              print('Deleting corrupt NC file... from failed run.')
+              import os
+              os.remove(fname)
+              m_fid = Dataset(fname, 'w', format="NETCDF4")
+              
+       # Make dimensions
+       m_fid.createDimension('time', None)
+       m_fid.createDimension('xlon', NX+1)
+       m_fid.createDimension('zlev', NZ+1)
+       # Create variables (time and grid)
+       tmvar = m_fid.createVariable('t', 'f8', ('time',))
+       xgvar = m_fid.createVariable('XL', 'f8', ('zlev', 'xlon'))
+       zgvar = m_fid.createVariable('ZTL', 'f8', ('zlev', 'xlon'))
+       # Store variables
+       xgvar[:] = XL
+       zgvar[:] = ZTL
+       # Create variables (background static fields)
+       UVAR = m_fid.createVariable('U', 'f8', ('zlev', 'xlon'))
+       PVAR = m_fid.createVariable('LNP', 'f8', ('zlev', 'xlon'))
+       TVAR = m_fid.createVariable('LNT', 'f8', ('zlev', 'xlon'))
+       # Store variables
+       UVAR[:] = np.reshape(hydroState[:,0], (NZ+1,NX+1), order='F')
+       PVAR[:] = np.reshape(hydroState[:,2], (NZ+1,NX+1), order='F')
+       TVAR[:] = np.reshape(hydroState[:,3], (NZ+1,NX+1), order='F')
+       # Create variables (transient fields)
+       uvar = m_fid.createVariable('u', 'f8', ('time', 'zlev', 'xlon'))
+       wvar = m_fid.createVariable('w', 'f8', ('time', 'zlev', 'xlon'))
+       pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
+       tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
+       # Create variables (field tendencies)
+       duvar = m_fid.createVariable('DuDt', 'f8', ('time', 'zlev', 'xlon'))
+       dwvar = m_fid.createVariable('DwDt', 'f8', ('time', 'zlev', 'xlon'))
+       dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
+       dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
+       # Create variables (diffusion coefficients)
+       dvar0 = m_fid.createVariable('CRES_X', 'f8', ('time', 'zlev', 'xlon'))
+       dvar1 = m_fid.createVariable('CRES_Z', 'f8', ('time', 'zlev', 'xlon'))
+       
+       return m_fid, tmvar, uvar, wvar, pvar, tvar, duvar, dwvar, dpvar, dtvar, dvar0, dvar1
+
 def runModel(TestName):
        import TestCase
        
@@ -392,36 +439,37 @@ def runModel(TestName):
        #%% FLAGS FOR SEM TESTING...
        isSEM_X = False
        isSEM_Z = False
-       isAdjusted = False
        isNonCoincident = True
+       minf = 6
+       CORDER = 10
        if isSEM_X and isSEM_Z:
-              NEZ = 24#int(np.ceil(NZ / 2))
-              NEX = 36#int(np.ceil(NX / 9))
+              NEZ = 32 #int(np.ceil(NZ / 5))
+              NEX = 36 #int(np.ceil(NX / 5))
               DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
               DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2)) #2
               HermCheb = True
               FourCheb = False
-              xnf = max(4, int(NEX/4) + 1)
-              znf = max(4, int(NEZ/4) + 1)
-              NE = (xnf, znf)
-              print('DynSGS filter size: ', NE)
+              xnf = max(minf, int(NEX/3) - 1)
+              znf = max(minf, int(NEZ/3) - 1)
+              NE = (znf, xnf)
        elif isSEM_X and not isSEM_Z:
-              NEX = 2 * NZ
-              DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
+              NEX = int(np.ceil(NX / 2))
+              DIMS[3] = 2
               HermCheb = True
               FourCheb = False
-              xnf = max(4, int(NEX/4) + 1)
-              NE = (xnf, 4)
+              xnf = max(minf, int(NEX/4) + 1)
+              NE = (minf, xnf)
        elif not isSEM_X and isSEM_Z:
-              NEZ = 24
-              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2))
+              NEZ = int(np.ceil(NZ / 5))
+              DIMS[4] = 5
               HermCheb = True
               FourCheb = False
-              znf = max(4, int(NEZ/4) + 1)
-              NE = (4, znf)
+              znf = max(minf, int(NEZ/4) + 1)
+              NE = (znf, minf)
        else:
-              NE = (4,4)
+              NE = (minf,minf)
               
+       print('DynSGS filter size: ', NE)
        if isSEM_X:
               print('@@ USING ' + str(DIMS[3]) + ' ELEMENTS IN X @@')
               print('@@ INTERIOR ORDER: ' + str(NEX) + ' @@')
@@ -441,7 +489,7 @@ def runModel(TestName):
               DDZP, CHT = derv.computeLegendreDerivativeMatrix(DIM0)
        
        if isSEM_X:
-              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isAdjusted, True)
+              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isNonCoincident, (False, False), CORDER)
               DIM0[3] = len(REF0[0]) - 1
        else:
               DDXP, HHT = derv.computeHermiteFunctionDerivativeMatrix(DIM0)
@@ -473,7 +521,7 @@ def runModel(TestName):
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
        if isSEM_X:
               domx = REFS[0]
-              DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(domx, NEX, isAdjusted, isNonCoincident)
+              DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(domx, NEX, isNonCoincident, (False, False), CORDER)
               DIMS[3] = len(REFS[0]) - 1
               NX = DIMS[3]
               OPS = (NX + 1) * (NZ + 1)
@@ -492,7 +540,7 @@ def runModel(TestName):
                             
        if isSEM_Z:
               domz = np.copy(REFS[1])
-              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(domz, NEZ, isAdjusted, isNonCoincident)
+              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(domz, NEZ, isNonCoincident, (False, False), CORDER)
               DIMS[4] = len(REFS[1]) - 1
               NZ = DIMS[4]
               OPS = (NX + 1) * (NZ + 1)
@@ -507,12 +555,6 @@ def runModel(TestName):
               
               if verticalLegdGrid:
                      DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
-       
-       #DDX_1D = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       #DDX_1D = derv.computeAdjustedOperatorNBC_ends(DDX_1D, DDX_1D)
-       #DDX_1D = derv.computeAdjustedOperatorNBC(DDX_1D, DDX_1D, -1)
-       #DDZ_1D = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-       #DDZ_1D = derv.computeAdjustedOperatorNBC(DDZ_1D, DDZ_1D, -1)
        
        #%% Set derivative operators for diffusion
        if isSEM_X and isSEM_Z:
@@ -531,10 +573,6 @@ def runModel(TestName):
        else:
               DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
               DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, False, False, DDZ_1D)
-              #DDX_CS = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-              #DDZ_CS = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-              #DDX2_CS = DDX_CS.dot(DDX_CS)
-              #DDZ2_CS = DDZ_CS.dot(DDZ_CS)
               
        #%% Update the REFS collection
        REFS.append(DDX_1D) # index 2
@@ -649,10 +687,14 @@ def runModel(TestName):
        del(DIM0)
        
        #%% DIFFERENTIATION OPERATORS
+       
+       DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_1D)
+       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], DDZ_1D)
+       
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
-       # Cubic Spline first derivative matrix (Neumann BC for diffusion)
-       DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
+       # Cubic Spline first derivative matrix
+       DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_QS, DDZ_QS)
        
        # Make the TF operators
        DZDX = np.reshape(DZT, (OPS,1), order='F')
@@ -730,7 +772,7 @@ def runModel(TestName):
               
               # Diffusion filter grid length based on resolution powers
               if isSEM_X and isSEM_Z:
-                     DLD = (1.0 * DX_max, 1.0 * DZ_max)
+                     DLD = (2.0 * DX_spr, 2.0 * DZ_spr)
                      DX = DX_min; DZ = DZ_min
               elif isSEM_X and not isSEM_Z:
                      DLD = (1.0 * DX_max, 1.0 * DZ_spr)
@@ -739,7 +781,7 @@ def runModel(TestName):
                      DLD = (1.0 * DX_spr, 1.0 * DZ_max)
                      DX = DX_min; DZ = DZ_min
               else:
-                     DLD = (1.0 * DX_spr, 1.0 * DZ_spr)
+                     DLD = (2.0 * DX_spr, 2.0 * DZ_spr)
                      DX = DX_min; DZ = DZ_min
                      
               DLD2 = DLD[0] * DLD[1]
@@ -750,7 +792,7 @@ def runModel(TestName):
               del(DXE); del(DZE)
               
               # Smallest physical grid spacing in the 2D mesh
-              DLS = 1.0 * min(DX, DZ)
+              DLS = min(DX, DZ)
               #'''              
        del(DDXMS); del(DDXM_CS)
        del(DDZMS); del(DDZM_CS)
@@ -797,6 +839,31 @@ def runModel(TestName):
        currentState = np.array(SOLT[:,0])
        fields, U, W = \
               eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
+              
+       # NetCDF restart
+       isRestartFromNC = True
+       if isRestartFromNC and NonLinSolve:
+              try:
+                     rdex = -1
+                     fname = 'transientNL_Spectral_QS.nc'
+                     m_fid = Dataset(fname, 'r', format="NETCDF4")
+                     thisTime = m_fid.variables['t'][rdex]
+                     fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
+                     fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
+                     fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:], (OPS,), order='F')
+                     fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:], (OPS,), order='F')
+                     
+                     DCF[0][:,0] = np.reshape(m_fid.variables['CRES_X'][rdex,:,:], (OPS,), order='F')
+                     DCF[1][:,0] = np.reshape(m_fid.variables['CRES_Z'][rdex,:,:], (OPS,), order='F')
+              except:
+                     print('Could NOT read restart NC file!', fname)
+       else:
+             thisTime = IT 
+              
+       # Initialize output to NetCDF
+       hydroState = np.reshape(INIT, (OPS, numVar), order='F')
+       m_fid, tmvar, uvar, wvar, pvar, tvar, duvar, dwvar, dpvar, dtvar, dvar0, dvar1 = \
+              initializeNetCDF(thisTime, NX, NZ, XL, ZTL, hydroState)
               
        #% Compute the global LHS operator and RHS
        if StaticSolve:
@@ -1086,93 +1153,30 @@ def runModel(TestName):
        #%% Transient solutions       
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
-                            
-              # Reshape main solution vectors and initialize
-              hydroState = np.reshape(INIT, (OPS, numVar), order='F')
               
-              # Initialize damping coefficients
-              DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
+              if TOPT[3] == 3:
+                     DTF = 1.25
+              elif TOPT[3] == 4:
+                     DTF = 1.5
+              else:
+                     DTF = 1.1
               
-              # Initialize vertical velocity
-              fields[ubdex,1] = -dWBC
-              
-              # Initialize a PT bubble...
-              PTR = np.power(np.power((XL + 0.0E3) / 30.0E3, 2.0) + \
-                     np.power((ZTL - 10.0E3) / 5.0E3, 2.0), 0.5)
-              PTF = np.power(np.cos(0.5 * mt.pi * PTR), 2.0)
-              PTF = 10.0 * np.where(PTR <= 1.0, PTF, 0.0)
-              
-              LPTF = np.log(1.0 + PTF * np.reciprocal(np.exp(LOGT)) )
-              
-              fields[:,3] = np.reshape(LPTF, (OPS,), order='F')
-              
-              # Initialize time constants
-              ti = 0
-              ff = 1
-              thisTime = IT
-              
-              # Initialize netcdf output
-              from netCDF4 import Dataset
-              
-              isRestartFromNC = False
-              if isRestartFromNC:
-                     try:
-                            rdex = -1
-                            fname = 'transientNL0.nc'
-                            m_fid = Dataset(fname, 'r', format="NETCDF4")
-                            thisTime = m_fid.variables['t'][rdex]
-                            fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
-                            fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
-                            fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:], (OPS,), order='F')
-                            fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:], (OPS,), order='F')
-                            
-                            DCF[0][:,0] = np.reshape(m_fid.variables['CRES_X'][rdex,:,:], (OPS,), order='F')
-                            DCF[1][:,0] = np.reshape(m_fid.variables['CRES_Z'][rdex,:,:], (OPS,), order='F')
-                     except:
-                            print('Could NOT read restart NC file!', fname)       
-              
-              # Rename output file to the current time for subsequent storage
-              fname = 'transientNL' + str(int(thisTime)) + '.nc'
-              try:
-                     m_fid = Dataset(fname, 'w', format="NETCDF4")
-              except PermissionError:
-                     print('Deleting corrupt NC file... from failed run.')
-                     import os
-                     os.remove(fname)
-                     m_fid = Dataset(fname, 'w', format="NETCDF4")
+              # Initialize the perturbations
+              if thisTime == 0.0:
+                     # Initialize damping coefficients
+                     DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
                      
-              # Make dimensions
-              m_fid.createDimension('time', None)
-              m_fid.createDimension('xlon', NX+1)
-              m_fid.createDimension('zlev', NZ+1)
-              # Create variables (time and grid)
-              tmvar = m_fid.createVariable('t', 'f8', ('time',))
-              xgvar = m_fid.createVariable('XL', 'f8', ('zlev', 'xlon'))
-              zgvar = m_fid.createVariable('ZTL', 'f8', ('zlev', 'xlon'))
-              # Store variables
-              xgvar[:] = XL
-              zgvar[:] = ZTL
-              # Create variables (background static fields)
-              UVAR = m_fid.createVariable('U', 'f8', ('zlev', 'xlon'))
-              PVAR = m_fid.createVariable('LNP', 'f8', ('zlev', 'xlon'))
-              TVAR = m_fid.createVariable('LNT', 'f8', ('zlev', 'xlon'))
-              # Store variables
-              UVAR[:] = np.reshape(hydroState[:,0], (NZ+1,NX+1), order='F')
-              PVAR[:] = np.reshape(hydroState[:,2], (NZ+1,NX+1), order='F')
-              TVAR[:] = np.reshape(hydroState[:,3], (NZ+1,NX+1), order='F')
-              # Create variables (transient fields)
-              uvar = m_fid.createVariable('u', 'f8', ('time', 'zlev', 'xlon'))
-              wvar = m_fid.createVariable('w', 'f8', ('time', 'zlev', 'xlon'))
-              pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
-              tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
-              # Create variables (field tendencies)
-              duvar = m_fid.createVariable('DuDt', 'f8', ('time', 'zlev', 'xlon'))
-              dwvar = m_fid.createVariable('DwDt', 'f8', ('time', 'zlev', 'xlon'))
-              dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
-              dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
-              # Create variables (diffusion coefficients)
-              dvar0 = m_fid.createVariable('CRES_X', 'f8', ('time', 'zlev', 'xlon'))
-              dvar1 = m_fid.createVariable('CRES_Z', 'f8', ('time', 'zlev', 'xlon'))
+                     # Initialize vertical velocity
+                     fields[ubdex,1] = -dWBC
+                     
+                     PTR = np.power(np.power((XL + 100.0E3) / 30.0E3, 2.0) + \
+                            np.power((ZTL - 10.0E3) / 5.0E3, 2.0), 0.5)
+                     PTF = np.power(np.cos(0.5 * mt.pi * PTR), 2.0)
+                     PTF = 10.0 * np.where(PTR <= 1.0, PTF, 0.0)
+                     
+                     LPTF = np.log(1.0 + PTF * np.reciprocal(np.exp(LOGT)) )
+                     
+                     fields[:,3] = np.reshape(LPTF, (OPS,), order='F')
               
               # Initialize local sound speed and time step
               #'''
@@ -1180,26 +1184,28 @@ def runModel(TestName):
               WD = fields[:,1]
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
               VWAV_max = bn.nanmax(VSND)
-              DT0 = DLS / VWAV_max
+              DT0 = DTF * DLS / VWAV_max
               TOPT[0] = DT0
               print('Initial time step by sound speed: ', str(DT0) + ' (sec)')
+              print('Time stepper order: ', str(TOPT[3]))
+              print('Time step factor: ', str(DTF))
               
               OTI = int(TOPT[5] / DT0)
               ITI = int(TOPT[6] / DT0)
               #'''
-              import computeResidualViscCoeffs as rescf
+              
+              ti = 0; ff = 0
+              delFields = np.zeros(fields.shape)
+              rhsVec = np.zeros(fields.shape)
+              resVec = np.zeros(fields.shape)
+              error = [np.linalg.norm(rhsVec)]
+              rhsVec0 = np.copy(rhsVec)
+              delFields0 = np.copy(delFields)
+              
               while thisTime <= TOPT[4]:
                      
                      if ti == 0:
                             isFirstStep = True
-                                   
-                            DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
-                            rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
-                                                                          fields, UD, WD, ebcDex, zeroDex)
-                            error = [np.linalg.norm(rhsVec)]
-                            deltaFields = np.array(fields)
-                            resVec = np.zeros(fields.shape)
                      else:
                             isFirstStep = False
                              
@@ -1214,47 +1220,41 @@ def runModel(TestName):
                      
                      if ti % ITI == 0:
                             # Store current time to NC file
-                            tmvar[ff-1] = thisTime
-                            PqPx = DqDx - REFS[15] * DqDz
+                            tmvar[ff] = thisTime
                             # Check the fields or tendencies
                             for pp in range(numVar):
                                    q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
                                    dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
-                                   #dqdt = np.reshape(PqPx[:,pp], (NZ+1, NX+1), order='F')
-                                   '''
-                                   if pp == 3:
-                                          PqPx = DqDx - REFS[15] * DqDz
-                                          div = PqPx[:,0] + DqDz[:,1]
-                                          dqdt = np.reshape(div, (NZ+1, NX+1), order='F')
-                                   '''
+
                                    if pp == 0:
-                                          uvar[ff-1,:,:] = q
-                                          duvar[ff-1,:,:] = dqdt
+                                          uvar[ff,:,:] = q
+                                          duvar[ff,:,:] = dqdt
                                    elif pp == 1:
-                                          wvar[ff-1,:,:] = q
-                                          dwvar[ff-1,:,:] = dqdt
+                                          wvar[ff,:,:] = q
+                                          dwvar[ff,:,:] = dqdt
                                    elif pp == 2:
-                                          pvar[ff-1,:,:] = q
-                                          dpvar[ff-1,:,:] = dqdt
+                                          pvar[ff,:,:] = q
+                                          dpvar[ff,:,:] = dqdt
                                    else:
-                                          tvar[ff-1,:,:] = q
-                                          dtvar[ff-1,:,:] = dqdt
+                                          tvar[ff,:,:] = q
+                                          dtvar[ff,:,:] = dqdt
                                           
-                            dvar0[ff-1,:,:] = np.reshape(DCF[0], (NZ+1, NX+1), order='F')
-                            dvar1[ff-1,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
+                            dvar0[ff,:,:] = np.reshape(DCF[0], (NZ+1, NX+1), order='F')
+                            dvar1[ff,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
                             ff += 1
                             
+                     import computeResidualViscCoeffs as rescf
                      # Compute the solution within a time step
-                     try:
+                     try:   
                             # Compute a time step
-                            deltaFields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
+                            delFields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, DLD2,\
-                                                                    TOPT, fields, deltaFields, hydroState, \
+                                                                    TOPT, fields, delFields, hydroState, \
                                                                     zeroDex, ebcDex, \
                                                                     DynSGS, DCF, isFirstStep)
                             
                             # Apply update
-                            fields += deltaFields
+                            fields += delFields
                             thisTime += TOPT[0]
                             Q = fields + hydroState
                                    
@@ -1265,34 +1265,44 @@ def runModel(TestName):
                             vel = np.stack((UD, WD),axis=1)
                             VFLW = np.linalg.norm(vel, axis=1)
                             
-                            rhsVec0 = np.copy(rhsVec)
-                            # Update the diffusion coefficients
+                            # Compute the updated RHS
                             DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
+                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
                             
                             # Compute the current residual
-                            resVec = (1.0 / TOPT[0]) * deltaFields - 0.5 * (rhsVec0 + rhsVec)
-                            del(rhsVec0)
+                            if ti == 0:
+                                   resVec = (1.0 / TOPT[0]) * delFields - rhsVec
+                            else:
+                                   resVec = (0.5 / DT0) * delFields0 + \
+                                          (0.5 / TOPT[0]) * delFields - \
+                                          0.5 * (rhsVec0 + rhsVec)
+                                          #(0.5 * rhsVec0 - 1.5 * rhsVec)
                             
                             # Compute DynSGS or Flow Dependent diffusion coefficients
                             #QM = bn.nanmax(np.abs(fields), axis=0)
                             DQ = fields - np.mean(fields, axis=0)
                             QM = bn.nanmax(np.abs(DQ), axis=0)
+                            #newDiff = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, VFLW, DLD, DLD2, 'maximum', NE)
                             newDiff = rescf.computeResidualViscCoeffs3(DIMS, resVec, QM, VFLW, DLD, DLD2, NE)
                             
                             DCF[0][:,0] = newDiff[0]
                             DCF[1][:,0] = newDiff[1]
-                            #'''
+                            
+                            # Get the previous state
+                            DT0 = TOPT[0]
+                            rhsVec0 = np.copy(rhsVec)
+                            delFields0 = np.copy(delFields)
+                            
                             # Compute sound speed
                             T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
                             RdT = REFS[9][0] * (1.0 + T_ratio)
                             VSND = np.sqrt(PHYS[6] * RdT)
                             
                             # Compute new time step based on updated sound speed
-                            DTN = DLS / bn.nanmax(VSND)
+                            DTN = DTF * DLS / bn.nanmax(VSND)
                             
                             # Update the local time step
                             TOPT[0] = DTN
@@ -1326,6 +1336,8 @@ def runModel(TestName):
        #% Make a database for restart
        if toRestart:
               rdb = shelve.open(restart_file, flag='n')
+              rdb['qdex'] = (udex, wdex, pdex, tdex)
+              rdb['INIT'] = INIT
               rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
               rdb['LMS'] = LMS

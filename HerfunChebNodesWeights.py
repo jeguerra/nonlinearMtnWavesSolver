@@ -24,7 +24,7 @@ def lgfunclb(NX):
               xir[ii] = xi[ii-1]
        
        # Compute the Hermite function weights
-       lf = lgfuncm(NX, xir, False)
+       lf = lgfuncm(NX+1, xir, False)
        w = 1.0 / (NX+1) * np.power(lf, -2.0, dtype=np.longdouble)
 
        return xir, w
