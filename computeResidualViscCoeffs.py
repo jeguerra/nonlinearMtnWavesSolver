@@ -177,21 +177,10 @@ def computeResidualViscCoeffs3(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
        
        return (CRES, CRES)
 
-def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
+def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2):
        
-       # Get the dimensions
-       NX = DIMS[3] + 1
-       NZ = DIMS[4] + 1
-       OPS = DIMS[5]
-       
-       # Pixel size for image filter
-       if NE == None:
-              MFS = (4,4)
-       else:
-              xnf = max(4, int(NE[0]/3) + 1)
-              znf = max(4, int(NE[1]/3) + 1)
-              MFS = (xnf, znf)
-              #MFS = (4,4)
+       # Get the length scale
+       DL = mt.sqrt(DLD2)
        
        # Compute absolute value of residuals
        ARES = np.abs(RES)
@@ -207,22 +196,11 @@ def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
        # Get the maximum in the residuals (unit = 1/s)
        QRES_MAX = bn.nanmax(ARES, axis=1)
        #'''
-       # Compute upper bound on coefficients (single bounding field)
-       #QMAX1 = 0.5 * DLD[0] * VFLW
-       #QMAX2 = 0.5 * DLD[1] * VFLW
-       QMAX = 0.5 * mt.sqrt(DLD2) * VFLW
+       # Compute upper bound on coefficients (single bounding fields
+       QMAX = 0.5 * DL * VFLW
        
        # Limit DynSGS to upper bound
-       compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)
-       CRES1 = bn.nanmin(compare, axis=1)
-       CRES1XZ = np.reshape(CRES1, (NZ, NX), order='F')
-       CRES1XZ = ndimage.maximum_filter(CRES1XZ, size=MFS, mode='mirror')
-       CRES1 = np.reshape(CRES1XZ, (OPS,), order='F')
+       compare = np.stack((DLD2 * QRES_MAX, QMAX),axis=1)
+       CRES = bn.nanmin(compare, axis=1)
        
-       compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX),axis=1)
-       CRES2 = bn.nanmin(compare, axis=1)
-       CRES2XZ = np.reshape(CRES2, (NZ, NX), order='F')
-       CRES2XZ = ndimage.maximum_filter(CRES2XZ, size=MFS, mode='mirror')
-       CRES2 = np.reshape(CRES2XZ, (OPS,), order='F')
-       
-       return (CRES1, CRES2)
+       return (CRES, CRES)

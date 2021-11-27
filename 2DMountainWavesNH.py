@@ -362,7 +362,7 @@ def runModel(TestName):
               ApplyGML = False
        else:
               RSBops = True # Turn off PyRSB SpMV
-              ApplyGML = True
+              ApplyGML = False
        
        # Set the grid type
        HermCheb = thisTest.solType['HermChebGrid']
@@ -841,7 +841,7 @@ def runModel(TestName):
               eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
        # NetCDF restart
-       isRestartFromNC = True
+       isRestartFromNC = False
        if isRestartFromNC and NonLinSolve:
               try:
                      rdex = -1
@@ -1185,6 +1185,7 @@ def runModel(TestName):
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
               VWAV_max = bn.nanmax(VSND)
               DT0 = DTF * DLS / VWAV_max
+              DTN = np.copy(DT0)
               TOPT[0] = DT0
               print('Initial time step by sound speed: ', str(DT0) + ' (sec)')
               print('Time stepper order: ', str(TOPT[3]))
@@ -1199,8 +1200,11 @@ def runModel(TestName):
               rhsVec = np.zeros(fields.shape)
               resVec = np.zeros(fields.shape)
               error = [np.linalg.norm(rhsVec)]
-              rhsVec0 = np.copy(rhsVec)
-              delFields0 = np.copy(delFields)
+              #rhsVec0 = np.copy(rhsVec)
+              #delFields0 = np.copy(delFields)
+              
+              mu = REFG[3]
+              RLM = REFG[4]
               
               while thisTime <= TOPT[4]:
                      
@@ -1215,10 +1219,6 @@ def runModel(TestName):
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                             
-                            if makePlots:
-                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
-                     
-                     if ti % ITI == 0:
                             # Store current time to NC file
                             tmvar[ff] = thisTime
                             # Check the fields or tendencies
@@ -1242,6 +1242,9 @@ def runModel(TestName):
                             dvar0[ff,:,:] = np.reshape(DCF[0], (NZ+1, NX+1), order='F')
                             dvar1[ff,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
                             ff += 1
+                                                 
+                     if ti % ITI == 0 and makePlots:
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
                             
                      import computeResidualViscCoeffs as rescf
                      # Compute the solution within a time step
@@ -1255,6 +1258,12 @@ def runModel(TestName):
                             
                             # Apply update
                             fields += delFields
+                            
+                            # Apply Rayleigh sponge
+                            RayDamp = np.reciprocal(1.0 + DT0 * mu * RLM.data)
+                            fields = (RayDamp.T) * fields
+                            
+                            # Update time and get total solution
                             thisTime += TOPT[0]
                             Q = fields + hydroState
                                    
@@ -1267,34 +1276,37 @@ def runModel(TestName):
                             
                             # Compute the updated RHS
                             DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[12][0], REFS[12][1])
+                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
                             rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
-                            
+                            '''
                             # Compute the current residual
                             if ti == 0:
-                                   resVec = (1.0 / TOPT[0]) * delFields - rhsVec
+                                   resVec = (1.0 / DTN) * delFields - rhsVec
                             else:
-                                   resVec = (0.5 / DT0) * delFields0 + \
-                                          (0.5 / TOPT[0]) * delFields - \
-                                          0.5 * (rhsVec0 + rhsVec)
+                                   CA = DT0 / (DT0 + DTN)
+                                   CB = DTN / (DT0 + DTN)
+                                   resVec = CA * delFields0 + CB * delFields - \
+                                            (CA * rhsVec0 + CB * rhsVec)
                                           #(0.5 * rhsVec0 - 1.5 * rhsVec)
-                            
+                            '''
+                            resVec = np.copy(rhsVec)
                             # Compute DynSGS or Flow Dependent diffusion coefficients
-                            #QM = bn.nanmax(np.abs(fields), axis=0)
-                            DQ = fields - np.mean(fields, axis=0)
-                            QM = bn.nanmax(np.abs(DQ), axis=0)
-                            #newDiff = rescf.computeResidualViscCoeffs(DIMS, resVec, QM, VFLW, DLD, DLD2, 'maximum', NE)
-                            newDiff = rescf.computeResidualViscCoeffs3(DIMS, resVec, QM, VFLW, DLD, DLD2, NE)
+                            QM = bn.nanmax(np.abs(fields), axis=0)
+                            #DQ = fields - np.mean(fields, axis=0)
+                            #QM = bn.nanmax(np.abs(DQ), axis=0)
+                            newDiff = rescf.computeResidualViscCoeffs3(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2, NE)
+                            #newDiff = rescf.computeResidualViscCoeffs4(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2)
                             
-                            DCF[0][:,0] = newDiff[0]
-                            DCF[1][:,0] = newDiff[1]
+                            DCF[0][:,0] = np.copy(newDiff[0])
+                            DCF[1][:,0] = np.copy(newDiff[1])
+                            del(newDiff)
                             
                             # Get the previous state
                             DT0 = TOPT[0]
-                            rhsVec0 = np.copy(rhsVec)
-                            delFields0 = np.copy(delFields)
+                            #rhsVec0 = np.copy(rhsVec)
+                            #delFields0 = np.copy(delFields)
                             
                             # Compute sound speed
                             T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])

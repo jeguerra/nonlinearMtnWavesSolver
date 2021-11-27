@@ -15,8 +15,8 @@ def enforceTerrainTendency(DqDt, ebcDex, DZDX):
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
-       DqDt[bdex,1] = DZDX[bdex,0] * DqDt[bdex,0]
-       DqDt[tdex,1] = np.zeros(len(bdex))
+       DqDt[bdex,1] = np.copy(DZDX[bdex,0] * DqDt[bdex,0])
+       DqDt[tdex,1] = 0.0
        
        return DqDt
 

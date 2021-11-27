@@ -681,7 +681,7 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
                      ET2[2,:] = DDM_BC[-1,:] - dom[-1] * DM2[-1,:] + a0 * dom[-1]**2 * DM3[-1,:]
                      
                      # Assemble to the equation for Z
-                     A[ii,ii] = a0 * hc
+                     A[ii,ii] = +a0 * hc
                      A[ii, N-4:N] -= -(OM2[0,:])# * dom[ii] + OM2[1,:])
                      A[ii, ii-2:ii+2] -= +(OM1[3,:])# * dom[ii] + OM1[1,:])
                      

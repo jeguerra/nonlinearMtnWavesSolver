@@ -5,7 +5,7 @@ Created on Thu Jan 30 08:35:16 2020
 
 @author: TempestGuerra
 """
-import numpy as np
+import math as mt
 
 class TestCase:
        
@@ -84,9 +84,9 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(647, 128, 205.0, 42.0, 300.0, \
+                     self.setUserData(683, 108, 205.0, 42.0, 300.0, \
                                       10000.0, 45000.0, 5.0, \
-                                      2500.0, 0.01, 0.006, 0.002, 3, 2.0E+4, 'uwpt_transient')
+                                      2000.0, 0.01, 0.006, 0.002, 3, 1.5E+4, 'uwpt_transient')
               
               elif TestName == "UniformTest":
                      # Wave breaking in uniform stratification
@@ -94,12 +94,12 @@ class TestCase:
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': False, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 96, 205.0, 35.0, 300.0, \
-                                      10000.0, 45000.0, 5.0, \
-                                      2500.0, 0.01, 0.0065, 0.003, 3, 2.0E+4, 'uwpt_transient')
+                                      8000.0, 45000.0, 5.0, \
+                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
@@ -156,7 +156,7 @@ class TestCase:
                      lC = 4000.0
               elif Mountain == 3:
                      aC = 5000.0
-                     lC = 7500.0
+                     lC = 2.0 * mt.pi * 1.0E3
               else:
                      aC = 5000.0
                      lC = 4000.0
@@ -171,7 +171,7 @@ class TestCase:
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 10.0 # Time for diagnostic output
-              ITI = 10.0 # Time for image output
+              ITI = 60.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               
               self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]

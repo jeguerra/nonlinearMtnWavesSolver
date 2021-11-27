@@ -115,7 +115,7 @@ h0 = 2500.0
 aC = 10000.0
 lC = 7500.0
 kC = 2.0E+4
-HOPT = [h0, aC, lC, kC, False, 3]
+HOPT = [h0, aC, lC, kC, False, 2]
 
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 
