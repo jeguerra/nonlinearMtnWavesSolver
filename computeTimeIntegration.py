@@ -53,14 +53,15 @@ def enforceEssentialBC(sol, init, zeroDex, ebcDex, DZDX):
        return sol
 
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
-                              sol0, dsol0, init0, zeroDex, ebcDex, \
-                              DynSGS, DCF, isFirstStep):
+                              sol0, init0, zeroDex, ebcDex, \
+                              DynSGS, NE, isFirstStep):
        DT = TOPT[0]
        order = TOPT[3]
        RdT_bar = REFS[9][0]
        DZDX = REFS[15]
        
        diffusiveFlux = True
+       
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
@@ -74,20 +75,21 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
                      
-       def computeUpdate(coeff, solA, sol2Update):
-              tol = 1.0E-15
+       def computeUpdate(coeff, solA, sol2Update, firstStage):
               DF = coeff * DT
               
               # Append log perturbation u and w... for advection
               U = solA[:,0] + init0[:,0]
               W = solA[:,1]
+              vel = np.stack((U, W),axis=1)
+              VFLW = np.linalg.norm(vel, axis=1)
               
               # Compute first derivatives
-              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+              if firstStage:
+                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_B, DDZM_B)
+              else:
+                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
               
-              # Numerical "clean up" here
-              DqDxA[np.abs(DqDxA) < tol] = 0.0
-              DqDzA[np.abs(DqDzA) < tol] = 0.0
               '''
               # Compute advective update (explicit)
               args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
@@ -107,17 +109,27 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               rhsAdv = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
               #rhsAdv += tendency.computeRayleighTendency(REFG, solA, zeroDex)
               
+              # Compute DynSGS or Flow Dependent diffusion coefficients
+              QM = bn.nanmax(np.abs(solA), axis=0)
+              #DQ = fields - np.mean(fields, axis=0)
+              #QM = bn.nanmax(np.abs(DQ), axis=0)
+              DCF = rescf.computeResidualViscCoeffs3(DIMS, rhsAdv, QM, VFLW, DLD, DLD2, NE)
+              #newDiff = rescf.computeResidualViscCoeffs4(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2)
+              
               #'''
-              # Compute 2nd derivatives
+              # Compute diffusive tendency
               if diffusiveFlux:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
                      tendency.computeFieldDerivativesFlux(DqDxA, DqDzA, DCF, REFG, DDXM_B, DDZM_B, DZDX)
+                     
+                     rhsDif = tendency.computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      REFS, ebcDex, zeroDex, DynSGS)
               else:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
                      tendency.computeFieldDerivatives2(DqDxA, DqDzA, REFG, DDXM_B, DDZM_B, DZDX)
                      
-              # Compute diffusive update (explicit)
-              rhsDif = computeRHSUpdate_diffusion(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz)
+                     rhsDif = tendency.computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      REFS, ebcDex, zeroDex, DCF, DynSGS)
               
               # Apply explicit part of the update
               solB = sol2Update + DF * (rhsAdv + rhsDif)
@@ -125,21 +137,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               # Enforce the essential BC in the final solution
               solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)
               
-              # Filter the solution to prevent underflow
-              solB[np.abs(solB) < tol] = 0.0
-              
               return solB
-       
-       def computeRHSUpdate_diffusion(fields, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz):
-              
-              if diffusiveFlux:
-                     rhs = tendency.computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      REFS, ebcDex, zeroDex, DynSGS)
-              else:
-                     rhs = tendency.computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      REFS, ebcDex, zeroDex, DCF, DynSGS)
-       
-              return rhs
        
        def ssprk43(sol):
               # Stage 1
@@ -176,7 +174,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               m = 5
               c1 = 1 / (m-1)
               c2 = 1 / m
-              sol1 = np.array(sol)
+              sol1 = np.copy(sol)
               for ii in range(m):
                      if ii == m-1:
                             sol1 = c2 * ((m-1) * sol + sol1)
@@ -191,18 +189,18 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               c1 = 1.0 / 6.0
               c2 = 1.0 / 15.0
               
-              sol = computeUpdate(c1, sol, sol)
-              sol1 = np.array(sol)
-                     
+              sol = computeUpdate(c1, sol, sol, True)
+              sol1 = np.copy(sol)
+              
               for ii in range(4):
-                     sol = computeUpdate(c1, sol, sol)
+                     sol = computeUpdate(c1, sol, sol, False)
                      
               # Compute stage 6 with linear combination
               sol1 = np.array(0.6 * sol1 + 0.4 * sol)
-              sol = computeUpdate(c2, sol, sol1)
+              sol = computeUpdate(c2, sol, sol1, False)
               
               for ii in range(3):
-                     sol= computeUpdate(c1, sol, sol)
+                     sol= computeUpdate(c1, sol, sol, False)
                      
               return sol
        
@@ -240,4 +238,4 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               print('Invalid time integration order. Going with 2.')
               solB = ketcheson62(sol0)
        
-       return (solB - sol0)
+       return solB, (solB - sol0)

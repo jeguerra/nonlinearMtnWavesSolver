@@ -81,7 +81,7 @@ def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
        
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
-       PqPz = DqDz + DQDZ
+       PqPz = DqDz# + DQDZ
        
        vd = np.hstack((PqPx, DqDz))
        dvdx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
@@ -104,7 +104,7 @@ def computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDX, DDZ, DZDX):
        
        # Compute first partial in X (on CPU)
        xFlux = DCF[0] * (DqDx - DZDX * DqDz)
-       zFlux = DCF[1] * (DqDz + DQDZ)
+       zFlux = DCF[1] * DqDz# + DQDZ)
        
        vd = np.hstack((xFlux, zFlux))
        DxFlux = DDX.dot(vd)

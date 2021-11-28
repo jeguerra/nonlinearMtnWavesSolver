@@ -58,6 +58,22 @@ schurName = localDir + 'SchurOps'
 #import pnumpy as pnp
 #pnp.enable()
 
+def computeRHS(fields, hydroState, PHYS, REFS, REFG, ebcDex, zeroDex):
+       
+       # Compute flow speed
+       Q = fields + hydroState
+       UD = Q[:,0]
+       WD = Q[:,1]
+       
+       # Compute the updated RHS
+       DqDx, DqDz = \
+              eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
+       rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
+                                                     fields, UD, WD, ebcDex, zeroDex)
+       #rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
+       
+       return rhsVec, DqDx, DqDz
+
 def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
        
        # Make a figure of the temperature background
@@ -340,8 +356,8 @@ def initializeNetCDF(thisTime, NX, NZ, XL, ZTL, hydroState):
        dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
        dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
        # Create variables (diffusion coefficients)
-       dvar0 = m_fid.createVariable('CRES_X', 'f8', ('time', 'zlev', 'xlon'))
-       dvar1 = m_fid.createVariable('CRES_Z', 'f8', ('time', 'zlev', 'xlon'))
+       dvar0 = m_fid.createVariable('VAR_X', 'f8', ('time', 'zlev', 'xlon'))
+       dvar1 = m_fid.createVariable('VAR_Z', 'f8', ('time', 'zlev', 'xlon'))
        
        return m_fid, tmvar, uvar, wvar, pvar, tvar, duvar, dwvar, dpvar, dtvar, dvar0, dvar1
 
@@ -359,10 +375,8 @@ def runModel(TestName):
        # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
        if StaticSolve:
               RSBops = False
-              ApplyGML = False
        else:
               RSBops = True # Turn off PyRSB SpMV
-              ApplyGML = False
        
        # Set the grid type
        HermCheb = thisTest.solType['HermChebGrid']
@@ -659,18 +673,10 @@ def runModel(TestName):
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        ROPS, RLM, GML, SBR = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
-       if ApplyGML:
-              GMLOP = sps.diags(np.reshape(GML[0], (OPS,), order='F'), offsets=0, format='csr')
-              GMLOX = sps.diags(np.reshape(GML[1], (OPS,), order='F'), offsets=0, format='csr')
-              GMLOZ = sps.diags(np.reshape(GML[2], (OPS,), order='F'), offsets=0, format='csr')
-       else:
-              GMLOP = sps.identity(OPS, format='csr')
-              GMLOX = sps.identity(OPS, format='csr')
-              GMLOZ = sps.identity(OPS, format='csr')
        
        SBROP = sps.diags(np.reshape(SBR, (OPS,), order='F'), offsets=0, format='csr')
        # Make a collection for background field derivatives
-       REFG = [(GMLOP, GMLOX, GMLOZ), DLTDZ, DQDZ, RLOPT[4], RLM, SBROP]
+       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, SBROP]
        
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F'))
@@ -738,12 +744,17 @@ def runModel(TestName):
               NL = 6 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
-              PPXM = (DDXMS - sps.diags(DZDX[:,0]).dot(DDZMS)).tolil()
-              DXE = PPXM[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
-              DZE = HOPT[0] / DIMS[2] * DDZMS[np.ix_(ebcDex[0],ebcDex[0])].tocsr()
+              #PPXM = (DDXMS - sps.diags(DZDX[:,0]).dot(DDZMS)).tolil()
+              #DXE = PPXM[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
+              #DZE = HOPT[0] / DIMS[2] * DDZMS[np.ix_(ebcDex[0],ebcDex[0])].tocsr()
               
-              DX_eig = spl.eigs(DXE[1:-1,1:-1], k=NL, which='LM', return_eigenvectors=False)
-              DZ_eig = spl.eigs(DZE[0:-1,0:-1], k=NL, which='LM', return_eigenvectors=False)
+              #DX_eig = spl.eigs(DXE[1:-1,1:-1], k=NL, which='LM', return_eigenvectors=False)
+              #DZ_eig = spl.eigs(DZE[0:-1,0:-1], k=NL, which='LM', return_eigenvectors=False)
+              
+              DXE = DDXMS[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
+              DZE = HOPT[0] / DIMS[2] * DDZMS[np.ix_(ebcDex[0],ebcDex[0])].tocsr()
+              DX_eig = spl.eigs(DXE[1:,1:], k=NL, which='LM', return_eigenvectors=False)
+              DZ_eig = spl.eigs(DZE[1:-1,1:-1], k=NL, which='LM', return_eigenvectors=False)
               
               print('Eigenvalues (largest magnitude) of derivative matrices:')
               print('X: ', DX_eig)
@@ -788,7 +799,6 @@ def runModel(TestName):
               
               print('Diffusion lengths: ', DLD[0], DLD[1])
               
-              del(PPXM); #del(PPZM)
               del(DXE); del(DZE)
               
               # Smallest physical grid spacing in the 2D mesh
@@ -796,7 +806,7 @@ def runModel(TestName):
               #'''              
        del(DDXMS); del(DDXM_CS)
        del(DDZMS); del(DDZM_CS)
-       del(DZDX); del(GMLOP)
+       del(DZDX)
        #input('STOP')
        
        #%% SOLUTION INITIALIZATION
@@ -841,11 +851,11 @@ def runModel(TestName):
               eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
        # NetCDF restart
-       isRestartFromNC = False
+       isRestartFromNC = True
        if isRestartFromNC and NonLinSolve:
               try:
                      rdex = -1
-                     fname = 'transientNL_Spectral_QS.nc'
+                     fname = 'transient_Spectral_QS.nc'
                      m_fid = Dataset(fname, 'r', format="NETCDF4")
                      thisTime = m_fid.variables['t'][rdex]
                      fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
@@ -1168,7 +1178,7 @@ def runModel(TestName):
                      
                      # Initialize vertical velocity
                      fields[ubdex,1] = -dWBC
-                     
+                     '''
                      PTR = np.power(np.power((XL + 100.0E3) / 30.0E3, 2.0) + \
                             np.power((ZTL - 10.0E3) / 5.0E3, 2.0), 0.5)
                      PTF = np.power(np.cos(0.5 * mt.pi * PTR), 2.0)
@@ -1177,11 +1187,11 @@ def runModel(TestName):
                      LPTF = np.log(1.0 + PTF * np.reciprocal(np.exp(LOGT)) )
                      
                      fields[:,3] = np.reshape(LPTF, (OPS,), order='F')
-              
+                     '''
               # Initialize local sound speed and time step
               #'''
-              UD = fields[:,0] + hydroState[:,0]
-              WD = fields[:,1]
+              #UD = fields[:,0] + hydroState[:,0]
+              #WD = fields[:,1]
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
               VWAV_max = bn.nanmax(VSND)
               DT0 = DTF * DLS / VWAV_max
@@ -1215,6 +1225,11 @@ def runModel(TestName):
                              
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
+                            
+                            rhsVec, DqDx, DqDz = computeRHS(fields, hydroState, PHYS, REFS, REFG, ebcDex, zeroDex)
+                            
+                            resVec = (1.0 / DTN) * delFields - rhsVec
+                            
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
@@ -1238,39 +1253,36 @@ def runModel(TestName):
                                    else:
                                           tvar[ff,:,:] = q
                                           dtvar[ff,:,:] = dqdt
-                                          
-                            dvar0[ff,:,:] = np.reshape(DCF[0], (NZ+1, NX+1), order='F')
-                            dvar1[ff,:,:] = np.reshape(DCF[1], (NZ+1, NX+1), order='F')
+                            
+                            dvar0[ff,:,:] = np.reshape(DqDx[:,2], (NZ+1, NX+1), order='F')
+                            dvar1[ff,:,:] = np.reshape(DqDz[:,2], (NZ+1, NX+1), order='F')
                             ff += 1
                                                  
                      if ti % ITI == 0 and makePlots:
                             makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
                             
-                     import computeResidualViscCoeffs as rescf
+                     #import computeResidualViscCoeffs as rescf
                      # Compute the solution within a time step
                      try:   
                             # Compute a time step
-                            delFields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
+                            fields, delFields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, DLD2,\
-                                                                    TOPT, fields, delFields, hydroState, \
+                                                                    TOPT, fields, hydroState, \
                                                                     zeroDex, ebcDex, \
-                                                                    DynSGS, DCF, isFirstStep)
-                            
-                            # Apply update
-                            fields += delFields
+                                                                    DynSGS, NE, isFirstStep)
                             
                             # Apply Rayleigh sponge
-                            RayDamp = np.reciprocal(1.0 + DT0 * mu * RLM.data)
+                            RayDamp = np.reciprocal(1.0 + DTN * mu * RLM.data)
                             fields = (RayDamp.T) * fields
                             
                             # Update time and get total solution
                             thisTime += TOPT[0]
-                            Q = fields + hydroState
-                                   
+
+                            '''       
                             # Compute flow speed
                             UD = Q[:,0]
                             WD = Q[:,1]
-                            #'''
+              
                             vel = np.stack((UD, WD),axis=1)
                             VFLW = np.linalg.norm(vel, axis=1)
                             
@@ -1279,7 +1291,8 @@ def runModel(TestName):
                                    eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
                             rhsVec = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
                                                                           fields, UD, WD, ebcDex, zeroDex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
+                            #rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
+                            '''
                             '''
                             # Compute the current residual
                             if ti == 0:
@@ -1290,7 +1303,7 @@ def runModel(TestName):
                                    resVec = CA * delFields0 + CB * delFields - \
                                             (CA * rhsVec0 + CB * rhsVec)
                                           #(0.5 * rhsVec0 - 1.5 * rhsVec)
-                            '''
+                            
                             resVec = np.copy(rhsVec)
                             # Compute DynSGS or Flow Dependent diffusion coefficients
                             QM = bn.nanmax(np.abs(fields), axis=0)
@@ -1302,9 +1315,9 @@ def runModel(TestName):
                             DCF[0][:,0] = np.copy(newDiff[0])
                             DCF[1][:,0] = np.copy(newDiff[1])
                             del(newDiff)
-                            
+                            '''
                             # Get the previous state
-                            DT0 = TOPT[0]
+                            #DT0 = TOPT[0]
                             #rhsVec0 = np.copy(rhsVec)
                             #delFields0 = np.copy(delFields)
                             
@@ -1314,10 +1327,7 @@ def runModel(TestName):
                             VSND = np.sqrt(PHYS[6] * RdT)
                             
                             # Compute new time step based on updated sound speed
-                            DTN = DTF * DLS / bn.nanmax(VSND)
-                            
-                            # Update the local time step
-                            TOPT[0] = DTN
+                            TOPT[0] = DTF * DLS / bn.nanmax(VSND)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)

@@ -86,7 +86,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 108, 205.0, 42.0, 300.0, \
                                       10000.0, 45000.0, 5.0, \
-                                      2000.0, 0.01, 0.006, 0.002, 3, 1.5E+4, 'uwpt_transient')
+                                      2500.0, 0.01, 0.006, 0.002, 3, 1.25E+4, 'uwpt_transient')
               
               elif TestName == "UniformTest":
                      # Wave breaking in uniform stratification
@@ -94,12 +94,12 @@ class TestCase:
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': False, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(683, 96, 205.0, 35.0, 300.0, \
-                                      8000.0, 45000.0, 5.0, \
-                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
+                     self.setUserData(623, 96, 165.0, 35.0, 300.0, \
+                                      8000.0, 25000.0, 5.0, \
+                                      2500.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      

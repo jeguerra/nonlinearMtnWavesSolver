@@ -169,13 +169,19 @@ def computeResidualViscCoeffs3(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
        QMAX = 0.5 * DL * VFLW
        
        # Limit DynSGS to upper bound
-       compare = np.stack((DLD2 * QRES_MAX, QMAX),axis=1)
+       compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)
        CRES = bn.nanmin(compare, axis=1)
        CRES_XZ = np.reshape(CRES, (NZ, NX), order='F')
        CRES_XZ = ndimage.maximum_filter(CRES_XZ, size=NE, mode='mirror')
-       CRES = np.reshape(CRES_XZ, (OPS,), order='F')
+       CRES1 = np.reshape(CRES_XZ, (OPS,), order='F')
        
-       return (CRES, CRES)
+       compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX),axis=1)
+       CRES = bn.nanmin(compare, axis=1)
+       CRES_XZ = np.reshape(CRES, (NZ, NX), order='F')
+       CRES_XZ = ndimage.maximum_filter(CRES_XZ, size=NE, mode='mirror')
+       CRES2 = np.reshape(CRES_XZ, (OPS,), order='F')
+       
+       return (np.expand_dims(CRES1, axis=1), np.expand_dims(CRES2, axis=1))
 
 def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2):
        
@@ -203,4 +209,4 @@ def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2):
        compare = np.stack((DLD2 * QRES_MAX, QMAX),axis=1)
        CRES = bn.nanmin(compare, axis=1)
        
-       return (CRES, CRES)
+       return (np.expand_dims(CRES, axis=1), np.expand_dims(CRES, axis=1))
