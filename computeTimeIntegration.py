@@ -53,7 +53,7 @@ def enforceEssentialBC(sol, init, zeroDex, ebcDex, DZDX):
        return sol
 
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
-                              sol0, init0, zeroDex, ebcDex, \
+                              sol0, DCF, init0, zeroDex, ebcDex, \
                               DynSGS, NE, isFirstStep):
        DT = TOPT[0]
        order = TOPT[3]
@@ -74,49 +74,20 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
-                     
-       def computeUpdate(coeff, solA, sol2Update, firstStage):
+       
+       # First stage computation includes updating the diffusion coefficient fields
+       def computeUpdate0(coeff, solA, sol2Update):
               DF = coeff * DT
               
               # Append log perturbation u and w... for advection
               U = solA[:,0] + init0[:,0]
               W = solA[:,1]
-              vel = np.stack((U, W),axis=1)
-              VFLW = np.linalg.norm(vel, axis=1)
               
-              # Compute first derivatives
-              if firstStage:
-                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_B, DDZM_B)
-              else:
-                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
-              
-              '''
-              # Compute advective update (explicit)
-              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
-              rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
-              
-              # Apply explicit part of the update
-              solAdv = sol2Update + DF * rhsAdv
-              # Compute internal forces (semi implicit)
-              
-              args2 = [PHYS, rhsAdv, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
-              rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
-              
-              solB = solAdv + DF * rhsFrc
-              '''
-              
+              # Compute first derivatives and RHS with QS derivative operators
+              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
               args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
               rhsAdv = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
-              #rhsAdv += tendency.computeRayleighTendency(REFG, solA, zeroDex)
               
-              # Compute DynSGS or Flow Dependent diffusion coefficients
-              QM = bn.nanmax(np.abs(solA), axis=0)
-              #DQ = fields - np.mean(fields, axis=0)
-              #QM = bn.nanmax(np.abs(DQ), axis=0)
-              DCF = rescf.computeResidualViscCoeffs3(DIMS, rhsAdv, QM, VFLW, DLD, DLD2, NE)
-              #newDiff = rescf.computeResidualViscCoeffs4(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2)
-              
-              #'''
               # Compute diffusive tendency
               if diffusiveFlux:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
@@ -133,6 +104,57 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
               
               # Apply explicit part of the update
               solB = sol2Update + DF * (rhsAdv + rhsDif)
+              
+              # Enforce the essential BC in the final solution
+              solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)
+              
+              return solB
+                     
+       def computeUpdate(coeff, solA, sol2Update):
+              DF = coeff * DT
+              
+              # Append log perturbation u and w... for advection
+              U = solA[:,0] + init0[:,0]
+              W = solA[:,1]
+              
+              # Compute first derivatives and RHS with spectral operators
+              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+              '''
+              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
+              rhsAdv = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+              '''
+              #'''
+              # Compute advective update (explicit)
+              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
+              rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
+              
+              # Apply explicit part of the update
+              solAdv = sol2Update + DF * rhsAdv
+              # Compute internal forces (semi implicit)
+              
+              args2 = [PHYS, rhsAdv, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
+              rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
+              
+              solB = solAdv + DF * rhsFrc
+              #'''
+              #'''
+              # Compute diffusive tendency
+              if diffusiveFlux:
+                     P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+                     tendency.computeFieldDerivativesFlux(DqDxA, DqDzA, DCF, REFG, DDXM_B, DDZM_B, DZDX)
+                     
+                     rhsDif = tendency.computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      REFS, ebcDex, zeroDex, DynSGS)
+              else:
+                     P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+                     tendency.computeFieldDerivatives2(DqDxA, DqDzA, REFG, DDXM_B, DDZM_B, DZDX)
+                     
+                     rhsDif = tendency.computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      REFS, ebcDex, zeroDex, DCF, DynSGS)
+              
+              # Apply explicit part of the update
+              #solB = sol2Update + DF * (rhsAdv + rhsDif)
+              solB += DF * rhsDif
               
               # Enforce the essential BC in the final solution
               solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)
@@ -155,7 +177,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        def ssprk53_Opt(sol):
               # Optimized truncation error to SSP coefficient method from Higueras, 2019
               # Stage 1
-              sol1 = computeUpdate(0.377268915331368, sol, sol)
+              sol1 = computeUpdate0(0.377268915331368, sol, sol)
               # Stage 2
               sol2 = computeUpdate(0.377268915331368, sol1, sol1)
               # Stage 3
@@ -229,13 +251,13 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, DLD2, TOPT, \
        if order == 2:
               solB = ketcheson62(sol0)
        elif order == 3:
-              solB = ketcheson93(sol0)
+              #solB = ketcheson93(sol0)
               #solB = ssprk43(sol0)
-              #solB = ssprk53_Opt(sol0)
+              solB = ssprk53_Opt(sol0)
        elif order == 4:
               solB = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketcheson62(sol0)
        
-       return solB, (solB - sol0)
+       return solB

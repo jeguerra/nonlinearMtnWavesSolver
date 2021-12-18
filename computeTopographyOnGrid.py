@@ -63,7 +63,7 @@ def computeTopographyOnGrid(REFS, opt, DDX):
        elif profile == 3:
               # General Kaiser window times a cosine series
               ps = 2.0 # polynomial order of cosine factor
-              hs = 0.5 # relative height of cosine wave part
+              hs = 0.75 # relative height of cosine wave part
               hf = 1.0 / (1.0 + hs) # scale for composite profile to have h = 1
               ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps)
               ht = hf * h0 * sin2Dom * ht2

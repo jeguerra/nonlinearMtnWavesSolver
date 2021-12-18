@@ -206,7 +206,10 @@ def computeResidualViscCoeffs4(DIMS, RES, QM, VFLW, DLD, DLD2):
        QMAX = 0.5 * DL * VFLW
        
        # Limit DynSGS to upper bound
-       compare = np.stack((DLD2 * QRES_MAX, QMAX),axis=1)
-       CRES = bn.nanmin(compare, axis=1)
+       compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)
+       CRES1 = bn.nanmin(compare, axis=1)
        
-       return (np.expand_dims(CRES, axis=1), np.expand_dims(CRES, axis=1))
+       compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX),axis=1)
+       CRES2 = bn.nanmin(compare, axis=1)
+       
+       return (np.expand_dims(CRES1, axis=1), np.expand_dims(CRES2, axis=1))

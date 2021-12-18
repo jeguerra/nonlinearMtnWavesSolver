@@ -66,28 +66,22 @@ def computeRdT(q, RdT_bar, kap):
 
 def computeFieldDerivatives(q, DDX, DDZ):
        
-       #print(DDX.shape)
-       #print(DDZ.shape)
-       
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
        
        return DqDx, DqDz
 
 def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
-       
-       DQDZ = REFG[2]
-       D2QDZ2 = REFG[-1]
-       
+              
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
-       PqPz = DqDz# + DQDZ
+       PqPz = DqDz
        
        vd = np.hstack((PqPx, DqDz))
        dvdx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
        
        D2qDz2 = dvdz[:,4:] #DDZ.dot(DqDz)
-       P2qPz2 = D2qDz2 + D2QDZ2
+       P2qPz2 = D2qDz2
        D2qDx2 = dvdx[:,0:4] #DDX.dot(PqPx)
        
        P2qPzx = dvdz[:,0:4] #DDZ.dot(PqPx)
@@ -99,12 +93,9 @@ def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
 
 def computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDX, DDZ, DZDX):
        
-       DQDZ = REFG[2]
-       #D2QDZ2 = REFG[-1]
-       
        # Compute first partial in X (on CPU)
        xFlux = DCF[0] * (DqDx - DZDX * DqDz)
-       zFlux = DCF[1] * DqDz# + DQDZ)
+       zFlux = DCF[1] * DqDz
        
        vd = np.hstack((xFlux, zFlux))
        DxFlux = DDX.dot(vd)
@@ -363,8 +354,8 @@ def computeEulerEquationsLogPLogT_StaticResidual(PHYS, DqDx, DqDz, REFG, DZDX, R
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
        
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
        DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
+       DqDt = enforceTendencyBC(DqDt, zeroDex)
                                
        return DqDt
 
@@ -409,8 +400,8 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
        
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
        DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
+       DqDt = enforceTendencyBC(DqDt, zeroDex)
                         
        return DqDt
 
@@ -436,13 +427,8 @@ def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFG, DZDX, RdT_ba
        
        DqDt = -(Uadvect + Wadvect)
        
-       # Compute local divergence
-       #gam = PHYS[6]
-       #divergence = PqPx[:,0] + DqDz[:,1]
-       #DqDt[:,2] -= gam * divergence
-       
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
        DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
+       DqDt = enforceTendencyBC(DqDt, zeroDex)
                         
        return DqDt
 
@@ -475,8 +461,8 @@ def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDt_adv, DqDx, DqDz, REFG
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
        
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
        DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
+       DqDt = enforceTendencyBC(DqDt, zeroDex)
                         
        return DqDt
 
@@ -550,7 +536,6 @@ def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, e
        DqDt[:,3] *= 1.0*Pr
        
        DqDt = enforceTendencyBC(DqDt, zeroDex)
-       DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
        
        return DqDt
 
@@ -567,7 +552,8 @@ def computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REF
        # Diffusion of scalars (broken up into anisotropic components
        DqDt[:,2] = (P2qPx2[:,2] + P2qPz2[:,2])
        DqDt[:,3] = (P2qPx2[:,3] + P2qPz2[:,3])
-                   
+       
+       '''            
        #%% TOP DIFFUSION (flow along top edge)
        tdex = ebcDex[3]
        DqDt[tdex,0] = 2.0 * P2qPx2[tdex,0]
@@ -600,7 +586,7 @@ def computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REF
        DqDt[bdex,2] = S2 * P2qPa2[:,2] - S4 * dhx * d2hx * (PqPa[:,2])
        # dltdt along terrain
        DqDt[bdex,3] = S2 * P2qPa2[:,3] - S4 * dhx * d2hx * (PqPa[:,3])
-
+       '''
        # Scale and apply coefficients
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr

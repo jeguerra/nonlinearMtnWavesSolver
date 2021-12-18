@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-fname = 'transientNL_Spectral_QS.nc'
+fname = 'SpectralXZ_QS-DynSGS01_Adv2Frc.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['t'][:]
@@ -32,8 +32,8 @@ lnt = m_fid.variables['ln_t'][:]
 
 dlnt = m_fid.variables['Dln_tDt'][:]
 
-DCF1 = m_fid.variables['CRES_X'][:]
-DCF2 = m_fid.variables['CRES_Z'][:]
+#DCF1 = m_fid.variables['CRES_X'][:]
+#DCF2 = m_fid.variables['CRES_Z'][:]
 
 # Compute the total and perturbation potential temperature
 TH = np.exp(LNT + lnt)
@@ -56,8 +56,8 @@ THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = True
-runSGS = False
+runPertb = False
+runSGS = True
 
 #%% Contour animation of perturbation potential temperatures
 if runPertb:
@@ -111,10 +111,15 @@ if runSGS:
                      q = np.zeros(th[tt,:,:].shape)
                      norm = 1.0
               elif tt == 1:
+                     q = 1.0 / dt * (th[tt,:,:] - th[tt-1,:,:]) - \
+                            0.5 * (dlnt[tt-1,:,:] + dlnt[tt+1,:,:])
+                     norm = 1.0 / np.amax(np.abs(q))
+              elif tt == len(times)-1:
                      q = 1.0 / dt * (th[tt,:,:] - th[tt-1,:,:]) - dlnt[tt,:,:]
                      norm = 1.0 / np.amax(np.abs(q))
               else:
-                     q = 0.5 / dt * (3.0 * th[tt,:,:] - 4.0 * th[tt-1,:,:] + th[tt-2,:,:]) - dlnt[tt,:,:]
+                     q = 0.5 / dt * (3.0 * th[tt,:,:] - 4.0 * th[tt-1,:,:] + th[tt-2,:,:]) - \
+                            0.5 * (dlnt[tt-1,:,:] + dlnt[tt+1,:,:])
                      norm = 1.0 / np.amax(np.abs(q))
                      
               qSGS = norm * q
