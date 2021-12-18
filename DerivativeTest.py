@@ -112,10 +112,10 @@ plt.legend()
 xv = REFS[0]
 # Set the terrain options0
 h0 = 2500.0
-aC = 10000.0
-lC = 7500.0
-kC = 2.0E+4
-HOPT = [h0, aC, lC, kC, False, 2]
+aC = 5000.0
+lC = 2.0 * mt.pi * 1.0E3
+kC = 1.5E+4
+HOPT = [h0, aC, lC, kC, False, 3]
 
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 
