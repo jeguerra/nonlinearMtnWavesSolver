@@ -725,15 +725,15 @@ def runModel(TestName):
               REFS.append((DDXMS, DDZMS))
               REFS.append(diffOps1)
        else: 
-              # Matrix operators for staggered method...
+              # Matrix operators
               REFS.append(DDXMS)
               REFS.append(DDZMS)
               
        # Store the terrain profile
        REFS.append(DZT)
        REFS.append(DZDX)
-       REFS.append(DDXM_CS.dot(DZDX))
-       REFS.append(np.power(DZDX, 2.0))
+       REFS.append(DDX_QS)
+       REFS.append(DDZ_QS)
        
        # Compute and store the 2nd derivatives of background quantities
        D2QDZ2 = DDZM_CS.dot(DQDZ)
@@ -1255,10 +1255,8 @@ def runModel(TestName):
                             
                             # Compute a time step
                             fields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, DLD2,\
-                                                                    TOPT, fields0, DCF, hydroState, \
-                                                                    zeroDex, ebcDex, \
-                                                                    DynSGS, NE, isFirstStep)
+                                                                    DLD, TOPT, fields0, DCF, hydroState, \
+                                                                    zeroDex, ebcDex, isFirstStep)
                                    
                             # Apply Rayleigh sponge
                             RayDamp = np.reciprocal(1.0 + DTN * mu * RLM.data)
@@ -1279,20 +1277,23 @@ def runModel(TestName):
                             rhsVec, DqDx, DqDz = computeRHS(fields, hydroState, PHYS, REFS, REFG, ebcDex, zeroDex)
                      
                             # Compute the current residual
-                            '''
+                            #'''
                             delFields = fields - fields0
                             if ti == 0:
                                    resVec = (1.0 / TOPT[0]) * delFields - rhsVec
                             else:
                                    resVec = (1.0 / TOPT[0]) * delFields - 0.5 * (rhsVec0 + rhsVec)
-                            '''
-                            resVec = np.copy(rhsVec)
+                            #'''
+                            #resVec = np.copy(rhsVec)
                             # Compute DynSGS or Flow Dependent diffusion coefficients
                             QM = bn.nanmax(np.abs(fields), axis=0)
                             #DQ = fields - np.mean(fields, axis=0)
                             #QM = bn.nanmax(np.abs(DQ), axis=0)
-                            DCF = rescf.computeResidualViscCoeffs3(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2, NE)
-                            #DCF = rescf.computeResidualViscCoeffs4(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2)
+                            
+                            #DCF = rescf.computeResidualViscCoeffs(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2, NE)
+                            
+                            #DCF = rescf.computeResidualViscCoeffs3(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2, NE)
+                            DCF = rescf.computeResidualViscCoeffsRaw(DIMS, np.copy(resVec), QM, VFLW, DLD, DLD2)
                             
                             # Compute sound speed
                             T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
