@@ -71,7 +71,7 @@ def computeFieldDerivatives(q, DDX, DDZ):
        
        return DqDx, DqDz
 
-def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
+def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, DZDX):
               
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
@@ -91,7 +91,7 @@ def computeFieldDerivatives2(DqDx, DqDz, REFG, DDX, DDZ, DZDX):
        
        return P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz
 
-def computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDX, DDZ, DZDX):
+def computeFieldDerivativesFlux(DqDx, DqDz, DCF, DDX, DDZ, DZDX, DLD):
        
        # Compute first partial in X (on CPU)
        xFlux = DCF[0] * (DqDx - DZDX * DqDz)
@@ -101,10 +101,10 @@ def computeFieldDerivativesFlux(DqDx, DqDz, DCF, REFG, DDX, DDZ, DZDX):
        DxFlux = DDX.dot(vd)
        DzFlux = DDZ.dot(vd)
        
-       PxxFlux = DxFlux[:,0:4] - DZDX * DzFlux[:,0:4]
+       PxxFlux = (DxFlux[:,0:4] - DZDX * DzFlux[:,0:4])
        PxzFlux = DzFlux[:,0:4]
        PzzFlux = DzFlux[:,4:]
-       PzxFlux = DxFlux[:,4:] - DZDX * PzzFlux
+       PzxFlux = (DxFlux[:,4:] - DZDX * PzzFlux)
               
        return PxxFlux, PzzFlux, PxzFlux, PzxFlux, xFlux, zFlux
 
@@ -433,7 +433,7 @@ def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFG, DZDX, RdT_ba
        return DqDt
 
 # Semi-implicit internal force evaluation
-def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDt_adv, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, ebcDex, zeroDex):
+def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, ebcDex, zeroDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -478,7 +478,7 @@ def computeRayleighTendency(REFG, fields, zeroDex):
        
        return DqDt
 
-def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF, DynSGS):
+def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF):
        
        DZDX = REFS[15]
        DZDX2 = REFS[16]
@@ -539,10 +539,10 @@ def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, e
        
        return DqDt
 
-def computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DynSGS):
+def computeDiffusiveFluxTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF):
        
        DZDX = REFS[15]
-       DZDX2 = REFS[16]
+       DDXM = REFS[16]
        DqDt = np.zeros(P2qPx2.shape)
             
        #%% INTERIOR DIFFUSION
@@ -552,14 +552,48 @@ def computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REF
        # Diffusion of scalars (broken up into anisotropic components
        DqDt[:,2] = (P2qPx2[:,2] + P2qPz2[:,2])
        DqDt[:,3] = (P2qPx2[:,3] + P2qPz2[:,3])
-       
-       '''            
+       #'''            
        #%% TOP DIFFUSION (flow along top edge)
        tdex = ebcDex[3]
        DqDt[tdex,0] = 2.0 * P2qPx2[tdex,0]
        DqDt[tdex,2] = P2qPx2[tdex,2]
        DqDt[tdex,3] = P2qPx2[tdex,3]
        
+       #%% BOTTOM DIFFUSION (flow along the terrain surface)
+       bdex = ebcDex[2]
+       dhx = DZDX[bdex,0]
+       dhx2 = np.power(dhx, 2.0)
+       S2 = np.reciprocal(1.0 + dhx2)
+       
+       mu_x = DCF[0][bdex,0]
+       mu_z = DCF[1][bdex,0]
+       dqb = DqDx[bdex,:]
+       
+       # Compute TF fluxes
+       flux1_p = mu_x * S2 * dqb[:,2]
+       flux2_p = mu_z * S2 * dhx * dqb[:,2]
+       
+       flux1_t = mu_x * S2 * dqb[:,3]
+       flux2_t = mu_z * S2 * dhx * dqb[:,3]
+       
+       flux1_u = mu_x * S2 * dqb[:,0]
+       flux2_u = mu_x * S2 * dqb[:,1] + mu_z * dhx * dqb[:,0]
+       
+       # Compute flux gradients
+       fluxes = np.stack((flux1_u, flux2_u, flux1_p, flux2_p, flux1_t, flux2_t), axis=1)
+       dflx = DDXM.dot(fluxes)
+              
+       # dudt along terrain
+       DqDt[bdex,0] = 2.0 * S2 * (dflx[:,0] + dhx * dflx[:,1])
+       # dwdt along terrain
+       DqDt[bdex,1] = dhx * DqDt[bdex,0]
+       
+       # dlpdt along terrain
+       DqDt[bdex,2] = S2 * (dflx[:,2] + dhx * dflx[:,3])
+       # dltdt along terrain
+       DqDt[bdex,3] = S2 * (dflx[:,4] + dhx * dflx[:,5])
+       
+       '''
        #%% BOTTOM DIFFUSION (flow along the terrain surface)
        bdex = ebcDex[2]
        dhx = DZDX[bdex,:]
@@ -592,6 +626,6 @@ def computeDiffusiveFluxTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REF
        DqDt[:,3] *= 1.0*Pr
        
        DqDt = enforceTendencyBC(DqDt, zeroDex)
-       DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
+       #DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
               
        return DqDt
