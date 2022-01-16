@@ -478,10 +478,10 @@ def computeRayleighTendency(REFG, fields, zeroDex):
        
        return DqDt
 
-def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF):
+def computeDiffusionTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF):
        
        DZDX = REFS[15]
-       DZDX2 = REFS[16]
+       DDXM = REFS[16]
        DqDt = np.zeros(P2qPx2.shape)
        
        DC1 = DCF[0][:,0] # XX
@@ -503,39 +503,45 @@ def computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, e
        
        #%% BOTTOM DIFFUSION (flow along the terrain surface)
        bdex = ebcDex[2]
-       dhx = DZDX[bdex,:]
-       d2hx = DZDX2[bdex,:]
-       dhx2 = np.power(dhx, 2.0)
-       S2 = np.reciprocal(dhx2 + 1.0)
-       S4 = np.power(S2, 2.0)
-       
-       # Compute the derivative terms
-       P2qPa2 = P2qPx2[bdex,:] + dhx * (P2qPzx[bdex,:] + P2qPxz[bdex,:]) + dhx2 * P2qPz2[bdex,:] + d2hx * PqPz[bdex,:]
-       PqPa = PqPx[bdex,:] + dhx * PqPz[bdex,:]
-       # Get the coefficients at the ground
-       DCB = np.power(S2[:,0] * (np.power(DC1[bdex], 2.0) + np.power(dhx[:,0] * DC2[bdex], 2.0)), 0.5)
-       #DCB = DC1[bdex]
-       
        dhx = DZDX[bdex,0]
-       d2hx = DZDX2[bdex,0]
        dhx2 = np.power(dhx, 2.0)
-       S2 = np.reciprocal(dhx2 + 1.0)
-       S4 = np.power(S2, 2.0)
+       S2 = np.reciprocal(1.0 + dhx2)
        
+       mu_x = DCF[0][bdex,0]
+       mu_z = DCF[1][bdex,0]
+       dqb = DqDx[bdex,:]
+       
+       # Compute TF fluxes
+       flux1_p = mu_x * S2 * dqb[:,2]
+       flux2_p = mu_z * S2 * dhx * dqb[:,2]
+       
+       flux1_t = mu_x * S2 * dqb[:,3]
+       flux2_t = mu_z * S2 * dhx * dqb[:,3]
+       
+       flux1_u = mu_x * S2 * dqb[:,0]
+       flux2_u = mu_x * S2 * dqb[:,1] + mu_z * dhx * dqb[:,0]
+       
+       # Compute flux gradients
+       fluxes = np.stack((flux1_u, flux2_u, flux1_p, flux2_p, flux1_t, flux2_t), axis=1)
+       dflx = DDXM.dot(fluxes)
+       
+              
        # dudt along terrain
-       DqDt[bdex,0] = S4 * DCB * ((2.0 + dhx2) * P2qPa2[:,0] + dhx * P2qPa2[:,1] - dhx * d2hx * (PqPa[:,0] + 2.0 * PqPa[:,1]))
+       DqDt[bdex,0] = 2.0 * S2 * mu_x * (dflx[:,0] + dhx *dflx[:,1])
        # dwdt along terrain
        DqDt[bdex,1] = dhx * DqDt[bdex,0]
+       
        # dlpdt along terrain
-       DqDt[bdex,2] = S2 * DCB * P2qPa2[:,2] - S4 * DCB * dhx * d2hx * (PqPa[:,2])
+       DqDt[bdex,2] = S2 * (mu_x * dflx[:,2] + dhx * mu_z * dflx[:,3])
        # dltdt along terrain
-       DqDt[bdex,3] = S2 * DCB * P2qPa2[:,3] - S4 * DCB * dhx * d2hx * (PqPa[:,3])
-
+       DqDt[bdex,3] = S2 * (mu_x * dflx[:,4] + dhx * mu_z * dflx[:,5])
+       
        # Scale and apply coefficients
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr
        
        DqDt = enforceTendencyBC(DqDt, zeroDex)
+       #DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
        
        return DqDt
 
@@ -593,34 +599,6 @@ def computeDiffusiveFluxTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPx
        # dltdt along terrain
        DqDt[bdex,3] = S2 * (dflx[:,4] + dhx * dflx[:,5])
        
-       '''
-       #%% BOTTOM DIFFUSION (flow along the terrain surface)
-       bdex = ebcDex[2]
-       dhx = DZDX[bdex,:]
-       d2hx = DZDX2[bdex,:]
-       dhx2 = np.power(dhx, 2.0)
-       S2 = np.reciprocal(dhx2 + 1.0)
-       S4 = np.power(S2, 2.0)
-       
-       # Compute the derivative terms
-       P2qPa2 = P2qPx2[bdex,:] + dhx * (P2qPzx[bdex,:] + P2qPxz[bdex,:]) + dhx2 * P2qPz2[bdex,:] + d2hx * PqPz[bdex,:]
-       PqPa = PqPx[bdex,:] + dhx * PqPz[bdex,:]
-       
-       dhx = DZDX[bdex,0]
-       d2hx = DZDX2[bdex,0]
-       dhx2 = np.power(dhx, 2.0)
-       S2 = np.reciprocal(dhx2 + 1.0)
-       S4 = np.power(S2, 2.0)
-       
-       # dudt along terrain
-       DqDt[bdex,0] = S4 * ((2.0 + dhx2) * P2qPa2[:,0] + dhx * P2qPa2[:,1] - dhx * d2hx * (PqPa[:,0] + 2.0 * PqPa[:,1]))
-       # dwdt along terrain
-       DqDt[bdex,1] = dhx * DqDt[bdex,0]
-       # dlpdt along terrain
-       DqDt[bdex,2] = S2 * P2qPa2[:,2] - S4 * dhx * d2hx * (PqPa[:,2])
-       # dltdt along terrain
-       DqDt[bdex,3] = S2 * P2qPa2[:,3] - S4 * dhx * d2hx * (PqPa[:,3])
-       '''
        # Scale and apply coefficients
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr

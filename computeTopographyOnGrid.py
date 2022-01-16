@@ -8,16 +8,15 @@ Created on Fri Jul 19 14:43:05 2019
 import sys
 import numpy as np
 import math as mt
+import computeDerivativeMatrix as derv
 from scipy import signal
-from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 
-def computeTopographyOnGrid(REFS, opt, DDX):
+def computeTopographyOnGrid(REFS, opt):
        h0 = opt[0]
        aC = opt[1]
        lC = opt[2]
        kC = opt[3]
-       withWindow = opt[4]
        profile = opt[5]
        
        # Get data from REFS
@@ -55,24 +54,28 @@ def computeTopographyOnGrid(REFS, opt, DDX):
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
               ht2 = np.power(np.cos(mt.pi / lC * xh), 2.0);
               ht = ht1 * ht2
-              ht[np.abs(ht) < 1.0E-15] = 0.0
               # Take the derivative
               dhdx = -2.0 * ht
               dhdx *= (1.0 / aC**2.0) * xh + (mt.pi / lC) * np.tan(mt.pi / lC * xh)
+              
+              ht[np.abs(ht) < 1.0E-15] = 0.0
               dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
        elif profile == 3:
               # General Kaiser window times a cosine series
               ps = 2.0 # polynomial order of cosine factor
-              hs = 0.75 # relative height of cosine wave part
+              hs = 0.5 # relative height of cosine wave part
               hf = 1.0 / (1.0 + hs) # scale for composite profile to have h = 1
               ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps)
               ht = hf * h0 * sin2Dom * ht2
               
+              # Take the derivative
+              '''
               dhdx1 = -(2.0 * mt.pi / L) * sinDom * cosDom
               dhdx2 = -hs * (ps * mt.pi / lC) * np.cos(mt.pi / lC * xh) * np.sin(mt.pi / lC * xh)
-              
-              # Take the derivative (DO NOT USE NATIVE DERIVATIVE OPERATOR)
               dhdx = hf * h0 * (dhdx1 * ht2 + sin2Dom * dhdx2)
+              '''
+              DDX, temp = derv.computeCubicSplineDerivativeMatrix(xh, False, True, False, False, None)
+              dhdx = DDX.dot(ht)
               dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
        elif profile == 4:
               # General even power exponential times a polynomial series

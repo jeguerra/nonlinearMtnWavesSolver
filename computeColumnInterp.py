@@ -15,7 +15,7 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
        NZ = DIMS[4] + 1
        
        # Interpolate the nominal column profile to TF Chebyshev grid
-       if TypeInt == '1DtoTerrainFollowingCheb' or TypeInt == '1DtoTerrainFollowingLegr':
+       if TypeInt == 'ChebyshevHR2SpectralZ':
               # Check that data is good for self interpolation
               if (zdata.all() == None) or (fdata.all() == None):
                      print('ERROR: No reference data for interpolation given!')
@@ -33,17 +33,10 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, FLD, CH_TRANS, TypeInt):
                      # Convert to the reference grid at this column
                      thisZ = ZTL[:,cc]
                      xi = 1.0 * ((2.0 / zpan * thisZ) - 1.0)
-                     
-                     # Get the inverse matrix for this column
-                     if TypeInt == '1DtoTerrainFollowingCheb':
-                            CTM = hcnw.chebpolym(NZ, -xi)
-                            # Apply the interpolation
-                            temp = (CTM).dot(fcoeffs)
-                            
-                     if TypeInt == '1DtoTerrainFollowingLegr':
-                            CTM, DTM = hcnw.legpolym(NZ-1, xi, True)
-                            # Apply the interpolation
-                            temp = (CTM.T).dot(fcoeffs)
+
+                     CTM = hcnw.chebpolym(NZ, -xi)
+                     # Apply the interpolation
+                     temp = (CTM).dot(fcoeffs)
                      
                      FLDI[:,cc] = np.ravel(temp)
                      

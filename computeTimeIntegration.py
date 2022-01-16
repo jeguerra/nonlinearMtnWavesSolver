@@ -60,7 +60,10 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        RdT_bar = REFS[9][0]
        DZDX = REFS[15]
        
-       diffusiveFlux = True
+       mu = REFG[3]
+       RLM = REFG[4]
+       
+       diffusiveFlux = False
        
        #'''
        if isFirstStep:
@@ -114,12 +117,16 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
                      tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, DZDX)
                      
-                     rhsDif = tendency.computeDiffusionTendency(PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                     rhsDif = tendency.computeDiffusionTendency(DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                       REFS, ebcDex, zeroDex, DCF)
               
               # Apply explicit part of the update
               #solB = sol2Update + DF * (rhsAdv + rhsDif)
               solB += DF * rhsDif
+              
+              # Apply Rayleigh damping layer
+              RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
+              solB = (RayDamp.T) * solB
               
               # Enforce the essential BC in the final solution
               solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)

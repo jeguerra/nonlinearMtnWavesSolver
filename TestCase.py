@@ -43,7 +43,7 @@ class TestCase:
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
@@ -71,8 +71,8 @@ class TestCase:
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 128, 75.0, 32.0, 300.0, \
-                                      7000.0, 15000.0, 1.0, \
+                     self.setUserData(191, 96, 75.0, 32.0, 300.0, \
+                                      7000.0, 10000.0, 1.0, \
                                       25.0, 0.01, 0.0065, 0.003, 3, 1.2E+4, 'uwpt_static')
               
               elif TestName == "UniformTestTransient":
@@ -86,7 +86,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 96, 185.0, 35.0, 300.0, \
                                       8000.0, 35000.0, 5.0, \
-                                      2500.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
+                                      3000.0, 0.01, 0.0065, 0.003, 3, 2.0E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -99,7 +99,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 108, 185.0, 42.0, 300.0, \
                                       10000.0, 35000.0, 5.0, \
-                                      2500.0, 0.01, 0.006, 0.002, 3, 1.5E+4, 'uwpt_transient')
+                                      2500.0, 0.01, 0.0065, 0.002, 3, 2.0E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')

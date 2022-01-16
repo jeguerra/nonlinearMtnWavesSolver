@@ -8,6 +8,7 @@ Created on Wed Aug 14 14:24:39 2019
 
 import numpy as np
 import math as mt
+import scipy.linalg as scl
 import matplotlib.pyplot as plt
 from computeGrid import computeGrid
 import computeDerivativeMatrix as derv
@@ -115,15 +116,16 @@ h0 = 2500.0
 aC = 5000.0
 lC = 2.0 * mt.pi * 1.0E3
 kC = 1.5E+4
-HOPT = [h0, aC, lC, kC, False, 3]
+HOPT = [h0, aC, lC, kC, False, 2]
 
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 
-HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT, DDX_1D)
+HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
 DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
 DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_1D)
+
 DYD_CS = DDX_CS.dot(HofX)
 DYD_QS = DDX_QS.dot(HofX)
 
@@ -184,10 +186,25 @@ DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 10)
 zv = (1.0 / ZH) * REFS[1]
 Y, DY = function1(zv)
 
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, False, False, ZH * DDZ_1D)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, ZH * DDZ_1D)
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, False, False, ZH * DDZ_CFD2)
+DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, ZH * DDZ_CFD2)
 
-# APPLY A GEOMETRIC MEAN TO THE VARIOUS D MATRICES USING A NORM OF THE SPECTRAL AS REFERENCE
+# Compute SVD of derivative matrices
+U1, s1, Vh1 = scl.svd(DDX_1D)
+U2, s2, Vh2 = scl.svd(DDZ_1D)
+U3, s3, Vh3 = scl.svd(DDZ_CFD1)
+U4, s4, Vh4 = scl.svd(DDZ_CFD2)
+U5, s5, Vh5 = scl.svd(DDZ_CFD3)
+U6, s6, Vh6 = scl.svd(DDZ_CS)
+U7, s7, Vh7 = scl.svd(DDZ_QS)
+
+plt.figure(figsize=(8, 6), tight_layout=True)
+plt.plot(s1 / s1[0], 'o', label='Hermite Function'); plt.plot(s2 / s2[0], 'o', label='Chebychev') 
+plt.plot(s3 / s3[0], 'o', label='Compact FD4'); plt.plot(s4 / s4[0], 'o', label='Compact FD6') 
+plt.plot(s5 / s5[0], 'o', label='Compact FD10'); plt.plot(s6 / s6[0], 'o', label='Cubic Spline') 
+plt.plot(s7 / s7[0], 'o', label='Quintic Spline')
+plt.grid(b=True, which='both', axis='both')
+plt.legend()
 
 DYD1 = ZH * DDZ_CFD1.dot(Y)
 DYD2 = ZH * DDZ_CFD2.dot(Y)
@@ -222,7 +239,7 @@ plt.title('Compact Finite Difference Derivative Test')
 plt.grid(b=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeTestZ_CFD.png")
-'''
+
 #%% LAGUERRE FUNCTION DERIVATIVE TEST
 NZ = 16
 DIMS[-1] = NZ
@@ -246,7 +263,7 @@ xi, whf = hcl.lgfunclb(NZL) #[0 inf]
 DIMS[-1] = NZL
 zv1 = 1.0 / np.amax(xi) * xi
 Y1, DY1 = function2(zv1, 1.0)
-DDZ_LG, LG_TRANS, scale = derv.computeLaguerreDerivativeMatrix(DIMS)
+DDZ_LG, LG_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
 DYD_LG = ZH * DDZ_LG.dot(Y1)
 
 CTM = hcl.chebpolym(NZC+1, -xi2) # interpolate to legendre grid
@@ -279,7 +296,6 @@ plt.legend()
 
 #%% Report eigenvalues
 plt.show()
-'''
 '''
 import scipy.sparse.linalg as spl
 DDZM = DDZ_LG.astype(dtype=np.double)

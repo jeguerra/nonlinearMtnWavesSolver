@@ -7,7 +7,6 @@ Created on Fri Nov  1 08:59:22 2019
 """
 
 import scipy.linalg as scl
-import scipy.sparse as sps
 import numpy as np
 import math as mt
 import matplotlib.pyplot as plt
@@ -21,7 +20,7 @@ def computeAdjustedOperatorNBC(D2A, DD, tdex):
        # D2A is the operator to adjust
        # DD is the 1st derivative operator
        R = DD[tdex,tdex]
-       dv = DD[tdex,:]; dv[tdex] = 0.0
+       dv = DD[tdex,:]; #dv[tdex] = 0.0
        DA = (1.0 / R) * np.outer(DD[:,tdex], -dv)
               
        D2A[:,tdex] = 0.0
@@ -94,6 +93,16 @@ def numericalCleanUp(DDM):
                      if abs(DDM[ii,jj]) <= ZTOL:
                             DDMC[ii,jj] = 0.0
        return DDMC
+
+def removeLeastSingularValue(DDM):
+       mr = 1
+       nm = DDM.shape
+       U, s, Vh = scl.svd(DDM)
+       S = scl.diagsvd(s[0:-mr], nm[0]-mr, nm[1]-mr)
+       DDM = U[:,0:-mr].dot(S)
+       DDM = DDM.dot(Vh[0:-mr,:])
+       
+       return DDM
 
 # Compute Spectral Element 1st derivative matrix (2 sided coupling)
 def computeSpectralElementDerivativeMatrix5E(dom, NE, nonCoincident, ORDER):
@@ -600,19 +609,16 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
               eta[4,:] = 1.0 / hp * np.array([0.0, -1.0, 1.0, 0.0])
               eta[5,:] = 1.0 / hp1 *np.array([0.0, 0.0, -1.0, 1.0])
               
-              PLU = scl.lu_factor(V)
-              VI = scl.lu_solve(PLU, np.eye(9))
+              #PLU = scl.lu_factor(V)
+              #VI = scl.lu_solve(PLU, np.eye(9))
+              
+              Q, R = scl.qr(V)
+              PLU = scl.lu_factor(R)
+              VI = scl.lu_solve(PLU, Q.T)
+              #VI = scl.solve(R, (Q.T).dot(np.eye(9)))
               
               OM = VI.dot(rho)
               ET = VI.dot(eta)
-              '''
-              thisTol = 1.0E-15
-              for ii in range(4):
-                     OM[:,ii], es1 = sps.linalg.lgmres(sps.csc_matrix(V, dtype=np.float64), rho[:,ii], x0=OM[:,ii], M=VI, tol=thisTol, maxiter=10000)
-                     ET[:,ii], es2 = sps.linalg.lgmres(sps.csc_matrix(V, dtype=np.float64), eta[:,ii], x0=ET[:,ii], M=VI, tol=thisTol, maxiter=10000)
-              '''                     
-              #OM = VIS.dot(rho)
-              #ET = VIS.dot(eta)
                             
               return OM, ET
                      
@@ -738,17 +744,21 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
        B[-1,:] = DM4[-1,:]
               
        # Compute the 4th derivative matrix
-       PLU = scl.lu_factor(A)
-       AIB = scl.lu_solve(PLU,B)
+       Q, R = scl.qr(A)
+       PLU = scl.lu_factor(R)
+       AIB = scl.lu_solve(PLU, (Q.T).dot(B))
        
        # Compute the 1st derivative matrix
-       DM1 = C.dot(AIB) + D
+       DDM = C.dot(AIB) + D
        
-       #DM1[0,:] = DDM_BC[0,:]
-       #DM1[-1,:] = DDM_BC[-1,:]
-       DM1C = numericalCleanUp(DM1)
+       # Set boundary derivatives from specified
+       DDM[0,:] = DDM_BC[0,:]
+       DDM[-1,:] = DDM_BC[-1,:]
+       
+       DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM1)
                      
-       return DM1C, AIB
+       return DDMC, AIB
 
 # Computes Cubic Spline 1st derivative matrix
 def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
@@ -904,8 +914,9 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               DDM[N-1,:] = -h0 / 6.0 * AIB[N-2,:]
               DDM[N-1,N-2] -= 1.0 / hn
               DDM[N-1,N-1] += 1.0 / hn      
-              
-       DDMC = numericalCleanUp(DDM)
+       
+       DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM1)
 
        return DDMC, AIB
 
@@ -1020,8 +1031,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      CM4_V -= alpha * CM4[:,-2]
                      CMS = CM4[0:-2,0:-2]
                      
-                     PLU = scl.lu_factor(CMS)
-                     CF = scl.lu_solve(PLU, CM4_V[0:-2])
+                     Q, R = scl.qr(CMS)
+                     PLU = scl.lu_factor(R)
+                     CF = scl.lu_solve(PLU, (Q.T).dot(CM4_V[0:-2]))
                      
                      CFE = -np.sum(CF[0:2])
                      
@@ -1047,8 +1059,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                                      
                      CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
                      
-                     PLU = scl.lu_factor(CME)
-                     CF = scl.lu_solve(PLU, CME_V)
+                     Q, R = scl.qr(CME)
+                     PLU = scl.lu_factor(R)
+                     CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
                      
                      CFE = -np.sum(CF[0:-1])
                      
@@ -1094,9 +1107,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      CM6_V -= alpha * CM6[:,-2]
                      CMS = CM6[0:-2,0:-2]
                      
-                     PLU = scl.lu_factor(CMS)
-                     CF = scl.lu_solve(PLU, CM6_V[0:-2])
-                     
+                     Q, R = scl.qr(CMS)
+                     PLU = scl.lu_factor(R)
+                     CF = scl.lu_solve(PLU, (Q.T).dot(CM6_V[0:-2]))
                      CFE = -np.sum(CF[0:4])
                      
                      # Write the right equation
@@ -1127,6 +1140,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      sdex = np.array([0, 1, 2, 3, 4, 5])
                      CMS = CMI[np.ix_(sdex,sdex)]
                      
+                     #Q, R = scl.qr(CMS)
+                     #PLU = scl.lu_factor(R)
+                     #CF = scl.lu_solve(PLU, (Q.T).dot(CM10_V[sdex]))
                      PLU = scl.lu_factor(CMS)
                      CF = scl.lu_solve(PLU, CM10_V[sdex])
                      CFE = -np.sum(CF[0:6])
@@ -1161,8 +1177,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               CME_V = np.zeros(ND)
               CME_V[0] = 1.0
               
-              PLU = scl.lu_factor(CME)
-              CF_F = scl.lu_solve(PLU, CME_V)
+              Q, R = scl.qr(CME)
+              PLU = scl.lu_factor(R)
+              CF_F = scl.lu_solve(PLU, (Q.T).dot(CME_V))
               beta = CF_F[-1]
               
               LDM[0,0] = 1.0
@@ -1202,11 +1219,17 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               RDM[N-1,N-3] = (hp2**2) / (hp3**2 * (hp2 + hp3))
               
        # Get the derivative matrix
-       DDM = np.linalg.solve(LDM, RDM)
+       #Q, R = scl.qr(LDM)
+       #PLU = scl.lu_factor(R)
+       #DDM = scl.lu_solve(PLU, (Q.T).dot(RDM))
        
-       DDMA = numericalCleanUp(DDM)
+       PLU = scl.lu_factor(LDM)
+       DDM = scl.lu_solve(PLU, RDM)
        
-       return DDMA
+       DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM1)
+       
+       return DDMC
 
 # Computes standard 4th order compact finite difference 2nd derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix2(DIMS, dom):
@@ -1301,7 +1324,8 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        temp = temp.dot(STR_H)
        DDM = b * temp
        
-       DDMC = numericalCleanUp(DDM)
+       DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM1)
        
        return DDMC.astype(np.float64), STR_H
 
@@ -1355,7 +1379,8 @@ def computeChebyshevDerivativeMatrix(DIMS):
        temp = (CT.T).dot(SDIFF)
        DDM = -b * temp.dot(STR_C)
        
-       DDMC = numericalCleanUp(DDM)
+       DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM1)
               
        #print(xi)
        #print(DDM[0,0], -(2.0 * NZ**2 + 1) / 3.0 / ZH)
@@ -1397,11 +1422,11 @@ def computeLaguerreDerivativeMatrix(DIMS):
        W = np.diag(wlf, k=0)
        
        # Compute scaling for the forward transform
-       S = np.eye(NM)
-   
+       S = np.eye(NM) # Identity matrix in the simplest case of Laguerre
+       '''
        for ii in range(NM):
               S[ii,ii] = mt.factorial(ii) / mt.gamma(ii+1)
-                     
+       '''              
        # Compute the spectral derivative coefficients
        SDIFF = np.zeros((NM,NM))
          
@@ -1414,13 +1439,13 @@ def computeLaguerreDerivativeMatrix(DIMS):
        STR_L = S.dot(temp)
        # Hermite function spatial derivative based on spectral differentiation
        temp = (LT.T).dot(SDIFF)
-       temp = temp.dot(STR_L)
-              
+       temp = temp.dot(STR_L)       
        DDM = b * temp
        
-       DDMC = numericalCleanUp(DDM)
+       DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM1)
        
-       return DDMC.astype(np.float64), STR_L, lg
+       return DDMC.astype(np.float64), STR_L
 
 def computeLegendreDerivativeMatrix(DIMS):
        
@@ -1462,7 +1487,8 @@ def computeLegendreDerivativeMatrix(DIMS):
        temp = (LT.T).dot(SDIFF)
        DDM = b * temp.dot(STR_L)
        
-       DDMC = numericalCleanUp(DDM)
+       DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM1)
        
        #print(DDM[0,0], -NZ * (NZ + 1) / 2.0 / ZH)
        #print(DDM[-1,-1], NZ * (NZ + 1) / 2.0 / ZH)

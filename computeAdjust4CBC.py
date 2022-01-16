@@ -38,7 +38,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        # Index all boundary DOF that can be diffused on
        diffDex = (uldex1, urdex1, ubdex, utdex)
        
-       isInflow = True
+       isInflow = False
        
        # BC indices for static solution (per variable)
        if bcType == 1:

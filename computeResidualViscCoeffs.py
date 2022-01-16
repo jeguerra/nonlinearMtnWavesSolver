@@ -50,51 +50,15 @@ def computeResidualViscCoeffs(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
 
        return (np.expand_dims(CRES, axis=1), np.expand_dims(CRES, axis=1))
 
-def computeResidualViscCoeffs3(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
-       
-       # Get the dimensions
-       NX = DIMS[3] + 1
-       NZ = DIMS[4] + 1
-       OPS = DIMS[5]
-       DL = mt.sqrt(DLD2)
-       
-       # Compute absolute value of residuals
-       ARES = np.abs(RES)
-       
-       for vv in range(4):
-              if QM[vv] > 0.0:
-                     # Normalize the residuals
-                     if vv < 4:
-                            ARES[:,vv] *= (1.0 / QM[vv])
-              else:
-                     ARES[:,vv] *= 0.0
-                     
-       # Get the maximum in the residuals (unit = 1/s)
-       QRES_MAX = bn.nanmax(ARES, axis=1)
-       #'''
-       # Compute upper bound on coefficients (single bounding fields
-       QMAX = 0.5 * DL * VFLW
-       
-       # Limit DynSGS to upper bound
-       compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)
-       CRES = bn.nanmin(compare, axis=1)
-       CRES_XZ = np.reshape(CRES, (NZ, NX), order='F')
-       CRES_XZ = ndimage.maximum_filter(CRES_XZ, size=NE, mode='mirror')
-       CRES1 = np.reshape(CRES_XZ, (OPS,), order='F')
-       
-       compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX),axis=1)
-       CRES = bn.nanmin(compare, axis=1)
-       CRES_XZ = np.reshape(CRES, (NZ, NX), order='F')
-       CRES_XZ = ndimage.maximum_filter(CRES_XZ, size=NE, mode='mirror')
-       CRES2 = np.reshape(CRES_XZ, (OPS,), order='F')
-       
-       return (np.expand_dims(CRES1, axis=1), np.expand_dims(CRES2, axis=1))
-
-def computeResidualViscCoeffsRaw(DIMS, RES, QM, VFLW, DLD, DLD2):
+def computeResidualViscCoeffsRaw(DIMS, RES, QM, UD, WD, DLD, DLD2):
        
        # Get the length scale
        DL = mt.sqrt(DLD2)
        
+       # Compute the flow magnitude
+       vel = np.stack((UD, WD),axis=1)
+       VFLW = np.linalg.norm(vel, axis=1)
+       
        # Compute absolute value of residuals
        ARES = np.abs(RES)
        
@@ -108,15 +72,63 @@ def computeResidualViscCoeffsRaw(DIMS, RES, QM, VFLW, DLD, DLD2):
                      
        # Get the maximum in the residuals (unit = 1/s)
        QRES_MAX = bn.nanmax(ARES, axis=1)
-       #'''
+       
        # Compute upper bound on coefficients (single bounding fields
        QMAX = 0.5 * DL * VFLW
+       #QMAX1 = 0.5 * DL * UD
+       #QMAX2 = 0.5 * DL * WD
        
        # Limit DynSGS to upper bound
        compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)
        CRES1 = bn.nanmin(compare, axis=1)
        
        compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX),axis=1)
+       CRES2 = bn.nanmin(compare, axis=1)
+       
+       return (np.expand_dims(CRES1, axis=1), np.expand_dims(CRES2, axis=1))
+
+def computeResidualViscCoeffsFiltered(DIMS, RES, QM, UD, WD, DLD, DLD2, NE):
+       
+       # Get the dimensions
+       NX = DIMS[3] + 1
+       NZ = DIMS[4] + 1
+       OPS = DIMS[5]
+       
+       # Get the length scale
+       DL = mt.sqrt(DLD2)
+       
+       # Compute the flow magnitude
+       vel = np.stack((UD, WD),axis=1)
+       VFLW = np.linalg.norm(vel, axis=1)
+       
+       # Compute absolute value of residuals
+       ARES = np.abs(RES)
+       
+       for vv in range(4):
+              if QM[vv] > 0.0:
+                     # Normalize the residuals
+                     if vv < 4:
+                            ARES[:,vv] *= (1.0 / QM[vv])
+              else:
+                     ARES[:,vv] *= 0.0
+                     
+       # Get the maximum in the residuals (unit = 1/s)
+       QRES_MAX = bn.nanmax(ARES, axis=1)
+       QRES_MAX_XZ = np.reshape(QRES_MAX, (NZ, NX), order='F')
+       QRES_MAX_XZ_FT = ndimage.maximum_filter(QRES_MAX_XZ, size=NE, mode='nearest')
+       QRES_MAX_FT = np.reshape(QRES_MAX_XZ_FT, (OPS,), order='F')
+       
+       # Compute upper bound on coefficients (single bounding fields
+       QMAX = 0.5 * DL * VFLW
+       QMAX_XZ = np.reshape(QMAX, (NZ, NX), order='F')
+       QMAX_XZ_FT = ndimage.maximum_filter(QMAX_XZ, size=NE, mode='nearest')
+       QMAX_FT = np.reshape(QMAX_XZ_FT, (OPS,), order='F')
+       
+       # Limit DynSGS to upper bound
+       compare = np.stack((DLD[0]**2 * QRES_MAX_FT, QMAX_FT),axis=1)
+       CRES1 = bn.nanmin(compare, axis=1)
+       
+       compare = np.stack((DLD[1]**2 * QRES_MAX_FT, QMAX_FT),axis=1)
        CRES2 = bn.nanmin(compare, axis=1)
        
        return (np.expand_dims(CRES1, axis=1), np.expand_dims(CRES2, axis=1))
