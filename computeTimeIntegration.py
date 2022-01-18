@@ -8,7 +8,7 @@ Created on Tue Aug 13 10:09:52 2019
 import numpy as np
 import math as mt
 import scipy.sparse as sps
-import time as timing
+import time as tm
 import bottleneck as bn
 import matplotlib.pyplot as plt
 import computeEulerEquationsLogPLogT as tendency
@@ -87,6 +87,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute first derivatives and RHS with spectral operators
               DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+              
               '''
               args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
               rhsAdv = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)

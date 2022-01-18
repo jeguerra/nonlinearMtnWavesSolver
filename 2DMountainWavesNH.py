@@ -406,7 +406,7 @@ def runModel(TestName):
               print('Diffusion coefficients by RHS evaluation.')
               
        isRestartFromNC = True
-       fname = 'Chebyshev01_QS-DynSGS_RES_h3000m0.nc'
+       fname = 'Chebyshev01_QS-DynSGS_RES_h3000m.nc'
        #fname = 'transientNL0.nc'
        if isRestartFromNC:
               print('Restarting from: ', fname)
@@ -732,14 +732,16 @@ def runModel(TestName):
               REFS.append(diffOps1)
        else: 
               # Matrix operators
-              REFS.append(DDXMS)
-              REFS.append(DDZMS)
+              REFS.append(DDXMS) # index 12
+              REFS.append(DDZMS) # index 13
               
        # Store the terrain profile
-       REFS.append(DZT)
-       REFS.append(DZDX)
-       REFS.append(DDX_QS)
-       REFS.append(DDZ_QS)
+       REFS.append(DZT) # index 14
+       REFS.append(DZDX) # index 15
+       REFS.append(DDX_QS) # index 16
+       REFS.append(DDZ_QS) # index 17
+       REFS.append(DDX_1D) # index 18
+       REFS.append(DDZ_1D) # index 19
        
        if not StaticSolve:
               NL = 6 # Number of eigenvalues to inspect...

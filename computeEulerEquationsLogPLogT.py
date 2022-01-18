@@ -254,7 +254,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        
        # Get the dimensions
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NZ = DIMS[4] + 1
        OPS = NX * NZ
        
        # Get REFS data
@@ -523,7 +523,7 @@ def computeDiffusionTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, R
        
        # Compute flux gradients
        fluxes = np.stack((flux1_u, flux2_u, flux1_p, flux2_p, flux1_t, flux2_t), axis=1)
-       dflx = DDXM.dot(fluxes)
+       dflx = DDXM @ fluxes
        
               
        # dudt along terrain
@@ -587,7 +587,7 @@ def computeDiffusiveFluxTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPx
        
        # Compute flux gradients
        fluxes = np.stack((flux1_u, flux2_u, flux1_p, flux2_p, flux1_t, flux2_t), axis=1)
-       dflx = DDXM.dot(fluxes)
+       dflx = DDXM @ fluxes
               
        # dudt along terrain
        DqDt[bdex,0] = 2.0 * S2 * (dflx[:,0] + dhx * dflx[:,1])

@@ -755,8 +755,8 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
        DDM[0,:] = DDM_BC[0,:]
        DDM[-1,:] = DDM_BC[-1,:]
        
-       DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM1)
+       #DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM)
                      
        return DDMC, AIB
 
@@ -915,8 +915,8 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               DDM[N-1,N-2] -= 1.0 / hn
               DDM[N-1,N-1] += 1.0 / hn      
        
-       DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM1)
+       #DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM)
 
        return DDMC, AIB
 
@@ -1226,8 +1226,8 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        PLU = scl.lu_factor(LDM)
        DDM = scl.lu_solve(PLU, RDM)
        
-       DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM1)
+       #DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM)
        
        return DDMC
 
