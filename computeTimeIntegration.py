@@ -63,17 +63,19 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        mu = REFG[3]
        RLM = REFG[4]
        
-       diffusiveFlux = False
+       diffusiveFlux = True
        
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
               DDXM_A = REFS[10][0]
-              DDZM_A = REFS[10][1]
+              #DDZM_A = REFS[10][1]
+              DDZM_A = REFS[18]
        else:
               # Use multithreading on CPU and GPU
               DDXM_A = REFS[12][0]
-              DDZM_A = REFS[12][1]
+              #DDZM_A = REFS[12][1]
+              DDZM_A = REFS[19]
        
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
@@ -86,7 +88,8 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               W = solA[:,1]
               
               # Compute first derivatives and RHS with spectral operators
-              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+              #DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+              DqDxA, DqDzA = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
               
               '''
               args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]

@@ -9,7 +9,6 @@ Created on Fri Nov  1 08:59:22 2019
 import scipy.linalg as scl
 import numpy as np
 import math as mt
-import matplotlib.pyplot as plt
 from computeGrid import computeGrid
 from HerfunChebNodesWeights import hefuncm, hefunclb
 from HerfunChebNodesWeights import chebpolym, cheblb
@@ -1324,8 +1323,8 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        temp = temp.dot(STR_H)
        DDM = b * temp
        
-       DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM1)
+       #DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM)
        
        return DDMC.astype(np.float64), STR_H
 
@@ -1379,8 +1378,8 @@ def computeChebyshevDerivativeMatrix(DIMS):
        temp = (CT.T).dot(SDIFF)
        DDM = -b * temp.dot(STR_C)
        
-       DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM1)
+       #DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM)
               
        #print(xi)
        #print(DDM[0,0], -(2.0 * NZ**2 + 1) / 3.0 / ZH)
@@ -1442,8 +1441,8 @@ def computeLaguerreDerivativeMatrix(DIMS):
        temp = temp.dot(STR_L)       
        DDM = b * temp
        
-       DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM1)
+       #DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM)
        
        return DDMC.astype(np.float64), STR_L
 
@@ -1487,8 +1486,8 @@ def computeLegendreDerivativeMatrix(DIMS):
        temp = (LT.T).dot(SDIFF)
        DDM = b * temp.dot(STR_L)
        
-       DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM1)
+       #DDM1 = removeLeastSingularValue(DDM)
+       DDMC = numericalCleanUp(DDM)
        
        #print(DDM[0,0], -NZ * (NZ + 1) / 2.0 / ZH)
        #print(DDM[-1,-1], NZ * (NZ + 1) / 2.0 / ZH)

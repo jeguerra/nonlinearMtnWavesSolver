@@ -39,6 +39,7 @@ from computeRayleighEquations import computeRayleighEquations
 import computeResidualViscCoeffs as rescf
 
 # Numerical stuff
+import computeDiskPartSchur as dsolver
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 import computeTimeIntegration as tint
@@ -54,6 +55,7 @@ localDir = '/home/jeguerra/scratch/' # Home super desktop
 #localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
+fname = 'Legendre01_QS-DynSGS_RES_h3000m.nc'
 
 #import pnumpy as pnp
 #pnp.enable()
@@ -234,8 +236,8 @@ def displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex):
        err4 = np.linalg.norm(RHS[tdex])
        if message != '':
               print(message)
-       print('Time (min): %d, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
-             % (thisTime / 60, err1, err2, err3, err4, err))
+       print('Time (min): %4.2f, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
+             % (thisTime / 60.0, err1, err2, err3, err4, err))
        
        return err
 
@@ -262,104 +264,68 @@ def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
        
        return np.array(SOLT), LMS, DCF, NX_in, NZ_in, IT
 
-# Store a matrix to disk in column wise chucks
-def storeColumnChunks(MM, Mname, dbName):
-       # Set up storage and store full array
-       mdb = shelve.open(dbName, flag='n')
-       # Get the number of cpus
-       import multiprocessing as mtp
-       NCPU = int(1.25 * mtp.cpu_count())
-       # Partition CS into NCPU column wise chuncks
-       NC = MM.shape[1] # Number of columns in MM
-       RC = NC % NCPU # Remainder of columns when dividing by NCPU
-       SC = int((NC - RC) / NCPU) # Number of columns in each chunk
-       
-       # Loop over NCPU column chunks and store
-       cranges = []
-       for cc in range(NCPU):
-              cbegin  = cc * SC
-              if cc < NCPU - 1:
-                     crange = range(cbegin,cbegin + SC)
-              elif cc == NCPU - 1:
-                     crange = range(cbegin,cbegin + SC + RC)
-              
-              cranges.append(crange)
-              mdb[Mname + str(cc)] = MM[:,crange]
-              
-       mdb.close()
-              
-       return NCPU, cranges
-
-def computeSchurBlock(dbName, blockName):
-       # Open the blocks database
-       bdb = shelve.open(dbName, flag='r')
-       
-       if blockName == 'AS':
-              SB = sps.bmat([[bdb['LDIA'], bdb['LNA'], bdb['LOA']], \
-                             [bdb['LDA'], bdb['A'], bdb['B']], \
-                             [bdb['LHA'], bdb['E'], bdb['F']]], format='csr')
-       elif blockName == 'BS':
-              SB = sps.bmat([[bdb['LPA'], bdb['LQAR']], \
-                             [bdb['C'], bdb['D']], \
-                             [bdb['G'], bdb['H']]], format='csr')
-       elif blockName == 'CS':
-              SB = sps.bmat([[bdb['LMA'], bdb['I'], bdb['J']], \
-                             [bdb['LQAC'], bdb['N'], bdb['O']]], format='csr')
-       elif blockName == 'DS':
-              SB = sps.bmat([[bdb['K'], bdb['M']], \
-                             [bdb['P'], bdb['Q']]], format='csr')
-       else:
-              print('INVALID SCHUR BLOCK NAME!')
-              
-       bdb.close()
-
-       return SB.toarray()
-
 def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
        # Rename output file to the current time for subsequent storage
-       fname = fname[0:-3] + str(int(thisTime)) + '.nc'
+       if thisTime > 0.0:
+              newFname = fname[0:-3] + str(int(thisTime)) + '.nc'
+       else:
+              newFname = fname
+       
        try:
-              m_fid = Dataset(fname, 'w', format="NETCDF4")
+              m_fid = Dataset(newFname, 'w', format="NETCDF4")
        except PermissionError:
               print('Deleting corrupt NC file... from failed run.')
               import os
               os.remove(fname)
-              m_fid = Dataset(fname, 'w', format="NETCDF4")
+              m_fid = Dataset(newFname, 'w', format="NETCDF4")
               
        # Make dimensions
        m_fid.createDimension('time', None)
-       m_fid.createDimension('xlon', NX+1)
-       m_fid.createDimension('zlev', NZ+1)
+       m_fid.createDimension('x', NX+1)
+       m_fid.createDimension('y', 1)
+       m_fid.createDimension('z', NZ+1)
        # Create variables (time and grid)
-       tmvar = m_fid.createVariable('t', 'f8', ('time',))
-       xgvar = m_fid.createVariable('XL', 'f8', ('zlev', 'xlon'))
-       zgvar = m_fid.createVariable('ZTL', 'f8', ('zlev', 'xlon'))
+       tmvar = m_fid.createVariable('time', 'f8', ('time',))
+       tmvar.units = 'seconds'
+       tmvar.axis = 'T'
+       xgvar = m_fid.createVariable('x', 'f8', ('z', 'x', 'y'))
+       xgvar.units = 'm'
+       xgvar.axis = 'X'
+       ygvar = m_fid.createVariable('y', 'f8', ('y'))
+       ygvar.units = 'm'
+       ygvar.axis = 'Y'
+       zgvar = m_fid.createVariable('z', 'f8', ('z', 'x', 'y'))
+       zgvar.units = 'm'
+       zgvar.axis = 'Z'
        # Store variables
-       xgvar[:] = XL
-       zgvar[:] = ZTL
+       xgvar[:,:,0] = XL
+       ygvar[:] = 0.0
+       zgvar[:,:,0] = ZTL
        # Create variables (background static fields)
-       UVAR = m_fid.createVariable('U', 'f8', ('zlev', 'xlon'))
-       PVAR = m_fid.createVariable('LNP', 'f8', ('zlev', 'xlon'))
-       TVAR = m_fid.createVariable('LNT', 'f8', ('zlev', 'xlon'))
+       UVAR = m_fid.createVariable('U', 'f8', ('z', 'x', 'y'))
+       PVAR = m_fid.createVariable('LNP', 'f8', ('z', 'x', 'y'))
+       TVAR = m_fid.createVariable('LNT', 'f8', ('z', 'x', 'y'))
        # Store variables
-       UVAR[:] = np.reshape(hydroState[:,0], (NZ+1,NX+1), order='F')
-       PVAR[:] = np.reshape(hydroState[:,2], (NZ+1,NX+1), order='F')
-       TVAR[:] = np.reshape(hydroState[:,3], (NZ+1,NX+1), order='F')
+       UVAR[:,:,0] = np.reshape(hydroState[:,0], (NZ+1,NX+1), order='F')
+       PVAR[:,:,0] = np.reshape(hydroState[:,2], (NZ+1,NX+1), order='F')
+       TVAR[:,:,0] = np.reshape(hydroState[:,3], (NZ+1,NX+1), order='F')
        # Create variables (transient fields)
-       uvar = m_fid.createVariable('u', 'f8', ('time', 'zlev', 'xlon'))
-       wvar = m_fid.createVariable('w', 'f8', ('time', 'zlev', 'xlon'))
-       pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
-       tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
+       m_fid.createVariable('u', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('w', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('ln_p', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('ln_t', 'f8', ('time', 'z', 'x', 'y'))
        # Create variables (field tendencies)
-       duvar = m_fid.createVariable('DuDt', 'f8', ('time', 'zlev', 'xlon'))
-       dwvar = m_fid.createVariable('DwDt', 'f8', ('time', 'zlev', 'xlon'))
-       dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
-       dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
+       m_fid.createVariable('DuDt', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('DwDt', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('Dln_pDt', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('Dln_tDt', 'f8', ('time', 'z', 'x', 'y'))
        # Create variables (diffusion coefficients)
-       dvar0 = m_fid.createVariable('VAR_X', 'f8', ('time', 'zlev', 'xlon'))
-       dvar1 = m_fid.createVariable('VAR_Z', 'f8', ('time', 'zlev', 'xlon'))
+       m_fid.createVariable('VAR_X', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('VAR_Z', 'f8', ('time', 'z', 'x', 'y'))
        
-       return m_fid, tmvar, uvar, wvar, pvar, tvar, duvar, dwvar, dpvar, dtvar, dvar0, dvar1
+       m_fid.close()
+       
+       return newFname
 
 def runModel(TestName):
        import TestCase
@@ -393,6 +359,7 @@ def runModel(TestName):
        else:
               print('Flow-Dependent Diffusion Model.')
               
+       NE = (3,3) # spatial filtering for DynSGS coefficients
        filteredCoeffs = False
        if filteredCoeffs:
               print('Spatially filtered DynSGS coefficients.')
@@ -404,12 +371,6 @@ def runModel(TestName):
               print('Diffusion coefficients by residual estimate.')
        else:
               print('Diffusion coefficients by RHS evaluation.')
-              
-       isRestartFromNC = True
-       fname = 'Chebyshev01_QS-DynSGS_RES_h3000m.nc'
-       #fname = 'transientNL0.nc'
-       if isRestartFromNC:
-              print('Restarting from: ', fname)
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = thisTest.solType['SolveFull']
@@ -458,67 +419,20 @@ def runModel(TestName):
        T_in = thisTest.T_in
        
        #%% Define the computational and physical grids+
-       verticalChebGrid = True
-       verticalLegdGrid = False
-       verticalLagrGrid = False
+       verticalChebGrid = False
+       verticalLegdGrid = True
        
-       interpolationType = 'ChebyshevHR2SpectralZ'
-       
-       #%% FLAGS FOR SEM TESTING...
-       isSEM_X = False
-       isSEM_Z = False
-       isNonCoincident = True
-       minf = 3
-       CORDER = 10
-       if isSEM_X and isSEM_Z:
-              NEZ = 32 #int(np.ceil(NZ / 5))
-              NEX = 36 #int(np.ceil(NX / 5))
-              DIMS[3] = int(2 * np.ceil(DIMS[3] / NEX / 2))
-              DIMS[4] = int(2 * np.ceil(DIMS[4] / NEZ / 2)) #2
-              HermCheb = True
-              FourCheb = False
-              xnf = max(minf, int(NEX/3) - 1)
-              znf = max(minf, int(NEZ/3) - 1)
-              NE = (znf, xnf)
-       elif isSEM_X and not isSEM_Z:
-              NEX = int(np.ceil(NX / 2))
-              DIMS[3] = 2
-              HermCheb = True
-              FourCheb = False
-              xnf = max(minf, int(NEX/4) + 1)
-              NE = (minf, xnf)
-       elif not isSEM_X and isSEM_Z:
-              NEZ = int(np.ceil(NZ / 5))
-              DIMS[4] = 5
-              HermCheb = True
-              FourCheb = False
-              znf = max(minf, int(NEZ/4) + 1)
-              NE = (znf, minf)
-       else:
-              NE = (minf,minf)
+       #%% Switch for vertical staggering
+       verticalStagger = True
               
-       if isSEM_X:
-              print('@@ USING ' + str(DIMS[3]) + ' ELEMENTS IN X @@')
-              print('@@ INTERIOR ORDER: ' + str(NEX) + ' @@')
-              
-       if isSEM_Z:
-              print('@@ USING ' + str(DIMS[4]) + ' ELEMENTS IN Z @@')
-              print('@@ INTERIOR ORDER: ' + str(NEZ) + ' @@')
-       
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 2 * DIMS[4], DIMS[5]]
-       REF0 = computeGrid(DIM0, HermCheb, FourCheb, True, False, False)
+       REF0 = computeGrid(DIM0, HermCheb, FourCheb, True, False)
        
        # Use the Chebyshev vertical derivative to set up the hydrostatic background
        DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
-
-       if isSEM_X:
-              DDXP, REF0[0] = derv.computeSpectralElementDerivativeMatrix(REF0[0], NEX, isNonCoincident, (False, False), CORDER)
-              DIM0[3] = len(REF0[0]) - 1
-       else:
-              DDXP, HHT = derv.computeHermiteFunctionDerivativeMatrix(DIM0)
                      
-       REF0.append(DDXP)
+       REF0.append(None)
        REF0.append(DDZP)
        
        hx, dhx = computeTopographyOnGrid(REF0, HOPT)
@@ -548,48 +462,23 @@ def runModel(TestName):
        input()
        '''
        #%% SET UP THE GRID AND INDEX VECTORS
-       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid, verticalLagrGrid)
+       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid)
       
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
-       if isSEM_X:
-              domx = REFS[0]
-              DDX_1D, REFS[0] = derv.computeSpectralElementDerivativeMatrix(domx, NEX, isNonCoincident, (False, False), CORDER)
-              DIMS[3] = len(REFS[0]) - 1
-              NX = DIMS[3]
-              OPS = (NX + 1) * (NZ + 1)
-              DIMS[5] = OPS
-              udex = np.arange(OPS)
-              wdex = np.add(udex, OPS)
-              pdex = np.add(wdex, OPS)
-              tdex = np.add(pdex, OPS)
+       if HermCheb and not FourCheb:
+              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       elif FourCheb and not HermCheb:
+              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
-              if HermCheb and not FourCheb:
-                     DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
-              elif FourCheb and not HermCheb:
-                     DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
-              else:
-                     DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
                             
-       if isSEM_Z:
-              domz = np.copy(REFS[1])
-              DDZ_1D, REFS[1] = derv.computeSpectralElementDerivativeMatrix(domz, NEZ, isNonCoincident, (False, False), CORDER)
-              DIMS[4] = len(REFS[1]) - 1
-              NZ = DIMS[4]
-              OPS = (NX + 1) * (NZ + 1)
-              DIMS[5] = OPS
-              udex = np.arange(OPS)
-              wdex = np.add(udex, OPS)
-              pdex = np.add(wdex, OPS)
-              tdex = np.add(pdex, OPS)
-       else:
-              if verticalChebGrid:
-                     DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-              
-              if verticalLegdGrid:
-                     DDZ_1D, CH_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
-                     
-              if verticalLagrGrid:
-                     DDZ_1D, CH_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
+       if verticalChebGrid:
+              interpolationType = 'ChebyshevHR2ChebZ'
+              DDZ_1D, VTRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       
+       if verticalLegdGrid:
+              interpolationType = 'ChebyshevHR2LegrZ'
+              DDZ_1D, VTRANS = derv.computeLegendreDerivativeMatrix(DIMS)
               
        #%% Update the REFS collection
        REFS.append(DDX_1D) # index 2
@@ -605,20 +494,6 @@ def runModel(TestName):
               coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX, StaticSolve)
        # USE UNIFORM STRETCHING
        #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
-       
-       # Compute DX and DZ grid length scales
-       DX_min = 1.0 * np.min(np.abs(DXM))
-       DZ_min = 1.0 * np.min(np.abs(DZM))
-       print('Minimum grid lengths:',DX_min,DZ_min)
-       DX_avg = 1.0 * np.mean(np.abs(DXM))
-       DZ_avg = 1.0 * np.mean(np.abs(DZM))
-       print('Average grid lengths:',DX_avg,DZ_avg)
-       DX_max = 1.0 * np.max(np.abs(DXM))
-       DZ_max = 1.0 * np.max(np.abs(DZM))
-       print('Maximum grid lengths:',DX_max,DZ_max)
-       DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
-       DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
-       print('Wavelength grid lengths:',DX_wav,DZ_wav)
        
        # Update the REFS collection
        REFS.append(XL)
@@ -644,8 +519,7 @@ def runModel(TestName):
        
        #% Compute the background gradients in physical 2D space
        dUdz = np.expand_dims(duz, axis=1)
-       DUDZ = np.tile(dUdz, NX+1)
-       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, 0, ZTL, DUDZ, ITRANS, interpolationType)
+       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, 0, ZTL, ITRANS, interpolationType)
        # Compute thermodynamic gradients (no interpolation!)
        PORZ = PHYS[3] * TZ
        DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
@@ -661,14 +535,11 @@ def runModel(TestName):
        
        # Compute the background (initial) fields
        U = np.expand_dims(uz, axis=1)
-       UZ = np.tile(U, NX+1)
-       UZ = computeColumnInterp(DIM0, REF0[1], U, 0, ZTL, UZ, ITRANS, interpolationType)
+       UZ = computeColumnInterp(DIM0, REF0[1], U, 0, ZTL, ITRANS, interpolationType)
        LPZ = np.expand_dims(lpz, axis=1)
-       LOGP = np.tile(LPZ, NX+1)
-       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, 0, ZTL, LOGP, ITRANS, interpolationType)
+       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, 0, ZTL, ITRANS, interpolationType)
        LPT = np.expand_dims(lpt, axis=1)
-       LOGT = np.tile(LPT, NX+1)
-       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, 0, ZTL, LOGT, ITRANS, interpolationType)       
+       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, 0, ZTL, ITRANS, interpolationType)       
        PBAR = np.exp(LOGP) # Hydrostatic pressure
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
@@ -706,6 +577,35 @@ def runModel(TestName):
        # Derivative operators for dynamics
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
        
+       #'''
+       # Staggered operator when using Legendre vertical
+       if verticalStagger:
+              xi_lg, whf = derv.leglb(NZ) #[-1 1]
+              xi_ch, whf = derv.cheblb(NZ) #[-1 1]
+              
+              CTM = derv.chebpolym(NZ+1, -xi_lg) # interpolate to legendre grid
+              LTM, dummy = derv.legpolym(NZ, xi_ch, True) # interpolate to chebyshev grid
+              
+              DDZ_CH, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+              DDZ_LD, LD_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+              
+              LG2CH_INT = (LTM.T).dot(LD_TRANS)
+              CH2LG_INT = (CTM).dot(CH_TRANS)
+              
+              if verticalLegdGrid:
+              
+                     DDZ_1DS = CH2LG_INT.dot(DDZ_CH).dot(LG2CH_INT)
+                     dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1DS)
+                     del(dummy)
+                     
+              if verticalChebGrid:
+              
+                     DDZ_1DS = LG2CH_INT.dot(DDZ_LD).dot(CH2LG_INT)
+                     dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1DS)
+                     del(dummy)
+       else:
+              DDZMST = sps.csr_matrix(DDZMS)
+       #'''
        # Derivative operators for diffusion
        DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_QS, DDZ_QS)
        
@@ -740,10 +640,27 @@ def runModel(TestName):
        REFS.append(DZDX) # index 15
        REFS.append(DDX_QS) # index 16
        REFS.append(DDZ_QS) # index 17
-       REFS.append(DDX_1D) # index 18
-       REFS.append(DDZ_1D) # index 19
+       
+       # Staggered operators
+       DDZM_ST = sps.block_diag((DDZMS, DDZMST), format='csr')
+       REFS.append(DDZM_ST) # index 18
+       REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 19
        
        if not StaticSolve:
+              # Compute DX and DZ grid length scales
+              DX_min = 1.0 * np.min(np.abs(DXM))
+              DZ_min = 1.0 * np.min(np.abs(DZM))
+              print('Minimum grid lengths:',DX_min,DZ_min)
+              DX_avg = 1.0 * np.mean(np.abs(DXM))
+              DZ_avg = 1.0 * np.mean(np.abs(DZM))
+              print('Average grid lengths:',DX_avg,DZ_avg)
+              DX_max = 1.0 * np.max(np.abs(DXM))
+              DZ_max = 1.0 * np.max(np.abs(DZM))
+              print('Maximum grid lengths:',DX_max,DZ_max)
+              DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
+              DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
+              print('Wavelength grid lengths:',DX_wav,DZ_wav)
+              
               NL = 6 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
@@ -776,19 +693,8 @@ def runModel(TestName):
               print('Z: ', DZ_spr)
               
               # Diffusion filter grid length based on resolution powers
-              if isSEM_X and isSEM_Z:
-                     DLD = (2.0 * DX_spr, 2.0 * DZ_spr)
-                     DX = DX_min; DZ = DZ_min
-              elif isSEM_X and not isSEM_Z:
-                     DLD = (1.0 * DX_max, 1.0 * DZ_spr)
-                     DX = DX_min; DZ = DZ_min
-              elif not isSEM_X and isSEM_Z:
-                     DLD = (1.0 * DX_spr, 1.0 * DZ_max)
-                     DX = DX_min; DZ = DZ_min
-              else:
-                     DLD = (2.0 * DX_spr, 2.0 * DZ_spr)
-                     DX = DX_min; DZ = DZ_min
-                     
+              DLD = (2.0 * DX_spr, 2.0 * DZ_spr)
+              DX = DX_min; DZ = DZ_min
               DLD2 = DLD[0] * DLD[1]
               
               print('Diffusion lengths: ', DLD[0], DLD[1])
@@ -826,7 +732,7 @@ def runModel(TestName):
        # Initialize diffusion coefficients
        DCF = (np.zeros((OPS, 1)), np.zeros((OPS, 1)))
        
-       if isRestart:
+       if isRestart and StaticSolve:
               print('Restarting from previous solution...')
               SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
               
@@ -835,6 +741,7 @@ def runModel(TestName):
        else:
               # Set the initial time
               IT = 0.0
+              thisTime = IT
               
               # Initial change in vertical velocity at boundary
               dWBC = -dHdX[hdex] * INIT[ubdex]
@@ -844,12 +751,13 @@ def runModel(TestName):
        fields, U, W = \
               eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
               
-       # NetCDF restart
-       if isRestartFromNC and NonLinSolve:
+       # NetCDF restart for transient runs
+       if isRestart and NonLinSolve:
+              print('Restarting from: ', fname)
               try:
                      rdex = -1
                      m_fid = Dataset(fname, 'r', format="NETCDF4")
-                     thisTime = m_fid.variables['t'][rdex]
+                     thisTime = m_fid.variables['time'][rdex]
                      fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
                      fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
                      fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:], (OPS,), order='F')
@@ -857,15 +765,17 @@ def runModel(TestName):
                      
                      DCF[0][:,0] = np.reshape(m_fid.variables['VAR_X'][rdex,:,:], (OPS,), order='F')
                      DCF[1][:,0] = np.reshape(m_fid.variables['VAR_Z'][rdex,:,:], (OPS,), order='F')
+                     m_fid.close()
               except:
                      print('Could NOT read restart NC file!', fname)
+                     m_fid.close()
        else:
-             thisTime = IT 
+             thisTime = IT
               
        # Initialize output to NetCDF
        hydroState = np.reshape(INIT, (OPS, numVar), order='F')
-       m_fid, tmvar, uvar, wvar, pvar, tvar, duvar, dwvar, dpvar, dtvar, dvar0, dvar1 = \
-              initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState)
+       newFname = initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState)
+       #input('Wrote initial NC!')
               
        #% Compute the global LHS operator and RHS
        if StaticSolve:
@@ -1021,104 +931,8 @@ def runModel(TestName):
                      del(bN)
                      del(factor)
               if SolveSchur and not SolveFull:
-                     print('Solving linear system by Schur Complement...')
-                     # Factor DS and compute the Schur Complement of DS
-                     DS = computeSchurBlock(schurName,'DS')
-                     factorDS = dsl.lu_factor(DS, overwrite_a=True, check_finite=False)
-                     del(DS)
-                     print('Factor D... DONE!')
-                     
-                     # Store factor_DS for a little bit...
-                     FDS = shelve.open(localDir + 'factorDS', flag='n', protocol=4)
-                     FDS['factorDS'] = factorDS
-                     FDS.close()
-                     print('Store LU factor of D... DONE!')
-                     
-                     # Compute f2_hat = DS^-1 * f2 and f1_hat
-                     BS = computeSchurBlock(schurName,'BS')
-                     f2_hat = dsl.lu_solve(factorDS, f2)
-                     f1_hat = f1 - BS.dot(f2_hat)
-                     del(f1)
-                     del(BS) 
-                     del(f2_hat)
-                     print('Compute modified force vectors... DONE!')
-                     
-                     # Get CS block and store in column chunks
-                     CS = computeSchurBlock(schurName, 'CS')
-                     fileCS = localDir + 'CS'
-                     NCPU, CS_cranges = storeColumnChunks(CS, 'CS', fileCS)
-                     print('Partition block C into chunks and store... DONE!')
-                     del(CS)
-                     
-                     # Get AS block and store in column chunks
-                     AS = computeSchurBlock(schurName, 'AS')
-                     fileAS = localDir + 'AS'
-                     NCPU, AS_cranges = storeColumnChunks(AS, 'AS', fileAS)
-                     print('Partition block A into chunks and store... DONE!')
-                     del(AS)
-                     
-                     # Loop over the chunks from disk
-                     #AS = computeSchurBlock(schurName, 'AS')
-                     BS = computeSchurBlock(schurName, 'BS')
-                     ASmdb = shelve.open(fileAS)
-                     CSmdb = shelve.open(fileCS, flag='r')
-                     print('Computing DS^-1 * CS in chunks: ', NCPU)
-                     for cc in range(NCPU):
-                            # Get CS chunk
-                            #CS_crange = CS_cranges[cc] 
-                            CS_chunk = CSmdb['CS' + str(cc)]
-                            
-                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk, overwrite_b=True, check_finite=False) # LONG EXECUTION
-                            del(CS_chunk)
-                            
-                            # Get AS chunk
-                            #AS_crange = AS_cranges[cc] 
-                            AS_chunk = ASmdb['AS' + str(cc)]
-                            #AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
-                            ASmdb['AS' + str(cc)] = AS_chunk - BS.dot(DS_chunk)
-                            del(AS_chunk)
-                            del(DS_chunk)
-                            print('Computed chunk: ', cc+1)
-                            
-                     CSmdb.close()
-                     del(BS)
-                     del(factorDS)
-                     
-                     # Reassemble Schur complement of DS from AS chunk storage
-                     print('Computing Schur Complement of D from chunks.')
-                     DS_SC = ASmdb['AS0']
-                     for cc in range(1,NCPU):
-                            DS_SC = np.hstack((DS_SC, ASmdb['AS' + str(cc)]))
-                     ASmdb.close()
-                     print('Solve DS^-1 * CS... DONE!')
-                     print('Compute Schur Complement of D... DONE!')
-                     #'''
-                     # Apply Schur C. solver on block partitioned DS_SC
-                     factorDS_SC = dsl.lu_factor(DS_SC, overwrite_a=True)
-                     del(DS_SC)
-                     print('Factor Schur Complement of D... DONE!')
-                     #'''
-                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat, overwrite_b=True, check_finite=False)
-                     del(factorDS_SC)
-                     #sol1, icode = spl.bicgstab(AS, f1_hat)
-                     del(f1_hat)
-                     print('Solve for u and w... DONE!')
-                     
-                     CS = computeSchurBlock(schurName, 'CS')
-                     f2_hat = f2 - CS.dot(sol1)
-                     del(f2)
-                     del(CS)
-                     FDS = shelve.open(localDir + 'factorDS', flag='r', protocol=4)
-                     factorDS = FDS['factorDS']
-                     FDS.close()
-                     sol2 = dsl.lu_solve(factorDS, f2_hat, overwrite_b=True, check_finite=False)
-                     del(f2_hat)
-                     del(factorDS)
-                     print('Solve for ln(p) and ln(theta)... DONE!')
-                     dsol = np.concatenate((sol1, sol2))
-                     
-                     # Get memory back
-                     del(sol1); del(sol2)
+                     # Call the 4 way partitioned Schur block solver
+                     dsol = dsolver.solveDiskPartSchur(localDir, schurName, f1, f2)
                      
               #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
@@ -1213,28 +1027,51 @@ def runModel(TestName):
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
                             error.append(err)
                             
-                            # Store current time to NC file
-                            tmvar[ff] = thisTime
-                            # Check the fields or tendencies
-                            for pp in range(numVar):
-                                   q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
-                                   dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
-
-                                   if pp == 0:
-                                          uvar[ff,:,:] = q
-                                          duvar[ff,:,:] = dqdt
-                                   elif pp == 1:
-                                          wvar[ff,:,:] = q
-                                          dwvar[ff,:,:] = dqdt
-                                   elif pp == 2:
-                                          pvar[ff,:,:] = q
-                                          dpvar[ff,:,:] = dqdt
-                                   else:
-                                          tvar[ff,:,:] = q
-                                          dtvar[ff,:,:] = dqdt
+                            # Check the NC file
+                            ww = 0
+                            good2open = False
+                            while good2open == False:
+                                   try:
+                                          m_fid = Dataset(newFname, 'r', format="NETCDF4")
+                                          good2open = True
+                                          m_fid.close()
+                                          del(m_fid)
+                                   except:
+                                          if ww == 0:
+                                                 print('PAUSED execution because NC file is not available...')
+                                          good2open = False
+                                          ww += 1
                             
-                            dvar0[ff,:,:] = np.reshape(DCF[0][:,0], (NZ+1, NX+1), order='F')
-                            dvar1[ff,:,:] = np.reshape(DCF[1][:,0], (NZ+1, NX+1), order='F')
+                            # Store in the NC file
+                            try:
+                                   m_fid = Dataset(newFname, 'a', format="NETCDF4")
+                                   m_fid.variables['time'][ff] = thisTime
+                            
+                                   for pp in range(numVar):
+                                          q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
+                                          dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
+       
+                                          if pp == 0:
+                                                 m_fid.variables['u'][ff,:,:,0] = q
+                                                 m_fid.variables['DuDt'][ff,:,:,0] = dqdt
+                                          elif pp == 1:
+                                                 m_fid.variables['w'][ff,:,:,0] = q
+                                                 m_fid.variables['DwDt'][ff,:,:,0] = dqdt
+                                          elif pp == 2:
+                                                 m_fid.variables['ln_p'][ff,:,:,0] = q
+                                                 m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
+                                          else:
+                                                 m_fid.variables['ln_t'][ff,:,:,0] = q
+                                                 m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
+                                   
+                                   m_fid.variables['VAR_X'][ff,:,:,0] = np.reshape(DCF[0][:,0], (NZ+1, NX+1), order='F')
+                                   m_fid.variables['VAR_Z'][ff,:,:,0] = np.reshape(DCF[1][:,0], (NZ+1, NX+1), order='F')
+                                   m_fid.close()
+                            except Exception as e:
+                                   print(e)
+                                   print('Could NOT store state to NC file!', fname)
+                                   print('At time (min): ', thisTime / 60)
+                            
                             ff += 1
                                                  
                      if ti % ITI == 0 and makePlots:

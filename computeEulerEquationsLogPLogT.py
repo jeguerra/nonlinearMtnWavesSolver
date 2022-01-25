@@ -71,6 +71,27 @@ def computeFieldDerivatives(q, DDX, DDZ):
        
        return DqDx, DqDz
 
+def computeFieldDerivativeStag(q, DDX, DDZ):
+       
+       DqDx = DDX.dot(q)
+       #DqDz = DDZ.dot(q)
+       
+       # This puts W with Ln_PT
+       #'''
+       qt = q[:,[0, 2, 1, 3]]
+       qs = np.reshape(qt, (2 * q.shape[0], 2), order='F')
+       DqDz = DDZ.dot(qs)
+       DqDz = np.reshape(DqDz, q.shape, order='F')
+       DqDz = np.copy(DqDz[:,[0, 2, 1, 3]])
+       #'''
+       '''
+       # This keep the velocity vector on the same operator
+       qs = np.reshape(q, (2 * q.shape[0], 2), order='F')
+       DqDz = DDZ.dot(qs)
+       DqDz = np.reshape(DqDz, q.shape, order='F')
+       '''
+       return DqDx, DqDz
+
 def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, DZDX):
               
        # Compute first partial in X (on CPU)
@@ -512,36 +533,37 @@ def computeDiffusionTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, R
        dqb = DqDx[bdex,:]
        
        # Compute TF fluxes
-       flux1_p = mu_x * S2 * dqb[:,2]
-       flux2_p = mu_z * S2 * dhx * dqb[:,2]
+       flux1_u = S2 * (dqb[:,0] + 0.5 * dqb[:,1])
+       flux2_u = 0.5 * S2 * dhx * dqb[:,0]
        
-       flux1_t = mu_x * S2 * dqb[:,3]
-       flux2_t = mu_z * S2 * dhx * dqb[:,3]
+       flux1_w = 0.5 * S2 * dqb[:,1]
+       flux2_w = S2 * dhx * (dqb[:,1] + 0.5 * dqb[:,0])
        
-       flux1_u = mu_x * S2 * dqb[:,0]
-       flux2_u = mu_x * S2 * dqb[:,1] + mu_z * dhx * dqb[:,0]
+       flux1_p = S2 * dqb[:,2]
+       flux2_p = S2 * dhx * dqb[:,2]
+       
+       flux1_t = S2 * dqb[:,3]
+       flux2_t = S2 * dhx * dqb[:,3]
        
        # Compute flux gradients
-       fluxes = np.stack((flux1_u, flux2_u, flux1_p, flux2_p, flux1_t, flux2_t), axis=1)
-       dflx = DDXM @ fluxes
-       
+       fluxes = np.stack((mu_x * flux1_u, mu_z * flux2_u, mu_x * flux1_w, mu_z * flux2_w, \
+                          mu_x * flux1_p, mu_z * flux2_p, mu_x * flux1_t, mu_z * flux2_t), axis=1)
+       dflx = DDXM @ (fluxes)
               
        # dudt along terrain
-       DqDt[bdex,0] = 2.0 * S2 * mu_x * (dflx[:,0] + dhx *dflx[:,1])
+       DqDt[bdex,0] = 2.0 * S2 * (mu_x * dflx[:,0] + dhx * mu_z * dflx[:,1])
        # dwdt along terrain
        DqDt[bdex,1] = dhx * DqDt[bdex,0]
+       #DqDt[bdex,1] = 2.0 * S2 * (mu_x * dflx[:,2] + dhx * mu_z * dflx[:,3])
        
        # dlpdt along terrain
-       DqDt[bdex,2] = S2 * (mu_x * dflx[:,2] + dhx * mu_z * dflx[:,3])
+       DqDt[bdex,2] = S2 * (mu_x * dflx[:,4] + dhx * mu_z * dflx[:,5])
        # dltdt along terrain
-       DqDt[bdex,3] = S2 * (mu_x * dflx[:,4] + dhx * mu_z * dflx[:,5])
+       DqDt[bdex,3] = S2 * (mu_x * dflx[:,6] + dhx * mu_z * dflx[:,7])
        
        # Scale and apply coefficients
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr
-       
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
-       #DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
        
        return DqDt
 
@@ -576,34 +598,36 @@ def computeDiffusiveFluxTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPx
        dqb = DqDx[bdex,:]
        
        # Compute TF fluxes
-       flux1_p = mu_x * S2 * dqb[:,2]
-       flux2_p = mu_z * S2 * dhx * dqb[:,2]
+       flux1_u = S2 * (dqb[:,0] + 0.5 * dqb[:,1])
+       flux2_u = 0.5 * S2 * dhx * dqb[:,0]
        
-       flux1_t = mu_x * S2 * dqb[:,3]
-       flux2_t = mu_z * S2 * dhx * dqb[:,3]
+       flux1_w = 0.5 * S2 * dqb[:,1]
+       flux2_w = S2 * dhx * (dqb[:,1] + 0.5 * dqb[:,0])
        
-       flux1_u = mu_x * S2 * dqb[:,0]
-       flux2_u = mu_x * S2 * dqb[:,1] + mu_z * dhx * dqb[:,0]
+       flux1_p = S2 * dqb[:,2]
+       flux2_p = S2 * dhx * dqb[:,2]
+       
+       flux1_t = S2 * dqb[:,3]
+       flux2_t = S2 * dhx * dqb[:,3]
        
        # Compute flux gradients
-       fluxes = np.stack((flux1_u, flux2_u, flux1_p, flux2_p, flux1_t, flux2_t), axis=1)
-       dflx = DDXM @ fluxes
+       fluxes = np.stack((mu_x * flux1_u, mu_z * flux2_u, mu_x * flux1_w, mu_z * flux2_w, \
+                          mu_x * flux1_p, mu_z * flux2_p, mu_x * flux1_t, mu_z * flux2_t), axis=1)
+       dflx = DDXM @ (fluxes)
               
        # dudt along terrain
-       DqDt[bdex,0] = 2.0 * S2 * (dflx[:,0] + dhx * dflx[:,1])
+       DqDt[bdex,0] = 2.0 * S2 * (mu_x * dflx[:,0] + dhx * mu_z * dflx[:,1])
        # dwdt along terrain
        DqDt[bdex,1] = dhx * DqDt[bdex,0]
+       #DqDt[bdex,1] = 2.0 * S2 * (mu_x * dflx[:,2] + dhx * mu_z * dflx[:,3])
        
        # dlpdt along terrain
-       DqDt[bdex,2] = S2 * (dflx[:,2] + dhx * dflx[:,3])
+       DqDt[bdex,2] = S2 * (mu_x * dflx[:,4] + dhx * mu_z * dflx[:,5])
        # dltdt along terrain
-       DqDt[bdex,3] = S2 * (dflx[:,4] + dhx * dflx[:,5])
+       DqDt[bdex,3] = S2 * (mu_x * dflx[:,6] + dhx * mu_z * dflx[:,7])
        
        # Scale and apply coefficients
        Pr = 0.71 / 0.4
        DqDt[:,3] *= 1.0*Pr
-       
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
-       #DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
               
        return DqDt
