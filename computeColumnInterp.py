@@ -12,7 +12,7 @@ import HerfunChebNodesWeights as hcnw
 
 def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, ITRANS, TypeInt):
        NX = DIMS[3] + 1
-       NZ = DIMS[4] + 1
+       NZ = DIMS[4]
        
        # Compute the total height of nominal column
        zpan = np.amax(zdata) - np.min(zdata)
@@ -34,13 +34,13 @@ def computeColumnInterp(DIMS, zdata, fdata, NZI, ZTL, ITRANS, TypeInt):
               thisZ = ZTL[:,cc]
               xi = ((2.0 / zpan * thisZ) - 1.0)
               
-              if TypeInt == 'ChebyshevHR2ChebZ':
-                     CTM = hcnw.chebpolym(NZ, -xi)
-              elif TypeInt == 'ChebyshevHR2LegrZ':
-                     CTM = hcnw.chebpolym(NZ, xi)
-              
               # Apply the interpolation
-              temp = (CTM).dot(fcoeffs)
+              if TypeInt == 'ChebyshevHR2ChebZ':
+                     ITM = hcnw.chebpolym(NZ+1, -xi)
+                     temp = (ITM).dot(fcoeffs)
+              elif TypeInt == 'ChebyshevHR2LegrZ':
+                     ITM, dum = hcnw.legpolym(NZ, xi, True)
+                     temp = (ITM.T).dot(fcoeffs)
               
               FLDI[:,cc] = np.ravel(temp)
               

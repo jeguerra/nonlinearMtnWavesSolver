@@ -39,15 +39,11 @@ def computeTerrainDecayFunctions(xi, ang, StaticSolve):
        
        return dzdh, d_dzdh_dxi
 
-def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
+def computeGuellrichDomain2D(DIMS, x, z, zRay, hx, dhdx, StaticSolve):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
        NX = DIMS[3] + 1
        NZ = DIMS[4] + 1
-       
-       # input REFS = [x, z, HFM, whf, CPM, wcp]
-       x = REFS[0]
-       z = REFS[1]
        
        # Compute the flat XZ mesh (computational domain)
        HTZL, dummy = np.meshgrid(hx / ZH,z)

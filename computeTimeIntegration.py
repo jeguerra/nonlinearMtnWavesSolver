@@ -38,32 +38,29 @@ def plotRHS(x, rhs, ebcDex, label):
        
        return
 
-def enforceEssentialBC(sol, init, zeroDex, ebcDex, DZDX):
-       
+def enforceEssentialBC(sol, init, zeroDex, ebcDex, dhdx):
+              
        # Enforce essential boundary conditions
        sol[zeroDex[0],0] = 0.0
        sol[zeroDex[1],1] = 0.0
        sol[zeroDex[2],2] = 0.0
        sol[zeroDex[3],3] = 0.0
        
-       #bdex = ebcDex[1]
-       #U = sol[:,0] + init[:,0]
-       #sol[bdex,1] = np.array(DZDX[bdex,0] * U[bdex])
+       bdex = ebcDex[2]
+       U = sol[:,0] + init[:,0]
+       sol[bdex,1] = np.array(dhdx * U[bdex])
        
        return sol
 
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, DCF, init0, zeroDex, ebcDex, \
-                              isFirstStep):
+                              sol0, init0, zeroDex, ebcDex, \
+                              isFirstStep, filteredCoeffs, NE):
        DT = TOPT[0]
        order = TOPT[3]
-       RdT_bar = REFS[9][0]
-       DZDX = REFS[15]
-       
        mu = REFG[3]
        RLM = REFG[4]
        
-       diffusiveFlux = True
+       diffusiveFlux = False
        
        #'''
        if isFirstStep:
@@ -72,7 +69,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #DDZM_A = REFS[10][1]
               DDZM_A = REFS[18]
        else:
-              # Use multithreading on CPU and GPU
+              # Use multithreading on CPU
               DDXM_A = REFS[12][0]
               #DDZM_A = REFS[12][1]
               DDZM_A = REFS[19]
@@ -92,49 +89,61 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               DqDxA, DqDzA = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
               
               '''
-              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
+              args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
               rhsAdv = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+              rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, REFS[6][0])
               '''
               #'''
               # Compute advective update (explicit)
-              args1 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solA, U, W, ebcDex, zeroDex]
+              args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
               rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
+              rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, REFS[6][0])
               
               # Apply explicit part of the update
               solAdv = sol2Update + DF * rhsAdv
+              solAdv = enforceEssentialBC(solAdv, init0, zeroDex, ebcDex, REFS[6][0])
               # Compute internal forces (semi implicit)
               
-              args2 = [PHYS, DqDxA, DqDzA, REFG, DZDX, RdT_bar, solAdv, ebcDex, zeroDex]
+              args2 = [PHYS, DqDxA, DqDzA, REFS, REFG, solAdv]
               rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
+              rhsFrc = tendency.enforceTendencyBC(rhsFrc, zeroDex, ebcDex, REFS[6][0])
               
               solB = solAdv + DF * rhsFrc
+              solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
               #'''
-              #'''
+              
+              # Update the adaptive coefficients
+              resField = np.copy(rhsAdv + rhsFrc)
+              if filteredCoeffs:
+                     DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, solA, init0, DLD, NE)
+              else:
+                     DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, solA, init0, DLD)
+              del(resField)
+              
               # Compute diffusive tendency
               if diffusiveFlux:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivativesFlux(DqDxA, DqDzA, DCF, DDXM_B, DDZM_B, DZDX, DLD)
+                     tendency.computeFieldDerivativesFlux(DqDxA, DqDzA, DCF, DDXM_B, DDZM_B, REFS, DLD)
                      
                      rhsDif = tendency.computeDiffusiveFluxTendency(DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                       REFS, ebcDex, zeroDex, DCF)
               else:
                      P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, DZDX)
+                     tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, REFS, REFG)
                      
-                     rhsDif = tendency.computeDiffusionTendency(DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      REFS, ebcDex, zeroDex, DCF)
+                     rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                                      REFS, REFG, ebcDex, zeroDex, DCF)
+              rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
-              # Apply explicit part of the update
+              # Apply diffusion update
               #solB = sol2Update + DF * (rhsAdv + rhsDif)
               solB += DF * rhsDif
+              solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
               
               # Apply Rayleigh damping layer
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
-              solB = (RayDamp.T) * solB
-              
-              # Enforce the essential BC in the final solution
-              solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, DZDX)
-              
+              solB = np.copy(RayDamp.T * solB)
+                            
               return solB
        
        def ssprk43(sol):
@@ -187,18 +196,18 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               c1 = 1.0 / 6.0
               c2 = 1.0 / 15.0
               
-              sol = computeUpdate(c1, sol, sol, True)
+              sol = computeUpdate(c1, sol, sol)
               sol1 = np.copy(sol)
               
               for ii in range(4):
-                     sol = computeUpdate(c1, sol, sol, False)
+                     sol = computeUpdate(c1, sol, sol)
                      
               # Compute stage 6 with linear combination
               sol1 = np.array(0.6 * sol1 + 0.4 * sol)
-              sol = computeUpdate(c2, sol, sol1, False)
+              sol = computeUpdate(c2, sol, sol1)
               
               for ii in range(3):
-                     sol= computeUpdate(c1, sol, sol, False)
+                     sol= computeUpdate(c1, sol, sol)
                      
               return sol
        

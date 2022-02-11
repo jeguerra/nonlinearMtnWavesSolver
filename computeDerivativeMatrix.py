@@ -760,8 +760,7 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
        return DDMC, AIB
 
 # Computes Cubic Spline 1st derivative matrix
-def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
-                                       isLeftEssentialRightClamped, isLeftClampedRightEssential, DDM_BC):
+def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        # Initialize matrix blocks
        N = len(dom)
        A = np.zeros((N,N)) # coefficients to 2nd derivatives
@@ -847,58 +846,6 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, \
               DDM[N-1,N-2] -= 1.0 / hn
               DDM[N-1,N-1] += 1.0 / hn
        
-       elif isLeftEssentialRightClamped:
-              # Left end
-              A[0,0] = -1.0 / h0
-              A[0,1] = 1.0 / h0
-              B[0,:] = np.zeros(N)
-              
-              # Right end
-              A[N-1,N-2] = -hn / 6.0
-              A[N-1,N-1] = 2.0 * hn / 3.0
-              
-              # Use derivative by CFD to set boundary condition
-              B[N-1,:] = DDM_BC[N-1,:]
-              B[N-1,N-2] += 1.0 / hn
-              B[N-1,N-1] -= 1.0 / hn
-              
-              # Compute the first derivative matrix
-              AIB = np.linalg.solve(A, B)
-              DDM = C.dot(AIB) + D
-              #'''
-              # Adjust ends
-              DDM[0,:] = h0 / 6.0 * AIB[1,:] - 2.0 * h0 / 3.0 * AIB[0,:]
-              DDM[0,0] -= 1.0 / h0
-              DDM[0,1] += 1.0 / h0
-              
-              DDM[N-1,:] = 1.0 * DDM_BC[N-1,:]
-              #'''
-       elif isLeftClampedRightEssential:
-              # Left end
-              A[0,0] = -2.0 * h0 / 3.0
-              A[0,1] = h0 / 6.0
-              
-              # Use derivative by CFD to set boundary condition
-              B[0,:] = DDM_BC[0,:]
-              B[0,0] += 1.0 / h0
-              B[0,1] -= 1.0 / h0
-              
-              # Right end
-              A[N-1,N-2] = 1.0 / hn
-              A[N-1,N-1] = -1.0 / hn
-              B[N-1,:] = np.zeros(N)
-              
-              # Compute the first derivative matrix
-              AIB = np.linalg.solve(A, B)
-              DDM = C.dot(AIB) + D
-              #'''
-              # Adjust ends
-              DDM[0,:] = 1.0 * DDM_BC[0,:]
-              
-              DDM[N-1,:] = -h0 / 6.0 * AIB[N-2,:] + 2.0 * hn / 3.0 * AIB[N-1,:]
-              DDM[N-1,N-2] -= 1.0 / hn
-              DDM[N-1,N-1] += 1.0 / hn
-              #'''
        else:
               # NATURAL cubic spline.
               AIB = np.zeros((N,N))
@@ -1229,65 +1176,6 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        DDMC = numericalCleanUp(DDM)
        
        return DDMC
-
-# Computes standard 4th order compact finite difference 2nd derivative matrix
-def computeCompactFiniteDiffDerivativeMatrix2(DIMS, dom):
-       # Initialize the left and right derivative matrices
-       N = len(dom)
-       LDM = np.zeros((N,N)) # tridiagonal
-       RDM = np.zeros((N,N)) # centered difference
-       
-       # Loop over each interior point in the irregular grid
-       for ii in range(1,N-1):
-              # Set compact finite difference
-              # Get the metric weights
-              hp = dom[ii+1] - dom[ii]
-              hm = dom[ii] - dom[ii-1]
-              
-              # Compute the stencil coefficients
-              hr = (hm / hp)
-              d = 3.0 / 24.0 - 1.0 / 24.0 * (1.0 / hr)**3
-              c = 3.0 / 24.0 - 1.0 / 24.0 * hr**3
-              b = 1.0
-              a = hr
-              
-              # Write the right equation
-              RDM[ii,ii-1] = b
-              RDM[ii,ii] = -(a + b)
-              RDM[ii,ii+1] = a
-              # Write the left equation
-              LDM[ii,ii-1] = -d * hm**2
-              LDM[ii,ii] = ((0.5 * a + c) * hp**2 + (0.5 * b + d) * hm**2) 
-              LDM[ii,ii+1] = -c * hp**2
-              
-       # Handle the left and right boundaries
-       LDM[0,0] = 1.0
-       LDM[N-1,N-1] = 1.0
-       
-       # Left end (forward)
-       hp = dom[1] - dom[0]
-       hpp = hp + (dom[2] - dom[1])
-       hr = hp / hpp
-       cd = 0.5 * (hp * (dom[2] - dom[1]))
-       RDM[0,0] = (1.0 - hr) / cd 
-       RDM[0,1] = -1.0 / cd
-       RDM[0,2] = hr / cd
-       
-       # Right end (backward)
-       hm = dom[N-2] - dom[N-1]
-       hmm = hm + (dom[N-3] - dom[N-2])
-       hr = hm / hmm
-       cd = 0.5 * (hm * (dom[N-3] - dom[N-2]))
-       RDM[N-1,N-1] = (1.0 - hr) / cd
-       RDM[N-1,N-2] = -1.0 / cd
-       RDM[N-1,N-3] = hr / cd
-
-       # Get the derivative matrix
-       DDM2 = np.linalg.solve(LDM, RDM)
-       
-       DDM2C = numericalCleanUp(DDM2)
-
-       return DDM2C
 
 def computeHermiteFunctionDerivativeMatrix(DIMS):
        

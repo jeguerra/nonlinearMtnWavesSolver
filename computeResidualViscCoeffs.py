@@ -50,10 +50,17 @@ def computeResidualViscCoeffs(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
 
        return (np.expand_dims(CRES, axis=1), np.expand_dims(CRES, axis=1))
 
-def computeResidualViscCoeffsRaw(DIMS, RES, QM, UD, WD, DLD, DLD2):
+def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD):
+       
+       # Compute flow speed
+       UD = fields[:,0] + hydroState[:,0]
+       WD = fields[:,1]
+       
+       # Compute field normalization
+       QM = bn.nanmax(np.abs(fields), axis=0)
        
        # Get the length scale
-       DL = mt.sqrt(DLD2)
+       DL = DLD[3]
        
        # Compute the flow magnitude
        vel = np.stack((UD, WD),axis=1)
@@ -87,15 +94,22 @@ def computeResidualViscCoeffsRaw(DIMS, RES, QM, UD, WD, DLD, DLD2):
        
        return (np.expand_dims(CRES1, axis=1), np.expand_dims(CRES2, axis=1))
 
-def computeResidualViscCoeffsFiltered(DIMS, RES, QM, UD, WD, DLD, DLD2, NE):
+def computeResidualViscCoeffsFiltered(DIMS, RES, fields, hydroState, DLD, NE):
        
        # Get the dimensions
        NX = DIMS[3] + 1
        NZ = DIMS[4] + 1
        OPS = DIMS[5]
        
+       # Compute flow speed
+       UD = fields[:,0] + hydroState[:,0]
+       WD = fields[:,1]
+       
+       # Compute field normalization
+       QM = bn.nanmax(np.abs(fields), axis=0)
+       
        # Get the length scale
-       DL = mt.sqrt(DLD2)
+       DL = DLD[3]
        
        # Compute the flow magnitude
        vel = np.stack((UD, WD),axis=1)

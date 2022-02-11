@@ -8,24 +8,21 @@ Created on Mon Jul 22 13:11:11 2019
 import numpy as np
 import warnings
 import scipy.sparse as sps
-import matplotlib.pyplot as plt
+import scipy.ndimage as spi
+#import matplotlib.pyplot as plt
 
-def enforceTerrainTendency(DqDt, ebcDex, DZDX):
-       
-       bdex = ebcDex[2]
-       tdex = ebcDex[3]
-       
-       DqDt[bdex,1] = np.copy(DZDX[bdex,0] * DqDt[bdex,0])
-       DqDt[tdex,1] = 0.0
-       
-       return DqDt
-
-def enforceTendencyBC(DqDt, zeroDex):
+def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        
        DqDt[zeroDex[0],0] = 0.0
        DqDt[zeroDex[1],1] = 0.0
        DqDt[zeroDex[2],2] = 0.0
        DqDt[zeroDex[3],3] = 0.0
+       
+       bdex = ebcDex[2]
+       tdex = ebcDex[3]
+       
+       DqDt[bdex,1] = 0.0 #np.copy(dhdx * DqDt[bdex,0])
+       DqDt[tdex,1] = 0.0
        
        return DqDt
 
@@ -65,7 +62,7 @@ def computeRdT(q, RdT_bar, kap):
        return RdT, T_ratio
 
 def computeFieldDerivatives(q, DDX, DDZ):
-       
+              
        DqDx = DDX.dot(q)
        DqDz = DDZ.dot(q)
        
@@ -92,17 +89,21 @@ def computeFieldDerivativeStag(q, DDX, DDZ):
        '''
        return DqDx, DqDz
 
-def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, DZDX):
-              
+def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, REFS, REFG):
+          
+       DZDX = REFS[15]
+       #DQDZ = REFG[2]
+       #D2QDZ2 = REFG[-1]
+       
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
-       PqPz = DqDz
+       PqPz = DqDz# + DQDZ
        
        vd = np.hstack((PqPx, DqDz))
        dvdx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
        
        D2qDz2 = dvdz[:,4:] #DDZ.dot(DqDz)
-       P2qPz2 = D2qDz2
+       P2qPz2 = D2qDz2# + D2QDZ2
        D2qDx2 = dvdx[:,0:4] #DDX.dot(PqPx)
        
        P2qPzx = dvdz[:,0:4] #DDZ.dot(PqPx)
@@ -140,25 +141,23 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeJacobianVectorProduct(DOPS, REFG, vec, udex, wdex, pdex, tdex):
-       # Get the Rayleight operators
-       ROPS = REFG[5]
+def computeRHS(fields, hydroState, PHYS, REFS, REFG, ebcDex, zeroDex):
        
-       # Compute the variable sections
-       uvec = vec[udex]
-       wvec = vec[wdex]
-       pvec = vec[pdex]
-       tvec = vec[tdex]
+       # Compute flow speed
+       Q = fields + hydroState
+       UD = Q[:,0]
+       WD = Q[:,1]
        
-       # Compute the block products
-       ures = (DOPS[0] + ROPS[0]).dot(uvec) + DOPS[1].dot(wvec) + DOPS[2].dot(pvec) + DOPS[3].dot(tvec)
-       wres = DOPS[4].dot(uvec) + (DOPS[5] + ROPS[1]).dot(wvec) + DOPS[6].dot(pvec) + DOPS[7].dot(tvec)
-       pres = DOPS[8].dot(uvec) + DOPS[9].dot(wvec) + (DOPS[10] + ROPS[2]).dot(pvec)
-       tres = DOPS[12].dot(uvec) + DOPS[13].dot(wvec) + (DOPS[15] + ROPS[3]).dot(tvec)
+       # Compute the updated RHS
+       DqDx, DqDz = \
+              computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
+       rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, \
+                                                     fields, UD, WD)
+       #rhsVec += computeRayleighTendency(REFG, fields, zeroDex)
        
-       qprod = np.concatenate((ures, wres, pres, tres))
+       rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, REFS[6][0])
        
-       return -qprod
+       return rhsVec, DqDx, DqDz
 
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
@@ -334,60 +333,16 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        
        return DOPS
 
-# Fully explicit evaluation of the non linear equations
-def computeEulerEquationsLogPLogT_StaticResidual(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
-       # Get physical constants
-       gc = PHYS[0]
-       kap = PHYS[4]
-       gam = PHYS[6]
-       
-       # Get the Background fields
-       DQDZ = REFG[2]
-              
-       # Compute advective (multiplicative) operators
-       UM = np.expand_dims(U,1)
-       WM = np.expand_dims(W,1)
-       
-       # Compute pressure gradient force scaling (buoyancy)
-       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
-       
-       # Compute partial and advection
-       PqPx = DqDx - DZDX * DqDz
-       
-       # Compute advection
-       Uadvect = UM * PqPx
-       Wadvect = WM * (DqDz + DQDZ)
-       
-       # Compute local divergence
-       divergence = PqPx[:,0] + DqDz[:,1]
-       
-       # Compute pressure gradient forces
-       pgradx = RdT * PqPx[:,2]
-       pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       
-       DqDt = -(Uadvect + Wadvect)
-       
-       # Horizontal momentum equation
-       DqDt[:,0] -= pgradx
-       # Vertical momentum equation
-       DqDt[:,1] -= pgradz
-       # Pressure (mass) equation
-       DqDt[:,2] -= gam * divergence
-       # Potential Temperature equation (transport only)
-       
-       DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
-                               
-       return DqDt
-
 # Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
+def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
        
        # Get the Background fields
+       RdT_bar = REFS[9][0]
+       DZDX = REFS[15]
        DQDZ = REFG[2]
               
        # Compute advective (multiplicative) operators
@@ -399,10 +354,11 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar
        
        # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
+       PqPz = DqDz + DQDZ
        
        # Compute advection
        Uadvect = UM * PqPx
-       Wadvect = WM * (DqDz + DQDZ)
+       Wadvect = WM * PqPz
        
        # Compute local divergence
        divergence = PqPx[:,0] + DqDz[:,1]
@@ -420,54 +376,56 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
-       
-       DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
                         
        return DqDt
 
 # Explicit advection RHS evaluation
-def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, U, W, ebcDex, zeroDex):
+def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W):
        # Get physical constants
        kap = PHYS[4]       
        # Get the Background fields
        DQDZ = REFG[2]
+       RdT_bar = REFS[9][0]
+       DZDX = REFS[15]
        
        # Compute pressure gradient force scaling (buoyancy)
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
        # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
+       PqPz = DqDz + DQDZ
        
        # Compute advection
        UM = np.expand_dims(U,1)
        WM = np.expand_dims(W,1)
        
        Uadvect = UM * PqPx
-       Wadvect = WM * (DqDz + DQDZ)
+       Wadvect = WM * PqPz
        
        DqDt = -(Uadvect + Wadvect)
-       
-       DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
                         
        return DqDt
 
 # Semi-implicit internal force evaluation
-def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFG, DZDX, RdT_bar, fields, ebcDex, zeroDex):
+def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFS, REFG, fields):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
        gam = PHYS[6]
+       # Get the Background fields
+       DQDZ = REFG[2]
+       RdT_bar = REFS[9][0]
+       DZDX = REFS[15]
        
        # Compute pressure gradient force scaling (buoyancy)
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
        # Compute partial and advection
        PqPx = DqDx - DZDX * DqDz
+       PqPz = DqDz + DQDZ
        
        # Compute local divergence
-       divergence = PqPx[:,0] + DqDz[:,1]
+       divergence = PqPx[:,0] + PqPz[:,1]
        
        # Compute pressure gradient forces
        pgradx = RdT * PqPx[:,2]
@@ -481,30 +439,22 @@ def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFG, DZDX, Rd
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
-       
-       DqDt = enforceTerrainTendency(DqDt, ebcDex, DZDX)
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
                         
        return DqDt
 
-def computeRayleighTendency(REFG, fields, zeroDex):
+def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
        mu = np.expand_dims(REFG[3],0)
        ROP = REFG[4]
        
        DqDt = -mu * ROP.dot(fields)
-       
-       DqDt = enforceTendencyBC(DqDt, zeroDex)
-       
+              
        return DqDt
 
-def computeDiffusionTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF):
+def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, zeroDex, DCF):
        
-       DZDX = REFS[15]
-       DDXM = REFS[16]
        DqDt = np.zeros(P2qPx2.shape)
-       
        DC1 = DCF[0][:,0] # XX
        DC2 = DCF[1][:,0] # ZZ
             
@@ -519,52 +469,55 @@ def computeDiffusionTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, R
        #%% TOP DIFFUSION (flow along top edge)
        tdex = ebcDex[3]
        DqDt[tdex,0] = 2.0 * DC1[tdex] * P2qPx2[tdex,0]
+       DqDt[tdex,1] = 0.0
        DqDt[tdex,2] = DC1[tdex] * P2qPx2[tdex,2]
        DqDt[tdex,3] = DC1[tdex] * P2qPx2[tdex,3]
        
-       #%% BOTTOM DIFFUSION (flow along the terrain surface)
+       #%% BOTTOM DIFFUSION (flow along the terrain surface
        bdex = ebcDex[2]
-       dhx = DZDX[bdex,0]
-       dhx2 = np.power(dhx, 2.0)
-       S2 = np.reciprocal(1.0 + dhx2)
+       dhdx = REFS[6][0]
+       dhx2 = np.power(dhdx, 2.0)
        
-       mu_x = DCF[0][bdex,0]
-       mu_z = DCF[1][bdex,0]
-       dqb = DqDx[bdex,:]
+       metrics = REFS[6][1]
+       d2hdx2 = metrics[0]
+       dSdx = metrics[1]
+       dSIdx = metrics[2]
+       d2SIdx2 = metrics[3]
+       S = metrics[4]
+       S2 = metrics[5]
+       #S4 = np.power(S2, 2.0)
        
-       # Compute TF fluxes
-       flux1_u = S2 * (dqb[:,0] + 0.5 * dqb[:,1])
-       flux2_u = 0.5 * S2 * dhx * dqb[:,0]
+       mu_x = DC1[bdex]
+       mu_z = DC2[bdex]
+       mu_t = S * np.linalg.norm(np.stack((mu_x, dhdx * mu_z)), axis=0)
        
-       flux1_w = 0.5 * S2 * dqb[:,1]
-       flux2_w = S2 * dhx * (dqb[:,1] + 0.5 * dqb[:,0])
-       
-       flux1_p = S2 * dqb[:,2]
-       flux2_p = S2 * dhx * dqb[:,2]
-       
-       flux1_t = S2 * dqb[:,3]
-       flux2_t = S2 * dhx * dqb[:,3]
-       
-       # Compute flux gradients
-       fluxes = np.stack((mu_x * flux1_u, mu_z * flux2_u, mu_x * flux1_w, mu_z * flux2_w, \
-                          mu_x * flux1_p, mu_z * flux2_p, mu_x * flux1_t, mu_z * flux2_t), axis=1)
-       dflx = DDXM @ (fluxes)
-              
+       # Compute directional derivatives
+       #DQDZ = REFG[2]
+       qa = q[bdex,:]
+       dqda = DqDx[bdex,:]# + np.expand_dims(dhdx, axis=1) * DQDZ[bdex,:]
+       d2qda2 = P2qPx2[bdex,:] + np.expand_dims(dhx2, axis=1) * P2qPz2[bdex,:] + \
+                2.0 * np.expand_dims(dhdx, axis=1) * P2qPxz[bdex,:] + \
+                np.expand_dims(d2hdx2, axis=1) * PqPz[bdex,:]
+       #'''       
        # dudt along terrain
-       DqDt[bdex,0] = 2.0 * S2 * (mu_x * dflx[:,0] + dhx * mu_z * dflx[:,1])
+       DqDt[bdex,0] = S * d2qda2[:,0] + S2 * dSIdx * dqda[:,0] + S * qa[:,0] * (dSdx * dSIdx + S * d2SIdx2)
+       #DqDt[bdex,0] = S2 * d2qda2[:,0] + S * dSdx * dqda[:,0]
+       DqDt[bdex,0] *= 2.0 * mu_t
+       
        # dwdt along terrain
-       DqDt[bdex,1] = dhx * DqDt[bdex,0]
-       #DqDt[bdex,1] = 2.0 * S2 * (mu_x * dflx[:,2] + dhx * mu_z * dflx[:,3])
+       DqDt[bdex,1] = 0.0
        
        # dlpdt along terrain
-       DqDt[bdex,2] = S2 * (mu_x * dflx[:,4] + dhx * mu_z * dflx[:,5])
+       DqDt[bdex,2] = S2 * d2qda2[:,2] + S * dSdx * dqda[:,2]
+       DqDt[bdex,2] *= mu_t
        # dltdt along terrain
-       DqDt[bdex,3] = S2 * (mu_x * dflx[:,6] + dhx * mu_z * dflx[:,7])
+       DqDt[bdex,3] = S2 * d2qda2[:,3] + S * dSdx * dqda[:,3]
+       DqDt[bdex,3] *= mu_t
+       #'''
        
        # Scale and apply coefficients
-       Pr = 0.71 / 0.4
-       DqDt[:,3] *= 1.0*Pr
-       
+       DqDt[:,3] *= 0.71 / 0.4
+
        return DqDt
 
 def computeDiffusiveFluxTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF):
@@ -618,8 +571,7 @@ def computeDiffusiveFluxTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPx
        # dudt along terrain
        DqDt[bdex,0] = 2.0 * S2 * (mu_x * dflx[:,0] + dhx * mu_z * dflx[:,1])
        # dwdt along terrain
-       DqDt[bdex,1] = dhx * DqDt[bdex,0]
-       #DqDt[bdex,1] = 2.0 * S2 * (mu_x * dflx[:,2] + dhx * mu_z * dflx[:,3])
+       DqDt[bdex,1] = 0.0
        
        # dlpdt along terrain
        DqDt[bdex,2] = S2 * (mu_x * dflx[:,4] + dhx * mu_z * dflx[:,5])

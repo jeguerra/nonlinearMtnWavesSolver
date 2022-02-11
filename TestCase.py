@@ -85,8 +85,8 @@ class TestCase:
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 96, 185.0, 35.0, 300.0, \
-                                      8000.0, 35000.0, 5.0, \
-                                      3500.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_static')
+                                      9000.0, 35000.0, 6.0,\
+                                      3000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -99,7 +99,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 108, 185.0, 42.0, 300.0, \
                                       10000.0, 35000.0, 5.0, \
-                                      2500.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                                      2500.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_transient')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -171,7 +171,7 @@ class TestCase:
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 15.0 # Time for diagnostic output
+              OTI = 10.0 # Time for diagnostic output
               ITI = 120.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               

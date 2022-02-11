@@ -65,8 +65,8 @@ NX = NNX * NEX
 DIMS = [L1, L2, ZH, NX, NZ]
 DIMS_EL = [L1, L2, ZH, NNZ, NZ]
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS, True, False, False, True, False)
-REFS_EL = computeGrid(DIMS_EL, True, False, False, True, False)
+REFS = computeGrid(DIMS, True, False, False, True)
+REFS_EL = computeGrid(DIMS_EL, True, False, False, True)
 
 #%% SCSE VS SPECTRAL TEST Z DIRECTION
 '''
@@ -116,11 +116,11 @@ h0 = 2500.0
 aC = 5000.0
 lC = 2.0 * mt.pi * 1.0E3
 kC = 1.5E+4
-HOPT = [h0, aC, lC, kC, False, 2]
+HOPT = [h0, aC, lC, kC, False, 3]
 
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 
-HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT)
+HofX, dHdX, SD = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
 DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
@@ -173,7 +173,7 @@ NZ = 96
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS, True, False, True, False, False)
+REFS = computeGrid(DIMS, True, False, True, False)
 
 #% Compute the raw derivative matrix operators in alpha-xi computational space
 DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)

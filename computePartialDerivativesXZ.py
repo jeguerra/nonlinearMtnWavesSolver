@@ -9,14 +9,11 @@ Created on Fri Aug  2 17:10:18 2019
 import numpy as np
 import scipy.sparse as sps
 
-def computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D):
+def computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D):
        # Get the dimensions
        NX = DIMS[3] + 1
        NZ = DIMS[4] + 1
        OPS = DIMS[5]
-       
-       # Get REFS data
-       sigma = REFS[7]
        
        # Unwrap the 1D derivative matrices into 2D operators
        
