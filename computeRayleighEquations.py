@@ -57,7 +57,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormX = 1.0
                             # Evaluate the Rayleigh factor
-                            RFX = (mt.cos(0.5 * mt.pi * dNormX))**RP
+                            RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
                      else:
                             RFX = 0.0
                      if applyTop:
@@ -68,7 +68,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             else:
                                    dNormZ = 1.0
                             # Evaluate the strength of the field
-                            RFZ = (mt.cos(0.5 * mt.pi * dNormZ))**RP
+                            RFZ = 1.0 - (mt.sin(0.5 * mt.pi * dNormZ))**RP
                      else:
                             RFZ = 0.0
                      
@@ -80,11 +80,11 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      if RL[ii,jj] != 0.0:
                             SBR[ii,jj] = 0.0                            
        '''
-       plt.figure()
-       plt.contourf(X, Z, RL, 101, cmap=cm.seismic)
-       plt.colorbar()
+       fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+       ax.plot_surface(X, Z, RL, cmap=cm.seismic,
+                       linewidth=0, antialiased=False)
        plt.show()
-       input()
+       input('CHECK RAYLEIGH...')
        '''                     
        # Assemble the Grid Matching Layer field X and Z directions
        GML = np.ones((NZ, NX))

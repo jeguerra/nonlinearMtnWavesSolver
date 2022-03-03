@@ -50,11 +50,11 @@ def computeResidualViscCoeffs(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
 
        return (np.expand_dims(CRES, axis=1), np.expand_dims(CRES, axis=1))
 
-def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD):
+def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD, dhdx, bdex):
        
        # Compute flow speed
-       UD = fields[:,0] + hydroState[:,0]
-       WD = fields[:,1]
+       UD = np.abs(fields[:,0] + hydroState[:,0])
+       WD = np.abs(fields[:,1])
        
        # Compute field normalization
        QM = bn.nanmax(np.abs(fields), axis=0)
@@ -82,8 +82,6 @@ def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD):
        
        # Compute upper bound on coefficients (single bounding fields
        QMAX = 0.5 * DL * VFLW
-       #QMAX1 = 0.5 * DL * UD
-       #QMAX2 = 0.5 * DL * WD
        
        # Limit DynSGS to upper bound
        compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)

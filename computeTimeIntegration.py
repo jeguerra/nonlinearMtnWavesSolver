@@ -67,12 +67,14 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Use SciPY sparse for dynamics
               DDXM_A = REFS[10][0]
               #DDZM_A = REFS[10][1]
-              DDZM_A = REFS[18]
+              #DDXM_A = REFS[17]
+              DDZM_A = REFS[19]
        else:
               # Use multithreading on CPU
               DDXM_A = REFS[12][0]
               #DDZM_A = REFS[12][1]
-              DDZM_A = REFS[19]
+              #DDXM_A = REFS[18]
+              DDZM_A = REFS[20]
        
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
@@ -117,22 +119,15 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               if filteredCoeffs:
                      DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, solA, init0, DLD, NE)
               else:
-                     DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, solA, init0, DLD)
+                     DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, solA, init0, DLD, REFS[6][0], ebcDex[2])
               del(resField)
               
               # Compute diffusive tendency
-              if diffusiveFlux:
-                     P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivativesFlux(DqDxA, DqDzA, DCF, DDXM_B, DDZM_B, REFS, DLD)
-                     
-                     rhsDif = tendency.computeDiffusiveFluxTendency(DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      REFS, ebcDex, zeroDex, DCF)
-              else:
-                     P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
-                     tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, REFS, REFG)
-                     
-                     rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                      REFS, REFG, ebcDex, zeroDex, DCF)
+              P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+              tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, REFS, REFG, DCF, diffusiveFlux)
+              
+              rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                               REFS, REFG, ebcDex, zeroDex, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
               # Apply diffusion update
@@ -140,8 +135,9 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB += DF * rhsDif
               solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
               
-              # Apply Rayleigh damping layer
+              # Apply Rayleigh damping layer implicitly
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
+              #npdex = np.array([0,1,2,3])
               solB = np.copy(RayDamp.T * solB)
                             
               return solB

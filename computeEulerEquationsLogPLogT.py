@@ -73,62 +73,44 @@ def computeFieldDerivativeStag(q, DDX, DDZ):
        DqDx = DDX.dot(q)
        #DqDz = DDZ.dot(q)
        
-       # This puts W with Ln_PT
-       #'''
-       qt = q[:,[0, 2, 1, 3]]
+       # This puts W with Ln_PT (Charney-Phillips style staggering)
+       cdex = np.array([[0, 2, 1, 3]])
+       qt = q[:,cdex]
        qs = np.reshape(qt, (2 * q.shape[0], 2), order='F')
+       
        DqDz = DDZ.dot(qs)
+       
        DqDz = np.reshape(DqDz, q.shape, order='F')
-       DqDz = np.copy(DqDz[:,[0, 2, 1, 3]])
-       #'''
-       '''
-       # This keep the velocity vector on the same operator
-       qs = np.reshape(q, (2 * q.shape[0], 2), order='F')
-       DqDz = DDZ.dot(qs)
-       DqDz = np.reshape(DqDz, q.shape, order='F')
-       '''
-       return DqDx, DqDz
+       DqDz = np.copy(DqDz[:,cdex])
+         
+       return DqDx[:,:], DqDz[:,0,:]
 
-def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, REFS, REFG):
+def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
           
        DZDX = REFS[15]
-       #DQDZ = REFG[2]
-       #D2QDZ2 = REFG[-1]
+       DQDZ = REFG[2]
+       D2QDZ2 = REFG[-1]
        
        # Compute first partial in X (on CPU)
        PqPx = DqDx - DZDX * DqDz
-       PqPz = DqDz# + DQDZ
+       PqPz = np.copy(DqDz) + DQDZ
        
-       vd = np.hstack((PqPx, DqDz))
+       if isFluxDiv:
+              vd = np.hstack((DCF[0] * PqPx, DCF[1] * PqPz))
+       else:
+              vd = np.hstack((PqPx, PqPz))
        dvdx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
        
        D2qDz2 = dvdz[:,4:] #DDZ.dot(DqDz)
-       P2qPz2 = D2qDz2# + D2QDZ2
+       P2qPz2 = D2qDz2 + D2QDZ2
        D2qDx2 = dvdx[:,0:4] #DDX.dot(PqPx)
        
        P2qPzx = dvdz[:,0:4] #DDZ.dot(PqPx)
-       P2qPxz = dvdx[:,4:] - DZDX * P2qPz2 #DDX.dot(DqDz)
+       P2qPxz = dvdx[:,4:]# - DZDX * P2qPz2 #DDX.dot(DqDz)
        
-       P2qPx2 = D2qDx2 - DZDX * P2qPzx
+       P2qPx2 = D2qDx2# - DZDX * P2qPzx
        
        return P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz
-
-def computeFieldDerivativesFlux(DqDx, DqDz, DCF, DDX, DDZ, DZDX, DLD):
-       
-       # Compute first partial in X (on CPU)
-       xFlux = DCF[0] * (DqDx - DZDX * DqDz)
-       zFlux = DCF[1] * DqDz
-       
-       vd = np.hstack((xFlux, zFlux))
-       DxFlux = DDX.dot(vd)
-       DzFlux = DDZ.dot(vd)
-       
-       PxxFlux = (DxFlux[:,0:4] - DZDX * DzFlux[:,0:4])
-       PxzFlux = DzFlux[:,0:4]
-       PzzFlux = DzFlux[:,4:]
-       PzxFlux = (DxFlux[:,4:] - DZDX * PzzFlux)
-              
-       return PxxFlux, PzzFlux, PxzFlux, PzxFlux, xFlux, zFlux
 
 def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        
@@ -452,11 +434,15 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, zeroDex, DCF):
+def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, zeroDex, DCF, isFluxDiv):
        
        DqDt = np.zeros(P2qPx2.shape)
-       DC1 = DCF[0][:,0] # XX
-       DC2 = DCF[1][:,0] # ZZ
+       if isFluxDiv:
+              DC1 = 1.0
+              DC2 = 1.0
+       else:
+              DC1 = DCF[0][:,0] # coefficient to the X direction flux
+              DC2 = DCF[1][:,0] # coefficient to the Z direction flux
             
        #%% INTERIOR DIFFUSION
        # Diffusion of u-w vector
@@ -465,121 +451,44 @@ def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz
        # Diffusion of scalars (broken up into anisotropic components
        DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
        DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
-                   
+           
+       #'''        
        #%% TOP DIFFUSION (flow along top edge)
        tdex = ebcDex[3]
-       DqDt[tdex,0] = 2.0 * DC1[tdex] * P2qPx2[tdex,0]
-       DqDt[tdex,1] = 0.0
+       DqDt[tdex,0] = DC1[tdex] * P2qPx2[tdex,0]
        DqDt[tdex,2] = DC1[tdex] * P2qPx2[tdex,2]
        DqDt[tdex,3] = DC1[tdex] * P2qPx2[tdex,3]
        
        #%% BOTTOM DIFFUSION (flow along the terrain surface
        bdex = ebcDex[2]
        dhdx = REFS[6][0]
-       dhx2 = np.power(dhdx, 2.0)
        
        metrics = REFS[6][1]
-       d2hdx2 = metrics[0]
-       dSdx = metrics[1]
-       dSIdx = metrics[2]
-       d2SIdx2 = metrics[3]
-       S = metrics[4]
-       S2 = metrics[5]
-       #S4 = np.power(S2, 2.0)
+       S = metrics[3]
        
-       mu_x = DC1[bdex]
-       mu_z = DC2[bdex]
-       mu_t = S * np.linalg.norm(np.stack((mu_x, dhdx * mu_z)), axis=0)
+       DQDZ = REFG[2]
+       
+       mu_x = DCF[0][bdex,0]
+       mu_z = DCF[1][bdex,0]
+       mu_t = mu_x + np.abs(dhdx) * mu_z
        
        # Compute directional derivatives
-       #DQDZ = REFG[2]
-       qa = q[bdex,:]
-       dqda = DqDx[bdex,:]# + np.expand_dims(dhdx, axis=1) * DQDZ[bdex,:]
-       d2qda2 = P2qPx2[bdex,:] + np.expand_dims(dhx2, axis=1) * P2qPz2[bdex,:] + \
-                2.0 * np.expand_dims(dhdx, axis=1) * P2qPxz[bdex,:] + \
-                np.expand_dims(d2hdx2, axis=1) * PqPz[bdex,:]
-       #'''       
+       DDX = REFS[16]
+       dqda1 = np.expand_dims(S, axis=1) * DqDx[bdex,:]
+       dqda2 = np.expand_dims(S * dhdx, axis=1) * DQDZ[bdex,:]
+       dqda = np.hstack((dqda1, dqda2))
+       
+       d2qda2 = np.expand_dims(S, axis=1) * (DDX @ dqda)
+
        # dudt along terrain
-       DqDt[bdex,0] = S * d2qda2[:,0] + S2 * dSIdx * dqda[:,0] + S * qa[:,0] * (dSdx * dSIdx + S * d2SIdx2)
-       #DqDt[bdex,0] = S2 * d2qda2[:,0] + S * dSdx * dqda[:,0]
-       DqDt[bdex,0] *= 2.0 * mu_t
-       
-       # dwdt along terrain
-       DqDt[bdex,1] = 0.0
-       
+       DqDt[bdex,0] = mu_t * (d2qda2[:,0] + d2qda2[:,4])
        # dlpdt along terrain
-       DqDt[bdex,2] = S2 * d2qda2[:,2] + S * dSdx * dqda[:,2]
-       DqDt[bdex,2] *= mu_t
+       DqDt[bdex,2] = mu_t * (d2qda2[:,2] + d2qda2[:,6])
        # dltdt along terrain
-       DqDt[bdex,3] = S2 * d2qda2[:,3] + S * dSdx * dqda[:,3]
-       DqDt[bdex,3] *= mu_t
+       DqDt[bdex,3] = mu_t * (d2qda2[:,3] + d2qda2[:,7])
        #'''
        
        # Scale and apply coefficients
        DqDt[:,3] *= 0.71 / 0.4
 
-       return DqDt
-
-def computeDiffusiveFluxTendency(DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, ebcDex, zeroDex, DCF):
-       
-       DZDX = REFS[15]
-       DDXM = REFS[16]
-       DqDt = np.zeros(P2qPx2.shape)
-            
-       #%% INTERIOR DIFFUSION
-       # Diffusion of u-w vector
-       DqDt[:,0] = (2.0 * P2qPx2[:,0] + P2qPzx[:,1] + P2qPz2[:,0])  
-       DqDt[:,1] = (P2qPx2[:,1] + P2qPxz[:,0] + 2.0 * P2qPz2[:,1])
-       # Diffusion of scalars (broken up into anisotropic components
-       DqDt[:,2] = (P2qPx2[:,2] + P2qPz2[:,2])
-       DqDt[:,3] = (P2qPx2[:,3] + P2qPz2[:,3])
-       #'''            
-       #%% TOP DIFFUSION (flow along top edge)
-       tdex = ebcDex[3]
-       DqDt[tdex,0] = 2.0 * P2qPx2[tdex,0]
-       DqDt[tdex,2] = P2qPx2[tdex,2]
-       DqDt[tdex,3] = P2qPx2[tdex,3]
-       
-       #%% BOTTOM DIFFUSION (flow along the terrain surface)
-       bdex = ebcDex[2]
-       dhx = DZDX[bdex,0]
-       dhx2 = np.power(dhx, 2.0)
-       S2 = np.reciprocal(1.0 + dhx2)
-       
-       mu_x = DCF[0][bdex,0]
-       mu_z = DCF[1][bdex,0]
-       dqb = DqDx[bdex,:]
-       
-       # Compute TF fluxes
-       flux1_u = S2 * (dqb[:,0] + 0.5 * dqb[:,1])
-       flux2_u = 0.5 * S2 * dhx * dqb[:,0]
-       
-       flux1_w = 0.5 * S2 * dqb[:,1]
-       flux2_w = S2 * dhx * (dqb[:,1] + 0.5 * dqb[:,0])
-       
-       flux1_p = S2 * dqb[:,2]
-       flux2_p = S2 * dhx * dqb[:,2]
-       
-       flux1_t = S2 * dqb[:,3]
-       flux2_t = S2 * dhx * dqb[:,3]
-       
-       # Compute flux gradients
-       fluxes = np.stack((mu_x * flux1_u, mu_z * flux2_u, mu_x * flux1_w, mu_z * flux2_w, \
-                          mu_x * flux1_p, mu_z * flux2_p, mu_x * flux1_t, mu_z * flux2_t), axis=1)
-       dflx = DDXM @ (fluxes)
-              
-       # dudt along terrain
-       DqDt[bdex,0] = 2.0 * S2 * (mu_x * dflx[:,0] + dhx * mu_z * dflx[:,1])
-       # dwdt along terrain
-       DqDt[bdex,1] = 0.0
-       
-       # dlpdt along terrain
-       DqDt[bdex,2] = S2 * (mu_x * dflx[:,4] + dhx * mu_z * dflx[:,5])
-       # dltdt along terrain
-       DqDt[bdex,3] = S2 * (mu_x * dflx[:,6] + dhx * mu_z * dflx[:,7])
-       
-       # Scale and apply coefficients
-       Pr = 0.71 / 0.4
-       DqDt[:,3] *= 1.0*Pr
-              
        return DqDt

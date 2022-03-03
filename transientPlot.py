@@ -14,23 +14,23 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-fname = 'SpectralXZ_QS-DynSGS_RES_h3000m.nc'
+fname = 'StaggeredZ_QS-DynSGS_RHS_h3000m.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
-times = m_fid.variables['t'][:]
-X = m_fid.variables['XL'][:]
-Z = m_fid.variables['ZTL'][:]
+times = m_fid.variables['time'][:]
+X = m_fid.variables['x'][:,:,0]
+Z = m_fid.variables['z'][:,:,0]
 
-U = m_fid.variables['u'][:]
-LNP = m_fid.variables['LNP'][:]
-LNT = m_fid.variables['LNT'][:]
+U = m_fid.variables['U'][:,:,0]
+LNP = m_fid.variables['LNP'][:,:,0]
+LNT = m_fid.variables['LNT'][:,:,0]
 
-u = m_fid.variables['u'][:]
-w = m_fid.variables['w'][:]
-lnp = m_fid.variables['ln_p'][:]
-lnt = m_fid.variables['ln_t'][:]
+u = m_fid.variables['u'][:,:,:,0]
+w = m_fid.variables['w'][:,:,:,0]
+lnp = m_fid.variables['ln_p'][:,:,:,0]
+lnt = m_fid.variables['ln_t'][:,:,:,0]
 
-dlnt = m_fid.variables['Dln_tDt'][:]
+dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
 
 #DCF1 = m_fid.variables['CRES_X'][:]
 #DCF2 = m_fid.variables['CRES_Z'][:]
@@ -56,15 +56,15 @@ THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = True
-runSGS = False
+runPertb = False
+runSGS = True
 
 #%% Contour animation of perturbation potential temperatures
 if runPertb:
        imglist = []
        for tt in range(len(times)):
               fig = plt.figure(figsize=(16.0, 8.0))
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
               cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
               
               norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
@@ -125,7 +125,7 @@ if runSGS:
               qSGS = norm * q
               
               fig = plt.figure(figsize=(16.0, 8.0))
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
               
               cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, qSGS[:,:], 101, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
               

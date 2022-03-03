@@ -55,7 +55,7 @@ localDir = '/home/jeguerra/scratch/' # Home super desktop
 #localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
-fname = 'Legendre01_QS-DynSGS_RES_h3000m.nc'
+fname = 'StaggeredZ00_QS-DynSGS_RHS_h3000m.nc'
 
 #import pnumpy as pnp
 #pnp.enable()
@@ -580,6 +580,7 @@ def runModel(TestName):
        
        # Derivative operators for diffusion
        DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
+       PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
        
        #'''
        # Staggered operator when using Legendre vertical
@@ -600,7 +601,7 @@ def runModel(TestName):
               if verticalLegdGrid:
                      
                      zST = 0.5 * DIMS[2] * (1.0 + xi_ch)
-                     XL, ZTL, DZT, sigmaST, ZRL, DXM, DZM = \
+                     var1, var2, var3, sigmaST, ZRL, var4, var5 = \
                             coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
                      
                      DDZ_1DS = CH2LG_INT.dot(DDZ_CH).dot(LG2CH_INT)
@@ -610,23 +611,20 @@ def runModel(TestName):
               if verticalChebGrid:
                      
                      zST = 0.5 * DIMS[2] * (1.0 + xi_lg)
-                     XL, ZTL, DZT, sigmaST, ZRL, DXM, DZM = \
+                     var1, var2, var3, sigmaST, ZRL, var4, var5 = \
                             coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
               
                      DDZ_1DS = LG2CH_INT.dot(DDZ_LD).dot(CH2LG_INT)
                      dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
                      del(dummy)
-              #'''       
-              #dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_QS, DDZ_QS)
-              #del(dummy)
        else:
               DDZMST = sps.csr_matrix(DDZMS)
        #'''
        
        # Prepare derivative operators for diffusion
        from rsb import rsb_matrix
-       diffOps1 = (DDXMD, DDZMD)
-       diffOps2 = (rsb_matrix(DDXMD, shape=DDXMD.shape), 
+       diffOps1 = (PPXMD, DDZMD)
+       diffOps2 = (rsb_matrix(PPXMD, shape=PPXMD.shape), 
                    rsb_matrix(DDZMD, shape=DDZMD.shape))
        
        REFS.append((DDXMS, DDZMS)) # index 10
@@ -649,13 +647,16 @@ def runModel(TestName):
        # Store the terrain profile
        REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
-       REFS.append(DDX_CS) # index 16
-       REFS.append(DDZ_CS) # index 17
+       REFS.append(sps.csr_matrix(DDX_QS)) # index 16
        
        # Staggered operators
+       DDXM_ST = sps.block_diag((DDXMS, DDXMS, DDXMD, DDXMS), format='csr')
+       REFS.append(DDXM_ST) # index 17
+       REFS.append(sps.csr_matrix(DDXM_ST,shape=DDXM_ST.shape)) # index 18
+       
        DDZM_ST = sps.block_diag((DDZMS, DDZMST), format='csr')
-       REFS.append(DDZM_ST) # index 18
-       REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 19
+       REFS.append(DDZM_ST) # index 19
+       REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 
        
        # Update REFG with the 2nd vertical derivative of backgrounds
        REFG.append(DDZMS @ DQDZ)
@@ -709,13 +710,15 @@ def runModel(TestName):
               
               # Diffusion filter grid length based on resolution powers
               DL2 = 1.0 * abs(DZ_avg)
-              DL1 = 0.5 * abs(DX_avg)
-              DLD = (DL1, DL2, DL1 * DL2, mt.sqrt(DL1 * DL2))
+              DL1 = 1.0 * abs(DX_avg)
+              SBC = DL1 * 0.5 * (metrics[2][1:] + metrics[2][0:-1])
+              DS = np.amax(SBC)              
+              DLD = (DL1, DL2, DL1 * DL2, mt.sqrt(DL1 * DL2), DS)
               
-              DZ = DZ_min
+              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
               DX = DX_min
               
-              print('Diffusion lengths: ', DLD[0], DLD[1])
+              print('Diffusion lengths: ', DLD[0], DLD[1], DS)
               
               del(DXE); del(DZE)
               
