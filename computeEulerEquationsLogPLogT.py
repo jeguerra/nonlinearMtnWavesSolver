@@ -468,9 +468,10 @@ def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz
        
        DQDZ = REFG[2]
        
-       mu_x = DCF[0][bdex,0]
-       mu_z = DCF[1][bdex,0]
-       mu_t = mu_x + np.abs(dhdx) * mu_z
+       mu_x = DCF[0][bdex,:]
+       mu_z = np.expand_dims(dhdx * DCF[1][bdex,0], axis=1)
+       mu_tv = np.hstack((mu_x, mu_z))
+       mu_t = np.linalg.norm(mu_tv, axis=1)
        
        # Compute directional derivatives
        DDX = REFS[16]

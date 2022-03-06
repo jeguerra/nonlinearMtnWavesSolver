@@ -115,11 +115,14 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #'''
               
               # Update the adaptive coefficients
-              resField = np.copy(rhsAdv + rhsFrc)
+              #resField = np.copy(rhsAdv + rhsFrc)
+              DqDxR, DqDzR = tendency.computeFieldDerivatives(solB, DDXM_B, DDZM_B)
+              args1 = [PHYS, DqDxR, DqDzR, REFS, REFG, solB, U, W]
+              resField = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
               if filteredCoeffs:
-                     DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, solA, init0, DLD, NE)
+                     DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, solB, init0, DLD, NE)
               else:
-                     DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, solA, init0, DLD, REFS[6][0], ebcDex[2])
+                     DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, solB, init0, DLD, REFS[6][0], ebcDex[2])
               del(resField)
               
               # Compute diffusive tendency
