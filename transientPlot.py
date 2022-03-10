@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-fname = 'StaggeredZ_QS-DynSGS_RHS_h3000m.nc'
+fname = 'StaggeredZ00_QS-DynSGS_RHS_h3000m.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -56,8 +56,8 @@ THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = False
-runSGS = True
+runPertb = True
+runSGS = False
 
 #%% Contour animation of perturbation potential temperatures
 if runPertb:

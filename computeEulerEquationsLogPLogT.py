@@ -89,11 +89,11 @@ def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
           
        DZDX = REFS[15]
        DQDZ = REFG[2]
-       D2QDZ2 = REFG[-1]
+       #D2QDZ2 = REFG[-1]
        
        # Compute first partial in X (on CPU)
-       PqPx = DqDx - DZDX * DqDz
-       PqPz = np.copy(DqDz) + DQDZ
+       PqPx = np.copy(DqDx) #- DZDX * DqDz
+       PqPz = DqDz + DQDZ
        
        if isFluxDiv:
               vd = np.hstack((DCF[0] * PqPx, DCF[1] * PqPz))
@@ -101,14 +101,11 @@ def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
               vd = np.hstack((PqPx, PqPz))
        dvdx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
        
-       D2qDz2 = dvdz[:,4:] #DDZ.dot(DqDz)
-       P2qPz2 = D2qDz2 + D2QDZ2
-       D2qDx2 = dvdx[:,0:4] #DDX.dot(PqPx)
+       P2qPx2 = dvdx[:,0:4]
+       P2qPz2 = dvdz[:,4:] 
        
-       P2qPzx = dvdz[:,0:4] #DDZ.dot(PqPx)
-       P2qPxz = dvdx[:,4:]# - DZDX * P2qPz2 #DDX.dot(DqDz)
-       
-       P2qPx2 = D2qDx2# - DZDX * P2qPzx
+       P2qPzx = dvdz[:,0:4]
+       P2qPxz = dvdx[:,4:]
        
        return P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz
 
@@ -150,7 +147,8 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        gam = PHYS[6]
        
        # Get the derivative operators (enhanced cubig spline derivative)
-       DDXM = REFS[10][0]; DDZM = REFS[10][1]
+       DDXM = REFS[10][0]
+       DDZM = REFS[10][1]
        DZDX = REFS[15].flatten()
        
        DLTDZ = REFG[1]
@@ -167,10 +165,10 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        
        # Compute (partial) x derivatives of perturbations
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
-       PqPx = DqDx - DZDXM.dot(DqDz)
+       PqPx = np.copy(DqDx) #- DZDXM.dot(DqDz)
        
        # Compute partial in X terrain following block
-       PPXM = DDXM - DZDXM.dot(DDZM)
+       PPXM = np.copy(DDXM) #- DZDXM.dot(DDZM)
        
        # Compute vertical gradient diagonal operators
        DuDzM = sps.diags(DqDz[:,0], offsets=0, format='csr')
@@ -335,7 +333,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields,
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
        # Compute partial and advection
-       PqPx = DqDx - DZDX * DqDz
+       PqPx = np.copy(DqDx) #- DZDX * DqDz
        PqPz = DqDz + DQDZ
        
        # Compute advection
@@ -374,7 +372,7 @@ def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFS, REFG, fields
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
        # Compute partial and advection
-       PqPx = DqDx - DZDX * DqDz
+       PqPx = np.copy(DqDx) #- DZDX * DqDz
        PqPz = DqDz + DQDZ
        
        # Compute advection
@@ -403,7 +401,7 @@ def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFS, REFG, fi
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
        # Compute partial and advection
-       PqPx = DqDx - DZDX * DqDz
+       PqPx = np.copy(DqDx) #- DZDX * DqDz
        PqPz = DqDz + DQDZ
        
        # Compute local divergence

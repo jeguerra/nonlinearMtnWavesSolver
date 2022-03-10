@@ -52,29 +52,33 @@ def enforceEssentialBC(sol, init, zeroDex, ebcDex, dhdx):
        
        return sol
 
-def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
+def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, zeroDex, ebcDex, \
-                              isFirstStep, filteredCoeffs, NE):
+                              isFirstStep, filteredCoeffs, \
+                              verticalStagger, DynSGS_RES, NE):
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
        RLM = REFG[4]
        
+       fullyExplicit = True
        diffusiveFlux = False
        
        #'''
        if isFirstStep:
               # Use SciPY sparse for dynamics
               DDXM_A = REFS[10][0]
-              #DDZM_A = REFS[10][1]
-              #DDXM_A = REFS[17]
-              DDZM_A = REFS[19]
+              if verticalStagger:
+                     DDZM_A = REFS[19]
+              else:
+                     DDZM_A = REFS[10][1]
        else:
               # Use multithreading on CPU
               DDXM_A = REFS[12][0]
-              #DDZM_A = REFS[12][1]
-              #DDXM_A = REFS[18]
-              DDZM_A = REFS[20]
+              if verticalStagger:
+                     DDZM_A = REFS[20]
+              else:
+                     DDZM_A = REFS[12][1]
        
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
@@ -87,38 +91,50 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               W = solA[:,1]
               
               # Compute first derivatives and RHS with spectral operators
-              #DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
-              DqDxA, DqDzA = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
+              if verticalStagger:
+                     DqDxA, DqDzA = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
+              else:
+                     solA_flux1 = solA.append(np.expand_dims(U,axis=1) * solA)
+                     solA_flux2 = solA.append(np.expand_dims(W,axis=1) * solA)
+                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
               
-              '''
-              args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
-              rhsAdv = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
-              rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, REFS[6][0])
-              '''
-              #'''
-              # Compute advective update (explicit)
-              args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
-              rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
-              rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, REFS[6][0])
+              if fullyExplicit:
+                     args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
+                     rhsExp = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+                     rhsExp = tendency.enforceTendencyBC(rhsExp, zeroDex, ebcDex, REFS[6][0])
+                     
+                     solB = sol2Update + DF * rhsExp
+              else:
+                     # Compute advective update (explicit)
+                     args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
+                     rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
+                     rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, REFS[6][0])
+                     
+                     # Apply advection part of the update
+                     solAdv = sol2Update + DF * rhsAdv
+                     solAdv = enforceEssentialBC(solAdv, init0, zeroDex, ebcDex, REFS[6][0])
+                     # Compute internal forces (semi implicit)
+                     
+                     args2 = [PHYS, DqDxA, DqDzA, REFS, REFG, solAdv]
+                     rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
+                     rhsFrc = tendency.enforceTendencyBC(rhsFrc, zeroDex, ebcDex, REFS[6][0])
+                     
+                     solB = solAdv + DF * rhsFrc
+                     solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
               
-              # Apply explicit part of the update
-              solAdv = sol2Update + DF * rhsAdv
-              solAdv = enforceEssentialBC(solAdv, init0, zeroDex, ebcDex, REFS[6][0])
-              # Compute internal forces (semi implicit)
-              
-              args2 = [PHYS, DqDxA, DqDzA, REFS, REFG, solAdv]
-              rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
-              rhsFrc = tendency.enforceTendencyBC(rhsFrc, zeroDex, ebcDex, REFS[6][0])
-              
-              solB = solAdv + DF * rhsFrc
-              solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
-              #'''
-              
-              # Update the adaptive coefficients
-              #resField = np.copy(rhsAdv + rhsFrc)
+              # Update the adaptive coefficients using residual
               DqDxR, DqDzR = tendency.computeFieldDerivatives(solB, DDXM_B, DDZM_B)
               args1 = [PHYS, DqDxR, DqDzR, REFS, REFG, solB, U, W]
-              resField = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+              rhsNew = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+              rhsNew = tendency.enforceTendencyBC(rhsNew, zeroDex, ebcDex, REFS[6][0])
+              
+              if fullyExplicit:
+                     #resField = np.copy(rhsNew)
+                     resField = rhsNew - rhsExp
+              else:
+                     #resField = np.copy(rhsAdv + rhsFrc)
+                     resField = rhsNew - (rhsAdv + rhsFrc)
+              
               if filteredCoeffs:
                      DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, solB, init0, DLD, NE)
               else:

@@ -55,7 +55,7 @@ localDir = '/home/jeguerra/scratch/' # Home super desktop
 #localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
-fname = 'StaggeredZ00_QS-DynSGS_RHS_h3000m.nc'
+fname = 'StaggeredZ_QS-DynSGS_RHS_h3000m.nc'
 
 #import pnumpy as pnp
 #pnp.enable()
@@ -347,7 +347,7 @@ def runModel(TestName):
        else:
               print('No spatial filter on DynSGS coefficients.')
               
-       DynSGS_RES = False
+       DynSGS_RES = True
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
        else:
@@ -580,10 +580,13 @@ def runModel(TestName):
        
        # Derivative operators for diffusion
        DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
+       
+       # X partial derivatives
+       PPXMS = DDXMS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS)
        PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
        
        #'''
-       # Staggered operator when using Legendre vertical
+       # Staggered operator in the vertical Legendre/Chebyshev mix
        if verticalStagger:
               #'''
               xi_lg, whf = derv.leglb(NZ) #[-1 1]
@@ -598,8 +601,28 @@ def runModel(TestName):
               LG2CH_INT = (LTM.T).dot(LD_TRANS)
               CH2LG_INT = (CTM).dot(CH_TRANS)
               
+              # Stagger to a different degree
+              NZS = int(1.01 * NZ)
+              xi_lgs, whf = derv.leglb(NZS)
+              
+              LTM1, dummy = derv.legpolym(NZ, xi_lgs, True)
+              LTM2, dummy = derv.legpolym(NZS, xi_lg, True)
+              
+              DIMSS = DIMS.copy(); DIMSS[4] = NZS
+              DDZ_LDS, LDS_TRANS = derv.computeLegendreDerivativeMatrix(DIMSS)
+              LG2LGS_INT = (LTM1.T).dot(LD_TRANS)
+              LGS2LG_INT = (LTM2.T).dot(LDS_TRANS)
+              
               if verticalLegdGrid:
                      
+                     zST = 0.5 * DIMS[2] * (1.0 + xi_lg)
+                     var1, var2, var3, sigmaST, ZRL, var4, var5 = \
+                            coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
+                            
+                     DDZ_1DS = LGS2LG_INT.dot(DDZ_LDS).dot(LG2LGS_INT)
+                     dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
+                     del(dummy)
+                     '''
                      zST = 0.5 * DIMS[2] * (1.0 + xi_ch)
                      var1, var2, var3, sigmaST, ZRL, var4, var5 = \
                             coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
@@ -607,7 +630,7 @@ def runModel(TestName):
                      DDZ_1DS = CH2LG_INT.dot(DDZ_CH).dot(LG2CH_INT)
                      dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
                      del(dummy)
-                     
+                     '''
               if verticalChebGrid:
                      
                      zST = 0.5 * DIMS[2] * (1.0 + xi_lg)
@@ -627,22 +650,22 @@ def runModel(TestName):
        diffOps2 = (rsb_matrix(PPXMD, shape=PPXMD.shape), 
                    rsb_matrix(DDZMD, shape=DDZMD.shape))
        
-       REFS.append((DDXMS, DDZMS)) # index 10
+       REFS.append((PPXMS, DDZMS)) # index 10
        REFS.append(diffOps1) # index 11
        
        if not StaticSolve and RSBops:
               # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(DDXMS,shape=DDXMS.shape), \
+              REFS.append((rsb_matrix(PPXMS,shape=DDXMS.shape), \
                            rsb_matrix(DDZMS,shape=DDZMS.shape)))
               REFS.append(diffOps2)
        elif not StaticSolve and not RSBops:
               # Native sparse
-              REFS.append((DDXMS, DDZMS))
+              REFS.append((PPXMS, DDZMS))
               REFS.append(diffOps1)
        else: 
               # Matrix operators
-              REFS.append(DDXMS) # index 12
-              REFS.append(DDZMS) # index 13
+              REFS.append(DDXMD) # index 12
+              REFS.append(DDZMD) # index 13
               
        # Store the terrain profile
        REFS.append(DZT) # index 14
@@ -1106,9 +1129,10 @@ def runModel(TestName):
                      try:   
                             # Compute a time step
                             fields0 = np.copy(fields)
-                            fields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
+                            fields = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields0, hydroState, \
-                                                                    zeroDex, ebcDex, isFirstStep, filteredCoeffs, NE)
+                                                                    zeroDex, ebcDex, isFirstStep, \
+                                                                    filteredCoeffs, verticalStagger, DynSGS_RES, NE)
                             
                             # Get solution update
                             delFields = fields - fields0

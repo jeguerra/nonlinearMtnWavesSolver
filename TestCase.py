@@ -85,7 +85,7 @@ class TestCase:
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 96, 160.0, 34.0, 300.0, \
-                                      9000.0, 40000.0, 7.5,
+                                      9000.0, 40000.0, 6.0,
                                       3000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
               
               elif TestName == "3LayerTestTransient":
