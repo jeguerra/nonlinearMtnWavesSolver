@@ -326,12 +326,12 @@ def runModel(TestName):
               RSBops = True # Turn off PyRSB SpMV
        
        # Set the grid type
-       HermCheb = thisTest.solType['HermChebGrid']
+       HermFunc = thisTest.solType['HermFuncGrid']
        # Use the uniform grid fourier solution if not Hermite Functions
-       if not HermCheb:
-              FourCheb = True
+       if not HermFunc:
+              FourierLin = False
        else:
-              FourCheb = False
+              FourierLin = False
               
        # Set residual diffusion switch
        DynSGS = thisTest.solType['DynSGS']
@@ -360,7 +360,7 @@ def runModel(TestName):
        else:
               print('Legendre spectral derivative in the vertical.')
        
-       verticalStagger = True
+       verticalStagger = False
        if verticalStagger:
               print('Staggered spectral method in the vertical.')
        else:
@@ -425,7 +425,7 @@ def runModel(TestName):
               
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 2 * DIMS[4], DIMS[5]]
-       REF0 = computeGrid(DIM0, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid)
+       REF0 = computeGrid(DIM0, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
        
        # Get the double resolution operator here
        if verticalChebGrid:
@@ -463,15 +463,16 @@ def runModel(TestName):
        input()
        '''
        #%% SET UP THE GRID AND INDEX VECTORS
-       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid, verticalLegdGrid)
+       REFS = computeGrid(DIMS, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
       
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
-       if HermCheb and not FourCheb:
+       if HermFunc and not FourierLin:
               DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
-       elif FourCheb and not HermCheb:
+       elif FourierLin and not HermFunc:
               DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
-              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+              DDX_1D = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+              HF_TRANS = sps.eye(DDX_1D.shape)
                             
        if verticalChebGrid:
               interpolationType = 'ChebyshevHR2ChebZ'
@@ -650,7 +651,10 @@ def runModel(TestName):
        diffOps2 = (rsb_matrix(PPXMD, shape=PPXMD.shape), 
                    rsb_matrix(DDZMD, shape=DDZMD.shape))
        
-       REFS.append((PPXMS, DDZMS)) # index 10
+       if StaticSolve:
+              REFS.append((DDXMS, DDZMS)) # index 10
+       else:
+              REFS.append((PPXMS, DDZMS)) # index 10
        REFS.append(diffOps1) # index 11
        
        if not StaticSolve and RSBops:
@@ -672,14 +676,15 @@ def runModel(TestName):
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
        REFS.append(sps.csr_matrix(DDX_QS)) # index 16
        
-       # Staggered operators
-       DDXM_ST = sps.block_diag((DDXMS, DDXMS, DDXMD, DDXMS), format='csr')
-       REFS.append(DDXM_ST) # index 17
-       REFS.append(sps.csr_matrix(DDXM_ST,shape=DDXM_ST.shape)) # index 18
-       
-       DDZM_ST = sps.block_diag((DDZMS, DDZMST), format='csr')
-       REFS.append(DDZM_ST) # index 19
-       REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 
+       if not StaticSolve:
+              # Staggered operators
+              DDXM_ST = sps.block_diag((DDXMS, DDXMS, DDXMD, DDXMS), format='csr')
+              REFS.append(DDXM_ST) # index 17
+              REFS.append(rsb_matrix(DDXM_ST,shape=DDXM_ST.shape)) # index 18
+              
+              DDZM_ST = sps.block_diag((DDZMS, DDZMST), format='csr')
+              REFS.append(DDZM_ST) # index 19
+              REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 
        
        # Update REFG with the 2nd vertical derivative of backgrounds
        REFG.append(DDZMS @ DQDZ)
@@ -843,10 +848,9 @@ def runModel(TestName):
               # Compute the RHS for this iteration
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
-              rhs = eqs.computeEulerEquationsLogPLogT_StaticResidual(PHYS, DqDx, DqDz, REFG, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
-              rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
-              
+              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
+              rhs = eqs.enforceTendencyBC(rhs, zeroDex, ebcDex, REFS[15])
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
@@ -996,9 +1000,9 @@ def runModel(TestName):
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               DqDx, DqDz = \
                      eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
-              rhs = eqs.computeEulerEquationsLogPLogT_StaticResidual(PHYS, DqDx, DqDz, REFG, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
-              rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
+              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W)
+              rhs += eqs.computeRayleighTendency(REFG, fields)
+              rhs = eqs.enforceTendencyBC(rhs, zeroDex, ebcDex, REFS[15])
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)

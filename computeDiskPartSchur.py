@@ -19,7 +19,7 @@ def storeColumnChunks(MM, Mname, dbName):
        mdb = shelve.open(dbName, flag='n')
        # Get the number of cpus
        import multiprocessing as mtp
-       NCPU = int(1.25 * mtp.cpu_count())
+       NCPU = int(1.0 * mtp.cpu_count())
        # Partition CS into NCPU column wise chuncks
        NC = MM.shape[1] # Number of columns in MM
        RC = NC % NCPU # Remainder of columns when dividing by NCPU

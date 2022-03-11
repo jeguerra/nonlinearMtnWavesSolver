@@ -9,7 +9,7 @@ Created on Wed Jul 17 14:12:01 2019
 import numpy as np
 import HerfunChebNodesWeights as qxw
 
-def computeGrid(DIMS, HermCheb, FourCheb, ChebCol, LegCol):
+def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
        # Get the domain dimensions
        L1 = DIMS[0]
        L2 = DIMS[1]
@@ -29,14 +29,25 @@ def computeGrid(DIMS, HermCheb, FourCheb, ChebCol, LegCol):
               z = np.linspace(0.0, ZH, num=NZ, endpoint=True)
        
        # Map reference 1D domains to physical 1D domains
-       if HermCheb and not FourCheb:
+       if Herm and not Four:
               alpha, whf = qxw.hefunclb(NX) #(-inf inf)
               x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
-       elif FourCheb and not HermCheb:
+       elif Four and not Herm:
               x = np.linspace(L1, L2, num=NX+1, endpoint=True)
        else:
-              alpha, whf = qxw.hefunclb(NX) #(-inf inf)
-              x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
+              if NX % 2 == 0:
+                     NXH = 0.5 * (NX + 2)
+              else:
+                     NXH = 0.5 * (NX + 3)
+              
+              alpha, whf = qxw.cheblb(NXH) #(-inf inf)
+              x1 = 0.5 * L1 * (alpha - 1.0)
+              x2 = 0.5 * L2 * (1.0 + alpha)
+              
+              if NX % 2 == 0:
+                     x = np.append(x1, x2[1:])
+              else:
+                     x = np.append(x1[0:-2], x2[1:])
        
        # Return the REFS structure
        REFS = [x, z]

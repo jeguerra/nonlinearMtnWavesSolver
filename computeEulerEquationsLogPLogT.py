@@ -11,6 +11,20 @@ import scipy.sparse as sps
 import scipy.ndimage as spi
 #import matplotlib.pyplot as plt
 
+def enforceEssentialBC(sol, init, zeroDex, ebcDex, dhdx):
+              
+       # Enforce essential boundary conditions
+       sol[zeroDex[0],0] = 0.0
+       sol[zeroDex[1],1] = 0.0
+       sol[zeroDex[2],2] = 0.0
+       sol[zeroDex[3],3] = 0.0
+       
+       bdex = ebcDex[2]
+       U = sol[:,0] + init[:,0]
+       sol[bdex,1] = np.array(dhdx * U[bdex])
+       
+       return sol
+
 def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        
        DqDt[zeroDex[0],0] = 0.0
@@ -89,10 +103,9 @@ def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
           
        DZDX = REFS[15]
        DQDZ = REFG[2]
-       #D2QDZ2 = REFG[-1]
        
        # Compute first partial in X (on CPU)
-       PqPx = np.copy(DqDx) #- DZDX * DqDz
+       PqPx = np.copy(DqDx)
        PqPz = DqDz + DQDZ
        
        if isFluxDiv:
@@ -151,6 +164,9 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DDZM = REFS[10][1]
        DZDX = REFS[15].flatten()
        
+       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
+       PPXM = DDXM - DZDXM.dot(DDZM)
+       
        DLTDZ = REFG[1]
        DQDZ = REFG[2]
        
@@ -159,16 +175,16 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        UZX = U * DZDX
        WXZ = wxz - UZX
 
-       # Compute (total) derivatives of perturbations
+       # Compute raw derivatives of perturbations
        DqDx = DDXM.dot(fields)
        DqDz = DDZM.dot(fields)
        
-       # Compute (partial) x derivatives of perturbations
+       # Compute terrain following x derivatives of perturbations
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
-       PqPx = np.copy(DqDx) #- DZDXM.dot(DqDz)
+       PqPx = DqDx - DZDXM.dot(DqDz)
        
        # Compute partial in X terrain following block
-       PPXM = np.copy(DDXM) #- DZDXM.dot(DDZM)
+       PPXM = DDXM - DZDXM.dot(DDZM)
        
        # Compute vertical gradient diagonal operators
        DuDzM = sps.diags(DqDz[:,0], offsets=0, format='csr')
@@ -314,7 +330,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W):
+def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -322,7 +338,6 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields,
        
        # Get the Background fields
        RdT_bar = REFS[9][0]
-       DZDX = REFS[15]
        DQDZ = REFG[2]
               
        # Compute advective (multiplicative) operators
@@ -332,8 +347,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields,
        # Compute pressure gradient force scaling (buoyancy)
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
-       # Compute partial and advection
-       PqPx = np.copy(DqDx) #- DZDX * DqDz
+       # Compute complete vertical partial
        PqPz = DqDz + DQDZ
        
        # Compute advection
@@ -360,19 +374,17 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields,
        return DqDt
 
 # Explicit advection RHS evaluation
-def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W):
+def computeEulerEquationsLogPLogT_Advection(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W):
        # Get physical constants
        kap = PHYS[4]       
        # Get the Background fields
        DQDZ = REFG[2]
        RdT_bar = REFS[9][0]
-       DZDX = REFS[15]
        
        # Compute pressure gradient force scaling (buoyancy)
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
-       # Compute partial and advection
-       PqPx = np.copy(DqDx) #- DZDX * DqDz
+       # Compute complete vertical partial
        PqPz = DqDz + DQDZ
        
        # Compute advection
@@ -387,7 +399,7 @@ def computeEulerEquationsLogPLogT_Advection(PHYS, DqDx, DqDz, REFS, REFG, fields
        return DqDt
 
 # Semi-implicit internal force evaluation
-def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFS, REFG, fields):
+def computeEulerEquationsLogPLogT_InternalForce(PHYS, PqPx, DqDz, REFS, REFG, fields):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -395,13 +407,11 @@ def computeEulerEquationsLogPLogT_InternalForce(PHYS, DqDx, DqDz, REFS, REFG, fi
        # Get the Background fields
        DQDZ = REFG[2]
        RdT_bar = REFS[9][0]
-       DZDX = REFS[15]
        
        # Compute pressure gradient force scaling (buoyancy)
        RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
        
-       # Compute partial and advection
-       PqPx = np.copy(DqDx) #- DZDX * DqDz
+       # Compute complete vertical partial
        PqPz = DqDz + DQDZ
        
        # Compute local divergence

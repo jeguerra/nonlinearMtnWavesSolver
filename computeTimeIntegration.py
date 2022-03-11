@@ -38,20 +38,6 @@ def plotRHS(x, rhs, ebcDex, label):
        
        return
 
-def enforceEssentialBC(sol, init, zeroDex, ebcDex, dhdx):
-              
-       # Enforce essential boundary conditions
-       sol[zeroDex[0],0] = 0.0
-       sol[zeroDex[1],1] = 0.0
-       sol[zeroDex[2],2] = 0.0
-       sol[zeroDex[3],3] = 0.0
-       
-       bdex = ebcDex[2]
-       U = sol[:,0] + init[:,0]
-       sol[bdex,1] = np.array(dhdx * U[bdex])
-       
-       return sol
-
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, zeroDex, ebcDex, \
                               isFirstStep, filteredCoeffs, \
@@ -74,11 +60,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DDZM_A = REFS[10][1]
        else:
               # Use multithreading on CPU
-              DDXM_A = REFS[12][0]
+              #DDXM_A = REFS[12][0]
+              DDXM_A = REFS[13][0]
               if verticalStagger:
                      DDZM_A = REFS[20]
               else:
-                     DDZM_A = REFS[12][1]
+                     DDZM_A = REFS[12][1]  
        
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
@@ -94,8 +81,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               if verticalStagger:
                      DqDxA, DqDzA = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
               else:
-                     solA_flux1 = solA.append(np.expand_dims(U,axis=1) * solA)
-                     solA_flux2 = solA.append(np.expand_dims(W,axis=1) * solA)
                      DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
               
               if fullyExplicit:
@@ -112,7 +97,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      
                      # Apply advection part of the update
                      solAdv = sol2Update + DF * rhsAdv
-                     solAdv = enforceEssentialBC(solAdv, init0, zeroDex, ebcDex, REFS[6][0])
+                     solAdv = tendency.enforceEssentialBC(solAdv, init0, zeroDex, ebcDex, REFS[6][0])
                      # Compute internal forces (semi implicit)
                      
                      args2 = [PHYS, DqDxA, DqDzA, REFS, REFG, solAdv]
@@ -120,7 +105,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      rhsFrc = tendency.enforceTendencyBC(rhsFrc, zeroDex, ebcDex, REFS[6][0])
                      
                      solB = solAdv + DF * rhsFrc
-                     solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
+                     solB = tendency.enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
               
               # Update the adaptive coefficients using residual
               DqDxR, DqDzR = tendency.computeFieldDerivatives(solB, DDXM_B, DDZM_B)
@@ -129,11 +114,16 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsNew = tendency.enforceTendencyBC(rhsNew, zeroDex, ebcDex, REFS[6][0])
               
               if fullyExplicit:
-                     #resField = np.copy(rhsNew)
-                     resField = rhsNew - rhsExp
+                     if DynSGS_RES:
+                            resField = rhsNew - rhsExp
+                     else:
+                            resField = np.copy(rhsNew)
               else:
-                     #resField = np.copy(rhsAdv + rhsFrc)
-                     resField = rhsNew - (rhsAdv + rhsFrc)
+                     if DynSGS_RES:
+                            resField = rhsNew - (rhsAdv + rhsFrc)
+                     else:
+                            resField = np.copy(rhsAdv + rhsFrc)
+                            
               
               if filteredCoeffs:
                      DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, solB, init0, DLD, NE)
@@ -152,7 +142,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Apply diffusion update
               #solB = sol2Update + DF * (rhsAdv + rhsDif)
               solB += DF * rhsDif
-              solB = enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
+              solB = tendency.enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
               
               # Apply Rayleigh damping layer implicitly
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
