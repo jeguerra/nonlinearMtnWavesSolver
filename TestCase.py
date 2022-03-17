@@ -29,7 +29,7 @@ class TestCase:
        def __init__(self, TestName):
               if TestName == 'ClassicalSchar01':
                      # Reproduction of the Classical Schar case (one solve)
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
+                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
@@ -41,7 +41,7 @@ class TestCase:
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
+                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
@@ -53,7 +53,7 @@ class TestCase:
                      
               elif TestName == 'UniformStratStatic':
                      # Newton iteration with smooth stratification
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
+                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
@@ -65,7 +65,7 @@ class TestCase:
                             
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
+                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
@@ -77,7 +77,7 @@ class TestCase:
               
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
+                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': False, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
@@ -85,12 +85,12 @@ class TestCase:
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 96, 160.0, 34.0, 300.0, \
-                                      9000.0, 40000.0, 6.0,
+                                      9000.0, 40000.0, 10.0,
                                       3000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
+                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
