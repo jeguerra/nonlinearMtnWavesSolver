@@ -1289,7 +1289,7 @@ def computeFourierDerivativeMatrix(DIMS):
        
        DDMC = numericalCleanUp(DDM)
        
-       return DDMC, DFT
+       return np.real(DDMC), DFT
 
 def computeLaguerreDerivativeMatrix(DIMS):
        

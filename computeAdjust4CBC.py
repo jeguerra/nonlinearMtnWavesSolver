@@ -38,7 +38,11 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        # Index all boundary DOF that can be diffused on
        diffDex = (uldex1, urdex1, ubdex, utdex)
        
-       isInflow = False
+       isInflow = True
+       if isInflow:
+              print('Inflow boundary configuration.')
+       else:
+              print('Horiztonally pinned state boundary configuration.')
        
        # BC indices for static solution (per variable)
        if bcType == 1:
@@ -79,7 +83,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      # Inflow condition on UWPT TRANSIENT SOLUTION
                      rowsOutU = set(np.concatenate((uldex1,urdex1)))
                      rowsOutW = set(np.concatenate((uldex1,urdex1,utdex)))
-                     rowsOutP = set() #set(np.concatenate((uldex1,urdex1)))
+                     rowsOutP = set(np.concatenate((uldex1,urdex1)))
                      rowsOutT = set(np.concatenate((uldex1,urdex1)))
               
                       # Indexing for static solver

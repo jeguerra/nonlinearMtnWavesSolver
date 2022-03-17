@@ -35,19 +35,22 @@ def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
        elif Four and not Herm:
               x = np.linspace(L1, L2, num=NX+1, endpoint=True)
        else:
-              if NX % 2 == 0:
-                     NXH = 0.5 * (NX + 2)
-              else:
-                     NXH = 0.5 * (NX + 3)
               
-              alpha, whf = qxw.cheblb(NXH) #(-inf inf)
-              x1 = 0.5 * L1 * (alpha - 1.0)
-              x2 = 0.5 * L2 * (1.0 + alpha)
+              if NX % 2 == 0:
+                     NXH = int(0.5 * (NX + 2))
+              else:
+                     NXH = int(0.5 * (NX + 1))
+              
+              alpha, whf = qxw.cheblb(NXH)
+              x1 = -0.5 * L1 * (alpha - 1.0)
+              x2 = +0.5 * L2 * (1.0 + alpha)
               
               if NX % 2 == 0:
                      x = np.append(x1, x2[1:])
               else:
-                     x = np.append(x1[0:-2], x2[1:])
+                     x = np.append(x1[0:-1], x2[1:])
+                     
+              #print(x)
        
        # Return the REFS structure
        REFS = [x, z]

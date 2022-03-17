@@ -328,10 +328,12 @@ def runModel(TestName):
        # Set the grid type
        HermFunc = thisTest.solType['HermFuncGrid']
        # Use the uniform grid fourier solution if not Hermite Functions
-       if not HermFunc:
+       if HermFunc:
               FourierLin = False
+              print('Hermite Function grid in the horizontal.')
        else:
-              FourierLin = False
+              FourierLin = True
+              print('Uniform Fourier grid in the horizontal.')
               
        # Set residual diffusion switch
        DynSGS = thisTest.solType['DynSGS']
@@ -471,8 +473,8 @@ def runModel(TestName):
        elif FourierLin and not HermFunc:
               DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
-              DDX_1D = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-              HF_TRANS = sps.eye(DDX_1D.shape)
+              DDX_1D = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 10)
+              HF_TRANS = sps.eye(DDX_1D.shape[0], DDX_1D.shape[1])
                             
        if verticalChebGrid:
               interpolationType = 'ChebyshevHR2ChebZ'
@@ -576,8 +578,12 @@ def runModel(TestName):
        DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_CFD)
        DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], DDZ_CFD)
        
+       #DDX_CS, DDX4_CS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_CFD)
+       #DDZ_CS, DDZ4_CS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], DDZ_CFD)
+       
        # Derivative operators for dynamics
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
+       DDXMS2, DDZMS2 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        # Derivative operators for diffusion
        DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
@@ -601,7 +607,7 @@ def runModel(TestName):
               
               LG2CH_INT = (LTM.T).dot(LD_TRANS)
               CH2LG_INT = (CTM).dot(CH_TRANS)
-              
+              '''
               # Stagger to a different degree
               NZS = int(1.01 * NZ)
               xi_lgs, whf = derv.leglb(NZS)
@@ -613,9 +619,9 @@ def runModel(TestName):
               DDZ_LDS, LDS_TRANS = derv.computeLegendreDerivativeMatrix(DIMSS)
               LG2LGS_INT = (LTM1.T).dot(LD_TRANS)
               LGS2LG_INT = (LTM2.T).dot(LDS_TRANS)
-              
+              '''
               if verticalLegdGrid:
-                     
+                     '''
                      zST = 0.5 * DIMS[2] * (1.0 + xi_lg)
                      var1, var2, var3, sigmaST, ZRL, var4, var5 = \
                             coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
@@ -624,6 +630,7 @@ def runModel(TestName):
                      dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
                      del(dummy)
                      '''
+                     #'''
                      zST = 0.5 * DIMS[2] * (1.0 + xi_ch)
                      var1, var2, var3, sigmaST, ZRL, var4, var5 = \
                             coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
@@ -631,7 +638,7 @@ def runModel(TestName):
                      DDZ_1DS = CH2LG_INT.dot(DDZ_CH).dot(LG2CH_INT)
                      dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
                      del(dummy)
-                     '''
+                     #'''
               if verticalChebGrid:
                      
                      zST = 0.5 * DIMS[2] * (1.0 + xi_lg)
@@ -659,7 +666,7 @@ def runModel(TestName):
        
        if not StaticSolve and RSBops:
               # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(PPXMS,shape=DDXMS.shape), \
+              REFS.append((rsb_matrix(PPXMS,shape=PPXMS.shape), \
                            rsb_matrix(DDZMS,shape=DDZMS.shape)))
               REFS.append(diffOps2)
        elif not StaticSolve and not RSBops:
@@ -708,22 +715,18 @@ def runModel(TestName):
               NL = 6 # Number of eigenvalues to inspect...
               #'''
               print('Computing spectral radii of derivative operators...')
-              DXE = DDXMS[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
+              DXE = PPXMS[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
               DZE = DDZMS[np.ix_(ebcDex[0],ebcDex[0])].tocsr()
-              DX_eig = spl.eigs(DXE[1:-1,1:-1], k=NL, which='LM', return_eigenvectors=False)
-              DZ_eig = spl.eigs(DZE[1:-1,1:-1], k=NL, which='LM', return_eigenvectors=False)
+              DX_eig = spl.eigs(DXE[1:-1,1:-1], k=NL, which='LI', return_eigenvectors=False)
+              DZ_eig = spl.eigs(DZE[1:-1,1:-1], k=NL, which='LI', return_eigenvectors=False)
               
-              print('Eigenvalues (largest magnitude) of derivative matrices:')
+              print('Eigenvalues (largest imaginary part) of derivative matrices:')
               print('X: ', DX_eig)
               print('Z: ', DZ_eig)
               
-              print('Eigenvalues magnitudes of derivative matrices:')
-              print('X: ', np.abs(DX_eig))
-              print('Z: ', np.abs(DX_eig))
-              
               # Minimum magnitude eigenvalues to "cover" smallest resolved scale 
-              DX_rho = np.amin(np.abs(DX_eig))
-              DZ_rho = np.amin(np.abs(DZ_eig))
+              DX_rho = np.amin(np.abs(np.imag(DX_eig)))
+              DZ_rho = np.amin(np.abs(np.imag(DZ_eig)))
               
               print('Derivative matrix spectral radii (1/m):')
               print('X: ', DX_rho)
@@ -738,7 +741,7 @@ def runModel(TestName):
               
               # Diffusion filter grid length based on resolution powers
               DL2 = 1.0 * abs(DZ_avg)
-              DL1 = 1.0 * abs(DX_avg)
+              DL1 = 1.0 * abs(DX_spr)
               SBC = DL1 * 0.5 * (metrics[2][1:] + metrics[2][0:-1])
               DS = np.amax(SBC)              
               DLD = (DL1, DL2, DL1 * DL2, mt.sqrt(DL1 * DL2), DS)
@@ -1037,7 +1040,7 @@ def runModel(TestName):
               VSND = np.sqrt(PHYS[6] * REFS[9][0])
               VWAV_max = bn.nanmax(VSND)
               DT0 = DTF * DLS / VWAV_max
-              TOPT[0] = DT0
+              TOPT[0] = 1.0 * DT0
               print('Initial time step by sound speed: ', str(DT0) + ' (sec)')
               print('Time stepper order: ', str(TOPT[3]))
               print('Time step factor: ', str(DTF))

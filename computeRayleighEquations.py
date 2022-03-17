@@ -163,8 +163,6 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        mu = RLOPT[4]
        
        # Get DIMS data
-       NX = DIMS[3] + 1
-       NZ = DIMS[4] + 1
        OPS = DIMS[5]
        
        # Set up the Rayleigh field

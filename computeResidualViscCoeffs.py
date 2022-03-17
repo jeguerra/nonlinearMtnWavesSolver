@@ -9,7 +9,6 @@ Created on Sun Aug  4 13:59:02 2019
 import math as mt
 import numpy as np
 import bottleneck as bn
-import scipy.sparse as sps
 from scipy import ndimage
 
 def computeResidualViscCoeffs(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
@@ -58,41 +57,46 @@ def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD, dhdx, bdex)
        
        # Compute field normalization
        QM = bn.nanmax(np.abs(fields), axis=0)
+       #QM = bn.nanmax(np.abs(RES), axis=0)
        
        # Get the length scale
        DL = DLD[3]
        
-       # Compute the flow magnitude
-       vel = np.stack((UD, WD),axis=1)
-       VFLW = np.linalg.norm(vel, axis=1)
+       try:
+              # Compute the flow magnitude
+              vel = np.stack((UD, WD),axis=1)
+              VFLW = np.linalg.norm(vel, axis=1)
+              
+              # Compute absolute value of residuals
+              ARES = np.abs(RES)
+              
+              for vv in range(4):
+                     if QM[vv] > 0.0:
+                            # Normalize the residuals
+                            if vv < 4:
+                                   ARES[:,vv] *= (1.0 / QM[vv])
+                     else:
+                            ARES[:,vv] *= 0.0
+                            
+              # Get the maximum in the residuals (unit = 1/s)
+              QRES_MAX = bn.nanmax(ARES, axis=1)
+              
+              # Compute upper bound on coefficients (single bounding fields
+              #QMAX = 0.5 * DL * VFLW
+              QMAX1 = 0.5 * DLD[0] * VFLW
+              QMAX2 = 0.5 * DLD[1] * VFLW
+              
+              # Limit DynSGS to upper bound
+              compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX1),axis=1)
+              CRES1 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
+              
+              compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX2),axis=1)
+              CRES2 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
+       except FloatingPointError:
+              CRES1 = np.zeros((fields.shape[0],1))
+              CRES2 = np.zeros((fields.shape[0],1))
        
-       # Compute absolute value of residuals
-       ARES = np.abs(RES)
-       
-       for vv in range(4):
-              if QM[vv] > 0.0:
-                     # Normalize the residuals
-                     if vv < 4:
-                            ARES[:,vv] *= (1.0 / QM[vv])
-              else:
-                     ARES[:,vv] *= 0.0
-                     
-       # Get the maximum in the residuals (unit = 1/s)
-       QRES_MAX = bn.nanmax(ARES, axis=1)
-       
-       # Compute upper bound on coefficients (single bounding fields
-       #QMAX = 0.5 * DL * VFLW
-       QMAX1 = 0.5 * DLD[0] * VFLW
-       QMAX2 = 0.5 * DLD[1] * VFLW
-       
-       # Limit DynSGS to upper bound
-       compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX1),axis=1)
-       CRES1 = bn.nanmin(compare, axis=1)
-       
-       compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX2),axis=1)
-       CRES2 = bn.nanmin(compare, axis=1)
-       
-       return (np.expand_dims(CRES1, axis=1), np.expand_dims(CRES2, axis=1))
+       return (CRES1, CRES2)
 
 def computeResidualViscCoeffsFiltered(DIMS, RES, fields, hydroState, DLD, NE):
        

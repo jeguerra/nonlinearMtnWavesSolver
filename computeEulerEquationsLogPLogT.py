@@ -11,7 +11,7 @@ import scipy.sparse as sps
 import scipy.ndimage as spi
 #import matplotlib.pyplot as plt
 
-def enforceEssentialBC(sol, init, zeroDex, ebcDex, dhdx):
+def enforceEssentialBC(sol, zeroDex, ebcDex, dhdx):
               
        # Enforce essential boundary conditions
        sol[zeroDex[0],0] = 0.0
@@ -19,9 +19,8 @@ def enforceEssentialBC(sol, init, zeroDex, ebcDex, dhdx):
        sol[zeroDex[2],2] = 0.0
        sol[zeroDex[3],3] = 0.0
        
-       bdex = ebcDex[2]
-       U = sol[:,0] + init[:,0]
-       sol[bdex,1] = np.array(dhdx * U[bdex])
+       #bdex = ebcDex[2]       
+       #sol[bdex,1] += np.array(dhdx * sol[bdex,0])
        
        return sol
 
@@ -32,11 +31,8 @@ def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        DqDt[zeroDex[2],2] = 0.0
        DqDt[zeroDex[3],3] = 0.0
        
-       bdex = ebcDex[2]
-       tdex = ebcDex[3]
-       
-       DqDt[bdex,1] = 0.0 #np.copy(dhdx * DqDt[bdex,0])
-       DqDt[tdex,1] = 0.0
+       bdex = ebcDex[2]  
+       DqDt[bdex,1] = dhdx * DqDt[bdex,0]
        
        return DqDt
 
@@ -99,14 +95,13 @@ def computeFieldDerivativeStag(q, DDX, DDZ):
          
        return DqDx[:,:], DqDz[:,0,:]
 
-def computeFieldDerivatives2(DqDx, DqDz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
+def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
           
        DZDX = REFS[15]
        DQDZ = REFG[2]
        
-       # Compute first partial in X (on CPU)
-       PqPx = np.copy(DqDx)
-       PqPz = DqDz + DQDZ
+       # Complete vertical parial
+       PqPz += DQDZ
        
        if isFluxDiv:
               vd = np.hstack((DCF[0] * PqPx, DCF[1] * PqPz))
@@ -351,8 +346,14 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        PqPz = DqDz + DQDZ
        
        # Compute advection
-       Uadvect = UM * PqPx
-       Wadvect = WM * PqPz
+       try:
+              Uadvect = UM * PqPx
+       except FloatingPointError:
+              Uadvect = np.zeros(PqPx.shape)
+       try:
+              Wadvect = WM * PqPz
+       except FloatingPointError:
+              Wadvect = np.zeros(PqPz.shape)
        
        # Compute local divergence
        divergence = PqPx[:,0] + DqDz[:,1]
@@ -370,7 +371,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
        # Potential Temperature equation (transport only)
-                        
+       
        return DqDt
 
 # Explicit advection RHS evaluation
@@ -444,58 +445,69 @@ def computeRayleighTendency(REFG, fields):
 
 def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, zeroDex, DCF, isFluxDiv):
        
+       dhdx = REFS[6][0]
+       metrics = REFS[6][1]
+       S = metrics[3]
+       DQDZ = REFG[2]
+       
+       bdex = ebcDex[2]
+       tdex = ebcDex[3]
+       
        DqDt = np.zeros(P2qPx2.shape)
        if isFluxDiv:
               DC1 = 1.0
               DC2 = 1.0
+              mu_xt = 1.0
+              mu_t = 1.0
        else:
               DC1 = DCF[0][:,0] # coefficient to the X direction flux
               DC2 = DCF[1][:,0] # coefficient to the Z direction flux
-            
-       #%% INTERIOR DIFFUSION
-       # Diffusion of u-w vector
-       DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPzx[:,1] + P2qPz2[:,0])  
-       DqDt[:,1] = DC1 * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2 * (2.0 * P2qPz2[:,1])
-       # Diffusion of scalars (broken up into anisotropic components
-       DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
-       DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
-           
-       #'''        
-       #%% TOP DIFFUSION (flow along top edge)
-       tdex = ebcDex[3]
-       DqDt[tdex,0] = DC1[tdex] * P2qPx2[tdex,0]
-       DqDt[tdex,2] = DC1[tdex] * P2qPx2[tdex,2]
-       DqDt[tdex,3] = DC1[tdex] * P2qPx2[tdex,3]
+              mu_xt = DC1[tdex]
+              
+              mu_xb = np.expand_dims(DC1[bdex], axis=1)
+              mu_zb = np.expand_dims(dhdx * DC1[bdex], axis=1)
+              mu_tv = np.hstack((mu_xb, mu_zb))
+              try:
+                     mu_t = np.linalg.norm(mu_tv, axis=1)
+              except FloatingPointError:
+                     mu_t = 0.0
        
-       #%% BOTTOM DIFFUSION (flow along the terrain surface
-       bdex = ebcDex[2]
-       dhdx = REFS[6][0]
+       try:
+              #%% INTERIOR DIFFUSION
+              # Diffusion of u-w vector
+              DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPzx[:,1] + P2qPz2[:,0])  
+              DqDt[:,1] = DC1 * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2 * (2.0 * P2qPz2[:,1])
+              # Diffusion of scalars (broken up into anisotropic components
+              DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
+              DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
+              
+              #DqDt[tdex,1] = 0.0
+              #DqDt[bdex,1] = dhdx * DqDt[bdex,0]
+                  
+              #'''        
+              #%% TOP DIFFUSION (flow along top edge)
+              DqDt[tdex,0] = mu_xt * P2qPx2[tdex,0]
+              DqDt[tdex,1] = 0.0
+              DqDt[tdex,2] = mu_xt * P2qPx2[tdex,2]
+              DqDt[tdex,3] = mu_xt * P2qPx2[tdex,3]
+              
+              #%% BOTTOM DIFFUSION (flow along the terrain surface)
+              
+              # Compute directional derivatives
+              DDX = REFS[16]
+              dqda1 = np.expand_dims(S, axis=1) * DqDx[bdex,:]
+              dqda2 = np.expand_dims(S * dhdx, axis=1) * DQDZ[bdex,:]
+              dqda = np.hstack((dqda1, dqda2))
+              
+              d2qda2 = np.expand_dims(S, axis=1) * (DDX @ dqda)
        
-       metrics = REFS[6][1]
-       S = metrics[3]
-       
-       DQDZ = REFG[2]
-       
-       mu_x = DCF[0][bdex,:]
-       mu_z = np.expand_dims(dhdx * DCF[1][bdex,0], axis=1)
-       mu_tv = np.hstack((mu_x, mu_z))
-       mu_t = np.linalg.norm(mu_tv, axis=1)
-       
-       # Compute directional derivatives
-       DDX = REFS[16]
-       dqda1 = np.expand_dims(S, axis=1) * DqDx[bdex,:]
-       dqda2 = np.expand_dims(S * dhdx, axis=1) * DQDZ[bdex,:]
-       dqda = np.hstack((dqda1, dqda2))
-       
-       d2qda2 = np.expand_dims(S, axis=1) * (DDX @ dqda)
-
-       # dudt along terrain
-       DqDt[bdex,0] = mu_t * (d2qda2[:,0] + d2qda2[:,4])
-       # dlpdt along terrain
-       DqDt[bdex,2] = mu_t * (d2qda2[:,2] + d2qda2[:,6])
-       # dltdt along terrain
-       DqDt[bdex,3] = mu_t * (d2qda2[:,3] + d2qda2[:,7])
-       #'''
+              DqDt[bdex,0] = mu_t * (d2qda2[:,0] + d2qda2[:,4])
+              DqDt[bdex,1] = dhdx * DqDt[bdex,0]
+              DqDt[bdex,2] = mu_t * (d2qda2[:,2] + d2qda2[:,6])
+              DqDt[bdex,3] = mu_t * (d2qda2[:,3] + d2qda2[:,7])
+              #'''
+       except FloatingPointError:
+              DqDt *= 0.0
        
        # Scale and apply coefficients
        DqDt[:,3] *= 0.71 / 0.4

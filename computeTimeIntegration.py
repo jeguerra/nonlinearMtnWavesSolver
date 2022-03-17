@@ -54,14 +54,15 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if isFirstStep:
               # Use SciPY sparse for dynamics
               DDXM_A = REFS[10][0]
+              #DDXM_A = REFS[11][0]
               if verticalStagger:
                      DDZM_A = REFS[19]
               else:
                      DDZM_A = REFS[10][1]
        else:
               # Use multithreading on CPU
-              #DDXM_A = REFS[12][0]
-              DDXM_A = REFS[13][0]
+              DDXM_A = REFS[12][0]
+              #DDXM_A = REFS[13][0]
               if verticalStagger:
                      DDZM_A = REFS[20]
               else:
@@ -97,7 +98,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      
                      # Apply advection part of the update
                      solAdv = sol2Update + DF * rhsAdv
-                     solAdv = tendency.enforceEssentialBC(solAdv, init0, zeroDex, ebcDex, REFS[6][0])
                      # Compute internal forces (semi implicit)
                      
                      args2 = [PHYS, DqDxA, DqDzA, REFS, REFG, solAdv]
@@ -105,12 +105,17 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      rhsFrc = tendency.enforceTendencyBC(rhsFrc, zeroDex, ebcDex, REFS[6][0])
                      
                      solB = solAdv + DF * rhsFrc
-                     solB = tendency.enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
+                     
+              # Apply Rayleigh damping layer implicitly
+              RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
+              #npdex = np.array([0,1,2,3])
+              solB = np.copy(RayDamp.T * solB)
               
               # Update the adaptive coefficients using residual
               DqDxR, DqDzR = tendency.computeFieldDerivatives(solB, DDXM_B, DDZM_B)
               args1 = [PHYS, DqDxR, DqDzR, REFS, REFG, solB, U, W]
               rhsNew = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+              rhsNew += tendency.computeRayleighTendency(REFG, solB)
               rhsNew = tendency.enforceTendencyBC(rhsNew, zeroDex, ebcDex, REFS[6][0])
               
               if fullyExplicit:
@@ -137,17 +142,15 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                REFS, REFG, ebcDex, zeroDex, DCF, diffusiveFlux)
-              rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
               # Apply diffusion update
-              #solB = sol2Update + DF * (rhsAdv + rhsDif)
-              solB += DF * rhsDif
-              solB = tendency.enforceEssentialBC(solB, init0, zeroDex, ebcDex, REFS[6][0])
+              if fullyExplicit:
+                     solB += DF * rhsDif
+              else:                     
+                     solB += DF * (rhsAdv + rhsDif)
               
-              # Apply Rayleigh damping layer implicitly
-              RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
-              #npdex = np.array([0,1,2,3])
-              solB = np.copy(RayDamp.T * solB)
+              # Clean up on essential BC
+              solB = tendency.enforceEssentialBC(solB, zeroDex, ebcDex, REFS[6][0])
                             
               return solB
        
