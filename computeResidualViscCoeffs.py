@@ -49,18 +49,14 @@ def computeResidualViscCoeffs(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
 
        return (np.expand_dims(CRES, axis=1), np.expand_dims(CRES, axis=1))
 
-def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD, dhdx, bdex):
+def computeResidualViscCoeffsRaw(DIMS, RES, dstate, state, hydroState, DLD, dhdx, bdex):
        
        # Compute flow speed
-       UD = np.abs(fields[:,0] + hydroState[:,0])
-       WD = np.abs(fields[:,1])
+       UD = np.abs(state[:,0] + hydroState[:,0])
+       WD = np.abs(state[:,1])
        
        # Compute field normalization
-       QM = bn.nanmax(np.abs(fields), axis=0)
-       #QM = bn.nanmax(np.abs(RES), axis=0)
-       
-       # Get the length scale
-       DL = DLD[3]
+       QM = bn.nanmax(np.abs(dstate), axis=0)
        
        try:
               # Compute the flow magnitude
@@ -82,7 +78,7 @@ def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD, dhdx, bdex)
               QRES_MAX = bn.nanmax(ARES, axis=1)
               
               # Compute upper bound on coefficients (single bounding fields
-              #QMAX = 0.5 * DL * VFLW
+              #QMAX = 0.5 * DLD[3] * VFLW
               QMAX1 = 0.5 * DLD[0] * VFLW
               QMAX2 = 0.5 * DLD[1] * VFLW
               
@@ -93,8 +89,8 @@ def computeResidualViscCoeffsRaw(DIMS, RES, fields, hydroState, DLD, dhdx, bdex)
               compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX2),axis=1)
               CRES2 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
        except FloatingPointError:
-              CRES1 = np.zeros((fields.shape[0],1))
-              CRES2 = np.zeros((fields.shape[0],1))
+              CRES1 = np.zeros((state.shape[0],1))
+              CRES2 = np.zeros((state.shape[0],1))
        
        return (CRES1, CRES2)
 

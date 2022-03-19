@@ -443,7 +443,7 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, zeroDex, DCF, isFluxDiv):
+def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, zeroDex, DCF, isFluxDiv):
        
        dhdx = REFS[6][0]
        metrics = REFS[6][1]
@@ -495,14 +495,15 @@ def computeDiffusionTendency(q, DqDx, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz
               
               # Compute directional derivatives
               DDX = REFS[16]
-              dqda1 = np.expand_dims(S, axis=1) * DqDx[bdex,:]
+              DqDx = PqPx[bdex,:] + np.expand_dims(dhdx, axis=1) * PqPz[bdex,:] #(DDX @ q[bdex,:]) 
+              dqda1 = np.expand_dims(S, axis=1) * DqDx
               dqda2 = np.expand_dims(S * dhdx, axis=1) * DQDZ[bdex,:]
               dqda = np.hstack((dqda1, dqda2))
               
               d2qda2 = np.expand_dims(S, axis=1) * (DDX @ dqda)
        
               DqDt[bdex,0] = mu_t * (d2qda2[:,0] + d2qda2[:,4])
-              DqDt[bdex,1] = dhdx * DqDt[bdex,0]
+              DqDt[bdex,1] = 0.0 #dhdx * DqDt[bdex,0]
               DqDt[bdex,2] = mu_t * (d2qda2[:,2] + d2qda2[:,6])
               DqDt[bdex,3] = mu_t * (d2qda2[:,3] + d2qda2[:,7])
               #'''

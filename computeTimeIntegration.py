@@ -118,6 +118,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsNew += tendency.computeRayleighTendency(REFG, solB)
               rhsNew = tendency.enforceTendencyBC(rhsNew, zeroDex, ebcDex, REFS[6][0])
               
+              dsol = (solB - solA)
+              
               if fullyExplicit:
                      if DynSGS_RES:
                             resField = rhsNew - rhsExp
@@ -131,16 +133,16 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                             
               
               if filteredCoeffs:
-                     DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, solB, init0, DLD, NE)
+                     DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, dsol, solB, init0, DLD, NE)
               else:
-                     DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, solB, init0, DLD, REFS[6][0], ebcDex[2])
+                     DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, dsol, solB, init0, DLD, REFS[6][0], ebcDex[2])
               del(resField)
               
               # Compute diffusive tendency
               P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
               tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, REFS, REFG, DCF, diffusiveFlux)
               
-              rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+              rhsDif = tendency.computeDiffusionTendency(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                REFS, REFG, ebcDex, zeroDex, DCF, diffusiveFlux)
               
               # Apply diffusion update
