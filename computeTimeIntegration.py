@@ -54,7 +54,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if isFirstStep:
               # Use SciPY sparse for dynamics
               DDXM_A = REFS[10][0]
-              #DDXM_A = REFS[11][0]
               if verticalStagger:
                      DDZM_A = REFS[19]
               else:
@@ -62,7 +61,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        else:
               # Use multithreading on CPU
               DDXM_A = REFS[12][0]
-              #DDXM_A = REFS[13][0]
               if verticalStagger:
                      DDZM_A = REFS[20]
               else:
@@ -74,7 +72,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        def computeUpdate(coeff, solA, sol2Update):
               DF = coeff * DT
               
-              # Append log perturbation u and w... for advection
+              # Compute flow field
               U = solA[:,0] + init0[:,0]
               W = solA[:,1]
               
@@ -84,32 +82,23 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               else:
                      DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
               
-              if fullyExplicit:
-                     args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
-                     rhsExp = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
-                     rhsExp = tendency.enforceTendencyBC(rhsExp, zeroDex, ebcDex, REFS[6][0])
-                     
-                     solB = sol2Update + DF * rhsExp
-              else:
-                     # Compute advective update (explicit)
-                     args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
-                     rhsAdv = tendency.computeEulerEquationsLogPLogT_Advection(*args1)
-                     rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, REFS[6][0])
-                     
-                     # Apply advection part of the update
-                     solAdv = sol2Update + DF * rhsAdv
-                     # Compute internal forces (semi implicit)
-                     
-                     args2 = [PHYS, DqDxA, DqDzA, REFS, REFG, solAdv]
-                     rhsFrc = tendency.computeEulerEquationsLogPLogT_InternalForce(*args2)
-                     rhsFrc = tendency.enforceTendencyBC(rhsFrc, zeroDex, ebcDex, REFS[6][0])
-                     
-                     solB = solAdv + DF * rhsFrc
+              args1 = [PHYS, DqDxA, DqDzA, REFS, REFG, solA, U, W]
+              rhsExp = tendency.computeEulerEquationsLogPLogT_Explicit(*args1)
+              rhsExp = tendency.enforceTendencyBC(rhsExp, zeroDex, ebcDex, REFS[6][0])
+              
+              try:
+                  solB = sol2Update + DF * rhsExp
+              except FloatingPointError:
+                  solB = sol2Update + 0.0
                      
               # Apply Rayleigh damping layer implicitly
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
-              #npdex = np.array([0,1,2,3])
               solB = np.copy(RayDamp.T * solB)
+              
+              # Compute flow field
+              del(U); del(W)
+              U = solB[:,0] + init0[:,0]
+              W = solB[:,1]
               
               # Update the adaptive coefficients using residual
               DqDxR, DqDzR = tendency.computeFieldDerivatives(solB, DDXM_B, DDZM_B)
@@ -118,20 +107,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsNew += tendency.computeRayleighTendency(REFG, solB)
               rhsNew = tendency.enforceTendencyBC(rhsNew, zeroDex, ebcDex, REFS[6][0])
               
-              dsol = (solB - solA)
+              dsol = (solB - np.nanmean(solB))
+              #dsol = (solB - solA)
               
-              if fullyExplicit:
-                     if DynSGS_RES:
-                            resField = rhsNew - rhsExp
-                     else:
-                            resField = np.copy(rhsNew)
+              if DynSGS_RES:
+                     resField = rhsNew - rhsExp
               else:
-                     if DynSGS_RES:
-                            resField = rhsNew - (rhsAdv + rhsFrc)
-                     else:
-                            resField = np.copy(rhsAdv + rhsFrc)
-                            
-              
+                     resField = np.copy(rhsNew)
+       
               if filteredCoeffs:
                      DCF = rescf.computeResidualViscCoeffsFiltered(DIMS, resField, dsol, solB, init0, DLD, NE)
               else:
@@ -139,21 +122,18 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               del(resField)
               
               # Compute diffusive tendency
-              P2qPx2, P2qPz2, P2qPzx, P2qPxz, PqPx, PqPz = \
+              P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, REFS, REFG, DCF, diffusiveFlux)
               
-              rhsDif = tendency.computeDiffusionTendency(solA, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+              rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, DqDzA, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                REFS, REFG, ebcDex, zeroDex, DCF, diffusiveFlux)
               
               # Apply diffusion update
-              if fullyExplicit:
-                     solB += DF * rhsDif
-              else:                     
-                     solB += DF * (rhsAdv + rhsDif)
+              solB += DF * rhsDif
               
               # Clean up on essential BC
               solB = tendency.enforceEssentialBC(solB, zeroDex, ebcDex, REFS[6][0])
-                            
+                                          
               return solB
        
        def ssprk43(sol):

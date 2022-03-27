@@ -25,10 +25,7 @@ def computeTopographyOnGrid(REFS, opt):
        NP = len(xh)
        
        # Get a derivative operator
-       #DDX, D2DX = derv.computeCubicSplineDerivativeMatrix(xh, False, False, None)
-       DDXC = derv.computeCompactFiniteDiffDerivativeMatrix1(xh, 6)
-       DDX, DDX4 = derv.computeQuinticSplineDerivativeMatrix(xh, np.zeros(DDXC.shape))
-       D2DX = DDX @ DDX
+       DDX, D2DX = derv.computeCubicSplineDerivativeMatrix(xh, False, False, None)
        
        # Make width for the Kaiser window
        r2 = 1.0 * kC

@@ -78,15 +78,15 @@ def computeResidualViscCoeffsRaw(DIMS, RES, dstate, state, hydroState, DLD, dhdx
               QRES_MAX = bn.nanmax(ARES, axis=1)
               
               # Compute upper bound on coefficients (single bounding fields
-              #QMAX = 0.5 * DLD[3] * VFLW
-              QMAX1 = 0.5 * DLD[0] * VFLW
-              QMAX2 = 0.5 * DLD[1] * VFLW
+              QMAX = 0.5 * DLD[3] * VFLW
+              #QMAX1 = 0.5 * DLD[0] * VFLW
+              #QMAX2 = 0.5 * DLD[1] * VFLW
               
               # Limit DynSGS to upper bound
-              compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX1),axis=1)
+              compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)
               CRES1 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
               
-              compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX2),axis=1)
+              compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX),axis=1)
               CRES2 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
        except FloatingPointError:
               CRES1 = np.zeros((state.shape[0],1))

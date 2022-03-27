@@ -275,7 +275,7 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
        xgvar = m_fid.createVariable('x', 'f8', ('z', 'x', 'y'))
        xgvar.units = 'm'
        xgvar.axis = 'X'
-       ygvar = m_fid.createVariable('y', 'f8', ('y'))
+       ygvar = m_fid.createVariable('y', 'f8', ('z', 'x', 'y'))
        ygvar.units = 'm'
        ygvar.axis = 'Y'
        zgvar = m_fid.createVariable('z', 'f8', ('z', 'x', 'y'))
@@ -283,7 +283,7 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
        zgvar.axis = 'Z'
        # Store variables
        xgvar[:,:,0] = XL
-       ygvar[:] = 0.0
+       ygvar[:,:,0] = 0.0
        zgvar[:,:,0] = ZTL
        # Create variables (background static fields)
        UVAR = m_fid.createVariable('U', 'f8', ('z', 'x', 'y'))
@@ -362,7 +362,7 @@ def runModel(TestName):
        else:
               print('Legendre spectral derivative in the vertical.')
        
-       verticalStagger = False
+       verticalStagger = True
        if verticalStagger:
               print('Staggered spectral method in the vertical.')
        else:
@@ -713,7 +713,7 @@ def runModel(TestName):
               print('Wavelength grid lengths:',DX_wav,DZ_wav)
               
               NL = 6 # Number of eigenvalues to inspect...
-              #'''
+              '''
               print('Computing spectral radii of derivative operators...')
               DXE = PPXMS[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
               DZE = DDZMS[np.ix_(ebcDex[0],ebcDex[0])].tocsr()
@@ -725,8 +725,8 @@ def runModel(TestName):
               print('Z: ', DZ_eig)
               
               # Minimum magnitude eigenvalues to "cover" smallest resolved scale 
-              DX_rho = np.amin(np.abs(np.imag(DX_eig)))
-              DZ_rho = np.amin(np.abs(np.imag(DZ_eig)))
+              DX_rho = np.amin(np.abs(DX_eig))
+              DZ_rho = np.amin(np.abs(DZ_eig))
               
               print('Derivative matrix spectral radii (1/m):')
               print('X: ', DX_rho)
@@ -738,20 +738,18 @@ def runModel(TestName):
               print('Grid resolution based on 1st derivative matrices: ')
               print('X: ', DX_spr)
               print('Z: ', DZ_spr)
-              
+              '''
               # Diffusion filter grid length based on resolution powers
               DL2 = 1.0 * abs(DZ_avg)
-              DL1 = 1.0 * abs(DX_spr)
-              SBC = DL1 * 0.5 * (metrics[2][1:] + metrics[2][0:-1])
-              DS = np.amax(SBC)              
-              DLD = (DL1, DL2, DL1 * DL2, mt.sqrt(DL1 * DL2), DS)
+              DL1 = 1.0 * abs(DX_avg) 
+              DLD = (DL1, DL2, DL1 * DL2, mt.sqrt(DL1 * DL2))
               
               DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
               DX = DX_min
               
-              print('Diffusion lengths: ', DLD[0], DLD[1], DS)
+              print('Diffusion lengths: ', DLD[0], DLD[1])
               
-              del(DXE); del(DZE)
+              #del(DXE); del(DZE)
               
               # Smallest physical grid spacing in the 2D mesh
               DLS = min(DX, DZ)
