@@ -469,14 +469,14 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               DC2 = DCF[1][:,0] # coefficient to the Z direction flux
               
               try:
-                  #mu_xb = DC1[bdex]
-                  #mu_xt = DC1[tdex]
+                  mu_xb = DC1[bdex]
+                  mu_xt = DC1[tdex]
                   
                   #mu_xb = np.linalg.norm(np.stack((DC1[bdex],DC2[bdex]), axis=1), axis=1)
                   #mu_xt = np.linalg.norm(np.stack((DC1[tdex],DC2[tdex]), axis=1), axis=1)
                   
-                  mu_xb = np.reciprocal(S) * DC1[bdex]
-                  mu_xt = DC1[tdex]
+                  #mu_xb = np.reciprocal(S) * DC1[bdex]
+                  #mu_xt = DC1[tdex]
               except FloatingPointError:
                   mu_xb = np.zeros(bdex.shape)
                   mu_xt = np.zeros(tdex.shape)

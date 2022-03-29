@@ -94,12 +94,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Apply Rayleigh damping layer implicitly
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM.data)
               solB = np.copy(RayDamp.T * solB)
-              
+              #'''
               # Compute flow field
               del(U); del(W)
               U = solB[:,0] + init0[:,0]
               W = solB[:,1]
-              
+              #'''
               # Update the adaptive coefficients using residual
               DqDxR, DqDzR = tendency.computeFieldDerivatives(solB, DDXM_B, DDZM_B)
               args1 = [PHYS, DqDxR, DqDzR, REFS, REFG, solB, U, W]
@@ -107,6 +107,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsNew += tendency.computeRayleighTendency(REFG, solB)
               rhsNew = tendency.enforceTendencyBC(rhsNew, zeroDex, ebcDex, REFS[6][0])
               
+              #dsol = np.copy(solB)
               dsol = (solB - np.nanmean(solB))
               #dsol = (solB - solA)
               

@@ -378,7 +378,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -2
+              rdex = -5
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -741,13 +741,16 @@ def runModel(TestName):
               '''
               # Diffusion filter grid length based on resolution powers
               DL2 = 1.0 * abs(DZ_avg)
-              DL1 = 1.0 * abs(DX_avg) 
-              DLD = (DL1, DL2, DL1 * DL2, mt.sqrt(DL1 * DL2))
+              DL1 = 1.0 * abs(DX_avg)
+              DL_MS = 0.5 * (DL1**2 + DL2**2)
+              DL_RMS = mt.sqrt(DL_MS)
+              DL_GM = mt.sqrt(DL1 * DL2)
+              DLD = (DL1, DL2, DL_RMS, DL_GM)
               
               DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
               DX = DX_min
               
-              print('Diffusion lengths: ', DLD[0], DLD[1])
+              print('Diffusion lengths: ', DLD[0], DLD[1], DL_RMS, DL_GM)
               
               #del(DXE); del(DZE)
               

@@ -62,6 +62,7 @@ def computeResidualViscCoeffsRaw(DIMS, RES, dstate, state, hydroState, DLD, dhdx
               # Compute the flow magnitude
               vel = np.stack((UD, WD),axis=1)
               VFLW = np.linalg.norm(vel, axis=1)
+              #VFLWM = bn.nanmax(VFLW) * np.ones(WD.shape)
               
               # Compute absolute value of residuals
               ARES = np.abs(RES)
@@ -79,15 +80,18 @@ def computeResidualViscCoeffsRaw(DIMS, RES, dstate, state, hydroState, DLD, dhdx
               
               # Compute upper bound on coefficients (single bounding fields
               QMAX = 0.5 * DLD[3] * VFLW
-              #QMAX1 = 0.5 * DLD[0] * VFLW
-              #QMAX2 = 0.5 * DLD[1] * VFLW
+              QMAXB = 0.5 * DLD[2] * VFLW[bdex]
+              #QMAX1 = 0.5 * DLD[0] * UD
+              #QMAX2 = 0.5 * DLD[1] * WD
               
               # Limit DynSGS to upper bound
               compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX),axis=1)
               CRES1 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
+              CRES1[bdex,0] = QMAXB
               
               compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX),axis=1)
               CRES2 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
+              CRES2[bdex,0] = QMAXB
        except FloatingPointError:
               CRES1 = np.zeros((state.shape[0],1))
               CRES2 = np.zeros((state.shape[0],1))
