@@ -11,7 +11,7 @@ import scipy.sparse as sps
 import scipy.ndimage as spi
 #import matplotlib.pyplot as plt
 
-def enforceEssentialBC(sol, zeroDex, ebcDex, dhdx):
+def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
               
        # Enforce essential boundary conditions
        sol[zeroDex[0],0] = 0.0
@@ -19,8 +19,8 @@ def enforceEssentialBC(sol, zeroDex, ebcDex, dhdx):
        sol[zeroDex[2],2] = 0.0
        sol[zeroDex[3],3] = 0.0
        
-       #bdex = ebcDex[2]       
-       #sol[bdex,1] += np.array(dhdx * sol[bdex,0])
+       bdex = ebcDex[2]       
+       sol[bdex,1] = dhdx * U[bdex]
        
        return sol
 
@@ -32,7 +32,7 @@ def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        DqDt[zeroDex[3],3] = 0.0
        
        bdex = ebcDex[2]  
-       DqDt[bdex,1] = dhdx * DqDt[bdex,0]
+       DqDt[bdex,1] = 0.0
        
        return DqDt
 
@@ -127,23 +127,22 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, PHYS, REFS, REFG, ebcDex, zeroDex):
+def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay):
        
        # Compute flow speed
        Q = fields + hydroState
-       UD = Q[:,0]
-       WD = Q[:,1]
        
        # Compute the updated RHS
        DqDx, DqDz = \
-              computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
+              computeFieldDerivatives(fields, DDX, DDZ)
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, \
-                                                     fields, UD, WD)
-       #rhsVec += computeRayleighTendency(REFG, fields, zeroDex)
+                                                     fields, Q[:,0], Q[:,1])
+       if withRay:
+              rhsVec += computeRayleighTendency(REFG, fields)
        
-       rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, REFS[6][0])
+       rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, dhdx)
        
-       return rhsVec, DqDx, DqDz
+       return rhsVec, DqDx, DqDz, Q[:,0]
 
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
@@ -376,65 +375,6 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        
        return DqDt
 
-# Explicit advection RHS evaluation
-def computeEulerEquationsLogPLogT_Advection(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W):
-       # Get physical constants
-       kap = PHYS[4]       
-       # Get the Background fields
-       DQDZ = REFG[2]
-       RdT_bar = REFS[9][0]
-       
-       # Compute pressure gradient force scaling (buoyancy)
-       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
-       
-       # Compute complete vertical partial
-       PqPz = DqDz + DQDZ
-       
-       # Compute advection
-       UM = np.expand_dims(U,1)
-       WM = np.expand_dims(W,1)
-       
-       Uadvect = UM * PqPx
-       Wadvect = WM * PqPz
-       
-       DqDt = -(Uadvect + Wadvect)
-                        
-       return DqDt
-
-# Semi-implicit internal force evaluation
-def computeEulerEquationsLogPLogT_InternalForce(PHYS, PqPx, DqDz, REFS, REFG, fields):
-       # Get physical constants
-       gc = PHYS[0]
-       kap = PHYS[4]
-       gam = PHYS[6]
-       # Get the Background fields
-       DQDZ = REFG[2]
-       RdT_bar = REFS[9][0]
-       
-       # Compute pressure gradient force scaling (buoyancy)
-       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
-       
-       # Compute complete vertical partial
-       PqPz = DqDz + DQDZ
-       
-       # Compute local divergence
-       divergence = PqPx[:,0] + PqPz[:,1]
-       
-       # Compute pressure gradient forces
-       pgradx = RdT * PqPx[:,2]
-       pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       
-       DqDt = np.zeros(fields.shape)
-       # Horizontal momentum equation
-       DqDt[:,0] -= pgradx
-       # Vertical momentum equation
-       DqDt[:,1] -= pgradz
-       # Pressure (mass) equation
-       DqDt[:,2] -= gam * divergence
-       # Potential Temperature equation (transport only)
-                        
-       return DqDt
-
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
@@ -448,7 +388,10 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, zeroDex, DCF, isFluxDiv):
+def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
+       
+       dx = DLD[0]
+       dz = DLD[1]
        
        dhdx = REFS[6][0]
        metrics = REFS[6][1]
@@ -469,21 +412,21 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               DC2 = DCF[1][:,0] # coefficient to the Z direction flux
               
               try:
-                  mu_xb = DC1[bdex]
-                  mu_xt = DC1[tdex]
+                  #mu_xb = DC1[bdex]
+                  #mu_xt = DC1[tdex]
                   
                   #mu_xb = np.linalg.norm(np.stack((DC1[bdex],DC2[bdex]), axis=1), axis=1)
                   #mu_xt = np.linalg.norm(np.stack((DC1[tdex],DC2[tdex]), axis=1), axis=1)
                   
-                  #mu_xb = np.reciprocal(S) * DC1[bdex]
-                  #mu_xt = DC1[tdex]
+                  mu_xb = np.reciprocal(S) * DC1[bdex]
+                  mu_xt = DC1[tdex]
               except FloatingPointError:
                   mu_xb = np.zeros(bdex.shape)
                   mu_xt = np.zeros(tdex.shape)
        try:
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
-              DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPzx[:,1] + P2qPz2[:,0])  
+              DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPzx[:,1] + P2qPz2[:,0])
               DqDt[:,1] = DC1 * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2 * (2.0 * P2qPz2[:,1])
               # Diffusion of scalars (broken up into anisotropic components
               DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
@@ -507,7 +450,7 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               d2qda2 = SB * (DDX @ dqda)
        
               DqDt[bdex,0] = mu_xb * d2qda2[:,0]
-              DqDt[bdex,1] = dhdx * DqDt[bdex,0]#mu_xb * d2qda2[:,1]
+              DqDt[bdex,1] = 0.0
               DqDt[bdex,2] = mu_xb * d2qda2[:,2]
               DqDt[bdex,3] = mu_xb * d2qda2[:,3]
               #'''

@@ -378,7 +378,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -5
+              rdex = -2
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -396,9 +396,9 @@ def runModel(TestName):
        
        # Time step scaling depending on RK solver
        if TOPT[3] == 3:
-              DTF = 1.1
+              DTF = 1.25
        elif TOPT[3] == 4:
-              DTF = 1.2
+              DTF = 1.5
        else:
               DTF = 1.1
        
@@ -850,11 +850,8 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              DqDx, DqDz = \
-                     eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
-              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W)
-              rhs += eqs.computeRayleighTendency(REFG, fields)
-              rhs = eqs.enforceTendencyBC(rhs, zeroDex, ebcDex, REFS[15])
+              rhs, DqDx, DqDz, U = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
+                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
@@ -1002,11 +999,8 @@ def runModel(TestName):
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              DqDx, DqDz = \
-                     eqs.computeFieldDerivatives(fields, REFS[10][0], REFS[10][1])
-              rhs = eqs.computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, fields, U, W)
-              rhs += eqs.computeRayleighTendency(REFG, fields)
-              rhs = eqs.enforceTendencyBC(rhs, zeroDex, ebcDex, REFS[15])
+              rhs, DqDx, DqDz, U = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
+                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
@@ -1067,7 +1061,8 @@ def runModel(TestName):
                      if ti % OTI == 0:
                      
                             # Compute the updated RHS
-                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PHYS, REFS, REFG, ebcDex, zeroDex)
+                            rhsVec, DqDx, DqDz, U = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
+                                                                PHYS, REFS, REFG, ebcDex, zeroDex, True)
                             
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
@@ -1148,13 +1143,16 @@ def runModel(TestName):
                             # Update time and get total solution
                             thisTime += TOPT[0]
                             
-                            # Compute sound speed
-                            T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
-                            RdT = REFS[9][0] * (1.0 + T_ratio)
-                            VSND = np.sqrt(PHYS[6] * RdT)
-                            
-                            # Compute new time step based on updated sound speed
-                            TOPT[0] = DTF * DLS / bn.nanmax(VSND)
+                            try: 
+                                   # Compute sound speed
+                                   T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
+                                   RdT = REFS[9][0] * (1.0 + T_ratio)
+                                   VSND = np.sqrt(PHYS[6] * RdT)
+                                   
+                                   # Compute new time step based on updated sound speed
+                                   TOPT[0] = DTF * DLS / bn.nanmax(VSND)
+                            except FloatingPointError:
+                                   print('Bad computation of local sound speed, no change in time step.')
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
