@@ -54,14 +54,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Use SciPY sparse for dynamics
               DDXM_A = REFS[10][0]
               if verticalStagger:
-                     DDZM_A = REFS[19]
+                     DDZM_A = REFS[18]
               else:
                      DDZM_A = REFS[10][1]
        else:
               # Use multithreading on CPU
               DDXM_A = REFS[12][0]
               if verticalStagger:
-                     DDZM_A = REFS[20]
+                     DDZM_A = REFS[19]
               else:
                      DDZM_A = REFS[12][1]  
        
@@ -97,7 +97,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB = np.copy(RayDamp.T * solB)
               
               # Update the adaptive coefficients using residual
-              rhsNew, DqDxR, DqDzR, U = tendency.computeRHS(solB, init0, DDXM_B, DDZM_B, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False)
+              rhsNew, DqDxR, DqDzR, U = tendency.computeRHS(solB, init0, DDXM_B, DDZM_B, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, True)
               
               #dsol = np.copy(solB)
               dsol = (solB - np.nanmean(solB))

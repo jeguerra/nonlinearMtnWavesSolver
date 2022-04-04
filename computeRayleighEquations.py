@@ -58,8 +58,10 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    dNormX = 1.0
                             # Evaluate the Rayleigh factor
                             RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
+                            isRL = 1.0
                      else:
                             RFX = 0.0
+                            isRL = 0.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
@@ -69,16 +71,19 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    dNormZ = 1.0
                             # Evaluate the strength of the field
                             RFZ = 1.0 - (mt.sin(0.5 * mt.pi * dNormZ))**RP
+                            isRL = 1.0
                      else:
                             RFZ = 0.0
+                            isRL = 0.0
                      
                      # Set the field to max(lateral, top) to handle corners
                      RLX[ii,jj] = RFX
                      RLZ[ii,jj] = RFZ
                      RL[ii,jj] = np.amax([RFX, RFZ])
+                     
                      # Set the binary matrix
-                     if RL[ii,jj] != 0.0:
-                            SBR[ii,jj] = 0.0                            
+                     SBR[ii,jj] = isRL
+       
        '''
        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
        ax.plot_surface(X, Z, RL, cmap=cm.seismic,
@@ -186,6 +191,10 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        # Store the diagonal blocks corresponding to Rayleigh damping terms
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
-       return ROPS, RLM, GML, SBR
+       # Get the indices for the layer regions
+       SBRV = np.reshape(SBR, (OPS,), order='F')
+       ldex = np.argwhere(SBRV)
+       
+       return ROPS, RLM, GML, ldex
        
                             

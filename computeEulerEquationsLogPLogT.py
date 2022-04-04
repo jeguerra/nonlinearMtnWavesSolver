@@ -442,12 +442,13 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
               
               # Compute directional derivatives
-              DDX = REFS[16]
+              DDX1 = REFS[16]
+              DDX2 = REFS[17]
               SB = np.expand_dims(S, axis=1)
-              #DqDx = (DDX @ q[bdex,:])
-              DqDx = PqPx[bdex,:] + np.expand_dims(dhdx, axis=1) * PqPz[bdex,:]
+              DqDx = (DDX1 @ q[bdex,:])
+              #DqDx = PqPx[bdex,:] + np.expand_dims(dhdx, axis=1) * PqPz[bdex,:]
               dqda = SB * (DqDx + np.expand_dims(dhdx, axis=1) * DQDZ[bdex,:])
-              d2qda2 = SB * (DDX @ dqda)
+              d2qda2 = SB * (DDX2 @ dqda)
        
               DqDt[bdex,0] = mu_xb * d2qda2[:,0]
               DqDt[bdex,1] = 0.0

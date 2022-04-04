@@ -768,6 +768,13 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        C = np.zeros((N,N)) # coefficients to 1st derivatives
        D = np.zeros((N,N)) # coefficients to additive part of 1st derivatives
        
+       if isClamped and np.isscalar(DDM_BC):
+              if DDM_BC == 0.0:
+                     DDM_BC = np.zeros((2,N))
+              else:
+                     print('Setting derivatives to single values at ends NOT SUPPORTED!')
+                     DDM_BC = np.zeros((2,N))
+                     
        # Loop over each interior point in the irregular grid
        for ii in range(1,N-1):
               hp = abs(dom[ii+1] - dom[ii])
@@ -792,7 +799,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               
        # Compute BC adjustments
        h0 = abs(dom[1] - dom[0])
-       hn = abs(dom[N-1] - dom[N-2])
+       hn = abs(dom[-1] - dom[-2])
        
        if isClamped:
               # Left end
@@ -809,7 +816,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               A[N-1,N-1] = 2.0 * hn / 3.0
               
               # Use derivative by CFD to set boundary condition
-              B[N-1,:] = DDM_BC[N-1,:]
+              B[N-1,:] = DDM_BC[-1,:]
               B[N-1,N-2] += 1.0 / hn
               B[N-1,N-1] -= 1.0 / hn
               #'''
@@ -842,14 +849,14 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               DDM[0,0] -= 1.0 / h0
               DDM[0,1] += 1.0 / h0
               
-              DDM[N-1,:] = -h0 / 6.0 * AIB[N-2,:] + 2.0 * hn / 3.0 * AIB[N-1,:]
+              DDM[N-1,:] = -h0 / 6.0 * AIB[-2,:] + 2.0 * hn / 3.0 * AIB[-1,:]
               DDM[N-1,N-2] -= 1.0 / hn
               DDM[N-1,N-1] += 1.0 / hn
        
        else:
               # NATURAL cubic spline.
               AIB = np.zeros((N,N))
-              AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:N-1,1:N-1], B[1:N-1,1:N-1])
+              AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:-1,1:-1], B[1:-1,1:-1])
               DDM = C.dot(AIB) + D
               
               # Adjust the ends
@@ -857,7 +864,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               DDM[0,0] -= 1.0 / h0
               DDM[0,1] += 1.0 / h0
               
-              DDM[N-1,:] = -h0 / 6.0 * AIB[N-2,:]
+              DDM[N-1,:] = -h0 / 6.0 * AIB[-2,:]
               DDM[N-1,N-2] -= 1.0 / hn
               DDM[N-1,N-1] += 1.0 / hn      
        

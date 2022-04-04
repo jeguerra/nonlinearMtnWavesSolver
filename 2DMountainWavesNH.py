@@ -547,11 +547,10 @@ def runModel(TestName):
        PBAR = np.exp(LOGP) # Hydrostatic pressure
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML, SBR = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
+       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
        
-       SBROP = sps.diags(np.reshape(SBR, (OPS,), order='F'), offsets=0, format='csr')
        # Make a collection for background field derivatives
-       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, SBROP]
+       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX]
        
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
@@ -681,17 +680,14 @@ def runModel(TestName):
        # Store the terrain profile
        REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
-       REFS.append(sps.csr_matrix(DDX_QS)) # index 16
+       REFS.append(sps.csr_matrix(DDX_1D)) # index 16
+       REFS.append(sps.csr_matrix(DDX_QS)) # index 17
        
        if not StaticSolve:
-              # Staggered operators
-              DDXM_ST = sps.block_diag((DDXMS, DDXMS, DDXMD, DDXMS), format='csr')
-              REFS.append(DDXM_ST) # index 17
-              REFS.append(rsb_matrix(DDXM_ST,shape=DDXM_ST.shape)) # index 18
-              
+              # Staggered vertical operator
               DDZM_ST = sps.block_diag((DDZMS, DDZMST), format='csr')
-              REFS.append(DDZM_ST) # index 19
-              REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 
+              REFS.append(DDZM_ST) # index 18
+              REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 19
        
        # Update REFG with the 2nd vertical derivative of backgrounds
        REFG.append(DDZMS @ DQDZ)
