@@ -41,7 +41,6 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        RL = np.zeros((NZ, NX))
        RLX = np.zeros((NZ, NX))
        RLZ = np.zeros((NZ, NX))
-       SBR = np.ones((NZ, NX))
        
        for ii in range(0,NZ):
               for jj in range(0,NX):
@@ -80,9 +79,6 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      RLX[ii,jj] = RFX
                      RLZ[ii,jj] = RFZ
                      RL[ii,jj] = np.amax([RFX, RFZ])
-                     
-                     # Set the binary matrix
-                     SBR[ii,jj] = isRL
        
        '''
        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -158,7 +154,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        plt.show()
        input()
        '''                  
-       return (GML, GMLX, GMLZ), RL, RLX, RLZ, SBR
+       return (GML, GMLX, GMLZ), RL, RLX, RLZ
 
 def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        # Get options data
@@ -171,7 +167,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        OPS = DIMS[5]
        
        # Set up the Rayleigh field
-       GML, RL, RLX, RLZ, SBR = computeRayleighField(DIMS, REFS, depth, width, \
+       GML, RL, RLX, RLZ = computeRayleighField(DIMS, REFS, depth, width, \
                                                      applyTop, applyLateral)
        
        # Compute the diagonal for full Rayleigh field
@@ -192,8 +188,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        # Get the indices for the layer regions
-       SBRV = np.reshape(SBR, (OPS,), order='F')
-       ldex = np.argwhere(SBRV)
+       ldex = np.argwhere(tempDiagonal)
        
        return ROPS, RLM, GML, ldex
        

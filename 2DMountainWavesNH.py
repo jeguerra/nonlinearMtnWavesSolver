@@ -550,8 +550,8 @@ def runModel(TestName):
        ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
        
        # Make a collection for background field derivatives
-       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX]
-       
+       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX.flatten()]
+              
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
        REFS.append((np.reshape(PORZ, (OPS,), order='F'), np.reshape(PBAR, (OPS,), order='F'))) #index 9
@@ -588,7 +588,7 @@ def runModel(TestName):
        DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        # X partial derivatives
-       PPXMS = DDXMS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS)
+       PPXMS = DDXMS2 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS2)
        PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
        
        #'''
@@ -680,7 +680,7 @@ def runModel(TestName):
        # Store the terrain profile
        REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
-       REFS.append(sps.csr_matrix(DDX_1D)) # index 16
+       REFS.append(sps.csr_matrix(DDX_QS)) # index 16
        REFS.append(sps.csr_matrix(DDX_QS)) # index 17
        
        if not StaticSolve:
@@ -736,8 +736,8 @@ def runModel(TestName):
               print('Z: ', DZ_spr)
               '''
               # Diffusion filter grid length based on resolution powers
-              DL2 = 1.0 * abs(DZ_avg)
-              DL1 = 1.0 * abs(DX_avg)
+              DL2 = 1.0 * DZ_max
+              DL1 = 1.0 * DX_avg
               DL_MS = 0.5 * (DL1**2 + DL2**2)
               DL_RMS = mt.sqrt(DL_MS)
               DL_GM = mt.sqrt(DL1 * DL2)
@@ -846,7 +846,7 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              rhs, DqDx, DqDz, U = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
+              rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
                                                   PHYS, REFS, REFG, ebcDex, zeroDex, True)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
@@ -995,7 +995,7 @@ def runModel(TestName):
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              rhs, DqDx, DqDz, U = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
+              rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
                                                   PHYS, REFS, REFG, ebcDex, zeroDex, True)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
@@ -1057,7 +1057,7 @@ def runModel(TestName):
                      if ti % OTI == 0:
                      
                             # Compute the updated RHS
-                            rhsVec, DqDx, DqDz, U = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
+                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
                                                                 PHYS, REFS, REFG, ebcDex, zeroDex, True)
                             
                             message = ''

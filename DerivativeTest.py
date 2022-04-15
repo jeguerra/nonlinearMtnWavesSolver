@@ -123,7 +123,7 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 HofX, dHdX, SD = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
-DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, False, False, DDX_1D)
+DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_1D)
 DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_1D)
 
 DYD_CS = DDX_CS.dot(HofX)
@@ -186,7 +186,7 @@ DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 10)
 zv = (1.0 / ZH) * REFS[1]
 Y, DY = function1(zv)
 
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, False, False, ZH * DDZ_CFD2)
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, ZH * DDZ_CFD2)
 DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, ZH * DDZ_CFD2)
 
 # Compute SVD of derivative matrices

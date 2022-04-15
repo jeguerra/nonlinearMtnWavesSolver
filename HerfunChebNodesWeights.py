@@ -195,6 +195,9 @@ def legpolym(ND, xi, fullMat):
               DLTM = np.zeros((ND+1,NX))
               DLTM[0,:] = dpoly0
               DLTM[1,:] = dpoly1
+       else:
+              LTM = np.ones(NX)
+              DLTM = np.zeros(NX)
        
        for nn in range(2,ND+1):
               # Compute the new polynomial

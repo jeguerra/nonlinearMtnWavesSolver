@@ -77,14 +77,14 @@ class TestCase:
               
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': True, \
+                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': False, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(683, 96, 160.0, 34.0, 300.0, \
+                     self.setUserData(647, 96, 140.0, 34.0, 300.0, \
                                       9000.0, 40000.0, 10.0,
                                       3000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
               

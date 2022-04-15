@@ -8,6 +8,7 @@ Created on Wed Jul 17 14:12:01 2019
 
 import numpy as np
 import HerfunChebNodesWeights as qxw
+import matplotlib.pyplot as plt
 
 def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
        # Get the domain dimensions
@@ -21,10 +22,12 @@ def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
               # Compute the Chebyshev native grids
               xi, wcp = qxw.cheblb(NZ) #[-1 +1]
               z = 0.5 * ZH * (1.0 + xi)
+              zf = qxw.chebpolym(NZ-1, xi)
        elif LegCol:
               # Compute the Legendre native grids
               xi, wcp = qxw.leglb(NZ) #[-1 +1]
               z = 0.5 * ZH * (1.0 + xi)
+              zf = qxw.legpolym(NZ-1, xi, False)
        else:
               z = np.linspace(0.0, ZH, num=NZ, endpoint=True)
        
@@ -32,6 +35,7 @@ def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
        if Herm and not Four:
               alpha, whf = qxw.hefunclb(NX) #(-inf inf)
               x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
+              xf = qxw.hefuncm(NX-1, alpha, False)
        elif Four and not Herm:
               x = np.linspace(L1, L2, num=NX+1, endpoint=True)
        else:

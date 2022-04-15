@@ -103,7 +103,11 @@ def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
        PqPz += DQDZ
        
        if isFluxDiv:
-              vd = np.hstack((DCF[0] * PqPx, DCF[1] * PqPz))
+              try:
+                     vd = np.hstack((np.expand_dims(DCF[0], axis=1) * PqPx, \
+                                     np.expand_dims(DCF[1], axis=1) * PqPz))
+              except FloatingPointError:
+                     vd = np.hstack((0.0 * PqPx, 0.0 * PqPz))
        else:
               vd = np.hstack((PqPx, PqPz))
        dvdx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
@@ -136,13 +140,13 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
        DqDx, DqDz = \
               computeFieldDerivatives(fields, DDX, DDZ)
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, \
-                                                     fields, Q[:,0], Q[:,1])
+                                                     fields, Q[:,0], Q[:,1], ebcDex)
        if withRay:
               rhsVec += computeRayleighTendency(REFG, fields)
        
        rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, dhdx)
        
-       return rhsVec, DqDx, DqDz, Q[:,0]
+       return rhsVec, DqDx, DqDz
 
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
@@ -323,7 +327,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W):
+def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W, ebcDex):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -356,9 +360,20 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        # Compute local divergence
        divergence = PqPx[:,0] + DqDz[:,1]
        
+       divergence[ebcDex[0]] = PqPx[ebcDex[0],0]
+       divergence[ebcDex[1]] = PqPx[ebcDex[1],0]
+       
        # Compute pressure gradient forces
        pgradx = RdT * PqPx[:,2]
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
+       
+       pgradx[ebcDex[0]] = 0.0
+       pgradx[ebcDex[1]] = 0.0
+       
+       pgradz[ebcDex[0]] = 0.0
+       pgradz[ebcDex[1]] = 0.0
+       pgradz[ebcDex[2]] = 0.0
+       pgradz[ebcDex[3]] = 0.0
        
        DqDt = -(Uadvect + Wadvect)
        
@@ -385,13 +400,12 @@ def computeRayleighTendency(REFG, fields):
               DqDt = -mu * ROP.dot(fields)
        except FloatingPointError:
               DqDt = np.zeros(fields.shape)
-              
+       
+       #DqDt[:,2] = 0.0       
+       
        return DqDt
 
 def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
-       
-       dx = DLD[0]
-       dz = DLD[1]
        
        dhdx = REFS[6][0]
        metrics = REFS[6][1]
@@ -402,27 +416,27 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
        tdex = ebcDex[3]
        
        DqDt = np.zeros(P2qPx2.shape)
+       
+       DC1 = DCF[0] # coefficient to the X direction flux
+       DC2 = DCF[1] # coefficient to the Z direction flux
+              
+       try:
+           #mu_xb = DC1[bdex]
+           #mu_xt = DC1[tdex]
+           
+           #mu_xb = np.linalg.norm(np.stack((DC1[bdex],DC2[bdex]), axis=1), axis=1)
+           #mu_xt = np.linalg.norm(np.stack((DC1[tdex],DC2[tdex]), axis=1), axis=1)
+           
+           mu_xb = np.reciprocal(S) * DC1[bdex]
+           mu_xt = DC1[tdex]
+       except FloatingPointError:
+           mu_xb = np.zeros(bdex.shape)
+           mu_xt = np.zeros(tdex.shape)
+           
        if isFluxDiv:
               DC1 = 1.0
               DC2 = 1.0
-              mu_xt = 1.0
-              mu_xb = 1.0
-       else:
-              DC1 = DCF[0][:,0] # coefficient to the X direction flux
-              DC2 = DCF[1][:,0] # coefficient to the Z direction flux
               
-              try:
-                  #mu_xb = DC1[bdex]
-                  #mu_xt = DC1[tdex]
-                  
-                  #mu_xb = np.linalg.norm(np.stack((DC1[bdex],DC2[bdex]), axis=1), axis=1)
-                  #mu_xt = np.linalg.norm(np.stack((DC1[tdex],DC2[tdex]), axis=1), axis=1)
-                  
-                  mu_xb = np.reciprocal(S) * DC1[bdex]
-                  mu_xt = DC1[tdex]
-              except FloatingPointError:
-                  mu_xb = np.zeros(bdex.shape)
-                  mu_xt = np.zeros(tdex.shape)
        try:
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector

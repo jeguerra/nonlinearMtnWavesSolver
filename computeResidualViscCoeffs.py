@@ -49,20 +49,19 @@ def computeResidualViscCoeffs(DIMS, RES, QM, VFLW, DLD, DLD2, NE):
 
        return (np.expand_dims(CRES, axis=1), np.expand_dims(CRES, axis=1))
 
-def computeResidualViscCoeffsRaw(DIMS, RES, dstate, state, hydroState, DLD, dhdx, bdex):
+def computeResidualViscCoeffsRaw(DIMS, RES, qnorm, state, DLD, dhdx, bdex, ldex):
        
        # Compute flow speed
-       UD = np.abs(state[:,0] + hydroState[:,0])
+       UD = np.abs(state[:,0])
        WD = np.abs(state[:,1])
        
        # Compute field normalization
-       QM = bn.nanmax(np.abs(dstate), axis=0)
+       QM = bn.nanmax(np.abs(qnorm), axis=0)
        
        try:
               # Compute the flow magnitude
               vel = np.stack((UD, WD),axis=1)
               VFLW = np.linalg.norm(vel, axis=1)
-              #VFLWM = bn.nanmax(VFLW) * np.ones(WD.shape)
               
               # Compute absolute value of residuals
               ARES = np.abs(RES)
@@ -79,26 +78,40 @@ def computeResidualViscCoeffsRaw(DIMS, RES, dstate, state, hydroState, DLD, dhdx
               QRES_MAX = bn.nanmax(ARES, axis=1)
               
               # Compute upper bound on coefficients based on flow speed
-              QMAX1 = 0.5 * DLD[0] * VFLW
-              QMAX2 = 0.5 * DLD[1] * VFLW
-              QMAXB = QMAX1[bdex]
-              #QMAX1 = 0.5 * UD
-              #QMAX2 = 0.5 * WD
-              #QMAX1[QMAX1 <= 1.0E-10] = np.inf
-              #QMAX2[QMAX2 <= 1.0E-10] = np.inf
+              QMAX1 = 0.5 * DLD[0] * UD
+              QMAX2 = 0.5 * DLD[1] * WD
+              
+              QB1 = bn.nanmax(QMAX1)
+              QB2 = bn.nanmax(QMAX2)
               
               # Limit DynSGS to upper bound
+              CRES1 = DLD[0]**2 * QRES_MAX
+              CRES1[CRES1 > QB1] = QB1
+              CRES2 = DLD[1]**2 * QRES_MAX
+              CRES2[CRES2 > QB2] = QB2
+              
+              # Set maximum adaptive damping along the terrain
+              CRES1[bdex] = QMAX1[bdex]
+              CRES2[bdex] = QMAX2[bdex]
+              '''
               compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX1),axis=1)
               CRES1 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
-              CRES1[bdex,0] = QMAXB
               
               compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX2),axis=1)
               CRES2 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
-              CRES2[bdex,0] = QMAXB
+              '''
+              '''
+              # Set maximum adaptive damping along the terrain
+              CRES1[bdex] = 0.5 * DLD[0] * VFLW[bdex]
+              CRES2[bdex] = 0.5 * DLD[1] * VFLW[bdex]
               
+              # Set maximum adaptive damping in the Rayleigh layers
+              CRES1[ldex] = 0.5 * DLD[0] * VFLW[ldex]
+              CRES2[ldex] = 0.5 * DLD[1] * VFLW[ldex]
+              '''
        except FloatingPointError:
-              CRES1 = np.zeros((state.shape[0],1))
-              CRES2 = np.zeros((state.shape[0],1))
+              CRES1 = np.zeros((state.shape[0]))
+              CRES2 = np.zeros((state.shape[0]))
        
        return (CRES1, CRES2)
 
