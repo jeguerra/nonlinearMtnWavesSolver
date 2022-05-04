@@ -24,9 +24,6 @@ def computeTopographyOnGrid(REFS, opt):
        xh = REFS[0]
        NP = len(xh)
        
-       # Get a derivative operator
-       DDX, D2DX = derv.computeCubicSplineDerivativeMatrix(xh, True, False, 0.0)
-       
        # Make width for the Kaiser window
        r2 = 1.0 * kC
        r1 = -r2
@@ -59,8 +56,8 @@ def computeTopographyOnGrid(REFS, opt):
               # Kaiser bell curve
               ht = h0 * sin2Dom
               # Take the derivative
-              dhdx = DDX @ ht
-              dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
+              fsp = CubicSpline(xh, ht, bc_type='clamped')
+              dhdx = fsp(xh, 1)
        elif profile == 2:
               # Schar mountain with analytical slope
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
@@ -70,8 +67,6 @@ def computeTopographyOnGrid(REFS, opt):
               dhdx = -2.0 * ht
               dhdx *= (1.0 / aC**2.0) * xh + (mt.pi / lC) * np.tan(mt.pi / lC * xh)
               
-              ht[np.abs(ht) < 1.0E-15] = 0.0
-              dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
        elif profile == 3:
               # General Kaiser window times a cosine series
               ps = 2.0 # polynomial order of cosine factor
@@ -79,9 +74,9 @@ def computeTopographyOnGrid(REFS, opt):
               hf = 1.0 / (1.0 + hs) # scale for composite profile to have h = 1
               ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps)
               ht = hf * h0 * sin2Dom * ht2
-              
-              dhdx = DDX @ ht
-              dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
+              # Take the derivative
+              fsp = CubicSpline(xh, ht, bc_type='clamped')
+              dhdx = fsp(xh, 1)
        elif profile == 4:
               # General even power exponential times a polynomial series
               ht = np.zeros(len(xh))
@@ -92,13 +87,19 @@ def computeTopographyOnGrid(REFS, opt):
               print('ERROR: invalid terrain option.')
               sys.exit(2)
        
-       d2hdx2 = D2DX @ ht
-       d2hdx2[np.abs(d2hdx2) < 1.0E-15] = 0.0
+       ht[np.abs(ht) < 1.0E-15] = 0.0
+       dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
+       
+       # Take the derivative
+       fsp = CubicSpline(xh, ht, bc_type='clamped')
+       d2hdx2 = fsp(xh, 2)
        
        S = np.power(1.0 + np.power(dhdx, 2.0), -0.5)
        S2 = np.reciprocal(1.0 + np.power(dhdx, 2.0))
        
-       dSdx = DDX @ S
+       # Take the derivative
+       fsp = CubicSpline(xh, S, bc_type='clamped')
+       dSdx = fsp(xh, 1)
        
        '''
        fc = 1.25

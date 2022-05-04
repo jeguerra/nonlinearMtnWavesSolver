@@ -97,10 +97,10 @@ def computeFieldDerivativeStag(q, DDX, DDZ):
 
 def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
           
-       DQDZ = REFG[2]
+       #DQDZ = REFG[2]
        
        # Complete vertical parial
-       PqPz += DQDZ
+       #PqPz += DQDZ
        
        if isFluxDiv:
               try:
@@ -110,13 +110,14 @@ def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
                      vd = np.hstack((0.0 * PqPx, 0.0 * PqPz))
        else:
               vd = np.hstack((PqPx, PqPz))
-       dvdx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
        
-       P2qPx2 = dvdx[:,0:4]
+       pvpx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
+       
+       P2qPx2 = pvpx[:,0:4]
        P2qPz2 = dvdz[:,4:] 
        
        P2qPzx = dvdz[:,0:4]
-       P2qPxz = dvdx[:,4:]
+       P2qPxz = pvpx[:,4:]
        
        return P2qPx2, P2qPz2, P2qPzx, P2qPxz
 
@@ -131,22 +132,25 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay):
+def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger):
        
        # Compute flow speed
        Q = fields + hydroState
        
        # Compute the updated RHS
-       DqDx, DqDz = \
-              computeFieldDerivatives(fields, DDX, DDZ)
-       rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, DqDx, DqDz, REFS, REFG, \
+       if vertStagger:
+              PqPx, DqDz = computeFieldDerivativeStag(fields, DDX, DDZ)
+       else:
+              PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ)
+              
+       rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, \
                                                      fields, Q[:,0], Q[:,1], ebcDex)
        if withRay:
               rhsVec += computeRayleighTendency(REFG, fields)
        
        rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, dhdx)
        
-       return rhsVec, DqDx, DqDz
+       return rhsVec, PqPx, DqDz
 
 #%% Evaluate the Jacobian matrix
 def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
@@ -360,6 +364,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        # Compute local divergence
        divergence = PqPx[:,0] + DqDz[:,1]
        
+       # Divergence at lateral boundaries vanishes
        divergence[ebcDex[0]] = PqPx[ebcDex[0],0]
        divergence[ebcDex[1]] = PqPx[ebcDex[1],0]
        
@@ -367,9 +372,10 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        pgradx = RdT * PqPx[:,2]
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
+       # PGF_x at lateral boundaries vanishes
        pgradx[ebcDex[0]] = 0.0
        pgradx[ebcDex[1]] = 0.0
-       
+       # PGF_x and PGF_z at vertical boundaries vanish
        pgradz[ebcDex[0]] = 0.0
        pgradz[ebcDex[1]] = 0.0
        pgradz[ebcDex[2]] = 0.0
@@ -400,9 +406,7 @@ def computeRayleighTendency(REFG, fields):
               DqDt = -mu * ROP.dot(fields)
        except FloatingPointError:
               DqDt = np.zeros(fields.shape)
-       
-       #DqDt[:,2] = 0.0       
-       
+              
        return DqDt
 
 def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
@@ -461,7 +465,7 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               SB = np.expand_dims(S, axis=1)
               DqDx = (DDX1 @ q[bdex,:])
               #DqDx = PqPx[bdex,:] + np.expand_dims(dhdx, axis=1) * PqPz[bdex,:]
-              dqda = SB * (DqDx + np.expand_dims(dhdx, axis=1) * DQDZ[bdex,:])
+              dqda = SB * DqDx #+ np.expand_dims(dhdx, axis=1) * DQDZ[bdex,:])
               d2qda2 = SB * (DDX2 @ dqda)
        
               DqDt[bdex,0] = mu_xb * d2qda2[:,0]

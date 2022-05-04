@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-fname = 'StaggeredZ00_QS-DynSGS_RHS_h3000m.nc'
+fname = 'StaggeredZ06_QS-DynSGS_RHS_h3000m.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]

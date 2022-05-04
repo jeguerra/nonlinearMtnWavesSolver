@@ -396,9 +396,9 @@ def runModel(TestName):
        
        # Time step scaling depending on RK solver
        if TOPT[3] == 3:
-              DTF = 1.25
+              DTF = 1.1
        elif TOPT[3] == 4:
-              DTF = 1.5
+              DTF = 1.25
        else:
               DTF = 1.1
        
@@ -547,7 +547,7 @@ def runModel(TestName):
        PBAR = np.exp(LOGP) # Hydrostatic pressure
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
+       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ebcDex)
        
        # Make a collection for background field derivatives
        REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX.flatten()]
@@ -577,9 +577,6 @@ def runModel(TestName):
        DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_CFD)
        DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], DDZ_CFD)
        
-       #DDX_CS, DDX4_CS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_CFD)
-       #DDZ_CS, DDZ4_CS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], DDZ_CFD)
-       
        # Derivative operators for dynamics
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        DDXMS2, DDZMS2 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
@@ -590,6 +587,9 @@ def runModel(TestName):
        # X partial derivatives
        PPXMS = DDXMS2 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS2)
        PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
+       
+       PPXMS = derv.numericalCleanUp(PPXMS)
+       PPXMD = derv.numericalCleanUp(PPXMD)
        
        #'''
        # Staggered operator in the vertical Legendre/Chebyshev mix
@@ -606,30 +606,8 @@ def runModel(TestName):
               
               LG2CH_INT = (LTM.T).dot(LD_TRANS)
               CH2LG_INT = (CTM).dot(CH_TRANS)
-              '''
-              # Stagger to a different degree
-              NZS = int(1.01 * NZ)
-              xi_lgs, whf = derv.leglb(NZS)
               
-              LTM1, dummy = derv.legpolym(NZ, xi_lgs, True)
-              LTM2, dummy = derv.legpolym(NZS, xi_lg, True)
-              
-              DIMSS = DIMS.copy(); DIMSS[4] = NZS
-              DDZ_LDS, LDS_TRANS = derv.computeLegendreDerivativeMatrix(DIMSS)
-              LG2LGS_INT = (LTM1.T).dot(LD_TRANS)
-              LGS2LG_INT = (LTM2.T).dot(LDS_TRANS)
-              '''
               if verticalLegdGrid:
-                     '''
-                     zST = 0.5 * DIMS[2] * (1.0 + xi_lg)
-                     var1, var2, var3, sigmaST, ZRL, var4, var5 = \
-                            coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
-                            
-                     DDZ_1DS = LGS2LG_INT.dot(DDZ_LDS).dot(LG2LGS_INT)
-                     dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
-                     del(dummy)
-                     '''
-                     #'''
                      zST = 0.5 * DIMS[2] * (1.0 + xi_ch)
                      var1, var2, var3, sigmaST, ZRL, var4, var5 = \
                             coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
@@ -637,9 +615,7 @@ def runModel(TestName):
                      DDZ_1DS = CH2LG_INT.dot(DDZ_CH).dot(LG2CH_INT)
                      dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
                      del(dummy)
-                     #'''
               if verticalChebGrid:
-                     
                      zST = 0.5 * DIMS[2] * (1.0 + xi_lg)
                      var1, var2, var3, sigmaST, ZRL, var4, var5 = \
                             coords.computeGuellrichDomain2D(DIMS, REFS[0], zST, zRay, HofX, dHdX, StaticSolve)
@@ -657,10 +633,7 @@ def runModel(TestName):
        diffOps2 = (rsb_matrix(PPXMD, shape=PPXMD.shape), 
                    rsb_matrix(DDZMD, shape=DDZMD.shape))
        
-       if StaticSolve:
-              REFS.append((DDXMS, DDZMS)) # index 10
-       else:
-              REFS.append((PPXMS, DDZMS)) # index 10
+       REFS.append((DDXMS, DDZMS)) # index 10
        REFS.append(diffOps1) # index 11
        
        if not StaticSolve and RSBops:
@@ -674,7 +647,7 @@ def runModel(TestName):
               REFS.append(diffOps1)
        else: 
               # Matrix operators
-              REFS.append(DDXMD) # index 12
+              REFS.append(PPXMD) # index 12
               REFS.append(DDZMD) # index 13
               
        # Store the terrain profile
@@ -708,36 +681,14 @@ def runModel(TestName):
               DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
               print('Wavelength grid lengths:',DX_wav,DZ_wav)
               
-              NL = 6 # Number of eigenvalues to inspect...
-              '''
-              print('Computing spectral radii of derivative operators...')
-              DXE = PPXMS[np.ix_(ebcDex[2],ebcDex[2])].tocsr()
-              DZE = DDZMS[np.ix_(ebcDex[0],ebcDex[0])].tocsr()
-              DX_eig = spl.eigs(DXE[1:-1,1:-1], k=NL, which='LI', return_eigenvectors=False)
-              DZ_eig = spl.eigs(DZE[1:-1,1:-1], k=NL, which='LI', return_eigenvectors=False)
-              
-              print('Eigenvalues (largest imaginary part) of derivative matrices:')
-              print('X: ', DX_eig)
-              print('Z: ', DZ_eig)
-              
-              # Minimum magnitude eigenvalues to "cover" smallest resolved scale 
-              DX_rho = np.amin(np.abs(DX_eig))
-              DZ_rho = np.amin(np.abs(DZ_eig))
-              
-              print('Derivative matrix spectral radii (1/m):')
-              print('X: ', DX_rho)
-              print('Z: ', DZ_rho)
-              
-              DZ_spr = 1.0 / DZ_rho
-              DX_spr = 1.0 / DX_rho
-              
-              print('Grid resolution based on 1st derivative matrices: ')
-              print('X: ', DX_spr)
-              print('Z: ', DZ_spr)
-              '''
               # Diffusion filter grid length based on resolution powers
-              DL2 = 1.0 * DZ_max
-              DL1 = 1.0 * DX_avg
+              if DynSGS_RES:
+                     DL2 = 1.0 * DZ_max
+                     DL1 = 1.0 * DX_max
+              else:
+                     DL2 = 1.0 * DZ_max
+                     DL1 = 1.0 * DX_max
+                     
               DL_MS = 0.5 * (DL1**2 + DL2**2)
               DL_RMS = mt.sqrt(DL_MS)
               DL_GM = mt.sqrt(DL1 * DL2)
@@ -1058,7 +1009,7 @@ def runModel(TestName):
                      
                             # Compute the updated RHS
                             rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
-                                                                PHYS, REFS, REFG, ebcDex, zeroDex, True)
+                                                                PHYS, REFS, REFG, ebcDex, zeroDex, True, False)
                             
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
@@ -1115,7 +1066,8 @@ def runModel(TestName):
                             rhsVec0 = np.copy(rhsVec)
                      
                             # Compute the updated RHS
-                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PHYS, REFS, REFG, ebcDex, zeroDex)
+                            args = [fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], PHYS, REFS, REFG, ebcDex, zeroDex, True, False]
+                            rhsVec, DqDxR, DqDzR = eqs.computeRHS(*args)
                      
                             if ti == 0:
                                    resVec = (1.0 / TOPT[0]) * delFields - rhsVec

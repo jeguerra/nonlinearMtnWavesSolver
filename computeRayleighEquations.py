@@ -156,7 +156,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        '''                  
        return (GML, GMLX, GMLZ), RL, RLX, RLZ
 
-def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
+def computeRayleighEquations(DIMS, REFS, depth, RLOPT, ebcDex):
        # Get options data
        width = RLOPT[1]
        applyTop = RLOPT[2]
@@ -172,8 +172,16 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, topdex, botdex):
        
        # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
+       
+       # Clean up the Rayleigh layers
+       #tempDiagonal[ebcDex[0]] = 0.0
+       #tempDiagonal[ebcDex[1]] = 0.0
+       #tempDiagonal[ebcDex[2]] = 0.0
+       #tempDiagonal[ebcDex[3]] = 0.0
+       
        # Compute the matrix operator
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
+
        '''
        # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RLX, (OPS,), order='F')

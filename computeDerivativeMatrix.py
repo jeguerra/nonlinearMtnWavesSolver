@@ -101,6 +101,8 @@ def removeLeastSingularValue(DDM):
        DDM = U[:,0:-mr].dot(S)
        DDM = DDM.dot(Vh[0:-mr,:])
        
+       DDM = numericalCleanUp(DDM)
+       
        return DDM
 
 # Compute Spectral Element 1st derivative matrix (2 sided coupling)
@@ -1093,9 +1095,6 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      sdex = np.array([0, 1, 2, 3, 4, 5])
                      CMS = CMI[np.ix_(sdex,sdex)]
                      
-                     #Q, R = scl.qr(CMS)
-                     #PLU = scl.lu_factor(R)
-                     #CF = scl.lu_solve(PLU, (Q.T).dot(CM10_V[sdex]))
                      PLU = scl.lu_factor(CMS)
                      CF = scl.lu_solve(PLU, CM10_V[sdex])
                      CFE = -np.sum(CF[0:6])
@@ -1172,14 +1171,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               RDM[N-1,N-3] = (hp2**2) / (hp3**2 * (hp2 + hp3))
               
        # Get the derivative matrix
-       #Q, R = scl.qr(LDM)
-       #PLU = scl.lu_factor(R)
-       #DDM = scl.lu_solve(PLU, (Q.T).dot(RDM))
-       
        PLU = scl.lu_factor(LDM)
        DDM = scl.lu_solve(PLU, RDM)
        
-       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
        
        return DDMC
@@ -1273,12 +1267,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        temp = (CT.T).dot(SDIFF)
        DDM = -b * temp.dot(STR_C)
        
-       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
-              
-       #print(xi)
-       #print(DDM[0,0], -(2.0 * NZ**2 + 1) / 3.0 / ZH)
-       #print(DDM[-1,-1], (2.0 * NZ**2 + 1) / 3.0 / ZH)
 
        return DDMC, STR_C
 
@@ -1336,7 +1325,6 @@ def computeLaguerreDerivativeMatrix(DIMS):
        temp = temp.dot(STR_L)       
        DDM = b * temp
        
-       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
        
        return DDMC.astype(np.float64), STR_L
@@ -1381,11 +1369,7 @@ def computeLegendreDerivativeMatrix(DIMS):
        temp = (LT.T).dot(SDIFF)
        DDM = b * temp.dot(STR_L)
        
-       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
-       
-       #print(DDM[0,0], -NZ * (NZ + 1) / 2.0 / ZH)
-       #print(DDM[-1,-1], NZ * (NZ + 1) / 2.0 / ZH)
        
        return DDMC, STR_L
        

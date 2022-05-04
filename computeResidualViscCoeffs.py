@@ -93,22 +93,9 @@ def computeResidualViscCoeffsRaw(DIMS, RES, qnorm, state, DLD, dhdx, bdex, ldex)
               # Set maximum adaptive damping along the terrain
               CRES1[bdex] = QMAX1[bdex]
               CRES2[bdex] = QMAX2[bdex]
-              '''
-              compare = np.stack((DLD[0]**2 * QRES_MAX, QMAX1),axis=1)
-              CRES1 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
+              #CRES1[bdex] = 0.5 * DLD[0] * VFLW[bdex]
+              #CRES2[bdex] = 0.5 * DLD[1] * VFLW[bdex]
               
-              compare = np.stack((DLD[1]**2 * QRES_MAX, QMAX2),axis=1)
-              CRES2 = np.expand_dims(bn.nanmin(compare, axis=1), axis=1)
-              '''
-              '''
-              # Set maximum adaptive damping along the terrain
-              CRES1[bdex] = 0.5 * DLD[0] * VFLW[bdex]
-              CRES2[bdex] = 0.5 * DLD[1] * VFLW[bdex]
-              
-              # Set maximum adaptive damping in the Rayleigh layers
-              CRES1[ldex] = 0.5 * DLD[0] * VFLW[ldex]
-              CRES2[ldex] = 0.5 * DLD[1] * VFLW[ldex]
-              '''
        except FloatingPointError:
               CRES1 = np.zeros((state.shape[0]))
               CRES2 = np.zeros((state.shape[0]))
