@@ -86,9 +86,12 @@ def computeResidualViscCoeffsRaw(DIMS, RES, qnorm, state, DLD, dhdx, bdex, ldex)
               
               # Limit DynSGS to upper bound
               CRES1 = DLD[0]**2 * QRES_MAX
-              CRES1[CRES1 > QB1] = QB1
+              vdex = np.argwhere(CRES1 > QB1)
+              CRES1[vdex] = QB1 #QMAX1[vdex]
+              
               CRES2 = DLD[1]**2 * QRES_MAX
-              CRES2[CRES2 > QB2] = QB2
+              vdex = np.argwhere(CRES2 > QB2)
+              CRES2[vdex] = QB2 #QMAX2[vdex]
               
               # Set maximum adaptive damping along the terrain
               CRES1[bdex] = QMAX1[bdex]

@@ -75,10 +75,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      
        def computeUpdate(coeff, solA, sol2Update):
               
-              # Normalization and bounding to DynSGS
-              #state = solA + init0
-              #qnorm = 1.0 * (solA - bn.nanmean(solA))
-              
               DF = coeff * DT
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
               
@@ -106,8 +102,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Update the adaptive coefficients using residual
               args = [solB, init0, DDXM_B, DDZM_B, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, False]
               rhsNew, DqDxR, DqDzR = tendency.computeRHS(*args)
+              
               if DynSGS_RES:
-                     resField = rhsNew - rhsExp
+                     resField = rhsExp - rhsNew
               else:
                      resField = np.copy(rhsNew)
        
@@ -301,9 +298,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketcheson62(sol0)
        elif order == 3:
-              #solB = ketcheson93(sol0)
+              solB = ketcheson93(sol0)
               #solB = ssprk43(sol0)
-              solB = ssprk53_Opt(sol0)
+              #solB = ssprk53_Opt(sol0)
        elif order == 4:
               solB = ketcheson104(sol0)
        else:

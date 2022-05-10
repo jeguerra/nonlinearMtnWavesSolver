@@ -18,6 +18,7 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 import sys
 import time
 import shelve
+import shutil
 import math as mt
 import numpy as np
 import bottleneck as bn
@@ -69,12 +70,12 @@ def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
        plt.title('Discrete Temperature Profile (K)')
        plt.xlabel('Temperature (K)')
        plt.ylabel('Height (km)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.subplot(1,2,2)
        plt.plot(TZ, 1.0E-3*ZTL, 'k-')
        plt.title('Smooth Temperature Profile (K)')
        plt.xlabel('Temperature (K)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.tight_layout()
        plt.savefig('python results/Temperature_Background.png')
        plt.show()
@@ -85,12 +86,12 @@ def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
        plt.title('Discrete Temperature Profile (K)')
        plt.xlabel('Temperature (K)')
        plt.ylabel('Height (km)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.subplot(1,2,2)
        plt.plot(DTDZ, 1.0E-3*ZTL, 'k-')
        plt.title('Smooth Temperature Profile (K)')
        plt.xlabel('Temperature (K)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        plt.tight_layout()
        plt.savefig('python results/Temperature_Background.png')
        plt.show()
@@ -98,8 +99,14 @@ def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
 
        return       
 
-def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
-       fig = plt.figure(num=1, clear=True, figsize=(26.0, 18.0)) 
+def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, dca, dcb, NX, NZ, numVar):
+       
+       keepHistory = False
+       
+       xlims = [-50.0, 50.0]
+       ylims = [0.0, 25.0]
+       
+       fig = plt.figure(num=1, clear=True, figsize=(13.0, 9.0)) 
        for pp in range(numVar):
               q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
               dqdt = np.reshape(rhs[:,pp], (NZ+1, NX+1), order='F')
@@ -116,9 +123,7 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
                      clim = np.abs(q.max())
              
               ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-              #plt.xlim(-30.0, 30.0)
-              #plt.ylim(0.0, 20.0)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               if pp < (numVar - 1):
                      plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -136,6 +141,9 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               else:
                      plt.title(r'(ln$\theta$)' + '\' (K)')
                      
+              plt.xlim(xlims[0], xlims[1])
+              plt.ylim(ylims[0], ylims[1])
+                     
               #%% Plot the full tendencies
               plt.subplot(4,3,rowDex + 1)
               if np.abs(dqdt.max()) > np.abs(dqdt.min()):
@@ -146,7 +154,7 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
                      clim = np.abs(dqdt.max())
              
               ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               if pp < (numVar - 1):
                      plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -164,8 +172,8 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               else:
                      plt.title(r'd(ln$\theta$)' + '\'/dt' + ' (K/s)')
                      
-              #plt.xlim(-50.0, 50.0)
-              #plt.ylim(0.0, 25.0)
+              plt.xlim(xlims[0], xlims[1])
+              plt.ylim(ylims[0], ylims[1])
                      
               #%% Plot the full residuals
               plt.subplot(4,3,rowDex + 2)
@@ -175,15 +183,10 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
                      clim = np.abs(residual.min())
               else:
                      clim = np.abs(residual.max())
-              '''
-              if clim > 0.0:
-                     normr = 1.0 / clim
-              else:
-                     normr = 1.0
-              '''       
+                 
               normr = 1.0
               ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, normr * residual, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               if pp < (numVar - 1):
                      plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -201,12 +204,54 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, NX, NZ, numVar):
               else:
                      plt.title('Residual: ' + r'(ln$\theta$)' + '\'')
                      
-              #plt.xlim(-50.0, 50.0)
-              #plt.ylim(0.0, 25.0)
+              plt.xlim(xlims[0], xlims[1])
+              plt.ylim(ylims[0], ylims[1])
                      
        plt.tight_layout()
-       #plt.show(block=False)
-       plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/transient' + '{:0>6d}'.format(int(thisTime)) +  '.pdf')
+       if keepHistory:
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions' + '{:0>6d}'.format(int(thisTime)) +  '.pdf')
+       else:
+              shutil.copyfile('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions.pdf', \
+                              '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions0.pdf')
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions.pdf')
+       fig.clear()
+       del(fig)
+       
+       #%% PLOT DIFFUCION COEFFICIENTS
+       fig = plt.figure(num=1, clear=True, figsize=(13.0, 9.0)) 
+       d1_rhs = np.reshape(dca[0], (NZ+1, NX+1), order='F')
+       d2_rhs = np.reshape(dca[1], (NZ+1, NX+1), order='F')
+       d1_res = np.reshape(dcb[0], (NZ+1, NX+1), order='F')
+       d2_res = np.reshape(dcb[1], (NZ+1, NX+1), order='F')
+       
+       plt.subplot(2,2,1)
+       cc1 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d1_rhs, 51, cmap=cm.afmhot)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc1, format='%.2e')
+       plt.title('RHS Coefficients X')
+       plt.subplot(2,2,2)
+       cc2 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d2_rhs, 51, cmap=cm.afmhot)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc2, format='%.2e')
+       plt.title('RHS Coefficients Z')
+       plt.subplot(2,2,3)
+       cc3 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d1_res, 51, cmap=cm.afmhot,)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc3, format='%.2e')
+       plt.title('RES Coefficients X')
+       plt.subplot(2,2,4)
+       cc4 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d2_res, 51, cmap=cm.afmhot)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc4, format='%.2e')
+       plt.title('RES Coefficients Z')
+       
+       plt.tight_layout()
+       if keepHistory:
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions' + '{:0>6d}'.format(int(thisTime)) +  '.pdf')
+       else:
+              shutil.copyfile('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions.pdf', \
+                              '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions0.pdf')
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions.pdf')
        fig.clear()
        del(fig)
        
@@ -585,11 +630,8 @@ def runModel(TestName):
        DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        # X partial derivatives
-       PPXMS = DDXMS2 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS2)
+       PPXMS = DDXMS2 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS)
        PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
-       
-       PPXMS = derv.numericalCleanUp(PPXMS)
-       PPXMD = derv.numericalCleanUp(PPXMD)
        
        #'''
        # Staggered operator in the vertical Legendre/Chebyshev mix
@@ -650,7 +692,7 @@ def runModel(TestName):
               REFS.append(PPXMD) # index 12
               REFS.append(DDZMD) # index 13
               
-       # Store the terrain profile
+       # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
        REFS.append(sps.csr_matrix(DDX_QS)) # index 16
@@ -1061,20 +1103,22 @@ def runModel(TestName):
                             ff += 1
                                                  
                      if ti % ITI == 0 and makePlots:
-                            
-                            # Get the previous state
-                            rhsVec0 = np.copy(rhsVec)
                      
+                            dhdx = REFS[6][0]
                             # Compute the updated RHS
-                            args = [fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], PHYS, REFS, REFG, ebcDex, zeroDex, True, False]
+                            args = [fields, hydroState, REFS[13][0], REFS[13][1], dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, False]
                             rhsVec, DqDxR, DqDzR = eqs.computeRHS(*args)
-                     
-                            if ti == 0:
-                                   resVec = (1.0 / TOPT[0]) * delFields - rhsVec
-                            else:
-                                   resVec = (1.0 / TOPT[0]) * delFields - 0.5 * (rhsVec0 + rhsVec)
+                            
+                            resVec = (1.0 / TOPT[0]) * delFields - rhsVec
+                            
+                            # Normalization and bounding to DynSGS
+                            state = fields + hydroState
+                            qnorm = (fields - bn.nanmean(fields))
                                    
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, NX, NZ, numVar)
+                            DCFA = rescf.computeResidualViscCoeffsRaw(DIMS, rhsVec, qnorm, state, DLD, dhdx, ebcDex[2], REFG[5])
+                            DCFB = rescf.computeResidualViscCoeffsRaw(DIMS, resVec, qnorm, state, DLD, dhdx, ebcDex[2], REFG[5])
+                                   
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCFA, DCFB, NX, NZ, numVar)
                             
                      # Compute the solution within a time step
                      try:   
@@ -1212,7 +1256,7 @@ def runModel(TestName):
                             
                      fig.colorbar(ccheck, format='%.3E')
                      plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-                     plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                     plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               plt.tight_layout()
               #plt.savefig('SolutionFields.png')
@@ -1233,7 +1277,7 @@ def runModel(TestName):
                      ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
                      plt.colorbar(ccheck, format='%+.3E')
                      plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-                     plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                     plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
                      plt.tight_layout()
               plt.show()
               

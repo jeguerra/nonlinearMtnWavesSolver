@@ -541,7 +541,7 @@ def computeSpectralElementDerivativeMatrix(dom, NE, nonCoincident, endsLaguerre,
        return DDMSA, domain
 
 # Computes Clamped Quintic Spline 1st derivative matrix
-def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
+def computeQuinticSplineDerivativeMatrix(dom, DDM_BC, clampRight):
        
        DM2 = DDM_BC.dot(DDM_BC)
        DM3 = DDM_BC.dot(DM2)
@@ -728,13 +728,24 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
                      D[ii,ii-1:ii+3] += a0 * dom[ii]**2 * ET2[3,:] + dom[ii] * ET2[4,:] + ET2[5,:]
               #'''
               
+       # Prescribed derivative conditions
+       if clampRight:
+              nullRightEnd = 0.0
+       else:
+              nullRightEnd = 1.0
+              
+       D4A = DM4[0,:] # left end 4th derivative
+       D4B = nullRightEnd * DM4[-1,:] # right end 4th derivative
+       D1A = DDM_BC[0,:] # left end 1st derivative
+       D1B = nullRightEnd * DDM_BC[-1,:] # right end 1st derivative
+       
        # Left end natural S^(5) = 0
        #A[0,0] = 1.0 * dom[1] / (dom[1] - dom[0]) 
        #A[0,1] = -1.0 * dom[0] / (dom[1] - dom[0])
        #B[0,:] = np.zeros(N)
        # Left end known S^(4)
        A[0,0] = 1.0
-       B[0,:] = DM4[0,:]
+       B[0,:] = np.copy(D4A)
        
        # Right end natural S^(5) = 0
        #A[N-1,N-2] = 1.0 * dom[-1] / (dom[-1] - dom[-2])
@@ -742,7 +753,7 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
        #B[N-1,:] = np.zeros(N)
        # Right end known S^(4)
        A[-1,-1] = 1.0
-       B[-1,:] = DM4[-1,:]
+       B[-1,:] = np.copy(D4B)
               
        # Compute the 4th derivative matrix
        Q, R = scl.qr(A)
@@ -753,8 +764,8 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC):
        DDM = C.dot(AIB) + D
        
        # Set boundary derivatives from specified
-       DDM[0,:] = DDM_BC[0,:]
-       DDM[-1,:] = DDM_BC[-1,:]
+       DDM[0,:] = np.copy(D1A)
+       DDM[-1,:] = np.copy(D1B)
        
        #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
@@ -774,7 +785,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               if DDM_BC == 0.0:
                      DDM_BC = np.zeros((2,N))
               else:
-                     print('Setting derivatives to single values at ends NOT SUPPORTED!')
+                     print('Setting derivatives to single values (not 0) at ends NOT SUPPORTED!')
                      DDM_BC = np.zeros((2,N))
                      
        # Loop over each interior point in the irregular grid
