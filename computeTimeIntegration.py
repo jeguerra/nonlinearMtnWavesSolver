@@ -79,7 +79,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
               
               # Compute dynamics RHS
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger]
+              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False]
               rhsExp, DqDxA, DqDzA = tendency.computeRHS(*args)
               
               try:
@@ -99,10 +99,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               U = solB[:,0] + init0[:,0]
               solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
               
-              # Update the adaptive coefficients using residual
-              args = [solB, init0, DDXM_B, DDZM_B, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, False]
+              # Update the adaptive coefficients using residual or right hand side
+              args = [solB, init0, DDXM_B, DDZM_B, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True]
               rhsNew, DqDxR, DqDzR = tendency.computeRHS(*args)
-              
               if DynSGS_RES:
                      resField = rhsExp - rhsNew
               else:

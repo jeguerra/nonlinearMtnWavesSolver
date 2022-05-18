@@ -55,7 +55,7 @@ class TestCase:
                      # Newton iteration with smooth stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(647, 96, 140.0, 34.0, 300.0, \
+                     self.setUserData(683, 96, 140.0, 34.0, 300.0, \
                                       9000.0, 40000.0, 10.0,
                                       3000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
               

@@ -541,7 +541,18 @@ def computeSpectralElementDerivativeMatrix(dom, NE, nonCoincident, endsLaguerre,
        return DDMSA, domain
 
 # Computes Clamped Quintic Spline 1st derivative matrix
-def computeQuinticSplineDerivativeMatrix(dom, DDM_BC, clampRight):
+def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
+       
+       if isClamped:
+              nullLeftEnd = 0.0
+              nullRightEnd = 0.0
+       else:
+              nullLeftEnd = 1.0
+              nullRightEnd = 1.0
+       
+       # Apply clamping
+       DDM_BC[0,:] *= nullLeftEnd
+       DDM_BC[-1,:] *= nullRightEnd
        
        DM2 = DDM_BC.dot(DDM_BC)
        DM3 = DDM_BC.dot(DM2)
@@ -729,31 +740,23 @@ def computeQuinticSplineDerivativeMatrix(dom, DDM_BC, clampRight):
               #'''
               
        # Prescribed derivative conditions
-       if clampRight:
-              nullRightEnd = 0.0
-       else:
-              nullRightEnd = 1.0
-              
        D4A = DM4[0,:] # left end 4th derivative
-       D4B = nullRightEnd * DM4[-1,:] # right end 4th derivative
+       D4B = DM4[-1,:] # right end 4th derivative
        D1A = DDM_BC[0,:] # left end 1st derivative
-       D1B = nullRightEnd * DDM_BC[-1,:] # right end 1st derivative
+       D1B = DDM_BC[-1,:] # right end 1st derivative
        
-       # Left end natural S^(5) = 0
-       #A[0,0] = 1.0 * dom[1] / (dom[1] - dom[0]) 
-       #A[0,1] = -1.0 * dom[0] / (dom[1] - dom[0])
-       #B[0,:] = np.zeros(N)
-       # Left end known S^(4)
-       A[0,0] = 1.0
-       B[0,:] = np.copy(D4A)
-       
-       # Right end natural S^(5) = 0
-       #A[N-1,N-2] = 1.0 * dom[-1] / (dom[-1] - dom[-2])
-       #A[N-1,N-1] = -1.0 * dom[-2] / (dom[-1] - dom[-2])
-       #B[N-1,:] = np.zeros(N)
-       # Right end known S^(4)
-       A[-1,-1] = 1.0
-       B[-1,:] = np.copy(D4B)
+       if isClamped:
+              A[0,0] = 1.0
+              B[0,:] = np.copy(D4A)
+              A[-1,-1] = 1.0
+              B[-1,:] = np.copy(D4B)
+       elif isEssential:
+              A[0,0] = 1.0 * dom[1] / (dom[1] - dom[0]) 
+              A[0,1] = -1.0 * dom[0] / (dom[1] - dom[0])
+              B[0,:] = np.zeros(N)
+              A[N-1,N-2] = 1.0 * dom[-1] / (dom[-1] - dom[-2])
+              A[N-1,N-1] = -1.0 * dom[-2] / (dom[-1] - dom[-2])
+              B[N-1,:] = np.zeros(N)
               
        # Compute the 4th derivative matrix
        Q, R = scl.qr(A)

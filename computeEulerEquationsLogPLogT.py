@@ -132,7 +132,7 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger):
+def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, isTFOpX):
        
        # Compute flow speed
        Q = fields + hydroState
@@ -142,6 +142,9 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
               PqPx, DqDz = computeFieldDerivativeStag(fields, DDX, DDZ)
        else:
               PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ)
+              
+       if not isTFOpX:
+              PqPx -= REFS[15] * DqDz
               
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, \
                                                      fields, Q[:,0], Q[:,1], ebcDex)

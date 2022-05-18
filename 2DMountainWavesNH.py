@@ -619,18 +619,16 @@ def runModel(TestName):
        DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        
-       DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], DDX_CFD)
-       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], DDZ_CFD)
+       DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
+       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        
        # Derivative operators for dynamics
        DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
-       DDXMS2, DDZMS2 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        # Derivative operators for diffusion
        DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
-       # X partial derivatives
-       PPXMS = DDXMS2 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS)
+       # X partial derivatives complete for diffusion evaluation
        PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
        
        #'''
@@ -680,12 +678,12 @@ def runModel(TestName):
        
        if not StaticSolve and RSBops:
               # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(PPXMS,shape=PPXMS.shape), \
+              REFS.append((rsb_matrix(DDXMD,shape=DDXMD.shape), \
                            rsb_matrix(DDZMS,shape=DDZMS.shape)))
               REFS.append(diffOps2)
        elif not StaticSolve and not RSBops:
               # Native sparse
-              REFS.append((PPXMS, DDZMS))
+              REFS.append((DDXMD, DDZMS))
               REFS.append(diffOps1)
        else: 
               # Matrix operators
@@ -840,7 +838,7 @@ def runModel(TestName):
               #'''
               # Compute the RHS for this iteration
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True)
+                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
@@ -989,7 +987,7 @@ def runModel(TestName):
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True)
+                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
@@ -1051,7 +1049,7 @@ def runModel(TestName):
                      
                             # Compute the updated RHS
                             rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
-                                                                PHYS, REFS, REFG, ebcDex, zeroDex, True, False)
+                                                                PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
                             
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
@@ -1106,7 +1104,7 @@ def runModel(TestName):
                      
                             dhdx = REFS[6][0]
                             # Compute the updated RHS
-                            args = [fields, hydroState, REFS[13][0], REFS[13][1], dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, False]
+                            args = [fields, hydroState, REFS[13][0], REFS[13][1], dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True]
                             rhsVec, DqDxR, DqDzR = eqs.computeRHS(*args)
                             
                             resVec = (1.0 / TOPT[0]) * delFields - rhsVec
