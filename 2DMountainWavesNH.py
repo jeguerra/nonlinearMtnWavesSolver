@@ -257,16 +257,16 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, dca, dcb, NX, NZ, 
        
        return
 
-def displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex):
-       err = np.linalg.norm(RHS)
-       err1 = np.linalg.norm(RHS[udex])
-       err2 = np.linalg.norm(RHS[wdex])
-       err3 = np.linalg.norm(RHS[pdex])
-       err4 = np.linalg.norm(RHS[tdex])
+def displayResiduals(message, RHS, thisTime, DT, OPS, udex, wdex, pdex, tdex):
+       err = np.linalg.norm(RHS) / mt.sqrt(OPS)
+       err1 = np.linalg.norm(RHS[udex]) / mt.sqrt(OPS)
+       err2 = np.linalg.norm(RHS[wdex]) / mt.sqrt(OPS)
+       err3 = np.linalg.norm(RHS[pdex]) / mt.sqrt(OPS)
+       err4 = np.linalg.norm(RHS[tdex]) / mt.sqrt(OPS)
        if message != '':
               print(message)
-       print('Time (min): %4.2f, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
-             % (thisTime / 60.0, err1, err2, err3, err4, err))
+       print('Time (min): %4.2f, DT (sec): %4.3E, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
+             % (thisTime / 60.0, DT, err1, err2, err3, err4, err))
        
        return err
 
@@ -394,7 +394,7 @@ def runModel(TestName):
        else:
               print('No spatial filter on DynSGS coefficients.')
               
-       DynSGS_RES = True
+       DynSGS_RES = False
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
        else:
@@ -423,7 +423,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -2
+              rdex = -10
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -440,13 +440,8 @@ def runModel(TestName):
        TOPT = thisTest.TOPT # Time integration options
        
        # Time step scaling depending on RK solver
-       if TOPT[3] == 3:
-              DTF = 1.1
-       elif TOPT[3] == 4:
-              DTF = 1.25
-       else:
-              DTF = 1.1
-       
+       DTF = 1.0
+        
        if RLOPT[5] == 'uwpt_static':
               bcType = 1
               print('BC profile: ' + RLOPT[5])
@@ -723,11 +718,11 @@ def runModel(TestName):
               
               # Diffusion filter grid length based on resolution powers
               if DynSGS_RES:
-                     DL2 = 1.0 * DZ_max
                      DL1 = 1.0 * DX_max
+                     DL2 = 1.0 * DZ_max
               else:
-                     DL2 = 1.0 * DZ_max
                      DL1 = 1.0 * DX_max
+                     DL2 = 1.0 * DZ_max
                      
               DL_MS = 0.5 * (DL1**2 + DL2**2)
               DL_RMS = mt.sqrt(DL_MS)
@@ -1019,16 +1014,18 @@ def runModel(TestName):
                      '''
               # Initialize local sound speed and time step
               #'''
-              VSND = np.sqrt(PHYS[6] * REFS[9][0])
-              VWAV_max = bn.nanmax(VSND)
-              DT0 = DTF * DLS / VWAV_max
-              TOPT[0] = 1.0 * DT0
-              print('Initial time step by sound speed: ', str(DT0) + ' (sec)')
+              T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
+              RdT = REFS[9][0] * (1.0 + T_ratio)
+              VSND = np.sqrt(PHYS[6] * RdT)
+              VFLW = np.sqrt(np.power(fields[:,0] + hydroState[:,0], 2.0) + np.power(fields[:,1], 2.0))
+              VWAV_max = bn.nanmax(VSND + VFLW)
+              TOPT[0] = DTF * DLS / VWAV_max
+              print('Initial time step by sound speed: ', str(DLS / VWAV_max) + ' (sec)')
               print('Time stepper order: ', str(TOPT[3]))
               print('Time step factor: ', str(DTF))
               
-              OTI = int(TOPT[5] / DT0)
-              ITI = int(TOPT[6] / DT0)
+              OTI = int(TOPT[5] / TOPT[0])
+              ITI = int(TOPT[6] / TOPT[0])
               #'''
               
               ti = 0; ff = 0
@@ -1037,6 +1034,13 @@ def runModel(TestName):
               delFields = np.zeros(fields.shape)
               error = [np.linalg.norm(rhsVec)]
               
+              # Applied tolerances
+              atol = np.array([2.0, 1.0, 0.002, 0.005]) # absolute changes in fields (10% of maximum values)
+              rtol = 1.0E-3 # relative tolerance to 0.1% on all fields
+              ERROR0 = 0.0
+              ERATIO = 1.0
+              
+              adaptiveTime = False
               while thisTime <= TOPT[4]:
                      
                      if ti == 0:
@@ -1052,7 +1056,8 @@ def runModel(TestName):
                                                                 PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
                             
                             message = ''
-                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
+                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
+                                                   thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
                             error.append(err)
                             
                             # Check the NC file
@@ -1122,27 +1127,69 @@ def runModel(TestName):
                      try:   
                             # Compute a time step
                             fields0 = np.copy(fields)
-                            fields = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                            fields1, errors = tint.computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields0, hydroState, \
                                                                     zeroDex, ebcDex, isFirstStep, \
                                                                     filteredCoeffs, verticalStagger, DynSGS_RES, NE)
-                            
+                                   
                             # Get solution update
-                            delFields = fields - fields0
-                                   
-                            # Update time and get total solution
-                            thisTime += TOPT[0]
+                            delFields = fields1 - fields0
                             
-                            try: 
-                                   # Compute sound speed
-                                   T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
-                                   RdT = REFS[9][0] * (1.0 + T_ratio)
-                                   VSND = np.sqrt(PHYS[6] * RdT)
-                                   
-                                   # Compute new time step based on updated sound speed
-                                   TOPT[0] = DTF * DLS / bn.nanmax(VSND)
+                            # Compute normalized error
+                            try:
+                                   enorm = np.stack((bn.nanmax(np.abs(fields1), axis=0), \
+                                                     bn.nanmax(np.abs(fields0), axis=0)), axis=0)
+                                   enorm = rtol * bn.nanmax(enorm, axis=0)
+                                   enorm += atol
+                                   enorm = np.expand_dims(enorm, axis=0)
+                                   ERRORS = np.power(delFields * np.reciprocal(enorm), 2.0)
+                                   ERRORN = np.power(1.0 / OPS * np.sum(ERRORS, axis=0), 0.5)
+                                   ERROR0 = bn.nanmax(ERRORN)
                             except FloatingPointError:
-                                   print('Bad computation of local sound speed, no change in time step.')
+                                   ERROR0 = 1.0
+                            
+                            # Compute the error ratio
+                            ERATIO = (1.0 / ERROR0)**(1/3)
+                            
+                            if adaptiveTime and ERROR0 <= 1.0:
+                                   # Update the solution
+                                   fields += delFields
+                                   
+                                   # Update time and solution counter
+                                   thisTime += TOPT[0]
+                                   ti += 1
+                                   
+                                   # Adjust time step on a successful step
+                                   fac = min(1.25, max(0.75, 0.9 * ERATIO))
+                                   TOPT[0] *= fac
+                                   print('Step passed, new DT, error, eratio, and factor: ', TOPT[0], ERROR0, ERATIO, fac)
+                            elif adaptiveTime and ERROR0 > 1.0:
+                                   # Adjust time step on a failed step
+                                   fac = min(1.0, max(0.75, 0.9 * ERATIO))
+                                   TOPT[0] *= fac
+                                   print('Step failed, new DT, error, eratio, and factor: ', TOPT[0], ERROR0, ERATIO, fac)
+                                   continue
+                            else:
+                                   # Update the solution
+                                   fields += delFields
+                                   
+                                   # Update time and solution counter
+                                   thisTime += TOPT[0]
+                                   
+                                   try: 
+                                          # Compute sound speed
+                                          T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
+                                          RdT = REFS[9][0] * (1.0 + T_ratio)
+                                          VSND = np.sqrt(PHYS[6] * RdT)
+                                          VFLW = np.sqrt(np.power(fields[:,0] + hydroState[:,0], 2.0) + np.power(fields[:,1], 2.0))
+                                          
+                                          # Compute new time step based on updated sound speed
+                                          TOPT[0] = DTF * DLS / bn.nanmax(VSND + VFLW)
+                                          
+                                   except FloatingPointError:
+                                          print('Bad computation of local sound speed, no change in time step.')
+                                   
+                                   ti += 1
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
@@ -1152,8 +1199,6 @@ def runModel(TestName):
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
-                     #'''
-                     ti += 1
                      
               # Close the output data file
               m_fid.close()
