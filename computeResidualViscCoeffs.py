@@ -99,6 +99,10 @@ def computeResidualViscCoeffsRaw(DIMS, RES, qnorm, state, DLD, dhdx, bdex, ldex)
               #CRES1[bdex] = 0.5 * DLD[0] * VFLW[bdex]
               #CRES2[bdex] = 0.5 * DLD[1] * VFLW[bdex]
               
+              # Set maximum adaptive damping in the rayleigh layers
+              CRES1[ldex] = QMAX1[ldex]
+              CRES2[ldex] = QMAX2[ldex]
+              
        except FloatingPointError:
               CRES1 = np.zeros((state.shape[0]))
               CRES2 = np.zeros((state.shape[0]))

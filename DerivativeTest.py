@@ -123,7 +123,7 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 HofX, dHdX, SD = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
-DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, 0.0)
+DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_1D)
 DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_1D)
 
 DYD_CS = DDX_CS.dot(HofX)
@@ -179,15 +179,15 @@ REFS = computeGrid(DIMS, True, False, True, False)
 DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
 DDZ2C = DDZ_1D.dot(DDZ_1D)
 
-DDZ_CFD1 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
-DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 10)
-
 zv = (1.0 / ZH) * REFS[1]
 Y, DY = function1(zv)
 
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, ZH * DDZ_CFD2)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, ZH * DDZ_CFD2, True)
+DDZ_CFD1 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 4)
+DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 6)
+DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 10)
+
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD2)
+DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, False, DDZ_CFD2)
 
 # Compute SVD of derivative matrices
 U1, s1, Vh1 = scl.svd(DDX_1D)
@@ -206,9 +206,9 @@ plt.plot(s7 / s7[0], 'o', label='Quintic Spline')
 plt.grid(visible=True, which='both', axis='both')
 plt.legend()
 
-DYD1 = ZH * DDZ_CFD1.dot(Y)
-DYD2 = ZH * DDZ_CFD2.dot(Y)
-DYD3 = ZH * DDZ_CFD3.dot(Y)
+DYD1 = DDZ_CFD1.dot(Y)
+DYD2 = DDZ_CFD2.dot(Y)
+DYD3 = DDZ_CFD3.dot(Y)
 DYD4 = DDZ_CS.dot(Y)
 DYD5 = DDZ_QS.dot(Y)
 DYD6 = ZH * DDZ_1D.dot(Y)

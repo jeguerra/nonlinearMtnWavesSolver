@@ -167,13 +167,13 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.05 # seconds
               HR = 4.0 # hours              
-              rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
-              intMethodOrder = 3
+              DTF = 1.0 # scale time step              
+              intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 10.0 # Time for diagnostic output
               ITI = 10.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               
-              self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]
+              self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI, RTI]
        

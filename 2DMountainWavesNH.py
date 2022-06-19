@@ -56,7 +56,8 @@ localDir = '/home/jeguerra/scratch/' # Home super desktop
 #localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
-fname = 'StaggeredZ_QS-DynSGS_RHS_h3000m.nc'
+fname2Restart = 'StaggeredZ_QS-DynSGS_RES_h3000m_TEST-NL1.nc'
+fname4Restart = 'SimulationTemp.nc'
 
 #import pnumpy as pnp
 #pnp.enable()
@@ -394,7 +395,7 @@ def runModel(TestName):
        else:
               print('No spatial filter on DynSGS coefficients.')
               
-       DynSGS_RES = False
+       DynSGS_RES = True
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
        else:
@@ -440,7 +441,7 @@ def runModel(TestName):
        TOPT = thisTest.TOPT # Time integration options
        
        # Time step scaling depending on RK solver
-       DTF = 1.0
+       DTF = TOPT[2]
         
        if RLOPT[5] == 'uwpt_static':
               bcType = 1
@@ -611,19 +612,19 @@ def runModel(TestName):
        DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
        DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        
-       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
-       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
+       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, 0.0)
+       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, 0.0)
        
        DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        
        # Derivative operators for dynamics
-       DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
-       
-       # Derivative operators for diffusion
-       DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
+       DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
+       DDXMS2, DDZMS2 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
+       #PPXMS = DDXMS2 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        
        # X partial derivatives complete for diffusion evaluation
+       DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
        
        #'''
@@ -659,7 +660,7 @@ def runModel(TestName):
                      dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, sigmaST, DDX_1D, DDZ_1DS)
                      del(dummy)
        else:
-              DDZMST = sps.csr_matrix(DDZMS)
+              DDZMST = sps.csr_matrix(DDZMS1)
        #'''
        
        # Prepare derivative operators for diffusion
@@ -668,20 +669,20 @@ def runModel(TestName):
        diffOps2 = (rsb_matrix(PPXMD, shape=PPXMD.shape), 
                    rsb_matrix(DDZMD, shape=DDZMD.shape))
        
-       REFS.append((DDXMS, DDZMS)) # index 10
+       REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
        
        if not StaticSolve and RSBops:
               # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(DDXMD,shape=DDXMD.shape), \
-                           rsb_matrix(DDZMS,shape=DDZMS.shape)))
+              REFS.append((rsb_matrix(DDXMS2,shape=DDXMS2.shape), \
+                           rsb_matrix(DDZMS1,shape=DDZMS1.shape)))
               REFS.append(diffOps2)
        elif not StaticSolve and not RSBops:
               # Native sparse
-              REFS.append((DDXMD, DDZMS))
+              REFS.append((DDXMS2, DDZMS1))
               REFS.append(diffOps1)
        else: 
-              # Matrix operators
+              # Matrix derivative operators in native format
               REFS.append(PPXMD) # index 12
               REFS.append(DDZMD) # index 13
               
@@ -693,12 +694,12 @@ def runModel(TestName):
        
        if not StaticSolve:
               # Staggered vertical operator
-              DDZM_ST = sps.block_diag((DDZMS, DDZMST), format='csr')
+              DDZM_ST = sps.block_diag((DDZMS1, DDZMST), format='csr')
               REFS.append(DDZM_ST) # index 18
               REFS.append(rsb_matrix(DDZM_ST,shape=DDZM_ST.shape)) # index 19
        
        # Update REFG with the 2nd vertical derivative of backgrounds
-       REFG.append(DDZMS @ DQDZ)
+       REFG.append(DDZMS1 @ DQDZ)
        
        if not StaticSolve:
               
@@ -740,8 +741,8 @@ def runModel(TestName):
               DLS = min(DX, DZ)
               #'''           
               
-       del(DDXMS); del(DDXMD)
-       del(DDZMS); del(DDZMD)
+       del(DDXMS1); del(DDXMS2); del(DDXMD)
+       del(DDZMS1); del(DDZMS2); del(DDZMD)
        #input('STOP')
        
        #%% SOLUTION INITIALIZATION
@@ -788,9 +789,9 @@ def runModel(TestName):
               
        # NetCDF restart for transient runs
        if isRestart and NonLinSolve:
-              print('Restarting from: ', fname)
+              print('Restarting from: ', fname2Restart)
               try:
-                     m_fid = Dataset(fname, 'r', format="NETCDF4")
+                     m_fid = Dataset(fname2Restart, 'r', format="NETCDF4")
                      thisTime = m_fid.variables['time'][rdex]
                      fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
                      fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
@@ -799,14 +800,14 @@ def runModel(TestName):
                      
                      m_fid.close()
               except:
-                     print('Could NOT read restart NC file!', fname)
+                     print('Could NOT read restart NC file!', fname2Restart)
                      m_fid.close()
        else:
              thisTime = IT
               
        # Initialize output to NetCDF
        hydroState = np.reshape(INIT, (OPS, numVar), order='F')
-       newFname = initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState)
+       newFname = initializeNetCDF(fname4Restart, thisTime, NX, NZ, XL, ZTL, hydroState)
        #input('Wrote initial NC!')
               
        #% Compute the global LHS operator and RHS
@@ -1034,13 +1035,6 @@ def runModel(TestName):
               delFields = np.zeros(fields.shape)
               error = [np.linalg.norm(rhsVec)]
               
-              # Applied tolerances
-              atol = np.array([2.0, 1.0, 0.002, 0.005]) # absolute changes in fields (10% of maximum values)
-              rtol = 1.0E-3 # relative tolerance to 0.1% on all fields
-              ERROR0 = 0.0
-              ERATIO = 1.0
-              
-              adaptiveTime = False
               while thisTime <= TOPT[4]:
                      
                      if ti == 0:
@@ -1052,8 +1046,14 @@ def runModel(TestName):
                      if ti % OTI == 0:
                      
                             # Compute the updated RHS
-                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
-                                                                PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
+                            DDXM_A = REFS[12][0]
+                            if verticalStagger:
+                                   DDZM_A = REFS[19]
+                            else:
+                                   DDZM_A = REFS[12][1]
+                                   
+                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, DDXM_A, DDZM_A, REFS[6][0], \
+                                                                PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False)
                             
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
@@ -1100,7 +1100,7 @@ def runModel(TestName):
                                    m_fid.close()
                             except Exception as e:
                                    print(e)
-                                   print('Could NOT store state to NC file!', fname)
+                                   print('Could NOT store state to NC file!', newFname)
                                    print('At time (min): ', thisTime / 60)
                             
                             ff += 1
@@ -1127,69 +1127,33 @@ def runModel(TestName):
                      try:   
                             # Compute a time step
                             fields0 = np.copy(fields)
-                            fields1, errors = tint.computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, \
+                            fields1 = tint.computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields0, hydroState, \
                                                                     zeroDex, ebcDex, isFirstStep, \
                                                                     filteredCoeffs, verticalStagger, DynSGS_RES, NE)
                                    
                             # Get solution update
                             delFields = fields1 - fields0
+                            # Update the solution
+                            fields += delFields
                             
-                            # Compute normalized error
-                            try:
-                                   enorm = np.stack((bn.nanmax(np.abs(fields1), axis=0), \
-                                                     bn.nanmax(np.abs(fields0), axis=0)), axis=0)
-                                   enorm = rtol * bn.nanmax(enorm, axis=0)
-                                   enorm += atol
-                                   enorm = np.expand_dims(enorm, axis=0)
-                                   ERRORS = np.power(delFields * np.reciprocal(enorm), 2.0)
-                                   ERRORN = np.power(1.0 / OPS * np.sum(ERRORS, axis=0), 0.5)
-                                   ERROR0 = bn.nanmax(ERRORN)
+                            # Update time and solution counter
+                            thisTime += TOPT[0]
+                            
+                            try: 
+                                   # Compute sound speed
+                                   T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
+                                   RdT = REFS[9][0] * (1.0 + T_ratio)
+                                   VSND = np.sqrt(PHYS[6] * RdT)
+                                   VFLW = np.sqrt(np.power(fields[:,0] + hydroState[:,0], 2.0) + np.power(fields[:,1], 2.0))
+                                   
+                                   # Compute new time step based on updated sound speed
+                                   TOPT[0] = DTF * DLS / bn.nanmax(VSND + VFLW)
+                                   
                             except FloatingPointError:
-                                   ERROR0 = 1.0
+                                   print('Bad computation of local sound speed, no change in time step.')
                             
-                            # Compute the error ratio
-                            ERATIO = (1.0 / ERROR0)**(1/3)
-                            
-                            if adaptiveTime and ERROR0 <= 1.0:
-                                   # Update the solution
-                                   fields += delFields
-                                   
-                                   # Update time and solution counter
-                                   thisTime += TOPT[0]
-                                   ti += 1
-                                   
-                                   # Adjust time step on a successful step
-                                   fac = min(1.25, max(0.75, 0.9 * ERATIO))
-                                   TOPT[0] *= fac
-                                   print('Step passed, new DT, error, eratio, and factor: ', TOPT[0], ERROR0, ERATIO, fac)
-                            elif adaptiveTime and ERROR0 > 1.0:
-                                   # Adjust time step on a failed step
-                                   fac = min(1.0, max(0.75, 0.9 * ERATIO))
-                                   TOPT[0] *= fac
-                                   print('Step failed, new DT, error, eratio, and factor: ', TOPT[0], ERROR0, ERATIO, fac)
-                                   continue
-                            else:
-                                   # Update the solution
-                                   fields += delFields
-                                   
-                                   # Update time and solution counter
-                                   thisTime += TOPT[0]
-                                   
-                                   try: 
-                                          # Compute sound speed
-                                          T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
-                                          RdT = REFS[9][0] * (1.0 + T_ratio)
-                                          VSND = np.sqrt(PHYS[6] * RdT)
-                                          VFLW = np.sqrt(np.power(fields[:,0] + hydroState[:,0], 2.0) + np.power(fields[:,1], 2.0))
-                                          
-                                          # Compute new time step based on updated sound speed
-                                          TOPT[0] = DTF * DLS / bn.nanmax(VSND + VFLW)
-                                          
-                                   except FloatingPointError:
-                                          print('Bad computation of local sound speed, no change in time step.')
-                                   
-                                   ti += 1
+                            ti += 1
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)

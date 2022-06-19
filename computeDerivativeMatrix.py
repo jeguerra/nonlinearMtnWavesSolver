@@ -757,6 +757,11 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               A[N-1,N-2] = 1.0 * dom[-1] / (dom[-1] - dom[-2])
               A[N-1,N-1] = -1.0 * dom[-2] / (dom[-1] - dom[-2])
               B[N-1,:] = np.zeros(N)
+       else:
+              A[0,0] = 1.0
+              B[0,:] = np.copy(D4A)
+              A[-1,-1] = 1.0
+              B[-1,:] = np.copy(D4B)
               
        # Compute the 4th derivative matrix
        Q, R = scl.qr(A)

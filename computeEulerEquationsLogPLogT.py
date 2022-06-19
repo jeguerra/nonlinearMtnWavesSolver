@@ -95,22 +95,14 @@ def computeFieldDerivativeStag(q, DDX, DDZ):
          
        return DqDx[:,:], DqDz[:,0,:]
 
-def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF, isFluxDiv):
+def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF):
           
        #DQDZ = REFG[2]
        
        # Complete vertical parial
        #PqPz += DQDZ
        
-       if isFluxDiv:
-              try:
-                     vd = np.hstack((np.expand_dims(DCF[0], axis=1) * PqPx, \
-                                     np.expand_dims(DCF[1], axis=1) * PqPz))
-              except FloatingPointError:
-                     vd = np.hstack((0.0 * PqPx, 0.0 * PqPz))
-       else:
-              vd = np.hstack((PqPx, PqPz))
-       
+       vd = np.hstack((PqPx, PqPz))
        pvpx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
        
        P2qPx2 = pvpx[:,0:4]
@@ -417,15 +409,18 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
        dhdx = REFS[6][0]
        metrics = REFS[6][1]
        S = metrics[3]
-       DQDZ = REFG[2]
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
        DqDt = np.zeros(P2qPx2.shape)
        
-       DC1 = DCF[0] # coefficient to the X direction flux
-       DC2 = DCF[1] # coefficient to the Z direction flux
+       if isFluxDiv:
+              DC1 = 1.0
+              DC2 = 1.0
+       else:              
+              DC1 = DCF[0] # coefficient to the X direction flux
+              DC2 = DCF[1] # coefficient to the Z direction flux
               
        try:
            #mu_xb = DC1[bdex]
@@ -439,10 +434,6 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
        except FloatingPointError:
            mu_xb = np.zeros(bdex.shape)
            mu_xt = np.zeros(tdex.shape)
-           
-       if isFluxDiv:
-              DC1 = 1.0
-              DC2 = 1.0
               
        try:
               #%% INTERIOR DIFFUSION
