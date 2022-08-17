@@ -38,7 +38,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        # Index all boundary DOF that can be diffused on
        diffDex = (uldex1, urdex1, ubdex, utdex)
        
-       isInflow = False
+       isInflow = True
        if isInflow:
               print('Inflow boundary configuration.')
        else:
@@ -48,6 +48,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        if bcType == 1:
               if isInflow:
                      # Inflow condition on UWPT STATIC SOLUTION
+                     #'''
                      rowsOutU = set(uldex2)
                      rowsOutW = set(np.concatenate((uldex2,utdex)))
                      rowsOutP = set(uldex2)
@@ -55,7 +56,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      # Indexing for static solver
                      left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
                      top = utdex + iW*OPS
-                     rowsOutBC_static = set(np.concatenate((left, top)))
+                     rowsOutBC = set(np.concatenate((left, top)))
               else:
                      # Inflow condition on UWPT STATIC SOLUTION
                      rowsOutU = set(np.concatenate((uldex2,urdex2)))
@@ -67,18 +68,21 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
                      right = np.concatenate((urdex2, urdex2 + iW*OPS, urdex2 + iP*OPS, urdex2 + iT*OPS))
                      top = utdex + iW*OPS
-                     rowsOutBC_static = set(np.concatenate((left, right, top)))
+                     rowsOutBC = set(np.concatenate((left, right, top)))
        elif bcType == 2:
               if isInflow:
                      # Inflow condition on UWPT TRANSIENT SOLUTION
                      rowsOutU = set(uldex1)
                      rowsOutW = set(np.concatenate((uldex1,utdex)))
-                     rowsOutP = set(uldex1)
+                     #rowsOutP = set(uldex1)
+                     rowsOutP = set()
                      rowsOutT = set(uldex1)
                      # Indexing for static solver
-                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+                     #left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iT*OPS))
                      top = utdex + iW*OPS
-                     rowsOutBC_static = set(np.concatenate((left, top)))
+                     rowsOutBC = set(np.concatenate((left, top)))
+                    
               else:
                      # Pinned condition on UWPT TRANSIENT SOLUTION
                      rowsOutU = set(np.concatenate((uldex1,urdex1)))
@@ -90,7 +94,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
                      right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iP*OPS, urdex1 + iT*OPS))
                      top = utdex + iW*OPS
-                     rowsOutBC_static = set(np.concatenate((left, right, top)))
+                     rowsOutBC = set(np.concatenate((left, right, top)))
               #'''
               
        # Indexing arrays for static solution
@@ -106,7 +110,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        # All DOF for all variables
        rowsAll = set(np.array(range(0,numVar*OPS)))
        # Compute set difference from all rows to rows to be taken out LINEAR
-       sysDex = rowsAll.difference(rowsOutBC_static)
+       sysDex = rowsAll.difference(rowsOutBC)
        sysDex = sorted(sysDex)
        
        return uldex1, urdex1, ubdex, utdex, ubdex + iW*OPS, ubcDex, wbcDex, pbcDex, tbcDex, rowsOutBC_transient, sysDex, diffDex

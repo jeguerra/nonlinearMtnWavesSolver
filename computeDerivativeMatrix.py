@@ -19,14 +19,14 @@ def computeAdjustedOperatorNBC(D2A, DD, tdex):
        # D2A is the operator to adjust
        # DD is the 1st derivative operator
        R = DD[tdex,tdex]
-       dv = DD[tdex,:]; #dv[tdex] = 0.0
+       dv = DD[tdex,:]; dv[tdex] = 0.0
        DA = (1.0 / R) * np.outer(DD[:,tdex], -dv)
               
        D2A[:,tdex] = 0.0
        D2A[tdex,:] = 0.0
        DOP = D2A + DA
 
-       #DOP[tdex,:] = 0.0; 
+       DOP[tdex,:] = 0.0
 
        DOPC = numericalCleanUp(DOP)
        
@@ -543,17 +543,6 @@ def computeSpectralElementDerivativeMatrix(dom, NE, nonCoincident, endsLaguerre,
 # Computes Clamped Quintic Spline 1st derivative matrix
 def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
-       if isClamped:
-              nullLeftEnd = 0.0
-              nullRightEnd = 0.0
-       else:
-              nullLeftEnd = 1.0
-              nullRightEnd = 1.0
-       
-       # Apply clamping
-       DDM_BC[0,:] *= nullLeftEnd
-       DDM_BC[-1,:] *= nullRightEnd
-       
        DM2 = DDM_BC.dot(DDM_BC)
        DM3 = DDM_BC.dot(DM2)
        DM4 = DDM_BC.dot(DM3)
@@ -772,8 +761,9 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        DDM = C.dot(AIB) + D
        
        # Set boundary derivatives from specified
-       DDM[0,:] = np.copy(D1A)
-       DDM[-1,:] = np.copy(D1B)
+       if isClamped or not isEssential:
+              DDM[0,:] = np.copy(D1A)
+              DDM[-1,:] = np.copy(D1B)
        
        #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)

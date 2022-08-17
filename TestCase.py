@@ -84,9 +84,9 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(683, 96, 140.0, 34.0, 300.0, \
-                                      9000.0, 40000.0, 10.0,
-                                      3000.0, 0.01, 0.0065, 0.003, 3, 1.5E+4, 'uwpt_transient')
+                     self.setUserData(747, 96, 160.0, 35.0, 300.0, \
+                                      10000.0, 40000.0, 10.0,
+                                      3000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_transient')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -141,7 +141,8 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = rlf * 1.0E-2
-              self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC)
+              rdex = [0, 1, 3]
+              self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC, rdex)
               
               # Set the terrain options
               withWindow = False
@@ -171,8 +172,8 @@ class TestCase:
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 10.0 # Time for diagnostic output
-              ITI = 10.0 # Time for image output
+              OTI = 5.0 # Time for diagnostic output
+              ITI = 5.0 # Time for image output
               RTI = 1 # Stride for residual visc update
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI, RTI]

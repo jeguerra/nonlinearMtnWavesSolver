@@ -7,7 +7,7 @@ Created on Sat Jul 20 12:58:27 2019
 """
 import numpy as np
 
-def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform):
+def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform, RLOPT, isStatic):
        
        # Get REFS data
        z = REFS[1]
@@ -130,5 +130,17 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
                                           if (z[kk] >= Z_in[pp]) and (z[kk] <= Z_in[pp+1]):
                                                  DTDZ[kk,cc] = LR
                                                  D2TDZ2[kk,cc] = 0.0
-       
+                                                 
+              '''
+              # Make profile dry adiabatic near the top boundary (unsupportive of waves)
+              if not isStatic:
+                     C = PHYS[0] / PHYS[2]
+                     for cc in range(NC):
+                            zcol = ZTL[:,cc]
+                            zrl = np.argwhere(zcol > (zcol[-1] - 0.5 * RLOPT[0]))
+                            zrcol = ZTL[zrl,cc]
+                            TZ[zrl,cc] = TZ[zrl[0],cc] - C * (zrcol - zrcol[0])
+                            DTDZ[zrl,cc] = -C
+                            D2TDZ2[zrl,cc] = 0.0
+              '''
        return TZ, DTDZ, D2TDZ2

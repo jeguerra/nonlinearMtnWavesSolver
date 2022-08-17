@@ -25,7 +25,6 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        NZ = DIMS[4] + 1
        
        RP = 4
-       GP = 2
        
        # Get REFS data
        X = REFS[4]
@@ -57,10 +56,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    dNormX = 1.0
                             # Evaluate the Rayleigh factor
                             RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
-                            isRL = 1.0
                      else:
                             RFX = 0.0
-                            isRL = 0.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
@@ -70,10 +67,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    dNormZ = 1.0
                             # Evaluate the strength of the field
                             RFZ = 1.0 - (mt.sin(0.5 * mt.pi * dNormZ))**RP
-                            isRL = 1.0
                      else:
                             RFZ = 0.0
-                            isRL = 0.0
                      
                      # Set the field to max(lateral, top) to handle corners
                      RLX[ii,jj] = RFX

@@ -44,16 +44,7 @@ def computeRdT(q, RdT_bar, kap):
               
               earg = kap * q[:,2] + q[:,3]
               try:
-                     #'''
-                     T_ratio = np.expm1(earg)
-                     RdT = RdT_bar * (T_ratio + 1.0)
-                     #'''
-                     '''
-                     p_hat = np.exp(kap * fields[:,2], dtype=np.longdouble)
-                     RdT_hat = p_hat * np.exp(fields[:,3], dtype=np.longdouble)
-                     RdT = RdT_bar * RdT_hat
-                     T_ratio = RdT_hat - 1.0
-                     '''
+                     T_ratio = np.expm1(earg, dtype=np.longdouble)
               except FloatingPointError:
                      earg_max = np.amax(earg)
                      earg_min = np.amin(earg)
@@ -66,8 +57,8 @@ def computeRdT(q, RdT_bar, kap):
                      print('Min/Max log potential temperature: ', tmin, tmax)
                      # Compute buoyancy by approximation...
                      T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
-                     RdT_hat = 1.0 + T_ratio
-                     RdT = RdT_bar * RdT_hat
+                     
+              RdT = RdT_bar * (T_ratio + 1.0)
                      
        return RdT, T_ratio
 
@@ -80,20 +71,15 @@ def computeFieldDerivatives(q, DDX, DDZ):
 
 def computeFieldDerivativeStag(q, DDX, DDZ):
        
-       DqDx = DDX.dot(q)
-       #DqDz = DDZ.dot(q)
+       qs = np.reshape(q, (4 * q.shape[0], 1), order='F')
        
-       # This puts W with Ln_PT (Charney-Phillips style staggering)
-       cdex = np.array([[0, 2, 1, 3]])
-       qt = q[:,cdex]
-       qs = np.reshape(qt, (2 * q.shape[0], 2), order='F')
-       
+       DqDx = DDX.dot(qs)
        DqDz = DDZ.dot(qs)
        
+       DqDx = np.reshape(DqDx, q.shape, order='F')
        DqDz = np.reshape(DqDz, q.shape, order='F')
-       DqDz = np.copy(DqDz[:,cdex])
-         
-       return DqDx[:,:], DqDz[:,0,:]
+                
+       return DqDx, DqDz
 
 def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF):
           
@@ -130,10 +116,7 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
        Q = fields + hydroState
        
        # Compute the updated RHS
-       if vertStagger:
-              PqPx, DqDz = computeFieldDerivativeStag(fields, DDX, DDZ)
-       else:
-              PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ)
+       PqPx, DqDz = computeFieldDerivativeStag(fields, DDX, DDZ)
               
        if not isTFOpX:
               PqPx -= REFS[15] * DqDz
@@ -383,10 +366,21 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        # Vertical momentum equation
        DqDt[:,1] -= pgradz
        # Pressure (mass) equation
+       DqDt[:,2] -= gam * divergence
+       '''
+       print(PqPx[ebcDex[1],0])
+       print(PqPz[ebcDex[1],1])
+       print(fields[ebcDex[1],2])
+       print(DqDt[ebcDex[1],2])
+       print(divergence[ebcDex[1]])
+       input()
+       '''
+       '''
        try:
               DqDt[:,2] -= gam * divergence
        except FloatingPointError:
               DqDt[:,2] = np.zeros(PqPx.shape[0])
+       '''
        # Potential Temperature equation (transport only)
        
        return DqDt
@@ -396,11 +390,13 @@ def computeRayleighTendency(REFG, fields):
        # Get the Rayleight operators
        mu = np.expand_dims(REFG[3],0)
        ROP = REFG[4]
+       rdex = REFG[-1]
        
+       DqDt = np.zeros(fields.shape)
        try:
-              DqDt = -mu * ROP.dot(fields)
+              DqDt[:,rdex] = -mu * ROP.dot(fields[:,rdex])
        except FloatingPointError:
-              DqDt = np.zeros(fields.shape)
+              DqDt[:,rdex] = 0.0
               
        return DqDt
 
@@ -422,19 +418,9 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               DC1 = DCF[0] # coefficient to the X direction flux
               DC2 = DCF[1] # coefficient to the Z direction flux
               
-       try:
-           #mu_xb = DC1[bdex]
-           #mu_xt = DC1[tdex]
-           
-           #mu_xb = np.linalg.norm(np.stack((DC1[bdex],DC2[bdex]), axis=1), axis=1)
-           #mu_xt = np.linalg.norm(np.stack((DC1[tdex],DC2[tdex]), axis=1), axis=1)
-           
-           mu_xb = np.reciprocal(S) * DC1[bdex]
-           mu_xt = DC1[tdex]
-       except FloatingPointError:
-           mu_xb = np.zeros(bdex.shape)
-           mu_xt = np.zeros(tdex.shape)
-              
+              # Get the coefficients along the terrain
+              mu_xb = DC1[bdex]
+              mu_xt = DC1[tdex]  
        try:
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
@@ -457,8 +443,8 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               DDX1 = REFS[16]
               DDX2 = REFS[17]
               SB = np.expand_dims(S, axis=1)
-              DqDx = (DDX1 @ q[bdex,:])
-              #DqDx = PqPx[bdex,:] + np.expand_dims(dhdx, axis=1) * PqPz[bdex,:]
+              #DqDx = (DDX1 @ q[bdex,:])
+              DqDx = PqPx[bdex,:] + np.expand_dims(dhdx, axis=1) * PqPz[bdex,:]
               dqda = SB * DqDx #+ np.expand_dims(dhdx, axis=1) * DQDZ[bdex,:])
               d2qda2 = SB * (DDX2 @ dqda)
        
