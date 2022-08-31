@@ -123,8 +123,12 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 HofX, dHdX, SD = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
-DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_1D)
-DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_1D)
+DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 10)
+DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
+DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
+
+DDX_CS = derv.computeAdjustedOperatorNBC(DDX_CS, DDX_BC, -1)
+DDX_QS = derv.computeAdjustedOperatorNBC(DDX_QS, DDX_BC, -1)
 
 DYD_CS = DDX_CS.dot(HofX)
 DYD_QS = DDX_QS.dot(HofX)
@@ -161,6 +165,7 @@ plt.grid(visible=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeErrorTestX.png")
 
+plt.show()
 print('Spectral Derivative: ', np.count_nonzero(DDX_1D))
 print('Cubic Spline Derivative: ', np.count_nonzero(DDX_CS))
 print('Quintic Spline Derivative: ', np.count_nonzero(DDX_QS))
@@ -186,8 +191,8 @@ DDZ_CFD1 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 4)
 DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 6)
 DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 10)
 
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD2)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CFD2)
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD3)
+DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD3)
 
 # Compute SVD of derivative matrices
 U1, s1, Vh1 = scl.svd(DDX_1D)
@@ -239,6 +244,8 @@ plt.title('Compact Finite Difference Derivative Test')
 plt.grid(visible=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeTestZ_CFD.png")
+
+plt.show()
 
 #%% LAGUERRE FUNCTION DERIVATIVE TEST
 NZ = 16

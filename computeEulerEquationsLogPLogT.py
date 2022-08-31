@@ -73,10 +73,10 @@ def computeFieldDerivativeStag(q, DDX, DDZ):
        
        qs = np.reshape(q, (4 * q.shape[0], 1), order='F')
        
-       DqDx = DDX.dot(qs)
+       DqDx = DDX.dot(q)
        DqDz = DDZ.dot(qs)
        
-       DqDx = np.reshape(DqDx, q.shape, order='F')
+       #DqDx = np.reshape(DqDx, q.shape, order='F')
        DqDz = np.reshape(DqDz, q.shape, order='F')
                 
        return DqDx, DqDz
@@ -116,7 +116,10 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
        Q = fields + hydroState
        
        # Compute the updated RHS
-       PqPx, DqDz = computeFieldDerivativeStag(fields, DDX, DDZ)
+       if vertStagger:
+              PqPx, DqDz = computeFieldDerivativeStag(fields, DDX, DDZ)
+       else:
+              PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ)
               
        if not isTFOpX:
               PqPx -= REFS[15] * DqDz
@@ -308,6 +311,77 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        
        return DOPS
 
+# Fully explicit evaluation of the non linear advection
+def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W, ebcDex):
+       
+       # Get the Background fields
+       DQDZ = REFG[2]
+              
+       # Compute advective (multiplicative) operators
+       UM = np.expand_dims(U,1)
+       WM = np.expand_dims(W,1)
+       
+       # Compute complete vertical partial
+       PqPz = DqDz + DQDZ
+       
+       # Compute advection
+       try:
+              Uadvect = UM * PqPx
+       except FloatingPointError:
+              Uadvect = np.zeros(PqPx.shape)
+       try:
+              Wadvect = WM * PqPz
+       except FloatingPointError:
+              Wadvect = np.zeros(PqPz.shape)
+              
+       # Advection at inflow left boundary vanish
+       Uadvect[ebcDex[0]] = 0.0
+       Wadvect[ebcDex[0]] = 0.0
+       
+       # Vertical advection at top boundary vanishes
+       Wadvect[ebcDex[3]] = 0.0
+       
+       DqDt = -(Uadvect + Wadvect)
+       
+       return DqDt
+
+# Fully explicit evaluation of the non linear internal forcing
+def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, ebcDex):
+       # Get physical constants
+       gc = PHYS[0]
+       kap = PHYS[4]
+       gam = PHYS[6]
+       
+       # Get the Background fields
+       RdT_bar = REFS[9][0]
+       
+       # Compute pressure gradient force scaling (buoyancy)
+       RdT, T_ratio = computeRdT(fields, RdT_bar, kap)
+       
+       # Compute local divergence
+       divergence = PqPx[:,0] + DqDz[:,1]
+       
+       # Divergence at inflow left boundary
+       divergence[ebcDex[0]] = PqPx[ebcDex[0],0]
+       
+       # Compute pressure gradient forces
+       pgradx = RdT * PqPx[:,2]
+       pgradz = RdT * DqDz[:,2] - gc * T_ratio
+       
+       # PGF_z at inflow left boundary reduces to bouyancy
+       pgradz[ebcDex[0]] = -gc * T_ratio[ebcDex[0]]
+       
+       DqDt = np.zeros(fields.shape)
+       
+       # Horizontal momentum equation
+       DqDt[:,0] = -pgradx
+       # Vertical momentum equation
+       DqDt[:,1] = -pgradz
+       # Pressure (mass) equation
+       DqDt[:,2] = -gam * divergence
+       
+       return DqDt
+
 # Fully explicit evaluation of the non linear equations (dynamic components)
 def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W, ebcDex):
        # Get physical constants
@@ -338,26 +412,26 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
               Wadvect = WM * PqPz
        except FloatingPointError:
               Wadvect = np.zeros(PqPz.shape)
+              
+       # Advection at inflow left boundary vanish
+       Uadvect[ebcDex[0]] = 0.0
+       Wadvect[ebcDex[0]] = 0.0
+       
+       # Vertical advection at top boundary vanishes
+       Wadvect[ebcDex[3]] = 0.0
        
        # Compute local divergence
        divergence = PqPx[:,0] + DqDz[:,1]
        
-       # Divergence at lateral boundaries vanishes
+       # Divergence at inflow left boundary
        divergence[ebcDex[0]] = PqPx[ebcDex[0],0]
-       divergence[ebcDex[1]] = PqPx[ebcDex[1],0]
        
        # Compute pressure gradient forces
        pgradx = RdT * PqPx[:,2]
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
-       # PGF_x at lateral boundaries vanishes
-       pgradx[ebcDex[0]] = 0.0
-       pgradx[ebcDex[1]] = 0.0
-       # PGF_x and PGF_z at vertical boundaries vanish
-       pgradz[ebcDex[0]] = 0.0
-       pgradz[ebcDex[1]] = 0.0
-       pgradz[ebcDex[2]] = 0.0
-       pgradz[ebcDex[3]] = 0.0
+       # PGF_z at inflow left boundary reduces to bouyancy
+       pgradz[ebcDex[0]] = -gc * T_ratio[ebcDex[0]]
        
        DqDt = -(Uadvect + Wadvect)
        
@@ -367,20 +441,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        DqDt[:,1] -= pgradz
        # Pressure (mass) equation
        DqDt[:,2] -= gam * divergence
-       '''
-       print(PqPx[ebcDex[1],0])
-       print(PqPz[ebcDex[1],1])
-       print(fields[ebcDex[1],2])
-       print(DqDt[ebcDex[1],2])
-       print(divergence[ebcDex[1]])
-       input()
-       '''
-       '''
-       try:
-              DqDt[:,2] -= gam * divergence
-       except FloatingPointError:
-              DqDt[:,2] = np.zeros(PqPx.shape[0])
-       '''
+       
        # Potential Temperature equation (transport only)
        
        return DqDt
@@ -400,11 +461,11 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
+def computeDiffusionTendency(q, DqDx, DqDz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
        
        dhdx = REFS[6][0]
-       metrics = REFS[6][1]
-       S = metrics[3]
+       S = DLD[4]
+       S2 = DLD[5]
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]
@@ -419,39 +480,36 @@ def computeDiffusionTendency(q, PqPx, PqPz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               DC2 = DCF[1] # coefficient to the Z direction flux
               
               # Get the coefficients along the terrain
-              mu_xb = DC1[bdex]
-              mu_xt = DC1[tdex]  
+              mu_xb = DC1[bdex,:]
+              mu_xt = DC1[tdex,:]  
        try:
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
-              DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPzx[:,1] + P2qPz2[:,0])
-              DqDt[:,1] = DC1 * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2 * (2.0 * P2qPz2[:,1])
+              DqDt[:,0] = DC1[:,0] * (2.0 * P2qPx2[:,0]) + DC2[:,0] * (P2qPzx[:,1] + P2qPz2[:,0])
+              DqDt[:,1] = DC1[:,1] * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2[:,1] * (2.0 * P2qPz2[:,1])
               # Diffusion of scalars (broken up into anisotropic components
-              DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
-              DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
+              DqDt[:,2] = DC1[:,2] * P2qPx2[:,2] + DC2[:,2] * P2qPz2[:,2]
+              DqDt[:,3] = DC1[:,3] * P2qPx2[:,3] + DC2[:,3] * P2qPz2[:,3]
                   
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = mu_xt * P2qPx2[tdex,0]
+              DqDt[tdex,0] = mu_xt[:,0] * P2qPx2[tdex,0]
               DqDt[tdex,1] = 0.0
-              DqDt[tdex,2] = mu_xt * P2qPx2[tdex,2]
-              DqDt[tdex,3] = mu_xt * P2qPx2[tdex,3]
+              DqDt[tdex,2] = mu_xt[:,2] * P2qPx2[tdex,2]
+              DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
               
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
               
               # Compute directional derivatives
-              DDX1 = REFS[16]
-              DDX2 = REFS[17]
+              DDX = REFS[16]
               SB = np.expand_dims(S, axis=1)
-              #DqDx = (DDX1 @ q[bdex,:])
-              DqDx = PqPx[bdex,:] + np.expand_dims(dhdx, axis=1) * PqPz[bdex,:]
-              dqda = SB * DqDx #+ np.expand_dims(dhdx, axis=1) * DQDZ[bdex,:])
-              d2qda2 = SB * (DDX2 @ dqda)
+              dqda = SB * DqDx[bdex,:]
+              d2qda2 = SB * (DDX @ dqda)
        
-              DqDt[bdex,0] = mu_xb * d2qda2[:,0]
+              DqDt[bdex,0] = S2 * mu_xb[:,0] * d2qda2[:,0]
               DqDt[bdex,1] = 0.0
-              DqDt[bdex,2] = mu_xb * d2qda2[:,2]
-              DqDt[bdex,3] = mu_xb * d2qda2[:,3]
+              DqDt[bdex,2] = S2 * mu_xb[:,2] * d2qda2[:,2]
+              DqDt[bdex,3] = S2 * mu_xb[:,3] * d2qda2[:,3]
               #'''
        except FloatingPointError:
               DqDt *= 0.0

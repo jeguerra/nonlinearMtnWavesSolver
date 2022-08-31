@@ -74,12 +74,12 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      # Inflow condition on UWPT TRANSIENT SOLUTION
                      rowsOutU = set(uldex1)
                      rowsOutW = set(np.concatenate((uldex1,utdex)))
-                     #rowsOutP = set(uldex1)
-                     rowsOutP = set()
+                     rowsOutP = set(uldex1)
+                     #rowsOutP = set()
                      rowsOutT = set(uldex1)
                      # Indexing for static solver
-                     #left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
-                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iT*OPS))
+                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+                     #left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iT*OPS))
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, top)))
                     

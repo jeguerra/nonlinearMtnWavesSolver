@@ -60,86 +60,71 @@ def computeResidualViscCoeffsRaw(DIMS, RES, qnorm, state, DLD, bdex, applyFilter
        UD = np.abs(state[:,0])
        WD = np.abs(state[:,1])
        
-       try:
-              UD2 = np.power(UD,2.0)
-       except FloatingPointError:
-              UD2 = np.zeros(UD.shape)
-              
-       try:
-              WD2 = np.power(WD,2.0)
-       except FloatingPointError:
-              WD2 = np.zeros(WD.shape)
-       
-       VL = np.sqrt(UD2 + WD2)
-       
+       # Compute upper bound on coefficients based on flow speed
+       QMAX1 = 0.5 * DLD[0] * UD
+       QMAX2 = 0.5 * DLD[1] * WD
+       #'''
+       if applyFilter:
+              QMAX1 = ndimage.maximum_filter(np.reshape(QMAX1, (NZ, NX), order='F'), size=3, mode='nearest')
+              QMAX2 = ndimage.maximum_filter(np.reshape(QMAX2, (NZ, NX), order='F'), size=3, mode='nearest')
+              QMAX1 = np.reshape(QMAX1, (OPS,), order='F')
+              QMAX2 = np.reshape(QMAX2, (OPS,), order='F')
+       #'''
        # Compute field normalization
        QM = bn.nanmax(np.abs(qnorm), axis=0)
+       QM = np.reciprocal(QM)
+       QM[QM == np.inf] = 0.0
+       QM = np.diag(QM)
        
        try:   
               # Compute absolute value of residuals
-              ARES = np.abs(RES)
-              
-              for vv in range(4):
-                     if QM[vv] > 0.0:
-                            # Normalize the residuals
-                            if vv < 4:
-                                   ARES[:,vv] *= (1.0 / QM[vv])
-                     else:
-                            ARES[:,vv] *= 0.0
-                            
-              # Get the maximum in the residuals (unit = 1/s)
-              QRES_MAX = bn.nanmax(ARES, axis=1)
-              
-              # Compute upper bound on coefficients based on flow speed
-              QMAX1 = 0.5 * DLD[0] * UD
-              QMAX2 = 0.5 * DLD[1] * WD
-              
+              ARES = np.abs(RES) @ QM
+              #'''
               # Apply image filtering to a 3 grid neighborhood
               if applyFilter:
-                     QRES_MAX = ndimage.maximum_filter(np.reshape(QRES_MAX, (NZ, NX), order='F'), size=3, mode='constant')
-                     QMAX1 = ndimage.maximum_filter(np.reshape(QMAX1, (NZ, NX), order='F'), size=3, mode='constant')
-                     QMAX2 = ndimage.maximum_filter(np.reshape(QMAX2, (NZ, NX), order='F'), size=3, mode='constant')
+                     QRES_PER = np.reshape(ARES, (NZ,NX,4), order='F')
+                     QRES_FLT = np.empty(QRES_PER.shape)
+                     for vv in range(4):
+                            QRES_FLT[:,:,vv] = ndimage.maximum_filter(QRES_PER[:,:,vv], size=3, mode='nearest')
                      
-                     QRES_MAX = np.reshape(QRES_MAX, (OPS,), order='F')
-                     QMAX1 = np.reshape(QMAX1, (OPS,), order='F')
-                     QMAX2 = np.reshape(QMAX2, (OPS,), order='F')
-              
+                     ARES = np.reshape(QRES_FLT, (OPS,4), order='F')
+              #'''
+              # Apply length scales to the coefficients
+              CRES1 = DLD[2] * ARES
+              CRES2 = DLD[3] * ARES
+
+              #'''
+              # Apply limiting bounds
               QB1 = bn.nanmax(QMAX1)
               QB2 = bn.nanmax(QMAX2)
               
-              # Limit DynSGS to upper bound
-              CRES1 = DLD[2] * QRES_MAX
-              vdex = np.argwhere(CRES1 > QB1)
-              CRES1[vdex] = QB1 #QMAX1[vdex]
-              
-              CRES2 = DLD[3] * QRES_MAX
-              vdex = np.argwhere(CRES2 > QB2)
-              CRES2[vdex] = QB2 #QMAX2[vdex]
-              #'''
-              # Set adaptive damping along the terrain
-              QMAX = 0.5 * DLD[0] * DLD[4] * VL[bdex]
-              QB = bn.nanmax(QMAX)
-              CRES = DLD[2] * DLD[5] * QRES_MAX[bdex]
-              vdex = np.argwhere(CRES > QB)
-              CRES[vdex] = QB
-              
-              CRES1[bdex] = CRES
-              CRES2[bdex] = CRES
+              for vv in range(4):
+                     CR1 = CRES1[:,vv]
+                     CR2 = CRES2[:,vv]
+                     CR1[CR1 > QB1] = QB1
+                     CR2[CR2 > QB2] = QB2
+                     CRES1[:,vv] = CR1
+                     CRES2[:,vv] = CR2
+
               #'''
        except FloatingPointError:
-              CRES1 = np.zeros((state.shape[0]))
-              CRES2 = np.zeros((state.shape[0]))
+              CRES1 = np.zeros((ARES.shape))
+              CRES2 = np.zeros((ARES.shape))
               
        # Apply a simple post-filter
        '''
        if applyFilter:
-              CRES1_XZ = np.reshape(CRES1, (NZ, NX), order='F')
-              CRES1_XZ_FT = ndimage.maximum_filter(CRES1_XZ, size=3, mode='constant')
-              CRES1 = np.reshape(CRES1_XZ_FT, (OPS,), order='F')
+              CRES1_XZ = np.reshape(CRES1, (NZ, NX, 4), order='F')
+              CRES2_XZ = np.reshape(CRES2, (NZ, NX, 4), order='F')
               
-              CRES2_XZ = np.reshape(CRES2, (NZ, NX), order='F')
-              CRES2_XZ_FT = ndimage.maximum_filter(CRES2_XZ, size=3, mode='constant')
-              CRES2 = np.reshape(CRES2_XZ_FT, (OPS,), order='F')
+              CRES1_XZ_FT = np.empty(CRES1_XZ.shape)
+              CRES2_XZ_FT = np.empty(CRES2_XZ.shape)
+              for vv in range(4):
+                     CRES1_XZ_FT[:,:,vv] = ndimage.maximum_filter(CRES1_XZ[:,:,vv], size=2, mode='nearest')
+                     CRES2_XZ_FT[:,:,vv] = ndimage.maximum_filter(CRES2_XZ[:,:,vv], size=2, mode='nearest')
+              
+              CRES1 = np.reshape(CRES1_XZ_FT, (OPS,4), order='F')
+              CRES2 = np.reshape(CRES2_XZ_FT, (OPS,4), order='F')
        '''
        return (CRES1, CRES2)
 

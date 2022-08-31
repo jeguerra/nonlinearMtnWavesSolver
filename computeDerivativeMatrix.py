@@ -19,18 +19,17 @@ def computeAdjustedOperatorNBC(D2A, DD, tdex):
        # D2A is the operator to adjust
        # DD is the 1st derivative operator
        R = DD[tdex,tdex]
-       dv = DD[tdex,:]; dv[tdex] = 0.0
-       DA = (1.0 / R) * np.outer(DD[:,tdex], -dv)
-              
-       D2A[:,tdex] = 0.0
-       D2A[tdex,:] = 0.0
-       DOP = D2A + DA
+       dr = DD[tdex,:]
+       dc = DD[:,tdex]
+       
+       DOP = np.copy(D2A)   
+       DA = 1.0 / R * np.expand_dims(dc, axis=1) @ np.expand_dims(dr, axis=0)
+       DOP -= DA
 
        DOP[tdex,:] = 0.0
-
-       DOPC = numericalCleanUp(DOP)
+       DOP[:,tdex] = 0.0
        
-       return DOPC
+       return DOP
 
 def computeAdjustedOperatorNBC_ends(D2A, DD):
        # D2A is the operator to adjust
@@ -38,8 +37,8 @@ def computeAdjustedOperatorNBC_ends(D2A, DD):
        
        R = (DD[0,0] * DD[-1,-1] - DD[0,-1] * DD[-1,0])
        
-       lv = DD[0,:]; lv[0] = 0.0
-       rv = DD[-1,:]; rv[-1] = 0.0
+       lv = DD[0,:]
+       rv = DD[-1,:]
        
        V1 = (DD[-1,-1] / R) * (-lv) + (DD[0,-1] / R) * rv 
        DA1 = np.outer(DD[:,0], V1)
@@ -47,17 +46,12 @@ def computeAdjustedOperatorNBC_ends(D2A, DD):
        V2 = (DD[-1,0] / R) * lv - (DD[0,0] / R) * (-rv) 
        DA2 = np.outer(DD[:,-1], V2)
        
-       D2A[:,0] = 0.0; D2A[:,-1] = 0.0
-       D2A[0,:] = 0.0; D2A[-1,:] = 0.0
-       
        DOP = D2A + DA1 + DA2
        
-       #DOP[0,:] = 0.0; DOP[:,0] = 0.0
-       #DOP[-1,:] = 0.0; DOP[:,-1] = 0.0
-       
-       DOPC = numericalCleanUp(DOP)
-       
-       return DOPC
+       DOP[0,:] = 0.0; DOP[:,0] = 0.0
+       DOP[-1,:] = 0.0; DOP[:,-1] = 0.0
+              
+       return DOP
 
 def computeAdjustedOperatorPeriodic(D2A):
        # D2A is the operator to adjust
@@ -1307,8 +1301,7 @@ def computeLaguerreDerivativeMatrix(DIMS):
        LT = lgfuncm(NM-1, xi, True)
               
        # Get the scale factor
-       lg = np.amax(xi)
-       b = lg / abs(ZH)
+       b = max(xi) / ZH
        
        # Make a diagonal matrix of weights
        W = np.diag(wlf, k=0)

@@ -42,7 +42,7 @@ def plotRHS(x, rhs, ebcDex, label):
 def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, zeroDex, ebcDex, \
                               filteredCoeffs, verticalStagger, \
-                              DynSGS_RES, NE):
+                              DynSGS_RES):
        DT = TOPT[0]
        mu = REFG[3]
        RLM = REFG[4].data
@@ -320,7 +320,7 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, DCF, rhs0, zeroDex, ebcDex, \
-                              filteredCoeffs, verticalStagger, DynSGS_RES, NE):
+                              filteredCoeffs, verticalStagger, DynSGS_RES):
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
@@ -335,7 +335,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
                      
-       def computeUpdate(coeff, solA, sol2Update):
+       def computeUpdate1(coeff, solA, sol2Update):
               
               DF = coeff * DT
               
@@ -356,11 +356,77 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                                                REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
-              # Apply diffusion update
+              # Apply update
               try:
                      solB = sol2Update + DF * (rhsExp + rhsDif)
               except FloatingPointError:
                      solB = sol2Update + 0.0
+              
+              # Clean up on essential BC
+              U = solB[:,0] + init0[:,0]
+              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
+              
+              return solB
+       
+       def computeUpdate(coeff, solA, sol2Update):
+              
+              DF = coeff * DT
+              
+              # Get derivatives
+              if verticalStagger:
+                     DqDx, DqDz = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
+              else:
+                     DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+                     
+              PqPx = DqDx - REFS[15] * DqDz
+              
+              #%% Compute advection update
+              stateA = solA + init0
+              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solA, stateA[:,0], stateA[:,1], ebcDex)
+              rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, dhdx)
+              
+              # Apply update
+              try:
+                     solB = sol2Update + DF * rhsAdv
+              except FloatingPointError:
+                     solB = np.copy(sol2Update)
+                     
+              # Clean up on essential BC
+              U = solB[:,0] + init0[:,0]
+              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
+                     
+              #%% Compute internal force update
+              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solB, ebcDex)
+              rhsIfc = tendency.enforceTendencyBC(rhsIfc, zeroDex, ebcDex, dhdx)
+              
+              # Apply update
+              try:
+                     solB += DF * rhsIfc
+              except FloatingPointError:
+                     solB += 0.0
+                     
+              # Clean up on essential BC
+              U = solB[:,0] + init0[:,0]
+              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
+              
+              #%% Compute diffusive update
+              if diffusiveFlux:
+                     PqPx *= np.expand_dims(DCF[0], axis=1)
+                     DqDz *= np.expand_dims(DCF[1], axis=1)
+              
+              # Compute diffusive tendency
+              P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
+              tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM_B, DDZM_B, REFS, REFG, DCF)
+              
+              rhsDif = tendency.computeDiffusionTendency(solB, DqDx, DqDz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                               REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
+              rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
+              
+              # Apply update
+              try:
+                     solB += DF * rhsDif
+              except FloatingPointError:
+                     solB += 0.0
               
               # Clean up on essential BC
               U = solB[:,0] + init0[:,0]
@@ -414,14 +480,24 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                             sol1 = computeUpdate(c1, sol1, sol1)
                      else:
                             sol1 = computeUpdate(c1, sol1, sol1)
+              try:
+                     sol2 *= 0.04
+              except FloatingPointError:
+                     sol2 *= 0.0
+              try:
+                     sol2 += 0.36 * sol1
+              except FloatingPointError:
+                     sol2 += 0.0
               
-              sol2 = 0.04 * sol2 + 0.36 * sol1
               sol1 = 15.0 * sol2 - 5.0 * sol1
               
               for ii in range(4):
                      sol1 = computeUpdate(c1, sol1, sol1)
+              try:       
+                     sol = sol2 + 0.6 * sol1
+              except FloatingPointError:
+                     sol = sol2 + 0.0
                      
-              sol = sol2 + 0.6 * sol1
               sol = computeUpdate(0.1, sol1, sol)
                             
               return sol
@@ -534,7 +610,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        elif order == 3:
               solB = ketcheson93(sol0)
        elif order == 4:
-              #solB = ssprk84(sol0)
+              #solB = ssprk54(sol0, 1.0)
               solB = ketcheson104(sol0)
               '''
               solA = ssprk54(sol0, 0.5)

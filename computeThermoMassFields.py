@@ -12,33 +12,6 @@ import numpy as np
 from numpy import linalg as lan
 import computeDerivativeMatrix as derv
 
-def computeAdjustedOperatorNBC(D2A, DOG, DD, tdex, isGivenValue, DP):
-       # D2A is the operator to adjust
-       # DOG is the original operator to adjust (unadjusted)
-       # DD is the 1st derivative operator
-       DOP = np.zeros(DD.shape)
-       # Get the column span size
-       NZ = DD.shape[1]
-       cdex = range(NZ)
-       cdex = np.delete(cdex, tdex)
-       
-       # For prescribed value:
-       if isGivenValue:
-              scale = - DD[tdex,tdex]
-       # For matching at infinity
-       else:
-              scale = (DP - DD[tdex,tdex])
-              
-       # Loop over columns of the operator and adjust for BC at z = H (tdex)
-       for jj in cdex:
-              factor = DD[tdex,jj] / scale
-              v1 = (D2A[:,jj]).flatten()
-              v2 = (DOG[:,tdex]).flatten()
-              nvector = v1 + factor * v2
-              DOP[:,jj] = nvector
-       
-       return DOP
-
 def computePfromSensibleT(DDZ, TZ, AC, P0):
        N = len(TZ)
        
@@ -55,7 +28,6 @@ def computePfromSensibleT(DDZ, TZ, AC, P0):
        # Specify the derivative at the model top
        dpdZ_H = AC * tempBarI[N-1]
        # Compute adjustment to the derivative matrix operator
-       #DOP = computeAdjustedOperatorNBC(DDZ, DDZ, DDZ, N-1, True, None)
        DOP = derv.computeAdjustedOperatorNBC(DDZ, DDZ, -1)
 
        # Impose resulting Neumann/Dirichlet conditions lnP top and bottom
@@ -68,8 +40,9 @@ def computePfromSensibleT(DDZ, TZ, AC, P0):
        bdex = range(0,NE)
        
        # Compute the forcing due to matching at the model top
-       f = -dpdZ_H / DDZ[NE,NE] * DDZ[:,NE]
-       F = np.add(tempBarI, f)
+       f1 = lnP0 * DDZ[:,0]
+       f2 = dpdZ_H / DDZ[NE,NE] * DDZ[:,NE]
+       F = tempBarI - f1 - f2
        # Solve the system for lnP
        ln_pBar[idex] = AC * lan.solve(DOPS, (F[1:NE]).astype(dtype=np.float64))
        
@@ -84,9 +57,10 @@ def computePfromSensibleT(DDZ, TZ, AC, P0):
        return pBar, ln_pBar
 
 def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
+       N = len(TZ)
+       
        # Initialize background pressure
-       pBar = np.mat(np.zeros(N))
-       pBar = pBar.T
+       pBar = np.zeros(N)
        
        # Compute the Neumann boundary value at the top z = H
        thetaBarI = np.reciprocal(TZ)
@@ -95,7 +69,6 @@ def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
        # Specify the derivative at the model top
        dpdZ_H = Kp * AC * thetaBarI[N-1]
        # Compute adjustment to the derivative matrix operator
-       #DOP = computeAdjustedOperatorNBC(DDZ, DDZ, DDZ, N-1, True, None)
        DOP = derv.computeAdjustedOperatorNBC(DDZ, DDZ, -1)
 
        # Impose resulting Dirichlet conditions p^K top and bottom
@@ -108,8 +81,9 @@ def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
        bdex = range(0,NE)
        
        # Compute the forcing due to matching at the model top
-       f = -dpdZ_H / DDZ[N-1,N-1] * DDZ[:,N-1]
-       F = np.add(thetaBarI, f)
+       f1 = P0 * DDZ[:,0]
+       f2 = dpdZ_H / DDZ[NE,NE] * DDZ[:,NE]
+       F = thetaBarI - f1 - f2
        # Solve the system for p^K
        pBar[idex] = AC * Kp * lan.solve(DOPS, F[1:NE])
        

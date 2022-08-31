@@ -55,7 +55,7 @@ class TestCase:
                      # Newton iteration with smooth stratification
                      self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
                                 'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True,\
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
