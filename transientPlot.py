@@ -14,12 +14,12 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
 m2k = 1.0E-3
-fname = 'StaggeredZ06_QS-DynSGS_RHS_h3000m.nc'
+fname = 'Simulation2Plot.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
-X = m_fid.variables['x'][:,:,0]
-Z = m_fid.variables['z'][:,:,0]
+X = m_fid.variables['Xlon'][:,:,0]
+Z = m_fid.variables['Zhgt'][:,:,0]
 
 U = m_fid.variables['U'][:,:,0]
 LNP = m_fid.variables['LNP'][:,:,0]
@@ -56,8 +56,8 @@ THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = True
-runSGS = False
+runPertb = False
+runSGS = True
 
 #%% Contour animation of perturbation potential temperatures
 if runPertb:

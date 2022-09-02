@@ -695,8 +695,8 @@ def runModel(TestName):
               DDXM_OP = DDXMS1
        else:
               #DDXM_OP = sps.block_diag((DDXMS_QS, DDXMS_QS, DDXMS_QS, DDXMS_QS), format='csr')
-              #DDXM_OP = 0.5 * (DDXMS_QS + DDXMS_CFD)
-              DDXM_OP = 1.0 * DDXMS_QS
+              DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+              #DDXM_OP = 1.0 * DDXMS_QS
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
        xi_lg, whf = derv.leglb(NZ) #[-1 1]
@@ -741,8 +741,8 @@ def runModel(TestName):
               DDZM_OP = 0.5 * (DDZMS1 + DDZMST)
        
        #%% Prepare derivative operators for diffusion
-       DDXMD, DDZMD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
-       PPXMD = DDXMD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMD)
+       PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+       DDZMD = 1.0 * DDZMS_QS
        diffOps1 = (PPXMD, DDZMD)
        
        # Get the operator for the terrain diffusion

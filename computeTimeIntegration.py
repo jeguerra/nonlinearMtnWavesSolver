@@ -374,11 +374,11 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Get derivatives
               if verticalStagger:
-                     DqDx, DqDz = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
+                     PqPx, DqDz = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
               else:
-                     DqDx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+                     PqPx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
                      
-              PqPx = DqDx - REFS[15] * DqDz
+              #PqPx = DqDx - REFS[15] * DqDz
               
               #%% Compute advection update
               stateA = solA + init0
@@ -418,6 +418,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM_B, DDZM_B, REFS, REFG, DCF)
               
+              DqDx = PqPx + REFS[15] * DqDz
               rhsDif = tendency.computeDiffusionTendency(solB, DqDx, DqDz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
