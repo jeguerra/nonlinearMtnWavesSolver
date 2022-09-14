@@ -103,7 +103,7 @@ def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
               thisZH = ZH - hx[cc]
               sigma[:,cc] *= (ZH / thisZH)
               ZTL[:,cc] = ZL[:,cc] * thisZH / ZH
-              ZTL[:,cc] += hx[cc]
+              ZTL[:,cc] += (ZH - ZTL[-1,cc])
        
        # Compute the terrain derivatives       
        for rr in range(1,NZ):
@@ -112,4 +112,8 @@ def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
        # Compute the coordinate surface at the edge of the Rayleigh layer
        ZRL = (1.0 - zRay / ZH) * hx + zRay
        
-       return XL, ZTL, DZT, sigma, ZRL
+       # Compute the local grid lengths at each node
+       DXM = np.gradient(XL, np.arange(XL.shape[1]), axis=1, edge_order=1)
+       DZM = np.gradient(ZTL, np.arange(ZTL.shape[0]), axis=0, edge_order=1)
+       
+       return XL, ZTL, DZT, sigma, ZRL, DXM, DZM

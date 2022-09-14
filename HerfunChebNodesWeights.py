@@ -129,16 +129,14 @@ def chebpolym(NM, xi):
        # Compute Chebyshev pols (first kind) into a matrix transformation
        # Functions need to be arranged bottom to top!
        NX = len(xi)
-       CTM = np.zeros((NX, NM))
+       CTM = np.zeros((NM, NX))
        
-       CTM[:,0] = np.ones(NX)
-       CTM[:,1] = xi
+       CTM[0,:] = np.ones(NX)
+       CTM[1,:] = xi
        
        # 3 Term recursion for functions
        for ii in range(2, NM):
-              CTM[:,ii] = 2.0 * \
-              mul(xi, CTM[:,ii-1]) - \
-              CTM[:,ii-2]
+              CTM[ii,:] = 2.0 * (xi * CTM[ii-1,:]) - CTM[ii-2,:]
               
        return CTM
 

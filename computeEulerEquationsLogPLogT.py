@@ -32,7 +32,7 @@ def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        DqDt[zeroDex[3],3] = 0.0
        
        bdex = ebcDex[2]  
-       DqDt[bdex,1] = 0.0
+       DqDt[bdex,1] = 0.0 #dhdx * DqDt[bdex,0]
        
        return DqDt
 
@@ -110,7 +110,7 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, isTFOpX):
+def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, withBCW, isTFOpX):
        
        # Compute flow speed
        Q = fields + hydroState
@@ -130,6 +130,10 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
               rhsVec += computeRayleighTendency(REFG, fields)
        
        rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, dhdx)
+       
+       if withBCW:
+              bdex = ebcDex[2]
+              rhsVec[bdex,1] = dhdx * rhsVec[bdex,0]
        
        return rhsVec, PqPx, DqDz
 
@@ -461,9 +465,9 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-def computeDiffusionTendency(q, DqDx, DqDz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
+def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
        
-       dhdx = REFS[6][0]
+       #dhdx = REFS[6][0]
        S = DLD[4]
        S2 = DLD[5]
        
@@ -503,7 +507,7 @@ def computeDiffusionTendency(q, DqDx, DqDz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS
               # Compute directional derivatives
               DDX = REFS[16]
               SB = np.expand_dims(S, axis=1)
-              dqda = SB * DqDx[bdex,:]
+              dqda = SB * (DDX @ q[bdex,:])
               d2qda2 = SB * (DDX @ dqda)
        
               DqDt[bdex,0] = S2 * mu_xb[:,0] * d2qda2[:,0]

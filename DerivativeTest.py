@@ -123,12 +123,9 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 HofX, dHdX, SD = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
-DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 10)
+DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
 DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
 DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
-
-DDX_CS = derv.computeAdjustedOperatorNBC(DDX_CS, DDX_BC, -1)
-DDX_QS = derv.computeAdjustedOperatorNBC(DDX_QS, DDX_BC, -1)
 
 DYD_CS = DDX_CS.dot(HofX)
 DYD_QS = DDX_QS.dot(HofX)
@@ -174,26 +171,55 @@ print('Quintic Spline Derivative: ', np.count_nonzero(DDX_QS))
 
 # Set grid dimensions and order
 NX = 96
-NZ = 96
+NZ = 95
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS, True, False, True, False)
+REFS_CH = computeGrid(DIMS, True, False, True, False)
+REFS_LG = computeGrid(DIMS, True, False, False, True)
 
 #% Compute the raw derivative matrix operators in alpha-xi computational space
-DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-DDZ2C = DDZ_1D.dot(DDZ_1D)
+DDZ_LG, LG_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+DDZ2L = DDZ_LG.dot(DDZ_LG)
+DDZ_CH, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+DDZ2C = DDZ_CH.dot(DDZ_CH)
 
-zv = (1.0 / ZH) * REFS[1]
+zv = (1.0 / ZH) * REFS_CH[1]
 Y, DY = function1(zv)
+
+zvl = (1.0 / ZH) * REFS_LG[1]
+YL, DYL = function1(zvl)
 
 DDZ_CFD1 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 4)
 DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 6)
 DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 10)
 
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD3)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD3)
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, ZH * DDZ_CH)
+DDZ_QS1, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, ZH * DDZ_CH)
+DDZ_QS2, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CFD3)
+DDZ_QS = 0.5 * (DDZ_QS1 + DDZ_QS2)
 
+# Compute eigenspectra
+W1 = scl.eigvals(DDZ_CFD1)
+W2 = scl.eigvals(DDZ_CFD2)
+W3 = scl.eigvals(DDZ_CS)
+W4 = scl.eigvals(DDZ_QS1)
+W5 = scl.eigvals(DDZ_QS2)
+W6 = scl.eigvals(ZH * DDZ_LG)
+W7 = scl.eigvals(ZH * DDZ_CH)
+
+plt.figure(figsize=(8, 6), tight_layout=True)
+plt.plot(np.real(W1), np.imag(W1), 'o', label='Compact FD4')
+plt.plot(np.real(W2), np.imag(W2), 'o', label='Compact FD6')
+plt.plot(np.real(W3), np.imag(W3), 'o', label='Cubic Spline') 
+plt.plot(np.real(W4), np.imag(W4), 'o', label='Quintic Clamped')
+plt.plot(np.real(W5), np.imag(W5), 'o', label='Quintic Natural')
+plt.plot(np.real(W6), np.imag(W6), 'o', label='Legendre') 
+plt.plot(np.real(W7), np.imag(W7), 'o', label='Chebyshev')
+plt.grid(visible=True, which='both', axis='both')
+plt.legend()
+
+'''
 # Compute SVD of derivative matrices
 U1, s1, Vh1 = scl.svd(DDX_1D)
 U2, s2, Vh2 = scl.svd(DDZ_1D)
@@ -210,13 +236,14 @@ plt.plot(s5 / s5[0], 'o', label='Compact FD10'); plt.plot(s6 / s6[0], 'o', label
 plt.plot(s7 / s7[0], 'o', label='Quintic Spline')
 plt.grid(visible=True, which='both', axis='both')
 plt.legend()
-
+'''
 DYD1 = DDZ_CFD1.dot(Y)
 DYD2 = DDZ_CFD2.dot(Y)
 DYD3 = DDZ_CFD3.dot(Y)
 DYD4 = DDZ_CS.dot(Y)
 DYD5 = DDZ_QS.dot(Y)
-DYD6 = ZH * DDZ_1D.dot(Y)
+DYD6 = ZH * DDZ_CH.dot(Y)
+DYD7 = ZH * DDZ_LG.dot(YL)
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(zv, Y, label='Function')
 plt.plot(zv, DY, 'r-', label='Analytical Derivative')
@@ -226,6 +253,7 @@ plt.plot(zv, DYD3, 'kh--', label='Compact FD10 1st Derivative')
 plt.plot(zv, DYD4, 'md--', label='Cubic Spline 1st Derivative')
 plt.plot(zv, DYD5, 'c+--', label='Quintic Spline 1st Derivative')
 plt.plot(zv, DYD6, 'rs--', label='Chebyshev Derivative')
+plt.plot(zvl, DYD7, 'ks--', label='Legendre Derivative')
 plt.xlabel('Domain')
 plt.ylabel('Functions')
 plt.title('Compact Finite Difference Derivative Test')
@@ -238,6 +266,8 @@ plt.semilogy(zv, np.abs(DYD2 - DY), 'gp--', label='Compact FD6 Error')
 plt.semilogy(zv, np.abs(DYD3 - DY), 'kh--', label='Compact FD10 Error')
 plt.semilogy(zv, np.abs(DYD4 - DY), 'md--', label='Cubic Spline Error')
 plt.semilogy(zv, np.abs(DYD5 - DY), 'c+--', label='Quintic Spline Error')
+plt.semilogy(zv, np.abs(DYD6 - DY), 'rs--', label='Chebyshev Spectral Error')
+plt.semilogy(zv, np.abs(DYD7 - DYL), 'ks--', label='Legendre Spectral Error')
 plt.xlabel('Domain')
 plt.ylabel('Error Magnitude')
 plt.title('Compact Finite Difference Derivative Test')
@@ -248,7 +278,7 @@ plt.legend()
 plt.show()
 
 #%% LAGUERRE FUNCTION DERIVATIVE TEST
-NZ = 16
+NZ = 17
 DIMS[-1] = NZ
 import HerfunChebNodesWeights as hcl
 

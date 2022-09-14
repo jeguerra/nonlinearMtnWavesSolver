@@ -989,10 +989,11 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      CM4_V -= alpha * CM4[:,-2]
                      CMS = CM4[0:-2,0:-2]
                      
-                     Q, R = scl.qr(CMS)
-                     PLU = scl.lu_factor(R)
-                     CF = scl.lu_solve(PLU, (Q.T).dot(CM4_V[0:-2]))
-                     
+                     #Q, R = scl.qr(CMS)
+                     #PLU = scl.lu_factor(R)
+                     #CF = scl.lu_solve(PLU, (Q.T).dot(CM4_V[0:-2]))
+                     PLU = scl.lu_factor(CMS)
+                     CF = scl.lu_solve(PLU, CM4_V[0:-2])
                      CFE = -np.sum(CF[0:2])
                      
                      # Write the right equation
@@ -1017,10 +1018,11 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                                      
                      CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
                      
-                     Q, R = scl.qr(CME)
-                     PLU = scl.lu_factor(R)
-                     CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
-                     
+                     #Q, R = scl.qr(CME)
+                     #PLU = scl.lu_factor(R)
+                     #CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
+                     PLU = scl.lu_factor(CME)
+                     CF = scl.lu_solve(PLU, CME_V)
                      CFE = -np.sum(CF[0:-1])
                      
                      # Write the right equation
@@ -1065,9 +1067,11 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      CM6_V -= alpha * CM6[:,-2]
                      CMS = CM6[0:-2,0:-2]
                      
-                     Q, R = scl.qr(CMS)
-                     PLU = scl.lu_factor(R)
-                     CF = scl.lu_solve(PLU, (Q.T).dot(CM6_V[0:-2]))
+                     #Q, R = scl.qr(CMS)
+                     #PLU = scl.lu_factor(R)
+                     #CF = scl.lu_solve(PLU, (Q.T).dot(CM6_V[0:-2]))
+                     PLU = scl.lu_factor(CMS)
+                     CF = scl.lu_solve(PLU, CM6_V[0:-2])
                      CFE = -np.sum(CF[0:4])
                      
                      # Write the right equation
@@ -1232,7 +1236,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        b = 2.0 / ZH
    
        # Get the Chebyshev transformation matrix
-       CT = chebpolym(NZ+1, -xi)
+       CT = chebpolym(NZ+1, xi)
    
        # Make a diagonal matrix of weights
        W = np.diag(wcp)
@@ -1268,7 +1272,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
        temp = (CT.T).dot(SDIFF)
-       DDM = -b * temp.dot(STR_C)
+       DDM = b * temp.dot(STR_C)
        
        DDMC = numericalCleanUp(DDM)
 

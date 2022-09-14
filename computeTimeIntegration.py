@@ -67,7 +67,7 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
               
               # Compute dynamics RHS
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False]
+              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False, True]
               rhsExp, DqDxA, DqDzA = tendency.computeRHS(*args)
               
               try:
@@ -293,9 +293,7 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        solB, rhsMid = ssprk54(solA, 0.5)
               
        # Update the adaptive coefficients using residual or right hand side
-       #args = [solB, init0, DDXM_B, DDZM_B, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True]
-       #rhsNew, DqDxA, DqDzA = tendency.computeRHS(*args)
-       args = [solB, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False]
+       args = [solB, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False, True]
        rhsNew, DqDxA, DqDzA = tendency.computeRHS(*args)
        
        # Normalization and bounding to DynSGS
@@ -303,13 +301,11 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        qnorm = (solB - bn.nanmean(solB))
        #'''
        if DynSGS_RES:
-              resField = (solB - solA) / DT - 0.5 * (rhsNew + rhsMid)
+              resField = 2.0 * (solB - solA) / DT - 0.5 * (rhsNew + rhsMid)
        else:
               resField = 0.5 * (rhsNew + rhsMid)
-       resField *= 2.0
        #'''
-       DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, qnorm, state, DLD, dhdx, ebcDex[2], filteredCoeffs)
-       #del(resField)       
+       DCF = rescf.computeResidualViscCoeffs(DIMS, resField, qnorm, state, DLD, dhdx, ebcDex[2], filteredCoeffs)
        
        # Solve first half step
        solB = ssprk43(solB, DCF, 0.5)
@@ -340,7 +336,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               DF = coeff * DT
               
               # Compute dynamics RHS
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False]
+              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False, True]
               rhsExp, DqDxA, DqDzA = tendency.computeRHS(*args)
               
               # Compute diffusive fluxes
@@ -377,9 +373,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      PqPx, DqDz = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
               else:
                      PqPx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
-                     
-              #PqPx = DqDx - REFS[15] * DqDz
-              
+                                   
               #%% Compute advection update
               stateA = solA + init0
               rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solA, stateA[:,0], stateA[:,1], ebcDex)
@@ -411,15 +405,14 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% Compute diffusive update
               if diffusiveFlux:
-                     PqPx *= np.expand_dims(DCF[0], axis=1)
-                     DqDz *= np.expand_dims(DCF[1], axis=1)
+                     PqPx *= DCF[0]
+                     DqDz *= DCF[1]
               
               # Compute diffusive tendency
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM_B, DDZM_B, REFS, REFG, DCF)
               
-              DqDx = PqPx + REFS[15] * DqDz
-              rhsDif = tendency.computeDiffusionTendency(solB, DqDx, DqDz, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+              rhsDif = tendency.computeDiffusionTendency(solB, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
@@ -612,6 +605,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB = ketcheson93(sol0)
        elif order == 4:
               #solB = ssprk54(sol0, 1.0)
+              #solB = ssprk84(sol0)
               solB = ketcheson104(sol0)
               '''
               solA = ssprk54(sol0, 0.5)
@@ -625,7 +619,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               U = solA[:,0] + init0[:,0]
               solA = tendency.enforceEssentialBC(solA, U, zeroDex, ebcDex, dhdx)
               
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, True, verticalStagger, False]
+              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, True, verticalStagger, True, True]
               rhsMid, DqDxA, DqDzA = tendency.computeRHS(*args)
               
               # Normalization and bounding to DynSGS
