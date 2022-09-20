@@ -55,14 +55,9 @@ def computeResidualViscCoeffs(DIMS, RES, qnorm, state, DLD, bdex, applyFilter):
               CRES1 = DLD[2] * ARES
               CRES2 = DLD[3] * ARES
 
-              #'''
               # Apply limiting bounds
               QB1 = bn.nanmax(QMAX1)
               QB2 = bn.nanmax(QMAX2)
-              
-              # Set U and W damping along terrain to maximum flow dependent coefficients
-              CRES1[bdex,0] = QMAX1[bdex]
-              CRES2[bdex,1] = QMAX2[bdex]
               
               for vv in range(4):
                      CR1 = CRES1[:,vv]
@@ -72,7 +67,9 @@ def computeResidualViscCoeffs(DIMS, RES, qnorm, state, DLD, bdex, applyFilter):
                      CRES1[:,vv] = CR1
                      CRES2[:,vv] = CR2
 
-              #'''
+              # Set U and W damping along terrain to maximum flow dependent coefficients
+              CRES1[bdex,0] = QMAX1[bdex]
+              CRES2[bdex,1] = QMAX2[bdex]
        except FloatingPointError:
               CRES1 = np.zeros((ARES.shape))
               CRES2 = np.zeros((ARES.shape))

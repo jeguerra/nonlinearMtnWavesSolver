@@ -881,8 +881,12 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        
-       end3 = False
-       end6 = True
+       if order == 4:
+              end3 = True
+              end6 = False
+       else:
+              end3 = False
+              end6 = True
        
        # Initialize the left and right derivative matrices
        N = len(dom)
@@ -989,11 +993,11 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      CM4_V -= alpha * CM4[:,-2]
                      CMS = CM4[0:-2,0:-2]
                      
-                     #Q, R = scl.qr(CMS)
-                     #PLU = scl.lu_factor(R)
-                     #CF = scl.lu_solve(PLU, (Q.T).dot(CM4_V[0:-2]))
-                     PLU = scl.lu_factor(CMS)
-                     CF = scl.lu_solve(PLU, CM4_V[0:-2])
+                     Q, R = scl.qr(CMS)
+                     PLU = scl.lu_factor(R)
+                     CF = scl.lu_solve(PLU, (Q.T).dot(CM4_V[0:-2]))
+                     #PLU = scl.lu_factor(CMS)
+                     #CF = scl.lu_solve(PLU, CM4_V[0:-2])
                      CFE = -np.sum(CF[0:2])
                      
                      # Write the right equation
@@ -1018,11 +1022,11 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                                      
                      CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
                      
-                     #Q, R = scl.qr(CME)
-                     #PLU = scl.lu_factor(R)
-                     #CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
-                     PLU = scl.lu_factor(CME)
-                     CF = scl.lu_solve(PLU, CME_V)
+                     Q, R = scl.qr(CME)
+                     PLU = scl.lu_factor(R)
+                     CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
+                     #PLU = scl.lu_factor(CME)
+                     #CF = scl.lu_solve(PLU, CME_V)
                      CFE = -np.sum(CF[0:-1])
                      
                      # Write the right equation
@@ -1067,11 +1071,11 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      CM6_V -= alpha * CM6[:,-2]
                      CMS = CM6[0:-2,0:-2]
                      
-                     #Q, R = scl.qr(CMS)
-                     #PLU = scl.lu_factor(R)
-                     #CF = scl.lu_solve(PLU, (Q.T).dot(CM6_V[0:-2]))
-                     PLU = scl.lu_factor(CMS)
-                     CF = scl.lu_solve(PLU, CM6_V[0:-2])
+                     Q, R = scl.qr(CMS)
+                     PLU = scl.lu_factor(R)
+                     CF = scl.lu_solve(PLU, (Q.T).dot(CM6_V[0:-2]))
+                     #PLU = scl.lu_factor(CMS)
+                     #CF = scl.lu_solve(PLU, CM6_V[0:-2])
                      CFE = -np.sum(CF[0:4])
                      
                      # Write the right equation

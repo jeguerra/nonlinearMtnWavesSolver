@@ -437,7 +437,7 @@ def runModel(TestName):
        else:
               print('No spatial filter on DynSGS coefficients.')
               
-       DynSGS_RES = True
+       DynSGS_RES = False
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
        else:
@@ -686,13 +686,13 @@ def runModel(TestName):
        del(DIM0)
        
        #%% DIFFERENTIATION OPERATORS
-       
-       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-       
+       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
+       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
        DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        
+       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        
@@ -710,29 +710,32 @@ def runModel(TestName):
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
        NZI = NZ + 1
        if verticalLegdGrid and verticalStagger:
-              xi_lg, whf = derv.leglb(NZ) #[-1 1]
-              xi_ch, whf = derv.cheblb(NZI) #[-1 1]
               
-              CTM = derv.chebpolym(NZI+1, xi_lg) # interpolate to legendre grid
-              LTM, dummy = derv.legpolym(NZ, xi_ch, True) # interpolate to chebyshev grid
+              xiI, whf = derv.cheblb(NZI) #[-1 1]
+              xiO, whf = derv.leglb(NZ) #[-1 1]
               
-              # Get spectral derivatives and transformations
+              TMO = derv.chebpolym(NZI+1, xiO)
+              TMI, dummy = derv.legpolym(NZ, xiI, True)
+              
+              # Get the outer vertical derivative
+              DDZ_O0, O_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+              DDZ_O1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiO, True, False, DDZ_O0)
+              
+              # Get the inner vertical derivatie
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
-              DDZ_CH0, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
-              DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(xi_ch, 6)
-              DDZ_CH1, dummy = derv.computeQuinticSplineDerivativeMatrix(xi_ch, True, False, DDZ_BC)
+              DDZ_I0, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
+              DDZ_I1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiI, True, False, DDZ_I0)
               
-              LG2CH_INT = (LTM.T).dot(VTRANS) # Outer Legendre to Internal Chebyshev grid
-              CH2LG_INT = (CTM.T).dot(CH_TRANS) # Inner Chebyshev to Outer Lengendre grid
+              O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
+              I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
               
-              DDZ_1DS = CH2LG_INT.dot(DDZ_CH0).dot(LG2CH_INT)
-              dummy, DDZMST = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1DS)
-              del(dummy)
+              DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
+              dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
+              dummy, DDZMO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_O0)
               
        if verticalStagger:
               # Staggered vertical operator
-              DDZM_OP = sps.block_diag((DDZMS1, DDZMST, DDZMS1, DDZMST), format='csr')
-              #DDZM_OP = sps.block_diag((DDZMS_QS, DDZMST, DDZMS_QS, DDZMST), format='csr')
+              DDZM_OP = sps.block_diag((DDZMO, DDZMI, DDZMO, DDZMI), format='csr')
        else:
               # Average the staggered operators
               DDZM_OP = 1.0 * DDZMS1
@@ -796,8 +799,8 @@ def runModel(TestName):
               
               # Diffusion filter grid length based on resolution powers
               if DynSGS_RES:
-                     DL1 = 2.0 * DX_max #1.0 * np.reshape(DXM, (OPS,), order='F')
-                     DL2 = 2.0 * DZ_max #1.0 * np.reshape(DZM, (OPS,), order='F')
+                     DL1 = 1.0 * DX_max #1.0 * np.reshape(DXM, (OPS,), order='F')
+                     DL2 = 1.0 * DZ_max #1.0 * np.reshape(DZM, (OPS,), order='F')
               else:
                      DL1 = 1.0 * DX_max
                      DL2 = 1.0 * DZ_max
@@ -1100,7 +1103,13 @@ def runModel(TestName):
               #'''
               
               ti = 0; ff = 0
-              delFields = np.zeros(fields.shape)
+              DT0 = TOPT[0]
+              delFields0 = np.zeros(fields.shape)
+              rhsVec0 = np.copy(rhsVec)
+              fields0 = np.copy(fields)
+              state0 = fields0 + hydroState
+              
+              resVec0 = np.zeros(fields.shape)
               error = [np.linalg.norm(rhsVec)]
               
               method1 = False
@@ -1153,12 +1162,6 @@ def runModel(TestName):
                      # Compute the solution within a time step
                      try:   
                             # Compute a time step
-                            DT0 = TOPT[0]
-                            delFields0 = np.copy(delFields)
-                            rhsVec0 = np.copy(rhsVec)
-                            fields0 = np.copy(fields)
-                            state0 = fields0 + hydroState
-                            
                             try: 
                                    # Compute sound speed
                                    RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
@@ -1207,9 +1210,6 @@ def runModel(TestName):
                             # Update time and solution counter
                             thisTime += TOPT[0]
                             
-                            # Compute the full state
-                            state = np.copy(fields)# + hydroState
-                            #state = fields + hydroState
                             
                             if method2:
                                    # Compute the updated RHS
@@ -1220,17 +1220,30 @@ def runModel(TestName):
                                                                        PHYS, REFS, REFG, ebcDex, zeroDex, True, verticalStagger, True, True)
                                           
                                    # Normalization and bounding to DynSGS
-                                   qnorm = (state - bn.nanmean(state))
-                                   #'''
+                                   state = np.copy(fields)
+                                   qnorm = 0.5 * (fields + fields0)
+                                   
+                                   # Compute residual and average
+                                   resVec = 0.5 * (delFields / DT + delFields0 / DT0) - \
+                                            0.5 * (rhsVec + rhsVec0)
+                                   resAvg = 0.5 * (resVec + resVec0)
+                                            
+                                   # Compute averaged RHS
+                                   rhsAvg = 0.5 * (rhsVec + rhsVec0)
+                                   
                                    if DynSGS_RES:
-                                          resVec = 0.5 * (delFields / DT + delFields0 / DT0) - \
-                                                   0.5 * (rhsVec + rhsVec0)                                   
+                                          DCF = rescf.computeResidualViscCoeffs(DIMS, resAvg, qnorm, state, DLD, ebcDex[2], filteredCoeffs)                            
                                    else:
-                                          resVec = 0.5 * (rhsVec + rhsVec0)
-                                   #'''
-                                   DCF = rescf.computeResidualViscCoeffs(DIMS, resVec, qnorm, state, DLD, ebcDex[2], filteredCoeffs)
+                                          DCF = rescf.computeResidualViscCoeffs(DIMS, rhsAvg, qnorm, state, DLD, ebcDex[2], filteredCoeffs)
                             
                             ti += 1
+                            
+                            DT0 = TOPT[0]
+                            fields0 = np.copy(fields)
+                            delFields0 = np.copy(delFields)
+                            rhsVec0 = np.copy(rhsVec)
+                            resVec0 = np.copy(resVec)
+                            state0 = fields0 + hydroState
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)

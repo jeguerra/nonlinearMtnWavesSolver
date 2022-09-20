@@ -386,8 +386,8 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB = np.copy(sol2Update)
                      
               # Clean up on essential BC
-              U = solB[:,0] + init0[:,0]
-              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
+              #U = solB[:,0] + init0[:,0]
+              #solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
                      
               #%% Compute internal force update
               rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solB, ebcDex)
@@ -400,8 +400,8 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB += 0.0
                      
               # Clean up on essential BC
-              U = solB[:,0] + init0[:,0]
-              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
+              #U = solB[:,0] + init0[:,0]
+              #solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
               
               #%% Compute diffusive update
               if diffusiveFlux:
@@ -409,6 +409,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DqDz *= DCF[1]
               
               # Compute diffusive tendency
+              #PqPz = DqDz + REFG[2]
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM_B, DDZM_B, REFS, REFG, DCF)
               
@@ -423,8 +424,8 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB += 0.0
               
               # Clean up on essential BC
-              U = solB[:,0] + init0[:,0]
-              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
+              #U = solB[:,0] + init0[:,0]
+              #solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
               
               return solB
        
@@ -607,35 +608,6 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #solB = ssprk54(sol0, 1.0)
               #solB = ssprk84(sol0)
               solB = ketcheson104(sol0)
-              '''
-              solA = ssprk54(sol0, 0.5)
-              
-              # Apply Rayleigh damping layer implicitly
-              RayDamp = np.reciprocal(1.0 + 1.0 * DT * mu * RLM)
-              rdex = [0, 1, 2, 3]
-              solA[:,rdex] = np.copy(RayDamp.T * solA[:,rdex])
-              
-              # Clean up on essential BC
-              U = solA[:,0] + init0[:,0]
-              solA = tendency.enforceEssentialBC(solA, U, zeroDex, ebcDex, dhdx)
-              
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, True, verticalStagger, True, True]
-              rhsMid, DqDxA, DqDzA = tendency.computeRHS(*args)
-              
-              # Normalization and bounding to DynSGS
-              state = solA + init0
-              qnorm = (solA - bn.nanmean(solA))
-              
-              if DynSGS_RES:
-                     resField = (solA - sol0) / (0.5 * DT) - 0.5 * (rhsMid + rhs0)
-              else:
-                     resField = 0.5 * (rhsMid + rhs0)
-              resField *= 2.0
-              
-              DCF = rescf.computeResidualViscCoeffsRaw(DIMS, resField, qnorm, state, DLD, dhdx, ebcDex[2], filteredCoeffs)
-                     
-              solB = ssprk54(solA, 0.5)
-              '''
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
