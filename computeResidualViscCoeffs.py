@@ -68,8 +68,8 @@ def computeResidualViscCoeffs(DIMS, RES, qnorm, state, DLD, bdex, applyFilter):
                      CRES2[:,vv] = CR2
 
               # Set U and W damping along terrain to maximum flow dependent coefficients
-              CRES1[bdex,0] = QMAX1[bdex]
-              CRES2[bdex,1] = QMAX2[bdex]
+              #CRES1[bdex,0] = QMAX1[bdex]
+              #CRES2[bdex,1] = QMAX2[bdex]
        except FloatingPointError:
               CRES1 = np.zeros((ARES.shape))
               CRES2 = np.zeros((ARES.shape))

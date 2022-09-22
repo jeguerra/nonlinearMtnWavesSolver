@@ -404,8 +404,11 @@ def runModel(TestName):
        NewtonLin = thisTest.solType['NewtonLin']
        ExactBC = thisTest.solType['ExactBC']
        
+       # Set the use of a persistent hydrostatic background:
+       withHydroState = True
+       
        # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
-       if StaticSolve:
+       if StaticSolve and not NonLinSolve:
               RSBops = False
               useGuellrich = True
               useUniformSt = False
@@ -470,7 +473,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -1
+              rdex = -10
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -686,21 +689,21 @@ def runModel(TestName):
        del(DIM0)
        
        #%% DIFFERENTIATION OPERATORS
-       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
-       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
-       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
+       DDX_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
+       DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
+       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD4)
+       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD4)
        
-       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-       DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
-       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
+       DDX_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+       DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD6)
+       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD6)
        
        # Derivative operators for dynamics
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
-       DDXMS_CFD, DDZMS_CFD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD, DDZ_CFD)
+       DDXMS_CFD, DDZMS_CFD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
        
        if HermFunc:
               DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
@@ -746,8 +749,7 @@ def runModel(TestName):
        
        #%% Prepare derivative operators for diffusion
        PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
-       DDZMD = 1.0 * DDZMS_QS
-       diffOps1 = (PPXMD, DDZMD)
+       diffOps1 = (PPXMD, DDZMS_QS)
        
        # Get the operator for the terrain diffusion
        DDX_BC = np.copy(DDX_QS)
@@ -760,8 +762,8 @@ def runModel(TestName):
               REFS.append((rsb_matrix(DDXM_OP,shape=DDXM_OP.shape), \
                            rsb_matrix(DDZM_OP,shape=DDZM_OP.shape)))
               
-              diffOps2 = (rsb_matrix(PPXMD, shape=PPXMD.shape), 
-                          rsb_matrix(DDZMD, shape=DDZMD.shape))
+              diffOps2 = (rsb_matrix(diffOps1[0], shape=diffOps1[0].shape), 
+                          rsb_matrix(diffOps1[1], shape=diffOps1[1].shape))
               REFS.append(diffOps2)
        elif not StaticSolve and not RSBops:
               # Native sparse
@@ -769,8 +771,8 @@ def runModel(TestName):
               REFS.append(diffOps1)
        else: 
               # Matrix derivative operators in native format
-              REFS.append(PPXMD) # index 12
-              REFS.append(DDZMD) # index 13
+              REFS.append(diffOps1[0]) # index 12
+              REFS.append(diffOps1[1]) # index 13
               
        # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(DZT) # index 14
@@ -797,15 +799,10 @@ def runModel(TestName):
               DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
               print('Uniform grid lengths:',DX_wav,DZ_wav)
               
-              # Diffusion filter grid length based on resolution powers
-              if DynSGS_RES:
-                     DL1 = 1.0 * DX_max #1.0 * np.reshape(DXM, (OPS,), order='F')
-                     DL2 = 1.0 * DZ_max #1.0 * np.reshape(DZM, (OPS,), order='F')
-              else:
-                     DL1 = 1.0 * DX_max
-                     DL2 = 1.0 * DZ_max
+              DL1 = 1.0 * DX_max
+              DL2 = 1.0 * DZ_max
                      
-              S2 = 1.0 + np.power(REFS[6][0],2)
+              S2 = np.reciprocal(1.0 + np.power(REFS[6][0],2))
               S = np.sqrt(S2)
               DLD = (DL1, DL2, DL1**2, DL2**2, S, S2)
               
@@ -1071,11 +1068,20 @@ def runModel(TestName):
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
               
+              PPXM = rsb_matrix(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
+              PPZM = rsb_matrix(DDZMS_CS)
+              
               # Initialize the perturbations
               if thisTime == 0.0:
                      
-                     # Initialize vertical velocity
-                     fields[ubdex,1] = -dWBC
+                     # Initialize fields
+                     if withHydroState:
+                            fields[ubdex,1] = -dWBC
+                     else:
+                            fields[:,0] = hydroState[:,0]
+                            fields[ubdex,1] = -dWBC
+                            fields[:,2] = hydroState[:,2]
+                            fields[:,3] = hydroState[:,3]
                      '''
                      PTR = np.power(np.power((XL + 100.0E3) / 30.0E3, 2.0) + \
                             np.power((ZTL - 10.0E3) / 5.0E3, 2.0), 0.5)
@@ -1121,11 +1127,8 @@ def runModel(TestName):
                      
                             # Compute the initial RHS
                             if ti == 0:
-                                   DDXM_A = REFS[12][0]
-                                   DDZM_A = REFS[12][1]
-                                          
-                                   rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, DDXM_A, DDZM_A, REFS[6][0], \
-                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, verticalStagger, True, True)
+                                   rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
+                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True, True)
                             
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
@@ -1153,10 +1156,6 @@ def runModel(TestName):
                             ff += 1
                                                  
                      if ti % ITI == 0 and makePlots:
-                                   
-                            #DCFA = rescf.computeResidualViscCoeffsRaw(DIMS, rhsVec, qnorm, state, DLD, ebcDex[2], REFG[5])
-                            #DCFB = rescf.computeResidualViscCoeffsRaw(DIMS, resVec, qnorm, state, DLD, ebcDex[2], REFG[5])
-                                   
                             makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
                             
                      # Compute the solution within a time step
@@ -1213,11 +1212,8 @@ def runModel(TestName):
                             
                             if method2:
                                    # Compute the updated RHS
-                                   DDXM = REFS[12][0]
-                                   DDZM = REFS[12][1]
-                                          
-                                   rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, DDXM, DDZM, REFS[6][0], \
-                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, verticalStagger, True, True)
+                                   rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
+                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True, True)
                                           
                                    # Normalization and bounding to DynSGS
                                    state = np.copy(fields)

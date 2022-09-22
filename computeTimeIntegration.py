@@ -385,10 +385,6 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               except FloatingPointError:
                      solB = np.copy(sol2Update)
                      
-              # Clean up on essential BC
-              #U = solB[:,0] + init0[:,0]
-              #solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
-                     
               #%% Compute internal force update
               rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solB, ebcDex)
               rhsIfc = tendency.enforceTendencyBC(rhsIfc, zeroDex, ebcDex, dhdx)
@@ -398,10 +394,6 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB += DF * rhsIfc
               except FloatingPointError:
                      solB += 0.0
-                     
-              # Clean up on essential BC
-              #U = solB[:,0] + init0[:,0]
-              #solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
               
               #%% Compute diffusive update
               if diffusiveFlux:
@@ -422,10 +414,6 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB += DF * rhsDif
               except FloatingPointError:
                      solB += 0.0
-              
-              # Clean up on essential BC
-              #U = solB[:,0] + init0[:,0]
-              #solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
               
               return solB
        

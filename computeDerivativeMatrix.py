@@ -881,25 +881,31 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        
+       end3 = False
        if order == 4:
-              end3 = True
-              end6 = False
-       else:
-              end3 = False
+              end4 = False
               end6 = True
+              end8 = False
+       elif order == 6:
+              end4 = False
+              end6 = False
+              end8 = True
+       elif order > 6:
+              end4 = False
+              end6 = False
+              end8 = True
        
        # Initialize the left and right derivative matrices
        N = len(dom)
        LDM = np.zeros((N,N)) # tridiagonal
        RDM = np.zeros((N,N)) # centered difference
        
-       def p2Matrix6(hm1, hp1, hp2, hp3, hp4, hp5, ND):
-              CM = np.ones((ND,ND))
+       def p2Matrix6(hm1, hp1, hp2, hp3, hp4):
+              CM = np.ones((6,6))
               c1 = hp1; c2 = hm1
               c3 = hp2 + hp1
               c5 = hp3 + hp2 + hp1
               c7 = hp4 + hp3 + hp2 + hp1
-              #c9 = hp5 + hp4 + hp3 + hp2 + hp1
 
               # One sided boundary scheme (2 forward derivatives)
               CM[0,:] = [+c1, -c2, +c3, +c5, +c7, -2.0]
@@ -911,8 +917,43 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
 
               return CM
        
-       def endMatrix6(hp1, hp2, hp3, hp4, hp5, ND):
-              CM = np.ones((ND,ND))
+       def p2Matrix8(hm1, hp1, hp2, hp3, hp4, hp5, hp6):
+              CM = np.ones((8,8))
+              c1 = hp1; c2 = hm1
+              c3 = hp2 + hp1
+              c5 = hp3 + hp2 + hp1
+              c7 = hp4 + hp3 + hp2 + hp1
+              c9 = hp5 + hp4 + hp3 + hp2 + hp1
+              c11 = hp6 + hp5 + hp4 + hp3 + hp2 + hp1
+
+              # One sided boundary scheme (2 forward derivatives)
+              CM[0,:] = [+c1, -c2, +c3, +c5, +c7, +c9, +c11, -2.0]
+              CM[1,:] = [c1**2, +c2**2, +c3**2, +c5**2, +c7**2, +c9**2, +c11**2, -2.0 * (hp1 - hm1)]
+              CM[2,:] = [c1**3, -c2**3, +c3**3, +c5**3, +c7**3, +c9**3, +c11**3, -3.0 * (hp1**2 + hm1**2)]
+              CM[3,:] = [c1**4, +c2**4, +c3**4, +c5**4, +c7**4, +c9**4, +c11**4, -4.0 * (hp1**3 - hm1**3)]
+              CM[4,:] = [c1**5, -c2**5, +c3**5, +c5**5, +c7**5, +c9**5, +c11**5, -5.0 * (hp1**4 + hm1**4)]
+              CM[5,:] = [c1**6, +c2**6, +c3**6, +c5**6, +c7**6, +c9**6, +c11**6, -6.0 * (hp1**5 - hm1**5)]
+              CM[6,:] = [c1**7, -c2**7, +c3**7, +c5**7, +c7**7, +c9**7, +c11**7, -7.0 * (hp1**6 + hm1**6)]
+              CM[7,:] = [c1**8, +c2**8, +c3**8, +c5**8, +c7**8, +c9**8, +c11**8, -8.0 * (hp1**7 - hm1**7)]
+
+              return CM
+       
+       def endMatrix4(hp1, hp2, hp3):
+              CM = np.ones((4,4))
+              c1 = hp1
+              c3 = hp2 + hp1
+              c5 = hp3 + hp2 + hp1
+
+              # One sided boundary scheme (2 forward derivatives)
+              CM[0,:] = [+c1, +c3, +c5, -1.0]
+              CM[1,:] = [c1**2, +c3**2, +c5**2, -2.0 * c1]
+              CM[2,:] = [c1**3, +c3**3, +c5**3, -3.0 * c1**2]
+              CM[3,:] = [c1**4, +c3**4, +c5**4, -4.0 * c1**3]
+              
+              return CM
+       
+       def endMatrix6(hp1, hp2, hp3, hp4, hp5):
+              CM = np.ones((6,6))
               c1 = hp1
               c3 = hp2 + hp1
               c5 = hp3 + hp2 + hp1
@@ -926,6 +967,28 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               CM[3,:] = [c1**4, +c3**4, +c5**4, +c7**4, +c9**4, -4.0 * c1**3]
               CM[4,:] = [c1**5, +c3**5, +c5**5, +c7**5, +c9**5, -5.0 * c1**4]
               CM[5,:] = [c1**6, +c3**6, +c5**6, +c7**6, +c9**6, -6.0 * c1**5]
+
+              return CM
+       
+       def endMatrix8(hp1, hp2, hp3, hp4, hp5, hp6, hp7):
+              CM = np.ones((8,8))
+              c1 = hp1
+              c3 = hp2 + hp1
+              c5 = hp3 + hp2 + hp1
+              c7 = hp4 + hp3 + hp2 + hp1
+              c9 = hp5 + hp4 + hp3 + hp2 + hp1
+              c11 = hp6 + hp5 + hp4 + hp3 + hp2 + hp1
+              c13 = hp7 + hp6 + hp5 + hp4 + hp3 + hp2 + hp1
+
+              # One sided boundary scheme (2 forward derivatives)
+              CM[0,:] = [+c1, +c3, +c5, +c7, +c9, +c11, +c13, -1.0]
+              CM[1,:] = [c1**2, +c3**2, +c5**2, +c7**2, +c9**2, +c11**2, +c13**2, -2.0 * c1]
+              CM[2,:] = [c1**3, +c3**3, +c5**3, +c7**3, +c9**3, +c11**3, +c13**3, -3.0 * c1**2]
+              CM[3,:] = [c1**4, +c3**4, +c5**4, +c7**4, +c9**4, +c11**4, +c13**4, -4.0 * c1**3]
+              CM[4,:] = [c1**5, +c3**5, +c5**5, +c7**5, +c9**5, +c11**5, +c13**5, -5.0 * c1**4]
+              CM[5,:] = [c1**6, +c3**6, +c5**6, +c7**6, +c9**6, +c11**6, +c13**6, -6.0 * c1**5]
+              CM[6,:] = [c1**7, +c3**7, +c5**7, +c7**7, +c9**7, +c11**7, +c13**7, -7.0 * c1**6]
+              CM[7,:] = [c1**8, +c3**8, +c5**8, +c7**8, +c9**8, +c11**8, +c13**8, -8.0 * c1**7]
 
               return CM
        
@@ -996,8 +1059,6 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      Q, R = scl.qr(CMS)
                      PLU = scl.lu_factor(R)
                      CF = scl.lu_solve(PLU, (Q.T).dot(CM4_V[0:-2]))
-                     #PLU = scl.lu_factor(CMS)
-                     #CF = scl.lu_solve(PLU, CM4_V[0:-2])
                      CFE = -np.sum(CF[0:2])
                      
                      # Write the right equation
@@ -1010,104 +1071,209 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      LDM[ii,ii] = 1.0
                      LDM[ii,ii+1] = beta
                      
-              if (order > 4 and ii in [1,N-2]):
-                     hm1 = dom[1] - dom[0]
-                     hp1 = dom[2] - dom[1]
-                     hp2 = dom[3] - dom[2]
-                     hp3 = dom[4] - dom[3]
-                     hp4 = dom[5] - dom[4]
-                     hp5 = dom[6] - dom[5]
-                     
-                     CME = p2Matrix6(hm1, hp1, hp2, hp3, hp4, hp5, 6)
-                                     
-                     CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-                     
-                     Q, R = scl.qr(CME)
-                     PLU = scl.lu_factor(R)
-                     CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
-                     #PLU = scl.lu_factor(CME)
-                     #CF = scl.lu_solve(PLU, CME_V)
-                     CFE = -np.sum(CF[0:-1])
-                     
-                     # Write the right equation
-                     if ii == 1:
+              if order == 6:
+                     if ii in [1,N-2]:
+                            hm1 = dom[1] - dom[0]
+                            hp1 = dom[2] - dom[1]
+                            hp2 = dom[3] - dom[2]
+                            hp3 = dom[4] - dom[3]
+                            hp4 = dom[5] - dom[4]
+                            hp5 = dom[6] - dom[5]
+                            hp6 = dom[7] - dom[6]
+                            
+                            CME = p2Matrix8(hm1, hp1, hp2, hp3, hp4, hp5, hp6)
+                                            
+                            CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                            
+                            Q, R = scl.qr(CME)
+                            PLU = scl.lu_factor(R)
+                            CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
+                            CFE = -np.sum(CF[0:-1])
+                            
+                            # Write the right equation
+                            if ii == 1 or ii == 2:
+                                   RDM[ii,ii-1] = CF[1]
+                                   RDM[ii,ii] = CFE
+                                   RDM[ii,ii+1] = CF[0]
+                                   RDM[ii,ii+2] = CF[2]
+                                   RDM[ii,ii+3] = CF[3]
+                                   RDM[ii,ii+4] = CF[4]
+                                   RDM[ii,ii+5] = CF[5]
+                                   RDM[ii,ii+6] = CF[6]
+                            elif ii == N-3 or ii == N-2:
+                                   RDM[ii,ii+1] = -CF[1]
+                                   RDM[ii,ii] = -CFE
+                                   RDM[ii,ii-1] = -CF[0]
+                                   RDM[ii,ii-2] = -CF[2]
+                                   RDM[ii,ii-3] = -CF[3]
+                                   RDM[ii,ii-4] = -CF[4]
+                                   RDM[ii,ii-5] = -CF[5]
+                                   RDM[ii,ii-6] = -CF[6]
+                            
+                            # Write the left equation
+                            LDM[ii,ii-1] = CF[-1]
+                            LDM[ii,ii] = 1.0
+                            LDM[ii,ii+1] = CF[-1]
+                            
+                     elif ii in range(2,N-2):   
+                                
+                             alpha = 1.0 / 3.0 
+                             beta = 1.0 / 3.0
+                             
+                             # Delete columns
+                             ddex = [4, 5, 8, 9]
+                             CM6 = np.delete(CM10, ddex, axis=1) 
+                             
+                             # Delete rows to 6th order
+                             ddex = [6, 7, 8, 9]
+                             CM6 = np.delete(CM6, ddex, axis=0)
+                             CM6_V = np.delete(CMV, ddex, axis=0)
+                             
+                             # Constraint alpha = beta = 1/3
+                             CM6[:,-2] += CM6[:,-1]
+                             CM6_V -= alpha * CM6[:,-2]
+                             CMS = CM6[0:-2,0:-2]
+                             
+                             Q, R = scl.qr(CMS)
+                             PLU = scl.lu_factor(R)
+                             CF = scl.lu_solve(PLU, (Q.T).dot(CM6_V[0:-2]))
+                             CFE = -np.sum(CF[0:4])
+                             
+                             # Write the right equation
+                             RDM[ii,ii-2] = CF[3]
+                             RDM[ii,ii-1] = CF[1]
+                             RDM[ii,ii] = CFE
+                             RDM[ii,ii+1] = CF[0]
+                             RDM[ii,ii+2] = CF[2]
+                             
+                             # Write the left equation
+                             LDM[ii,ii-1] = alpha
+                             LDM[ii,ii] = 1.0
+                             LDM[ii,ii+1] = beta
+                             
+              if order == 8 or order == 10:
+                     if ii in [1,N-2]:
+                            hm1 = dom[1] - dom[0]
+                            hp1 = dom[2] - dom[1]
+                            hp2 = dom[3] - dom[2]
+                            hp3 = dom[4] - dom[3]
+                            hp4 = dom[5] - dom[4]
+                            hp5 = dom[6] - dom[5]
+                            hp6 = dom[7] - dom[6]
+                            
+                            CME = p2Matrix8(hm1, hp1, hp2, hp3, hp4, hp5, hp6)
+                                            
+                            CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                            
+                            Q, R = scl.qr(CME)
+                            PLU = scl.lu_factor(R)
+                            CF = scl.lu_solve(PLU, (Q.T).dot(CME_V))
+                            CFE = -np.sum(CF[0:-1])
+                            
+                            # Write the right equation
+                            if ii == 1 or ii == 2:
+                                   RDM[ii,ii-1] = CF[1]
+                                   RDM[ii,ii] = CFE
+                                   RDM[ii,ii+1] = CF[0]
+                                   RDM[ii,ii+2] = CF[2]
+                                   RDM[ii,ii+3] = CF[3]
+                                   RDM[ii,ii+4] = CF[4]
+                                   RDM[ii,ii+5] = CF[5]
+                                   RDM[ii,ii+6] = CF[6]
+                            elif ii == N-3 or ii == N-2:
+                                   RDM[ii,ii+1] = -CF[1]
+                                   RDM[ii,ii] = -CFE
+                                   RDM[ii,ii-1] = -CF[0]
+                                   RDM[ii,ii-2] = -CF[2]
+                                   RDM[ii,ii-3] = -CF[3]
+                                   RDM[ii,ii-4] = -CF[4]
+                                   RDM[ii,ii-5] = -CF[5]
+                                   RDM[ii,ii-6] = -CF[6]
+                            
+                            # Write the left equation
+                            LDM[ii,ii-1] = CF[-1]
+                            LDM[ii,ii] = 1.0
+                            LDM[ii,ii+1] = CF[-1]
+                     if ii in [2,N-3]:
+                            CMI = np.copy(CM10)
+                            CMI[:,-2] += CMI[:,-1]
+                            CMI[:,-4] += CMI[:,-3]
+                            CM10_V = CMV #- (alpha * CMI[:,-4] + theta * CMI[:,-2])
+                            
+                            sdex = np.array([0, 1, 2, 3, -2, -4])
+                            CMS = CMI[np.ix_(sdex,sdex)]
+                            
+                            Q, R = scl.qr(CMS)
+                            PLU = scl.lu_factor(R)
+                            CF = scl.lu_solve(PLU, (Q.T).dot(CM10_V[sdex]))
+                            CFE = -np.sum(CF[0:4])
+                            
+                            # Write the right equation
+                            RDM[ii,ii-2] = CF[3]
                             RDM[ii,ii-1] = CF[1]
                             RDM[ii,ii] = CFE
                             RDM[ii,ii+1] = CF[0]
                             RDM[ii,ii+2] = CF[2]
-                            RDM[ii,ii+3] = CF[3]
-                            RDM[ii,ii+4] = CF[4]
-                     elif ii == N-2:
-                            RDM[ii,ii+1] = -CF[1]
-                            RDM[ii,ii] = -CFE
-                            RDM[ii,ii-1] = -CF[0]
-                            RDM[ii,ii-2] = -CF[2]
-                            RDM[ii,ii-3] = -CF[3]
-                            RDM[ii,ii-4] = -CF[4]
-                     
-                     # Write the left equation
-                     LDM[ii,ii-1] = CF[-1]
-                     LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = CF[-1]
-              
-              # Loop over each interior point in the irregular grid
-              if (order == 10 and ii in [2,N-3]) or \
-                 (order == 6 and ii in range(2,N-2)):   
-                        
-                     alpha = 1.0 / 3.0 
-                     beta = 1.0 / 3.0
-                     
-                     # Delete columns
-                     ddex = [4, 5, 8, 9]
-                     CM6 = np.delete(CM10, ddex, axis=1) 
-                     
-                     # Delete rows to 4th order
-                     ddex = [6, 7, 8, 9]
-                     CM6 = np.delete(CM6, ddex, axis=0)
-                     CM6_V = np.delete(CMV, ddex, axis=0)
-                     
-                     # Constraint alpha = beta = 1/3
-                     CM6[:,-2] += CM6[:,-1]
-                     CM6_V -= alpha * CM6[:,-2]
-                     CMS = CM6[0:-2,0:-2]
-                     
-                     Q, R = scl.qr(CMS)
-                     PLU = scl.lu_factor(R)
-                     CF = scl.lu_solve(PLU, (Q.T).dot(CM6_V[0:-2]))
-                     #PLU = scl.lu_factor(CMS)
-                     #CF = scl.lu_solve(PLU, CM6_V[0:-2])
-                     CFE = -np.sum(CF[0:4])
-                     
-                     # Write the right equation
-                     RDM[ii,ii-2] = CF[3]
-                     RDM[ii,ii-1] = CF[1]
-                     RDM[ii,ii] = CFE
-                     RDM[ii,ii+1] = CF[0]
-                     RDM[ii,ii+2] = CF[2]
-                     
-                     # Write the left equation
-                     LDM[ii,ii-1] = alpha
-                     LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = beta
+                            
+                            # Write the left equation
+                            LDM[ii,ii-2] = CF[4]
+                            LDM[ii,ii-1] = CF[5]
+                            LDM[ii,ii] = 1.0
+                            LDM[ii,ii+1] = CF[5]
+                            LDM[ii,ii+2] = CF[4]
+                            
+              if (order == 8 and ii in range(3,N-3)):
+                                
+                             alpha = 2.0 / 5.0 
+                             beta = 2.0 / 5.0
+                             
+                             # Delete columns
+                             ddex = [5, 9]
+                             CM8 = np.delete(CM10, ddex, axis=1) 
+                             
+                             # Delete rows to 8th order
+                             ddex = [7, 9]
+                             CM8 = np.delete(CM8, ddex, axis=0)
+                             CM8_V = np.delete(CMV, ddex, axis=0)
+                             
+                             # Constraint alpha = beta
+                             CM8[:,-2] += CM8[:,-1]
+                             CM8_V -= alpha * CM8[:,-2]
+                             CMS = CM8[0:-2,0:-2]
+                             
+                             Q, R = scl.qr(CMS)
+                             PLU = scl.lu_factor(R)
+                             CF = scl.lu_solve(PLU, (Q.T).dot(CM8_V[0:-2]))
+                             CFE = -np.sum(CF[0:4])
+                             
+                             # Write the right equation
+                             RDM[ii,ii-3] = CF[5]
+                             RDM[ii,ii-2] = CF[3]
+                             RDM[ii,ii-1] = CF[1]
+                             RDM[ii,ii] = CFE
+                             RDM[ii,ii+1] = CF[0]
+                             RDM[ii,ii+2] = CF[2]
+                             RDM[ii,ii+3] = CF[4]
+                             
+                             # Write the left equation
+                             LDM[ii,ii-1] = alpha
+                             LDM[ii,ii] = 1.0
+                             LDM[ii,ii+1] = beta
                      
               # Loop over each interior point in the irregular grid
               if (order == 10 and ii in range(3,N-3)):
                      
-                     alpha = 0.5
-                     beta = 0.5
-                     theta = 0.05
-                     rho = 0.05
-                     
                      CMI = np.copy(CM10)
                      CMI[:,-2] += CMI[:,-1]
                      CMI[:,-4] += CMI[:,-3]
-                     CM10_V = CMV - (alpha * CMI[:,-4] + theta * CMI[:,-2])
+                     CM10_V = CMV #- (alpha * CMI[:,-4] + theta * CMI[:,-2])
                      
-                     sdex = np.array([0, 1, 2, 3, 4, 5])
+                     sdex = np.array([0, 1, 2, 3, 4, 5, -2, -4])
                      CMS = CMI[np.ix_(sdex,sdex)]
                      
-                     PLU = scl.lu_factor(CMS)
-                     CF = scl.lu_solve(PLU, CM10_V[sdex])
+                     Q, R = scl.qr(CMS)
+                     PLU = scl.lu_factor(R)
+                     CF = scl.lu_solve(PLU, (Q.T).dot(CM10_V[sdex]))
                      CFE = -np.sum(CF[0:6])
                      
                      # Write the right equation
@@ -1120,11 +1286,53 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                      RDM[ii,ii+3] = CF[4]
                      
                      # Write the left equation
-                     LDM[ii,ii-2] = theta
-                     LDM[ii,ii-1] = alpha
+                     LDM[ii,ii-2] = CF[6]
+                     LDM[ii,ii-1] = CF[7]
                      LDM[ii,ii] = 1.0
-                     LDM[ii,ii+1] = beta
-                     LDM[ii,ii+2] = rho
+                     LDM[ii,ii+1] = CF[7]
+                     LDM[ii,ii+2] = CF[6]
+                     
+       if end8: 
+              # Coefficients for 6th order compact one-sided schemes
+              hp1 = dom[1] - dom[0]
+              hp2 = dom[2] - dom[1]
+              hp3 = dom[3] - dom[2]
+              hp4 = dom[4] - dom[3]
+              hp5 = dom[5] - dom[4]
+              hp6 = dom[6] - dom[5]
+              hp7 = dom[7] - dom[6]
+       
+              # Compute the stencil coefficients
+              CME = endMatrix8(hp1, hp2, hp3, hp4, hp5, hp6, hp7)
+              CME_V = np.zeros(8)
+              CME_V[0] = 1.0
+              
+              Q, R = scl.qr(CME)
+              PLU = scl.lu_factor(R)
+              CF_F = scl.lu_solve(PLU, (Q.T).dot(CME_V))
+              beta = CF_F[-1]
+              
+              LDM[0,0] = 1.0
+              LDM[0,1] = beta
+              RDM[0,0] = -np.sum(CF_F[0:-1])
+              RDM[0,1] = CF_F[0]
+              RDM[0,2] = CF_F[1]
+              RDM[0,3] = CF_F[2]
+              RDM[0,4] = CF_F[3]
+              RDM[0,5] = CF_F[4]
+              RDM[0,6] = CF_F[5]
+              RDM[0,7] = CF_F[6]
+              
+              LDM[N-1,N-1] = 1.0
+              LDM[N-1,N-2] = beta
+              RDM[N-1,N-1] = np.sum(CF_F[0:-1])
+              RDM[N-1,N-2] = -CF_F[0]
+              RDM[N-1,N-3] = -CF_F[1]
+              RDM[N-1,N-4] = -CF_F[2]
+              RDM[N-1,N-5] = -CF_F[3]
+              RDM[N-1,N-6] = -CF_F[4]
+              RDM[N-1,N-7] = -CF_F[5]
+              RDM[N-1,N-8] = -CF_F[6]
        
        if end6: 
               # Coefficients for 6th order compact one-sided schemes
@@ -1135,9 +1343,8 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               hp5 = dom[5] - dom[4]
        
               # Compute the stencil coefficients
-              ND = 6
-              CME = endMatrix6(hp1, hp2, hp3, hp4, hp5, 6)
-              CME_V = np.zeros(ND)
+              CME = endMatrix6(hp1, hp2, hp3, hp4, hp5)
+              CME_V = np.zeros(6)
               CME_V[0] = 1.0
               
               Q, R = scl.qr(CME)
@@ -1162,6 +1369,38 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               RDM[N-1,N-4] = -CF_F[2]
               RDM[N-1,N-5] = -CF_F[3]
               RDM[N-1,N-6] = -CF_F[4]
+              
+       if end4: 
+              # Coefficients for 6th order compact one-sided schemes
+              hp1 = dom[1] - dom[0]
+              hp2 = dom[2] - dom[1]
+              hp3 = dom[3] - dom[2]
+              hp4 = dom[4] - dom[3]
+              hp5 = dom[5] - dom[4]
+       
+              # Compute the stencil coefficients
+              CME = endMatrix4(hp1, hp2, hp3)
+              CME_V = np.zeros(4)
+              CME_V[0] = 1.0
+              
+              Q, R = scl.qr(CME)
+              PLU = scl.lu_factor(R)
+              CF_F = scl.lu_solve(PLU, (Q.T).dot(CME_V))
+              beta = CF_F[-1]
+              
+              LDM[0,0] = 1.0
+              LDM[0,1] = beta
+              RDM[0,0] = -np.sum(CF_F[0:-1])
+              RDM[0,1] = CF_F[0]
+              RDM[0,2] = CF_F[1]
+              RDM[0,3] = CF_F[2]
+              
+              LDM[N-1,N-1] = 1.0
+              LDM[N-1,N-2] = beta
+              RDM[N-1,N-1] = np.sum(CF_F[0:-1])
+              RDM[N-1,N-2] = -CF_F[0]
+              RDM[N-1,N-3] = -CF_F[1]
+              RDM[N-1,N-4] = -CF_F[2]
        
        if end3:
               hp2 = dom[1] - dom[0]
