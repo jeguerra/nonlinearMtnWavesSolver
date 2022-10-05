@@ -358,7 +358,11 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, 
        #pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))      
        
        DqDt = np.zeros(fields.shape)
-       
+       '''
+       pgradx[pgradx < 1.0E-15] = 0.0
+       pgradz[pgradz < 1.0E-15] = 0.0
+       divergence[divergence < 1.0E-15] = 0.0
+       '''
        # Horizontal momentum equation
        DqDt[:,0] = -pgradx
        # Vertical momentum equation
@@ -416,7 +420,11 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))
        
        DqDt = -(Uadvect + Wadvect)
-       
+       '''
+       pgradx[pgradx < 1.0E-15] = 0.0
+       pgradz[pgradz < 1.0E-15] = 0.0
+       divergence[divergence < 1.0E-15] = 0.0
+       '''
        # Horizontal momentum equation
        DqDt[:,0] -= pgradx
        # Vertical momentum equation

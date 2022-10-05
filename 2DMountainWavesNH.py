@@ -1136,6 +1136,8 @@ def runModel(TestName):
               qnorm = 0.0
               delFields0 = np.zeros(fields.shape)
               rhsVec0 = np.copy(rhsVec)
+              rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
+                                                         PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
               fields0 = np.copy(fields)
               state0 = fields0 + hydroState
               
@@ -1148,18 +1150,10 @@ def runModel(TestName):
                              
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
-                     
-                            # Compute the initial RHS
-                            if ti == 0:
-                                   rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
-                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
-                            
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
                             error.append(err)
-                            
-                            #print(qnorm)
                             
                             # Check the NC file
                             ww = 0
@@ -1224,9 +1218,9 @@ def runModel(TestName):
                                    
                             if method2:
                                    fields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
-                                                                           DLD, TOPT, fields0, hydroState, DCF, rhsVec0, \
-                                                                           zeroDex, ebcDex, filteredCoeffs, \
-                                                                           verticalStagger, diffusiveFlux)
+                                                                           DLD, TOPT, fields0, hydroState, rhsVec0, \
+                                                                           DCF, zeroDex, ebcDex, filteredCoeffs, \
+                                                                           verticalStagger, diffusiveFlux, DynSGS_RES)
                                    
                             # Get solution update
                             DT = TOPT[0]
@@ -1235,36 +1229,28 @@ def runModel(TestName):
                             # Update time and solution counter
                             thisTime += TOPT[0]
                             
-                            
+                            #'''
                             if method2:
                                    # Compute the updated RHS
                                    rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
                                                                        PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
                                           
+                                   DTL = DT + DT0
                                    # Compute averaged RHS
-                                   #rhsAvg = DAM @ rhsVec
-                                   rhsAvg = 0.5 * (rhsVec + rhsVec0)
+                                   rhsAvg = DT / DTL * rhsVec + DT0 / DTL * rhsVec0
                                           
                                    # Normalization and bounding to DynSGS
-                                   #state = fields + hydroState 
-                                   state = np.copy(fields)
-                                   #fieldsAvg = 0.5 * (fields + fields0)
-                                   
-                                   fieldsAvg = DAM @ fields
-                                   qnorm = bn.nanmax(np.abs(fields - fieldsAvg), axis=0)
-                                   #qnorm = DT * bn.nanmax(np.abs(rhsVec - rhsAvg), axis=0)
-                                   #qnorm = DT * bn.nanmax(np.abs(rhsVec), axis=0)
+                                   stateAvg = DT / DTL * fields + DT0 / DTL * fields0
                                    
                                    # Compute residual and average
-                                   resVec = 0.5 * (delFields / DT + delFields0 / DT0) - \
-                                            0.5 * (rhsVec + rhsVec0)
-                                   resAvg = 0.5 * (resVec + resVec0)
+                                   resVec = 1.0 / DTL * (delFields + delFields0) - rhsAvg
+                                   resAvg = DT / DTL * resVec + DT0 / DTL * resVec0
                                    
                                    if DynSGS_RES:
-                                          DCF = rescf.computeResidualViscCoeffs(DIMS, resAvg, qnorm, state, DLD, ebcDex[2], filteredCoeffs)                            
+                                          DCF = rescf.computeResidualViscCoeffs(DIMS, resAvg, qnorm, stateAvg, DLD, ebcDex[2], filteredCoeffs)                            
                                    else:
-                                          DCF = rescf.computeResidualViscCoeffs(DIMS, rhsAvg, qnorm, state, DLD, ebcDex[2], filteredCoeffs)
-                            
+                                          DCF = rescf.computeResidualViscCoeffs(DIMS, rhsAvg, qnorm, stateAvg, DLD, ebcDex[2], filteredCoeffs)
+                            #'''
                             ti += 1
                             
                             DT0 = TOPT[0]

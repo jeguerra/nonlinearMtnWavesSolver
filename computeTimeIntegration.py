@@ -313,8 +313,8 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        return solB
        
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, init0, DCF, rhs0, zeroDex, ebcDex, \
-                              filteredCoeffs, verticalStagger, diffusiveFlux):
+                              sol0, init0, rhs0, DCF, zeroDex, ebcDex, \
+                              filteredCoeffs, verticalStagger, diffusiveFlux, DynSGS_RES):
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
@@ -327,7 +327,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
 
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
-                     
+       '''              
        def computeUpdate1(coeff, solA, sol2Update):
               
               DF = coeff * DT
@@ -356,7 +356,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB = sol2Update + 0.0
               
               return solB
-       
+       '''
        def computeUpdate(coeff, solA, sol2Update):
               
               DF = coeff * DT
@@ -387,7 +387,24 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB += DF * rhsIfc
               except FloatingPointError:
                      solB += 0.0
+              '''       
+              #%% Update the diffusion coefficients
+              try:
+                     #rhsAvg = 0.5 * (rhsAdv + rhsIfc + rhs0)
+                     rhsAvg = rhsAdv + rhsIfc
+              except FloatingPointError:
+                     rhsAvg = np.zeros(rhs0.shape)
+                     
+              try:
+                     resVec = rhsAvg - rhs0
+              except FloatingPointError:
+                     resVec = np.zeros(rhs0.shape)
               
+              if DynSGS_RES:
+                     DCF = rescf.computeResidualViscCoeffs(DIMS, resVec, 1.0, solB, DLD, ebcDex[2], filteredCoeffs)                            
+              else:
+                     DCF = rescf.computeResidualViscCoeffs(DIMS, rhsAvg, 1.0, solB, DLD, ebcDex[2], filteredCoeffs)
+              '''
               #%% Compute diffusive update
               if diffusiveFlux:
                      try:
