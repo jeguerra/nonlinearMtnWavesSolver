@@ -178,11 +178,11 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, ebcDex):
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
 
        '''
-       # Compute the diagonal for full Rayleigh field
+       # Compute the diagonal for lateral Rayleigh field
        tempDiagonal = np.reshape(RLX, (OPS,), order='F')
        # Compute the matrix operator
        RLXM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       # Compute the diagonal for full Rayleigh field
+       # Compute the diagonal for vertical Rayleigh field
        tempDiagonal = np.reshape(RLZ, (OPS,), order='F')
        # Compute the matrix operator
        RLZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)

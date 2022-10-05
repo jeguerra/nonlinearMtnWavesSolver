@@ -25,10 +25,9 @@ def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
 
 def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        
-       DqDt[zeroDex[0],0] = 0.0
-       DqDt[zeroDex[1],1] = 0.0
-       DqDt[zeroDex[2],2] = 0.0
-       DqDt[zeroDex[3],3] = 0.0
+       for vv in range(4):
+              if len(zeroDex[vv]) > 0:
+                     DqDt[zeroDex[vv],vv] = 0.0
        
        bdex = ebcDex[2]  
        DqDt[bdex,1] = dhdx * DqDt[bdex,0]
@@ -44,6 +43,7 @@ def computeRdT(q, RdT_bar, kap):
               earg = kap * q[:,2] + q[:,3]
               try:
                      T_ratio = np.expm1(earg, dtype=np.longdouble)
+                     #T_exp = np.exp(earg, dtype=np.longdouble)
               except FloatingPointError:
                      earg_max = np.amax(earg)
                      earg_min = np.amin(earg)
@@ -55,9 +55,11 @@ def computeRdT(q, RdT_bar, kap):
                      tmin = np.amin(q[:,3])
                      print('Min/Max log potential temperature: ', tmin, tmax)
                      # Compute buoyancy by approximation...
-                     T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...
+                     T_ratio = earg + 0.5 * np.power(earg, 2.0) # + ...                     
                      
               RdT = RdT_bar * (T_ratio + 1.0)
+              #RdT = RdT_bar * T_exp
+              #T_ratio = T_exp - 1.0
                      
        return RdT, T_ratio
 
@@ -104,7 +106,7 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, withBCW, isTFOpX):
+def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, isTFOpX):
        
        # Compute flow speed
        Q = fields + hydroState
@@ -124,10 +126,6 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
               rhsVec += computeRayleighTendency(REFG, fields)
        
        rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, dhdx)
-       
-       if withBCW:
-              bdex = ebcDex[2]
-              rhsVec[bdex,1] = dhdx * rhsVec[bdex,0]
        
        return rhsVec, PqPx, DqDz
 
@@ -356,8 +354,8 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, 
        # Compute pressure gradient forces
        pgradx = RdT * PqPx[:,2]
        #pgradz = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
-       #pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))      
+       pgradz = RdT * DqDz[:,2] - gc * T_ratio
+       #pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))      
        
        DqDt = np.zeros(fields.shape)
        
@@ -449,7 +447,7 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
        
        #dhdx = REFS[6][0]
        S = DLD[4]
-       S2 = DLD[5]
+       dS2 = DLD[5]
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]
@@ -484,13 +482,14 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
                      # Compute directional derivatives
                      DDX = REFS[16]
                      SB = np.expand_dims(S, axis=1)
-                     dqda = SB * (DDX @ mu_xb * q[bdex,:])
+                     dSB2 = np.expand_dims(dS2, axis=1)
+                     dqda = 1.0 * mu_xb * (DDX @ q[bdex,:])
                      d2qda2 = SB * (DDX @ dqda)
               
-                     DqDt[bdex,0] = S2 * d2qda2[:,0]
+                     DqDt[bdex,0] = d2qda2[:,0]
                      DqDt[bdex,1] = 0.0
-                     DqDt[bdex,2] = S2 * d2qda2[:,2]
-                     DqDt[bdex,3] = S2 * d2qda2[:,3]
+                     DqDt[bdex,2] = d2qda2[:,2]
+                     DqDt[bdex,3] = d2qda2[:,3]
                      #'''
               except FloatingPointError:
                      DqDt *= 0.0
@@ -510,24 +509,24 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
                      DqDt[tdex,1] = 0.0
                      DqDt[tdex,2] = mu_xt[:,2] * P2qPx2[tdex,2]
                      DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
-                     
+              
                      #%% BOTTOM DIFFUSION (flow along the terrain surface)
                      
                      # Compute directional derivatives
                      DDX = REFS[16]
                      SB = np.expand_dims(S, axis=1)
                      dqda = SB * (DDX @ q[bdex,:])
-                     d2qda2 = SB * (DDX @ dqda)
+                     d2qda2 = 1.0 * (DDX @ dqda)
               
-                     DqDt[bdex,0] = S2 * mu_xb[:,0] * d2qda2[:,0]
+                     DqDt[bdex,0] = mu_xb[:,0] * d2qda2[:,0]
                      DqDt[bdex,1] = 0.0
-                     DqDt[bdex,2] = S2 * mu_xb[:,2] * d2qda2[:,2]
-                     DqDt[bdex,3] = S2 * mu_xb[:,3] * d2qda2[:,3]
+                     DqDt[bdex,2] = mu_xb[:,2] * d2qda2[:,2]
+                     DqDt[bdex,3] = mu_xb[:,3] * d2qda2[:,3]
+                     
+                     # Scale and apply coefficients
+                     DqDt[:,3] *= 0.71 / 0.4
                      #'''
               except FloatingPointError:
                      DqDt *= 0.0
-       
-       # Scale and apply coefficients
-       DqDt[:,3] *= 0.71 / 0.4
 
        return DqDt

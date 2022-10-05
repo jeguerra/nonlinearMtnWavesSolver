@@ -6,12 +6,13 @@ Created on Wed Mar 31 08:25:38 2021
 @author: jeg
 """
 import os
-import imageio
+import imageio.v2 as imageio
 import numpy as np
 import matplotlib as mpl
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
+from joblib import Parallel, delayed
 
 m2k = 1.0E-3
 fname = 'Simulation2Plot.nc'
@@ -31,9 +32,6 @@ lnp = m_fid.variables['ln_p'][:,:,:,0]
 lnt = m_fid.variables['ln_t'][:,:,:,0]
 
 dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
-
-#DCF1 = m_fid.variables['CRES_X'][:]
-#DCF2 = m_fid.variables['CRES_Z'][:]
 
 # Compute the total and perturbation potential temperature
 TH = np.exp(LNT + lnt)
@@ -56,40 +54,60 @@ THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = False
-runSGS = True
+runPertb = True
+runSGS = False
+
+runPar = True
+runSer = False
+
+def plotPertb(tt):
+       fig = plt.figure(figsize=(16.0, 8.0))
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
+       plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+       
+       norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
+       plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e')
+       
+       plt.contour(m2k * X, m2k * Z, TH[tt,:,:], 101, colors='k', linewidths=1.0)
+       
+       plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
+       plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+       plt.xlim(-50.0, 50.0)
+       plt.ylim(0.0, 25.0)
+       plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
+                 ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
+       plt.tight_layout()
+       # Save out the image
+       plt.savefig(imgname)
+       
+       # Get the current image and add to gif list
+       image = imageio.imread(imgname)
+       #imglist.append(image)
+                     
+       # Delete stuff
+       os.remove(imgname)
+       plt.close('all')
+       del(fig)
+       
+       print('Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
+       
+       return image
 
 #%% Contour animation of perturbation potential temperatures
 if runPertb:
-       imglist = []
-       for tt in range(len(times)):
-              fig = plt.figure(figsize=(16.0, 8.0))
-              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-              cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+       # Serial processing
+       if runSer:
+              print('Run serial processing...')
+              imglist = []
+              for tt in range(len(times)):
+                     image = plotPertb(tt)
+                     imglist.append(image)
               
-              norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
-              plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e')
               
-              plt.contour(m2k * X, m2k * Z, TH[tt,:,:], 101, colors='k', linewidths=1.0)
-              
-              plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
-              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-              plt.xlim(-50.0, 50.0)
-              plt.ylim(0.0, 25.0)
-              plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
-                        ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
-              plt.tight_layout()
-              # Save out the image
-              plt.savefig(imgname)
-              
-              # Get the current image and add to gif list
-              image = imageio.imread(imgname)
-              imglist.append(image)
-                            
-              # Delete stuff
-              os.remove(imgname)
-              plt.close('all')
-              del(fig)
+       # Parallel processing
+       if runPar:
+              print('Attempt parallel processing...')
+              imglist = Parallel(n_jobs=4)(delayed(plotPertb)(tt) for tt in range(len(times)))
        
        imageio.mimsave(thname, imglist, fps=10)
        

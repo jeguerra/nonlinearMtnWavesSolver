@@ -46,10 +46,8 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        DT = TOPT[0]
        mu = REFG[3]
        RLM = REFG[4].data
-       ldex = REFG[5]
        dhdx = REFS[6][0]       
-       diffusiveFlux = False
-       
+       diffusiveFlux = True
 
        # Use multithreading on CPU
        DDXM_A = REFS[12][0]
@@ -67,7 +65,7 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
               
               # Compute dynamics RHS
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False, True]
+              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, True]
               rhsExp, DqDxA, DqDzA = tendency.computeRHS(*args)
               
               try:
@@ -106,7 +104,7 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Compute diffusive fluxes
               if diffusiveFlux:
                      DqDxA *= np.expand_dims(DCF[0], axis=1)
-                     DqDzA *= np.expand_dims(DCF[0], axis=1)
+                     DqDzA *= np.expand_dims(DCF[1], axis=1)
               
               #'''
               # Compute second derivatives
@@ -293,7 +291,7 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        solB, rhsMid = ssprk54(solA, 0.5)
               
        # Update the adaptive coefficients using residual or right hand side
-       args = [solB, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False, True]
+       args = [solB, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, True]
        rhsNew, DqDxA, DqDzA = tendency.computeRHS(*args)
        
        # Normalization and bounding to DynSGS
@@ -316,13 +314,12 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, DCF, rhs0, zeroDex, ebcDex, \
-                              filteredCoeffs, verticalStagger, DynSGS_RES):
+                              filteredCoeffs, verticalStagger, diffusiveFlux):
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
        RLM = REFG[4].data
        dhdx = REFS[6][0]       
-       diffusiveFlux = False
        
        # Use multithreading on CPU
        DDXM_A = REFS[12][0]
@@ -336,7 +333,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               DF = coeff * DT
               
               # Compute dynamics RHS
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, False, True]
+              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, True]
               rhsExp, DqDxA, DqDzA = tendency.computeRHS(*args)
               
               # Compute diffusive fluxes
@@ -357,10 +354,6 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      solB = sol2Update + DF * (rhsExp + rhsDif)
               except FloatingPointError:
                      solB = sol2Update + 0.0
-              
-              # Clean up on essential BC
-              U = solB[:,0] + init0[:,0]
-              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
               
               return solB
        
@@ -397,11 +390,16 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% Compute diffusive update
               if diffusiveFlux:
-                     PqPx *= DCF[0]
-                     DqDz *= DCF[1]
-              
+                     try:
+                            PqPx *= DCF[0]
+                     except FloatingPointError:
+                            PqPx *= 0.0
+                     try:
+                            DqDz *= DCF[1]
+                     except FloatingPointError:
+                            DqDz *= 0.0
+                            
               # Compute diffusive tendency
-              #PqPz = DqDz + REFG[2]
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM_B, DDZM_B, REFS, REFG, DCF)
               
@@ -604,9 +602,5 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        RayDamp = np.reciprocal(1.0 + DT * mu * RLM)
        rdex = REFG[-1]
        solB[:,rdex] = np.copy(RayDamp.T * solB[:,rdex])
-       
-       # Clean up on essential BC
-       U = solB[:,0] + init0[:,0]
-       solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
        
        return solB #, solA, rhsMid

@@ -10,7 +10,7 @@ import numpy as np
 import math as mt
 import computeDerivativeMatrix as derv
 from scipy import signal
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import PchipInterpolator, Akima1DInterpolator, CubicSpline
 import matplotlib.pyplot as plt
 
 def computeTopographyOnGrid(REFS, opt):
@@ -90,17 +90,6 @@ def computeTopographyOnGrid(REFS, opt):
        ht[np.abs(ht) < 1.0E-15] = 0.0
        dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
        
-       # Take the derivative
-       fsp = CubicSpline(xh, ht, bc_type='clamped')
-       d2hdx2 = fsp(xh, 2)
-       
-       S = np.power(1.0 + np.power(dhdx, 2.0), -0.5)
-       S2 = np.reciprocal(1.0 + np.power(dhdx, 2.0))
-       
-       # Take the derivative
-       fsp = CubicSpline(xh, S, bc_type='clamped')
-       dSdx = fsp(xh, 1)
-       
        '''
        fc = 1.25
        plt.figure()
@@ -113,5 +102,5 @@ def computeTopographyOnGrid(REFS, opt):
        input()
        '''
        
-       return ht, dhdx, (d2hdx2, dSdx, S, S2)
+       return ht, dhdx
               

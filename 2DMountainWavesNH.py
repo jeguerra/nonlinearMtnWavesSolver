@@ -423,7 +423,7 @@ def runModel(TestName):
               FourierLin = False
               print('Hermite Function grid in the horizontal.')
        else:
-              FourierLin = True
+              FourierLin = False
               print('Uniform Fourier grid in the horizontal.')
               
        # Set residual diffusion switch
@@ -440,11 +440,17 @@ def runModel(TestName):
        else:
               print('No spatial filter on DynSGS coefficients.')
               
-       DynSGS_RES = False
+       DynSGS_RES = True
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
        else:
               print('Diffusion coefficients by RHS evaluation.')
+              
+       diffusiveFlux = True
+       if diffusiveFlux:
+              print('Diffusion by gradient of diffusive flux.')
+       else:
+              print('Diffusion by product of coefficients with 2nd derivatives.')
               
        verticalChebGrid = False
        verticalLegdGrid = True
@@ -529,7 +535,7 @@ def runModel(TestName):
        REF0.append(DDXP)
        REF0.append(DDZP)
        
-       hx, dhx, metrics = computeTopographyOnGrid(REF0, HOPT)
+       hx, dhx = computeTopographyOnGrid(REF0, HOPT)
        zRay = DIMS[2] - RLOPT[0]
        
        if useGuellrich:
@@ -587,7 +593,7 @@ def runModel(TestName):
        REFS.append(DDZ_1D) # index 3
        
        #% Read in topography profile or compute from analytical function
-       HofX, dHdX, metrics = computeTopographyOnGrid(REFS, HOPT)
+       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT)
               
        # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
@@ -602,7 +608,7 @@ def runModel(TestName):
        # Update the REFS collection
        REFS.append(XL) # index 4
        REFS.append(ZTL) # index 5
-       REFS.append((dHdX, metrics)) # index 6
+       REFS.append((dHdX, HofX)) # index 6
        REFS.append(sigma) # index 7
        
        #% Compute the BC index vector
@@ -765,6 +771,7 @@ def runModel(TestName):
               diffOps2 = (rsb_matrix(diffOps1[0], shape=diffOps1[0].shape), 
                           rsb_matrix(diffOps1[1], shape=diffOps1[1].shape))
               REFS.append(diffOps2)
+              del(diffOps2)
        elif not StaticSolve and not RSBops:
               # Native sparse
               REFS.append((DDXM_OP, DDZM_OP))
@@ -799,13 +806,12 @@ def runModel(TestName):
               DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
               print('Uniform grid lengths:',DX_wav,DZ_wav)
               
-              DL1 = 1.0 * DX_max
-              DL2 = 1.0 * DZ_max
+              DL1 = 1.25 * DX_avg
+              DL2 = 1.25 * DZ_max
                      
-              S2 = np.reciprocal(1.0 + np.power(REFS[6][0],2))
+              dS2 = 1.0 + np.power(REFS[6][0],2)
+              S2 = np.reciprocal(dS2)
               S = np.sqrt(S2)
-              DLD = (DL1, DL2, DL1**2, DL2**2, S, S2)
-              
               DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
               DX = DX_min
               
@@ -813,7 +819,24 @@ def runModel(TestName):
                             
               # Smallest physical grid spacing in the 2D mesh
               DLS = min(DX, DZ)
-              #'''           
+              
+              # Compute mesh areas
+              DAM = 1.0 / (abs(DIMS[1] - DIMS[0]) * DIMS[2]) * np.reshape(DXM * DZM, (1,OPS), order='F')
+              
+              # Create a container for these quantities
+              #DLD = (DL1, DL2, DL1**2, DL2**2, S, dS2, DAM)
+              
+              DLD = (np.reshape(1.25*DXM, (OPS,), order='F'), 
+                     DL2, 
+                     np.reshape(np.power(1.25*DXM,2), (OPS,1), order='F'),
+                     DL2**2, S, dS2, DAM)
+              
+       # Get memory back
+       del(DDXMS1); del(DDZMS1)
+       del(DDXMS_CFD); del(DDZMS_CFD)
+       del(DDXMS_QS); del(DDZMS_QS)
+       del(diffOps1)
+       del(PPXMD)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
@@ -905,7 +928,7 @@ def runModel(TestName):
               #'''
               # Compute the RHS for this iteration
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True, False)
+                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               err = displayResiduals('Current function evaluation residual: ', RHS, \
                                      thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1055,7 +1078,7 @@ def runModel(TestName):
               message = 'Residual 2-norm BEFORE Newton step:'
               err = displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True, False)
+                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               err = displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1110,6 +1133,7 @@ def runModel(TestName):
               
               ti = 0; ff = 0
               DT0 = TOPT[0]
+              qnorm = 0.0
               delFields0 = np.zeros(fields.shape)
               rhsVec0 = np.copy(rhsVec)
               fields0 = np.copy(fields)
@@ -1128,12 +1152,14 @@ def runModel(TestName):
                             # Compute the initial RHS
                             if ti == 0:
                                    rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
-                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True, True)
+                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
                             
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
                             error.append(err)
+                            
+                            #print(qnorm)
                             
                             # Check the NC file
                             ww = 0
@@ -1200,7 +1226,7 @@ def runModel(TestName):
                                    fields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
                                                                            DLD, TOPT, fields0, hydroState, DCF, rhsVec0, \
                                                                            zeroDex, ebcDex, filteredCoeffs, \
-                                                                           verticalStagger, DynSGS_RES)
+                                                                           verticalStagger, diffusiveFlux)
                                    
                             # Get solution update
                             DT = TOPT[0]
@@ -1213,19 +1239,26 @@ def runModel(TestName):
                             if method2:
                                    # Compute the updated RHS
                                    rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
-                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True, True)
+                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
+                                          
+                                   # Compute averaged RHS
+                                   #rhsAvg = DAM @ rhsVec
+                                   rhsAvg = 0.5 * (rhsVec + rhsVec0)
                                           
                                    # Normalization and bounding to DynSGS
+                                   #state = fields + hydroState 
                                    state = np.copy(fields)
-                                   qnorm = 0.5 * (fields + fields0)
+                                   #fieldsAvg = 0.5 * (fields + fields0)
+                                   
+                                   fieldsAvg = DAM @ fields
+                                   qnorm = bn.nanmax(np.abs(fields - fieldsAvg), axis=0)
+                                   #qnorm = DT * bn.nanmax(np.abs(rhsVec - rhsAvg), axis=0)
+                                   #qnorm = DT * bn.nanmax(np.abs(rhsVec), axis=0)
                                    
                                    # Compute residual and average
                                    resVec = 0.5 * (delFields / DT + delFields0 / DT0) - \
                                             0.5 * (rhsVec + rhsVec0)
                                    resAvg = 0.5 * (resVec + resVec0)
-                                            
-                                   # Compute averaged RHS
-                                   rhsAvg = 0.5 * (rhsVec + rhsVec0)
                                    
                                    if DynSGS_RES:
                                           DCF = rescf.computeResidualViscCoeffs(DIMS, resAvg, qnorm, state, DLD, ebcDex[2], filteredCoeffs)                            
