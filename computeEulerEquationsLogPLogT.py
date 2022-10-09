@@ -13,10 +13,9 @@ import scipy.sparse as sps
 def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
               
        # Enforce essential boundary conditions
-       sol[zeroDex[0],0] = 0.0
-       sol[zeroDex[1],1] = 0.0
-       sol[zeroDex[2],2] = 0.0
-       sol[zeroDex[3],3] = 0.0
+       for vv in range(4):
+              if len(zeroDex[vv]) > 0:
+                     sol[zeroDex[vv],vv] = 0.0
        
        bdex = ebcDex[2]       
        sol[bdex,1] = dhdx * U[bdex]
@@ -31,6 +30,9 @@ def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        
        bdex = ebcDex[2]  
        DqDt[bdex,1] = dhdx * DqDt[bdex,0]
+       
+       for vv in range(4):
+              DqDt[:,vv][np.abs(DqDt[:,vv]) < 1.0E-16] = 0.0
        
        return DqDt
 
@@ -358,11 +360,7 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, 
        #pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))      
        
        DqDt = np.zeros(fields.shape)
-       '''
-       pgradx[pgradx < 1.0E-15] = 0.0
-       pgradz[pgradz < 1.0E-15] = 0.0
-       divergence[divergence < 1.0E-15] = 0.0
-       '''
+       
        # Horizontal momentum equation
        DqDt[:,0] = -pgradx
        # Vertical momentum equation
@@ -420,11 +418,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))
        
        DqDt = -(Uadvect + Wadvect)
-       '''
-       pgradx[pgradx < 1.0E-15] = 0.0
-       pgradz[pgradz < 1.0E-15] = 0.0
-       divergence[divergence < 1.0E-15] = 0.0
-       '''
+       
        # Horizontal momentum equation
        DqDt[:,0] -= pgradx
        # Vertical momentum equation
@@ -468,73 +462,70 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
        mu_xt = DC1[tdex,:] 
        
        if isFluxDiv:
-
-              try:
-                     #%% INTERIOR DIFFUSION
-                     # Diffusion of u-w vector
-                     DqDt[:,0] = (2.0 * P2qPx2[:,0]) + (P2qPzx[:,1] + P2qPz2[:,0])
-                     DqDt[:,1] = (P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1])
-                     # Diffusion of scalars (broken up into anisotropic components
-                     DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
-                     DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
-                         
-                     #'''        
-                     #%% TOP DIFFUSION (flow along top edge)
-                     DqDt[tdex,0] = P2qPx2[tdex,0]
-                     DqDt[tdex,1] = 0.0
-                     DqDt[tdex,2] = P2qPx2[tdex,2]
-                     DqDt[tdex,3] = P2qPx2[tdex,3]
-                     
-                     #%% BOTTOM DIFFUSION (flow along the terrain surface)
-                     
-                     # Compute directional derivatives
-                     DDX = REFS[16]
-                     SB = np.expand_dims(S, axis=1)
-                     dSB2 = np.expand_dims(dS2, axis=1)
-                     dqda = 1.0 * mu_xb * (DDX @ q[bdex,:])
-                     d2qda2 = SB * (DDX @ dqda)
+              #%% INTERIOR DIFFUSION
+              # Diffusion of u-w vector
+              DqDt[:,0] = (2.0 * P2qPx2[:,0]) + (P2qPzx[:,1] + P2qPz2[:,0])
+              DqDt[:,1] = (P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1])
+              # Diffusion of scalars (broken up into anisotropic components
+              DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
+              DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
+                  
+              #'''        
+              #%% TOP DIFFUSION (flow along top edge)
+              DqDt[tdex,0] = P2qPx2[tdex,0]
+              DqDt[tdex,1] = 0.0
+              DqDt[tdex,2] = P2qPx2[tdex,2]
+              DqDt[tdex,3] = P2qPx2[tdex,3]
               
-                     DqDt[bdex,0] = d2qda2[:,0]
-                     DqDt[bdex,1] = 0.0
-                     DqDt[bdex,2] = d2qda2[:,2]
-                     DqDt[bdex,3] = d2qda2[:,3]
-                     #'''
-              except FloatingPointError:
-                     DqDt *= 0.0
+              #%% BOTTOM DIFFUSION (flow along the terrain surface)
+              
+              # Compute directional derivatives
+              DDX = REFS[16]
+              SB = np.expand_dims(S, axis=1)
+              ISB = np.reciprocal(SB)
+              
+              # On scalars
+              dqda = 1.0 * mu_xb * (DDX @ q[bdex,:])
+              d2qda2 = SB * (DDX @ dqda)
+              
+              # On velocity
+              duda = 1.0 * mu_xb * (DDX @ (ISB * q[bdex,:]))
+              d2uda2 = SB * (DDX @ duda)
+       
+              DqDt[bdex,0] = d2uda2[:,0]
+              DqDt[bdex,1] = 0.0
+              DqDt[bdex,2] = d2qda2[:,2]
+              DqDt[bdex,3] = d2qda2[:,3]
        else:              
-              try:
-                     #%% INTERIOR DIFFUSION
-                     # Diffusion of u-w vector
-                     DqDt[:,0] = DC1[:,0] * (2.0 * P2qPx2[:,0]) + DC2[:,0] * (P2qPzx[:,1] + P2qPz2[:,0])
-                     DqDt[:,1] = DC1[:,1] * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2[:,1] * (2.0 * P2qPz2[:,1])
-                     # Diffusion of scalars (broken up into anisotropic components
-                     DqDt[:,2] = DC1[:,2] * P2qPx2[:,2] + DC2[:,2] * P2qPz2[:,2]
-                     DqDt[:,3] = DC1[:,3] * P2qPx2[:,3] + DC2[:,3] * P2qPz2[:,3]
-                         
-                     #'''        
-                     #%% TOP DIFFUSION (flow along top edge)
-                     DqDt[tdex,0] = mu_xt[:,0] * P2qPx2[tdex,0]
-                     DqDt[tdex,1] = 0.0
-                     DqDt[tdex,2] = mu_xt[:,2] * P2qPx2[tdex,2]
-                     DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
+              #%% INTERIOR DIFFUSION
+              # Diffusion of u-w vector
+              DqDt[:,0] = DC1[:,0] * (2.0 * P2qPx2[:,0]) + DC2[:,0] * (P2qPzx[:,1] + P2qPz2[:,0])
+              DqDt[:,1] = DC1[:,1] * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2[:,1] * (2.0 * P2qPz2[:,1])
+              # Diffusion of scalars (broken up into anisotropic components
+              DqDt[:,2] = DC1[:,2] * P2qPx2[:,2] + DC2[:,2] * P2qPz2[:,2]
+              DqDt[:,3] = DC1[:,3] * P2qPx2[:,3] + DC2[:,3] * P2qPz2[:,3]
+                  
+              #'''        
+              #%% TOP DIFFUSION (flow along top edge)
+              DqDt[tdex,0] = mu_xt[:,0] * P2qPx2[tdex,0]
+              DqDt[tdex,1] = 0.0
+              DqDt[tdex,2] = mu_xt[:,2] * P2qPx2[tdex,2]
+              DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
+       
+              #%% BOTTOM DIFFUSION (flow along the terrain surface)
               
-                     #%% BOTTOM DIFFUSION (flow along the terrain surface)
-                     
-                     # Compute directional derivatives
-                     DDX = REFS[16]
-                     SB = np.expand_dims(S, axis=1)
-                     dqda = SB * (DDX @ q[bdex,:])
-                     d2qda2 = 1.0 * (DDX @ dqda)
+              # Compute directional derivatives
+              DDX = REFS[16]
+              SB = np.expand_dims(S, axis=1)
+              dqda = SB * (DDX @ q[bdex,:])
+              d2qda2 = 1.0 * (DDX @ dqda)
+       
+              DqDt[bdex,0] = mu_xb[:,0] * d2qda2[:,0]
+              DqDt[bdex,1] = 0.0
+              DqDt[bdex,2] = mu_xb[:,2] * d2qda2[:,2]
+              DqDt[bdex,3] = mu_xb[:,3] * d2qda2[:,3]
               
-                     DqDt[bdex,0] = mu_xb[:,0] * d2qda2[:,0]
-                     DqDt[bdex,1] = 0.0
-                     DqDt[bdex,2] = mu_xb[:,2] * d2qda2[:,2]
-                     DqDt[bdex,3] = mu_xb[:,3] * d2qda2[:,3]
-                     
-                     # Scale and apply coefficients
-                     DqDt[:,3] *= 0.71 / 0.4
-                     #'''
-              except FloatingPointError:
-                     DqDt *= 0.0
+       # Scale and apply coefficients
+       DqDt[:,3] *= 0.71 / 0.4
 
        return DqDt

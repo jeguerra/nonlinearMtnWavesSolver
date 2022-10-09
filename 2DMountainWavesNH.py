@@ -426,6 +426,18 @@ def runModel(TestName):
               FourierLin = False
               print('Uniform Fourier grid in the horizontal.')
               
+       method1 = False
+       method2 = True
+       inlineDCF = False
+       if method1:
+              print('Time integration by method 1.')
+       if method2:
+              print('Time integration by method 2.')
+       if inlineDCF:
+              print('DynSGS coefficients updated inline with RK stage updates.')
+       else:
+              print('DynSGS coefficients updated on full time step updates.')
+              
        # Set residual diffusion switch
        DynSGS = thisTest.solType['DynSGS']
        if DynSGS:
@@ -479,7 +491,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -10
+              rdex = -2
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -715,6 +727,7 @@ def runModel(TestName):
               DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
               DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+              #DDXM_OP = DDXMS_CFD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CFD)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
        NZI = NZ + 1
@@ -784,7 +797,7 @@ def runModel(TestName):
        # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
-       REFS.append(sps.csr_matrix(DDX_BC)) # index 16
+       REFS.append(sps.csr_array(DDX_BC)) # index 16
        
        # Update REFG with the 2nd vertical derivative of backgrounds
        REFG.append(DDZMS1 @ DQDZ)
@@ -806,8 +819,8 @@ def runModel(TestName):
               DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
               print('Uniform grid lengths:',DX_wav,DZ_wav)
               
-              DL1 = 1.25 * DX_avg
-              DL2 = 1.25 * DZ_max
+              DL1 = 1.0 * DX_avg
+              DL2 = 1.0 * DZ_max
                      
               dS2 = 1.0 + np.power(REFS[6][0],2)
               S2 = np.reciprocal(dS2)
@@ -826,9 +839,9 @@ def runModel(TestName):
               # Create a container for these quantities
               #DLD = (DL1, DL2, DL1**2, DL2**2, S, dS2, DAM)
               
-              DLD = (np.reshape(1.25*DXM, (OPS,), order='F'), 
+              DLD = (np.reshape(1.0*DXM, (OPS,), order='F'), 
                      DL2, 
-                     np.reshape(np.power(1.25*DXM,2), (OPS,1), order='F'),
+                     np.reshape(np.power(1.0*DXM,2), (OPS,1), order='F'),
                      DL2**2, S, dS2, DAM)
               
        # Get memory back
@@ -1138,18 +1151,21 @@ def runModel(TestName):
               rhsVec0 = np.copy(rhsVec)
               rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
                                                          PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
+              resVec = np.copy(rhsVec)
               fields0 = np.copy(fields)
               state0 = fields0 + hydroState
               
               resVec0 = np.zeros(fields.shape)
               error = [np.linalg.norm(rhsVec)]
               
-              method1 = False
-              method2 = True
               while thisTime <= TOPT[4]:
                              
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
+                            
+                            #print(delFields0[ebcDex[3]-10,2])
+                            #print(fields[ebcDex[3]-10,2])
+                            
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1217,25 +1233,25 @@ def runModel(TestName):
                                                                            verticalStagger, DynSGS_RES)
                                    
                             if method2:
-                                   fields = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
-                                                                           DLD, TOPT, fields0, hydroState, rhsVec0, \
-                                                                           DCF, zeroDex, ebcDex, filteredCoeffs, \
-                                                                           verticalStagger, diffusiveFlux, DynSGS_RES)
+                                   fields, rhsVec = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
+                                                                           DLD, TOPT, fields0, hydroState, rhsVec0, DCF, \
+                                                                           zeroDex, ebcDex, inlineDCF, filteredCoeffs, \
+                                                                           verticalStagger, diffusiveFlux)
                                    
                             # Get solution update
-                            DT = TOPT[0]
                             delFields = fields - fields0
                             
                             # Update time and solution counter
+                            DT = TOPT[0]
                             thisTime += TOPT[0]
+                            DTL = DT + DT0
                             
                             #'''
-                            if method2:
+                            if method2 and not inlineDCF:
                                    # Compute the updated RHS
-                                   rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
-                                                                       PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
+                                   #rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
+                                   #                                    PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
                                           
-                                   DTL = DT + DT0
                                    # Compute averaged RHS
                                    rhsAvg = DT / DTL * rhsVec + DT0 / DTL * rhsVec0
                                           
@@ -1244,13 +1260,17 @@ def runModel(TestName):
                                    
                                    # Compute residual and average
                                    resVec = 1.0 / DTL * (delFields + delFields0) - rhsAvg
+                                   #resVec = (rhsVec - rhsAvg)
                                    resAvg = DT / DTL * resVec + DT0 / DTL * resVec0
                                    
                                    if DynSGS_RES:
                                           DCF = rescf.computeResidualViscCoeffs(DIMS, resAvg, qnorm, stateAvg, DLD, ebcDex[2], filteredCoeffs)                            
                                    else:
                                           DCF = rescf.computeResidualViscCoeffs(DIMS, rhsAvg, qnorm, stateAvg, DLD, ebcDex[2], filteredCoeffs)
-                            #'''
+                            else:
+                                   rhsVec = np.copy(rhs)
+                                   resVec = 1.0 / DTL * (delFields + delFields0) - rhsVec
+                                   
                             ti += 1
                             
                             DT0 = TOPT[0]

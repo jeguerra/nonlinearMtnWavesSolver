@@ -19,13 +19,13 @@ def computeResidualViscCoeffs(DIMS, RES, qnorm, state, DLD, bdex, applyFilter):
        OPS = DIMS[5]
        
        # Compute flow speed
-       UD = np.abs(state[:,0])
-       WD = np.abs(state[:,1])
-       #VD = np.sqrt(np.power(state[:,0],2.0) + np.power(state[:,1],2.0))
+       UD = np.abs(state[:,0]); UD[UD < 1.0E-16] = 0.0
+       WD = np.abs(state[:,1]); WD[WD < 1.0E-16] = 0.0
+       VD = np.sqrt(np.power(UD,2.0) + np.power(WD,2.0))
        
        # Compute upper bound on coefficients based on flow speed
-       QMAX1 = 0.5 * DLD[0] * UD
-       QMAX2 = 0.5 * DLD[1] * WD
+       QMAX1 = 0.5 * DLD[0] * VD
+       QMAX2 = 0.5 * DLD[1] * VD
        
        # Compute field normalization
        #QM = np.reciprocal(qnorm)
@@ -50,6 +50,10 @@ def computeResidualViscCoeffs(DIMS, RES, qnorm, state, DLD, bdex, applyFilter):
               for vv in range(4):
                      CR1 = CRES1[:,vv]
                      CR2 = CRES2[:,vv]
+                     
+                     CR1[CR1 < 1.0E-16] = 0.0
+                     CR2[CR2 < 1.0E-16] = 0.0
+                     
                      CR1 *= QB1 / QR1[vv]
                      CR2 *= QB2 / QR2[vv]
                      CRES1[:,vv] = CR1
@@ -72,10 +76,10 @@ def computeResidualViscCoeffs(DIMS, RES, qnorm, state, DLD, bdex, applyFilter):
               CRES1_XZ_FT = np.empty(CRES1_XZ.shape)
               CRES2_XZ_FT = np.empty(CRES2_XZ.shape)
               for vv in range(4):
-                     CRES1_XZ_FT[:,:,vv] = ndimage.maximum_filter(CRES1_XZ[:,:,vv], size=4, mode='nearest')
-                     CRES2_XZ_FT[:,:,vv] = ndimage.maximum_filter(CRES2_XZ[:,:,vv], size=4, mode='nearest')
+                     CRES1_XZ_FT[:,:,vv] = ndimage.maximum_filter(CRES1_XZ[:,:,vv], size=5, mode='nearest')
+                     CRES2_XZ_FT[:,:,vv] = ndimage.maximum_filter(CRES2_XZ[:,:,vv], size=5, mode='nearest')
               
-              CRES1 = np.reshape(CRES1_XZ_FT, (OPS,4), order='F')
-              CRES2 = np.reshape(CRES2_XZ_FT, (OPS,4), order='F')
+              CRES1 = 1.0 * np.reshape(CRES1_XZ_FT, (OPS,4), order='F')
+              CRES2 = 1.0 * np.reshape(CRES2_XZ_FT, (OPS,4), order='F')
        #'''
        return (CRES1, CRES2)

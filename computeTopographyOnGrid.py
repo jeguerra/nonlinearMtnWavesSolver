@@ -87,8 +87,8 @@ def computeTopographyOnGrid(REFS, opt):
               print('ERROR: invalid terrain option.')
               sys.exit(2)
        
-       ht[np.abs(ht) < 1.0E-15] = 0.0
-       dhdx[np.abs(dhdx) < 1.0E-15] = 0.0
+       ht[np.abs(ht) < 1.0E-16] = 0.0
+       dhdx[np.abs(dhdx) < 1.0E-16] = 0.0
        
        '''
        fc = 1.25

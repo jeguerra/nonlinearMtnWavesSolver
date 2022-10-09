@@ -314,12 +314,13 @@ def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
 def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, rhs0, DCF, zeroDex, ebcDex, \
-                              filteredCoeffs, verticalStagger, diffusiveFlux, DynSGS_RES):
+                              inlineDCF, filteredCoeffs, verticalStagger, diffusiveFlux):
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
        RLM = REFG[4].data
-       dhdx = REFS[6][0]       
+       dhdx = REFS[6][0]
+       bdex = ebcDex[2]
        
        # Use multithreading on CPU
        DDXM_A = REFS[12][0]
@@ -366,6 +367,10 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      PqPx, DqDz = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
               else:
                      PqPx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
+              
+              # HORIZONTAL PRESSURE DERIVATIVES VANISH
+              #PqPx[ebcDex[0],2] = 0.0
+              #PqPx[ebcDex[1],2] = 0.0
                                    
               #%% Compute advection update
               stateA = solA + init0
@@ -373,64 +378,39 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, dhdx)
               
               # Apply update
-              try:
-                     solB = sol2Update + DF * rhsAdv
-              except FloatingPointError:
-                     solB = np.copy(sol2Update)
+              solB = sol2Update + DF * rhsAdv
                      
               #%% Compute internal force update
               rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solB, ebcDex)
               rhsIfc = tendency.enforceTendencyBC(rhsIfc, zeroDex, ebcDex, dhdx)
               
               # Apply update
-              try:
-                     solB += DF * rhsIfc
-              except FloatingPointError:
-                     solB += 0.0
-              '''       
-              #%% Update the diffusion coefficients
-              try:
-                     #rhsAvg = 0.5 * (rhsAdv + rhsIfc + rhs0)
-                     rhsAvg = rhsAdv + rhsIfc
-              except FloatingPointError:
-                     rhsAvg = np.zeros(rhs0.shape)
-                     
-              try:
-                     resVec = rhsAvg - rhs0
-              except FloatingPointError:
-                     resVec = np.zeros(rhs0.shape)
+              solB += DF * rhsIfc
               
-              if DynSGS_RES:
-                     DCF = rescf.computeResidualViscCoeffs(DIMS, resVec, 1.0, solB, DLD, ebcDex[2], filteredCoeffs)                            
+              #%% Update the diffusion coefficients
+              rhsDyn = (rhsAdv + rhsIfc)
+              if inlineDCF:
+                     DCFL = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, 1.0, sol2Update, DLD, bdex, filteredCoeffs)
               else:
-                     DCF = rescf.computeResidualViscCoeffs(DIMS, rhsAvg, 1.0, solB, DLD, ebcDex[2], filteredCoeffs)
-              '''
+                     DCFL = DCF
+              
               #%% Compute diffusive update
               if diffusiveFlux:
-                     try:
-                            PqPx *= DCF[0]
-                     except FloatingPointError:
-                            PqPx *= 0.0
-                     try:
-                            DqDz *= DCF[1]
-                     except FloatingPointError:
-                            DqDz *= 0.0
+                     PqPx *= DCFL[0]
+                     DqDz *= DCFL[1]
                             
               # Compute diffusive tendency
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM_B, DDZM_B, REFS, REFG, DCF)
               
               rhsDif = tendency.computeDiffusionTendency(solB, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                               REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
+                                               REFS, REFG, ebcDex, DLD, DCFL, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
               # Apply update
-              try:
-                     solB += DF * rhsDif
-              except FloatingPointError:
-                     solB += 0.0
+              solB += DF * rhsDif
               
-              return solB
+              return solB, rhsDyn
        
        def ketchesonM2(sol):
               m = 5
@@ -473,32 +453,23 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               sol1 = np.copy(sol)
               sol2 = np.copy(sol)
+              rhsL = np.zeros(sol.shape)
               for ii in range(4):
-                     if ii == 0:
-                            sol1 = computeUpdate(c1, sol1, sol1)
-                     else:
-                            sol1 = computeUpdate(c1, sol1, sol1)
-              try:
-                     sol2 *= 0.04
-              except FloatingPointError:
-                     sol2 *= 0.0
-              try:
-                     sol2 += 0.36 * sol1
-              except FloatingPointError:
-                     sol2 += 0.0
+                     sol1, rhs = computeUpdate(c1, sol1, sol1)
+                     rhsL += rhs
               
+              sol2 = 0.04 * sol2 + 0.36 * sol1
               sol1 = 15.0 * sol2 - 5.0 * sol1
               
               for ii in range(4):
-                     sol1 = computeUpdate(c1, sol1, sol1)
-              try:       
-                     sol = sol2 + 0.6 * sol1
-              except FloatingPointError:
-                     sol = sol2 + 0.0
+                     sol1, rhs = computeUpdate(c1, sol1, sol1)
+                     rhsL += rhs
                      
-              sol = computeUpdate(0.1, sol1, sol)
+              sol = sol2 + 0.6 * sol1
+              sol, rhs = computeUpdate(0.1, sol1, sol)
+              rhsL += rhs
                             
-              return sol
+              return sol, 1.0/9.0 * rhsL
        
        def ssprk84(sol):
               
@@ -561,41 +532,40 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        def ssprk54(sol, DTF):
               
               # Stage 1
-              b10 = 0.39175222700392
+              b10 = 0.391752226571890
               sol1 = computeUpdate(DTF * b10, sol, sol)
               
               # Stage 2
-              a0 = 0.44437049406734
-              a1 = 0.55562950593266
+              a0 = 0.444370493651235
+              a1 = 0.555629506348765
               sols = a0 * sol + a1 * sol1
-              b21 = 0.36841059262959
+              b21 = 0.368410593050371
               sol2 = computeUpdate(DTF * b21, sol1, sols)
               
               # Stage 3
-              a0 = 0.62010185138540
-              a2 = 0.37989814861460
+              a0 = 0.620101851488403
+              a2 = 0.379898148511597
               sols = a0 * sol + a2 * sol2
-              b32 = 0.25189177424738
+              b32 = 0.251891774271694
               sol3 = computeUpdate(DTF * b32, sol2, sols)
               fun3 = (sol3 - sols) / (DTF * b32)
               
               # Stage 4
-              a40 = 0.17807995410773
-              a43 = 0.82192004589227
+              a40 = 0.178079954393132
+              a43 = 0.821920045606868
               sols = a40 * sol + a43 * sol3
-              b43 = 0.54497475021237
+              b43 = 0.544974750228521
               sol4 = computeUpdate(DTF * b43, sol3, sols)
-              fun4 = (sol4 - sols) / (DTF * b43)
+              #fun4 = (sol4 - sols) / (DTF * b43)
               
               # Stage 5
-              a50 = 0.00683325884039
-              a52 = 0.51723167208978
-              a53 = 0.12759831133288
-              a54 = 0.34833675773694
-              b53 = 0.08460416338212
-              b54 = 0.22600748319395
-              sols = a50 * sol + a52 * sol2 + a53 * sol3 + a54 * sol4
-              funs = (DTF * DT) * (b53 * fun3 + b54 * fun4)
+              a52 = 0.517231671970585
+              a53 = 0.096059710526147
+              a54 = 0.386708617503269
+              b53 = 0.063692468666290
+              b54 = 0.226007483236906
+              sols = a52 * sol2 + a53 * sol3 + a54 * sol4
+              funs = (DTF * DT) * (b53 * fun3)
               sol5 = computeUpdate(b54, sol4, sols + funs)
               
               return sol5
@@ -610,7 +580,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        elif order == 4:
               #solB = ssprk54(sol0, 1.0)
               #solB = ssprk84(sol0)
-              solB = ketcheson104(sol0)
+              solB, rhsB = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
@@ -620,4 +590,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        rdex = REFG[-1]
        solB[:,rdex] = np.copy(RayDamp.T * solB[:,rdex])
        
-       return solB #, solA, rhsMid
+       # Impose boundary conditions
+       #solB = tendency.enforceEssentialBC(solB, solB[:,0] + init0[:,0], zeroDex, ebcDex, dhdx)
+       
+       return solB, rhsB
