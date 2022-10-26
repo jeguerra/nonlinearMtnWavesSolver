@@ -37,284 +37,10 @@ def plotRHS(x, rhs, ebcDex, label):
        plt.show()
        
        return
-
-# Computes an update of the dynamics only
-def computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, init0, zeroDex, ebcDex, \
-                              filteredCoeffs, verticalStagger, \
-                              DynSGS_RES):
-       DT = TOPT[0]
-       mu = REFG[3]
-       RLM = REFG[4].data
-       dhdx = REFS[6][0]       
-       diffusiveFlux = True
-
-       # Use multithreading on CPU
-       DDXM_A = REFS[12][0]
-       if verticalStagger:
-              DDZM_A = REFS[19]
-       else:
-              DDZM_A = REFS[12][1]  
        
-       DDXM_B = REFS[13][0]
-       DDZM_B = REFS[13][1]
-       
-       def computeUpdate1(coeff, solA, sol2Update):
-              
-              DF = coeff * DT
-              RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
-              
-              # Compute dynamics RHS
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, True]
-              rhsExp, DqDxA, DqDzA = tendency.computeRHS(*args)
-              
-              try:
-                  solB = sol2Update + DF * rhsExp
-              except FloatingPointError:
-                  solB = sol2Update + 0.0
-                  
-              # Clean up on essential BC
-              U = solB[:,0] + init0[:,0]
-              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)    
-                  
-              # Apply Rayleigh damping layer implicitly
-              rdex = [0, 1, 2, 3]
-              solB[:,rdex] = np.copy(RayDamp.T * solB[:,rdex])
-              
-              # Clean up on essential BC
-              U = solB[:,0] + init0[:,0]
-              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
-                                       
-              return solB, rhsExp
-       
-       def computeUpdate2(coeff, solA, sol2Update, DCF):
-              
-              DF = coeff * DT
-              RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
-              
-              # Compute first derivatives
-              if verticalStagger:
-                     DqDxA, DqDzA = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
-              else:
-                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
-              
-              # Compute terrain following adjustments
-              DqDxA -= REFS[15] * DqDzA
-              
-              # Compute diffusive fluxes
-              if diffusiveFlux:
-                     DqDxA *= np.expand_dims(DCF[0], axis=1)
-                     DqDzA *= np.expand_dims(DCF[1], axis=1)
-              
-              #'''
-              # Compute second derivatives
-              P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
-              tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, REFS, REFG, DCF)
-              
-              # Compute diffusive tendency
-              rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, DqDzA, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                               REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
-              rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
-              
-              # Apply diffusion update
-              try:
-                     solB = sol2Update + DF * rhsDif
-              except FloatingPointError:
-                     solB = np.copy(sol2Update)
-                     
-              # Apply Rayleigh damping layer implicitly
-              rdex = [0, 1, 2, 3]
-              solB[:,rdex] = np.copy(RayDamp.T * solB[:,rdex])
-              
-              # Clean up on essential BC
-              U = solB[:,0] + init0[:,0]
-              solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, dhdx)
-              
-              return solB
-       
-       def ketcheson93(sol):
-              
-              # Ketchenson, 2008 10.1137/07070485X
-              c1 = 1.0 / 6.0
-              c2 = 1.0 / 15.0
-              
-              #sol0 = np.copy(sol)
-              sol1, rhs0 = computeUpdate1(c1, sol, sol)
-              sol2 = np.copy(sol1)
-              
-              for ii in range(4):
-                     sol1, rhs = computeUpdate1(c1, sol1, sol1)
-              
-              # Compute stage 6
-              sol2 = 0.6 * sol2 + 0.4 * sol1
-              sol1, rhs = computeUpdate1(c2, sol1, sol2)
-              
-              for ii in range(3):
-                     sol1, rhs = computeUpdate1(c1, sol1, sol1)
-                                                 
-              return sol1, rhs0
-       
-       def ketcheson104(sol):
-              # Ketchenson, 2008 10.1137/07070485X
-              c1 = 1.0 / 6.0
-              
-              sol1 = np.copy(sol)
-              sol2 = np.copy(sol)
-              for ii in range(4):
-                     if ii == 0:
-                            sol1, rhs0 = computeUpdate1(c1, sol1, sol1)
-                     else:
-                            sol1, rhs = computeUpdate1(c1, sol1, sol1)
-              
-              sol2 = 0.04 * sol2 + 0.36 * sol1
-              sol1 = 15.0 * sol2 - 5.0 * sol1
-              
-              for ii in range(4):
-                     sol1, rhs = computeUpdate1(c1, sol1, sol1)
-                     
-              sol = sol2 + 0.6 * sol1
-              sol, rhs = computeUpdate1(0.1, sol1, sol)
-              
-              return sol, rhs0
-       
-       def ssprk54(sol, DTF):
-              
-              # Stage 1
-              b1 = 0.39175222700392
-              sol1, rhs0 = computeUpdate1(DTF * b1, sol, sol)
-              
-              # Stage 2
-              sols = 0.44437049406734 * sol + 0.55562950593266 * sol1
-              b2 = 0.36841059262959
-              sol2, rhs = computeUpdate1(DTF * b2, sol1, sols)
-              
-              # Stage 3
-              sols = 0.62010185138540 * sol + 0.37989814861460 * sol2
-              b3 = 0.25189177424738
-              sol3, rhs = computeUpdate1(DTF * b3, sol2, sols)
-              
-              # Stage 4
-              a40 = 0.17807995410773
-              a43 = 0.82192004589227
-              sols = a40 * sol + a43 * sol3
-              b43 = 0.54497475021237
-              sol4, rhs = computeUpdate1(DTF * b43, sol3, sols)
-              
-              # Stage 5
-              a50 = 0.00683325884039
-              a52 = 0.51723167208978
-              a53 = 0.12759831133288
-              a54 = 0.34833675773694
-              b53 = 0.08460416338212
-              b54 = 0.22600748319395
-              sols = (a50 - a40 * b53 / b43) * sol + a52 * sol2 + \
-                     (a53 - a43 * b53 / b43) * sol3 + (a54 + b53 / b43) * sol4
-              sol5, rhs = computeUpdate1(DTF * b54, sol4, sols)
-              
-              return sol5, rhs0
-       
-       def ketchesonM2(sol, DCF):
-              m = 5
-              c1 = 1 / (m-1)
-              c2 = 1 / m
-              sol1 = np.copy(sol)
-              for ii in range(m):
-                     if ii == m-1:
-                            sol1 = c2 * ((m-1) * sol + sol1)
-                            sol = computeUpdate2(c2, sol, sol1, DCF)
-                     elif ii == 0:
-                            sol = computeUpdate2(c1, sol, sol, DCF)
-                     else:
-                            sol = computeUpdate2(c1, sol, sol, DCF)
-                      
-              return sol
-       
-       def ssprk32(sol, DCF, DTF):
-              # Stage 1
-              sol1 = computeUpdate2(0.5 * DTF, sol, sol, DCF)
-              # Stage 2
-              sol2 = computeUpdate2(0.5 * DTF, sol1, sol1, DCF)
-              
-              # Stage 3
-              sol3 = np.array(1.0 / 3.0 * sol + 2.0 / 3.0 * sol2)
-              sol = computeUpdate2(1.0 / 3.0 * DTF, sol2, sol3, DCF)
-
-              return sol
-       
-       def ssprk43(sol, DCF, DTF):
-              # Stage 1
-              sol1 = computeUpdate2(0.5 * DTF, sol, sol, DCF)
-              # Stage 2
-              sol2 = computeUpdate2(0.5 * DTF, sol1, sol1, DCF)
-              
-              # Stage 3
-              sols = np.array(2.0 / 3.0 * sol + 1.0 / 3.0 * sol2)
-              sol3 = computeUpdate2(1.0 / 6.0 * DTF, sol2, sols, DCF)
-              
-              # Stage 4
-              sol4 = computeUpdate2(0.5 * DTF, sol3, sol3, DCF)
-                                          
-              return sol4
-       
-       def ssprk53_Opt(sol, DCF):
-              
-              # Optimized truncation error to SSP coefficient method from Higueras, 2021
-              # Stage 1
-              c1 = 0.377268915331368
-              sol1 = computeUpdate2(c1, sol, sol, DCF)
-              
-              # Stage 2
-              c2 = 0.377268915331368
-              sol2 = computeUpdate2(c2, sol1, sol1, DCF)
-              
-              # Stage 3
-              c3 = 0.178557978754048
-              sols = np.array(0.526709009150106 * sol + 0.473290990849893 * sol2)
-              sol3 = computeUpdate2(c3, sol2, sols, DCF)
-              
-              # Stage 4
-              c4 = 0.321244742913218
-              sols = np.array(0.148499306837781 * sol + 0.851500693162219 * sol3)
-              sol4 = computeUpdate2(c4, sol3, sols, DCF)
-              
-              # Stage 5
-              sols = np.array(0.166146375373442 * sol1 + 0.063691005483375 * sol2 + 0.770162619143183 * sol4)
-              sol5 = computeUpdate2(0.290558415952914, sol4, sols, DCF)
-              
-              return sol5
-       
-       #%% THE MAIN TIME INTEGRATION STAGES
-       
-       # Solve to first half step
-       solA, rhsOld = ssprk54(sol0, 0.5)
-       # Solve to last half step
-       solB, rhsMid = ssprk54(solA, 0.5)
-              
-       # Update the adaptive coefficients using residual or right hand side
-       args = [solB, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, True]
-       rhsNew, DqDxA, DqDzA = tendency.computeRHS(*args)
-       
-       # Normalization and bounding to DynSGS
-       state = solB + init0
-       qnorm = (solB - bn.nanmean(solB))
-       #'''
-       if DynSGS_RES:
-              resField = 2.0 * (solB - solA) / DT - 0.5 * (rhsNew + rhsMid)
-       else:
-              resField = 0.5 * (rhsNew + rhsMid)
-       #'''
-       DCF = rescf.computeResidualViscCoeffs(DIMS, resField, qnorm, state, DLD, dhdx, ebcDex[2], filteredCoeffs)
-       
-       # Solve first half step
-       solB = ssprk43(solB, DCF, 0.5)
-       # Solve second half step
-       solB = ssprk43(solB, DCF, 0.5)
-       
-       return solB
-       
-def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, init0, rhs0, DCF, zeroDex, ebcDex, \
-                              inlineDCF, filteredCoeffs, verticalStagger, diffusiveFlux):
+def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
+                              sol0, rhs0, init0, DCF, zeroDex, ebcDex, \
+                              filteredCoeffs, verticalStagger, diffusiveFlux):
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
@@ -328,89 +54,57 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
 
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
-       '''              
-       def computeUpdate1(coeff, solA, sol2Update):
+       
+       def computeUpdate(coeff, solA, sol2Update, rhsA):
               
               DF = coeff * DT
               
-              # Compute dynamics RHS
-              args = [solA, init0, DDXM_A, DDZM_A, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, False, verticalStagger, True]
-              rhsExp, DqDxA, DqDzA = tendency.computeRHS(*args)
-              
-              # Compute diffusive fluxes
-              if diffusiveFlux:
-                     DqDxA *= np.expand_dims(DCF[0], axis=1)
-                     DqDzA *= np.expand_dims(DCF[1], axis=1)
-              
-              # Compute diffusive tendency
-              P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
-              tendency.computeFieldDerivatives2(DqDxA, DqDzA, DDXM_B, DDZM_B, REFS, REFG, DCF)
-              
-              rhsDif = tendency.computeDiffusionTendency(solA, DqDxA, DqDzA, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                               REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
-              rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
-              
-              # Apply update
-              try:
-                     solB = sol2Update + DF * (rhsExp + rhsDif)
-              except FloatingPointError:
-                     solB = sol2Update + 0.0
-              
-              return solB
-       '''
-       def computeUpdate(coeff, solA, sol2Update):
-              
-              DF = coeff * DT
-              
-              # Get derivatives
-              if verticalStagger:
-                     PqPx, DqDz = tendency.computeFieldDerivativeStag(solA, DDXM_A, DDZM_A)
-              else:
-                     PqPx, DqDz = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A)
-              
-              # HORIZONTAL PRESSURE DERIVATIVES VANISH
-              #PqPx[ebcDex[0],2] = 0.0
-              #PqPx[ebcDex[1],2] = 0.0
+              #%% First dynamics update
+              PqPxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
                                    
-              #%% Compute advection update
+              # Compute advection update
               stateA = solA + init0
-              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solA, stateA[:,0], stateA[:,1], ebcDex)
+              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA, stateA[:,0], stateA[:,1], ebcDex)
               rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, dhdx)
               
               # Apply update
               solB = sol2Update + DF * rhsAdv
                      
-              #%% Compute internal force update
-              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, solB, ebcDex)
+              # Compute internal force update
+              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solB, ebcDex)
               rhsIfc = tendency.enforceTendencyBC(rhsIfc, zeroDex, ebcDex, dhdx)
-              
               # Apply update
-              solB += DF * rhsIfc
-              
+              solB += 1.0 * DF * rhsIfc
+
               #%% Update the diffusion coefficients
               rhsDyn = (rhsAdv + rhsIfc)
-              if inlineDCF:
-                     DCFL = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, 1.0, sol2Update, DLD, bdex, filteredCoeffs)
-              else:
-                     DCFL = DCF
+              #resDyn = rhsDyn - rhsA
+              #state = solA + init0
+              #DCF = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, solA, DLD, bdex, filteredCoeffs)
               
               #%% Compute diffusive update
+              #PqPxB, DqDzB = tendency.computeFieldDerivatives(solB, DDXM_A, DDZM_A, verticalStagger)
               if diffusiveFlux:
-                     PqPx *= DCFL[0]
-                     DqDz *= DCFL[1]
+                     PqPxA *= DCF[0]
+                     DqDzA *= DCF[1]
                             
               # Compute diffusive tendency
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
-              tendency.computeFieldDerivatives2(PqPx, DqDz, DDXM_B, DDZM_B, REFS, REFG, DCF)
+              tendency.computeFieldDerivatives2(PqPxA, DqDzA, DDXM_B, DDZM_B, REFS)
               
-              rhsDif = tendency.computeDiffusionTendency(solB, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                               REFS, REFG, ebcDex, DLD, DCFL, diffusiveFlux)
+              rhsDif = tendency.computeDiffusionTendency(solA, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+                                               REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
               # Apply update
               solB += DF * rhsDif
               
-              return solB, rhsDyn
+              # Apply Rayleigh damping layer implicitly
+              RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
+              rdex = REFG[-1]
+              solB[:,rdex] = np.copy(RayDamp.T * solB[:,rdex])
+              
+              return solB, rhsDyn#, resDyn, dcf
        
        def ketchesonM2(sol):
               m = 5
@@ -426,128 +120,157 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                       
               return sol
        
-       def ketcheson93(sol):
+       def ssprk32(sol):
+              rhs = np.copy(rhs0)
+              # Stage 1
+              sol1, rhs, res = computeUpdate(0.5, sol0, sol0, rhs)
+              # Stage 2
+              sol2, rhs, res = computeUpdate(0.5, sol1, sol1, rhs)
               
+              # Stage 3
+              sol3 = 1.0 / 3.0 * sol + 2.0 / 3.0 * sol2
+              sol, rhs, res = computeUpdate(1.0 / 3.0, sol2, sol3, rhs)
+
+              return sol, rhs, res#, dcf
+       
+       def ssprk43(sol):
+              rhs = np.copy(rhs0)
+              # Stage 1
+              sol1, rhs, res = computeUpdate(0.5, sol, sol, rhs)
+              # Stage 2
+              sol2, rhs, res = computeUpdate(0.5, sol1, sol1, rhs)
+              
+              # Stage 3 from SSPRK32
+              sols = 1.0 / 3.0 * sol + 2.0 / 3.0 * sol2
+              sol3, rhs, res = computeUpdate(1.0 / 3.0, sol2, sols, rhs)
+              
+              sols = 0.5 * (sol3 + sol)
+              # Stage 3
+              #sols, rhs, res = np.array(2.0 / 3.0 * sol + 1.0 / 3.0 * sol2)
+              #sol3, rhs, res = computeUpdate(1.0 / 6.0, sol2, sols, rhs)
+              
+              # Stage 4
+              sol4, rhs, res = computeUpdate(0.5, sols, sols, rhs)
+              
+              res = sol4 - sol3
+                                          
+              return sol4, rhs, res#, dcf
+       
+       def ssprk53_Opt(sol):
+              res = 0.0
+              rhs = np.copy(rhs0)
+              # Optimized truncation error to SSP coefficient method from Higueras, 2021
+              # Stage 1
+              c1 = 0.377268915331368
+              sol1, rhs, res = computeUpdate(c1, sol, sol, rhs)
+              res += res
+              
+              # Stage 2
+              c2 = 0.377268915331368
+              sol2, rhs, res = computeUpdate(c2, sol1, sol1, rhs)
+              res += res
+              
+              # Stage 3
+              c3 = 0.178557978754048
+              sols = np.array(0.526709009150106 * sol + 0.473290990849893 * sol2)
+              sol3, rhs, res = computeUpdate(c3, sol2, sols, rhs)
+              res += res
+              
+              # Stage 4
+              c4 = 0.321244742913218
+              sols = np.array(0.148499306837781 * sol + 0.851500693162219 * sol3)
+              sol4, rhs, res = computeUpdate(c4, sol3, sols, rhs)
+              res += res
+              
+              # Stage 5
+              sols = np.array(0.166146375373442 * sol1 + 0.063691005483375 * sol2 + 0.770162619143183 * sol4)
+              sol5, rhs, res = computeUpdate(0.290558415952914, sol4, sols, rhs)
+              res += res
+              res *= 0.2
+              return sol5, rhs, res
+       
+       def ketcheson93(sol):
+              rhs = np.copy(rhs0); nr = 1.0
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
-              c2 = 1.0 / 15.0
+              #c2 = 1.0 / 15.0
+              c2 = 1.0 / 42.0
               
-              sol = computeUpdate(c1, sol, sol)
+              sol0 = np.copy(sol)
+              sol, rhs = computeUpdate(c1, sol, sol, rhs)
+              rhs += rhs; nr += 1.0
               sol1 = np.copy(sol)
               
-              for ii in range(4):
-                     sol = computeUpdate(c1, sol, sol)
+              for ii in range(5):
+                     sol, rhs = computeUpdate(c1, sol, sol, rhs)
+                     rhs += rhs; nr += 1.0
                      
-              # Compute stage 6 with linear combination
-              sol1 = np.array(0.6 * sol1 + 0.4 * sol)
-              sol = computeUpdate(c2, sol, sol1)
+              sols = 1.0/7.0 * sol0 + 6.0/7.0 * sol
+              solO2, rhs = computeUpdate(c2, sol, sols, rhs)
+              rhs += rhs; nr += 1.0
+                     
+              # Compute stage 6* with linear combination
+              sols = 0.6 * sol1 + 0.4 * sol
+              sol = np.copy(sols)
+              #sol, rhs, res = computeUpdate(c2, sol, sols, rhs)
+              #res += res; nr += 1.0
               
               for ii in range(3):
-                     sol = computeUpdate(c1, sol, sol)
+                     sol, rhs = computeUpdate(c1, sol, sol, rhs)
+                     rhs += rhs; nr += 1.0
                      
-              return sol
+              resErr = sol - solO2
+              rhsAvg = 1.0/nr * rhs
+                            
+              return sol, rhsAvg, resErr
        
        def ketcheson104(sol):
+              rhs = np.copy(rhs0); nr = 1.0
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               
               sol1 = np.copy(sol)
               sol2 = np.copy(sol)
-              rhsL = np.zeros(sol.shape)
               for ii in range(4):
-                     sol1, rhs = computeUpdate(c1, sol1, sol1)
-                     rhsL += rhs
+                     sol1, rhs = computeUpdate(c1, sol1, sol1, rhs)
+                     rhs += rhs; nr += 1.0
               
               sol2 = 0.04 * sol2 + 0.36 * sol1
               sol1 = 15.0 * sol2 - 5.0 * sol1
               
               for ii in range(4):
-                     sol1, rhs = computeUpdate(c1, sol1, sol1)
-                     rhsL += rhs
+                     sol1, rhs = computeUpdate(c1, sol1, sol1, rhs)
+                     rhs += rhs; nr += 1.0
                      
               sol = sol2 + 0.6 * sol1
-              sol, rhs = computeUpdate(0.1, sol1, sol)
-              rhsL += rhs
+              sol, rhs = computeUpdate(0.1, sol1, sol, rhs)
+              rhs += rhs; nr += 1.0
                             
-              return sol, 1.0/9.0 * rhsL
-       
-       def ssprk84(sol):
+              rhsAvg = 1.0 / nr * rhs
               
-              # Stage 1
-              b0 = 0.24120020561311
-              sol1 = computeUpdate(b0, sol, sol)
-              
-              # Stage 2
-              sols = 0.10645325745007 * sol + 0.89354674254993 * sol1
-              b1 = 0.21552365802797
-              sol2 = computeUpdate(b1, sol1, sols)
-              
-              # Stage 3
-              b2 = 0.24120020561311
-              sol3 = computeUpdate(b2, sol2, sol2)
-              fun2 = (sol3 - sol2) / (b2 * DT)
-              
-              # Stage 4
-              a0 = 0.57175518477257
-              a3 = 1.0 - a0
-              sols = a0 * sol + a3 * sol3
-              b3 = 0.10329273748560
-              sol4 = computeUpdate(b3, sol3, sols)
-              fun3 = (sol4 - sols) / (b3 * DT)
-              
-              # Stage 5
-              a0 = 0.19161667219044
-              a4 = 1.0 - a0
-              sols = a0 * sol + a4 * sol4
-              b4 = 0.19498222488188
-              sol5 = computeUpdate(b4, sol4, sols)
-              
-              # Stage 6
-              b5 = 0.24120020561311
-              sol6 = computeUpdate(b5, sol5, sol5)
-              fun5 = (sol6 - sol5) / (b5 * DT)
-              
-              # Stage 7
-              b6 = 0.24120020561311
-              sol7 = computeUpdate(b6, sol6, sol6)
-              
-              # Stage 8
-              a0 = 0.02580435327923
-              a2 = 0.03629901341774
-              a3 = 0.31859181340256
-              a4 = 0.05186768980103
-              a5 = 0.03944076217320
-              a6 = 0.00511633747411
-              a7 = 0.52288003045213
-              b2 = 0.00875532949991
-              b3 = 0.06195575835101
-              b5 = 0.00951311994571
-              b7 = 0.12611877085604
-              sols = a0 * sol + a2 * sol2 + a3 * sol3 + a4 * sol4 + a5 * sol5 + a6 * sol6 + a7 * sol7
-              funs = DT * (b2 * fun2 + b3 * fun3 + b5 * fun5)
-              sol8 = computeUpdate(b7, sol7, sols + funs)
-              
-              return sol8
+              return sol, rhsAvg
        
        def ssprk54(sol, DTF):
               
+              rhs = 0.0
+              
               # Stage 1
               b10 = 0.391752226571890
-              sol1 = computeUpdate(DTF * b10, sol, sol)
+              sol1, rhs, res = computeUpdate(DTF * b10, sol, sol, rhs)
               
               # Stage 2
               a0 = 0.444370493651235
               a1 = 0.555629506348765
               sols = a0 * sol + a1 * sol1
               b21 = 0.368410593050371
-              sol2 = computeUpdate(DTF * b21, sol1, sols)
+              sol2, rhs, res = computeUpdate(DTF * b21, sol1, sols, rhs)
               
               # Stage 3
               a0 = 0.620101851488403
               a2 = 0.379898148511597
               sols = a0 * sol + a2 * sol2
               b32 = 0.251891774271694
-              sol3 = computeUpdate(DTF * b32, sol2, sols)
+              sol3, rhs, res = computeUpdate(DTF * b32, sol2, sols, rhs)
               fun3 = (sol3 - sols) / (DTF * b32)
               
               # Stage 4
@@ -555,8 +278,7 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               a43 = 0.821920045606868
               sols = a40 * sol + a43 * sol3
               b43 = 0.544974750228521
-              sol4 = computeUpdate(DTF * b43, sol3, sols)
-              #fun4 = (sol4 - sols) / (DTF * b43)
+              sol4, rhs, res = computeUpdate(DTF * b43, sol3, sols, rhs)
               
               # Stage 5
               a52 = 0.517231671970585
@@ -566,9 +288,9 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               b54 = 0.226007483236906
               sols = a52 * sol2 + a53 * sol3 + a54 * sol4
               funs = (DTF * DT) * (b53 * fun3)
-              sol5 = computeUpdate(b54, sol4, sols + funs)
+              sol5, rhs, res = computeUpdate(b54, sol4, sols + funs, rhs)
               
-              return sol5
+              return sol5, rhs, res#, dcf
 
        #%% THE MAIN TIME INTEGRATION STAGES
        
@@ -576,21 +298,15 @@ def computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB = ketcheson93(sol0)
+              solB, rhs, err = ketcheson93(sol0)
        elif order == 4:
-              #solB = ssprk54(sol0, 1.0)
-              #solB = ssprk84(sol0)
-              solB, rhsB = ketcheson104(sol0)
+              solB, rhs = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
-              
-       # Apply Rayleigh damping layer implicitly
-       RayDamp = np.reciprocal(1.0 + DT * mu * RLM)
-       rdex = REFG[-1]
-       solB[:,rdex] = np.copy(RayDamp.T * solB[:,rdex])
        
-       # Impose boundary conditions
-       #solB = tendency.enforceEssentialBC(solB, solB[:,0] + init0[:,0], zeroDex, ebcDex, dhdx)
+       #state = solB + init0
+       res = (solB - sol0) / DT - rhs
+       dcf = rescf.computeResidualViscCoeffs(DIMS, res, solB, DLD, bdex, filteredCoeffs)
        
-       return solB, rhsB
+       return solB, rhs, res, dcf

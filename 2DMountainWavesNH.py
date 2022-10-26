@@ -15,6 +15,14 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 
 @author: Jorge E. Guerra
 """
+# Set up the multithreading environment (physical cores only)
+import os
+os.environ["OMP_NUM_THREADS"] = "6"
+os.environ["OPENBLAS_NUM_THREADS"] = "6"
+os.environ["MKL_NUM_THREADS"] = "6"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "6"
+os.environ["NUMEXPR_NUM_THREADS"] = "6"
+
 import sys
 import time
 import shelve
@@ -24,7 +32,7 @@ import numpy as np
 import bottleneck as bn
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
-import scipy.interpolate as spi
+import scipy.spatial as spk
 from matplotlib import cm
 import matplotlib.pyplot as plt
 # Import from the local library of routines
@@ -294,6 +302,7 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
        
        try:
               m_fid = Dataset(newFname, 'w', format="NETCDF4")
+              print('Data output to: ', newFname)
        except PermissionError:
               print('Deleting corrupt NC file... from failed run.')
               import os
@@ -343,12 +352,13 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
        m_fid.createVariable('Rln_p', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Rln_t', 'f8', ('time', 'z', 'x', 'y'))
        # Create variables for diffusion coefficients
-       m_fid.createVariable('DCu', 'f8', ('time', 'z', 'x', 'y'))
-       m_fid.createVariable('DCw', 'f8', ('time', 'z', 'x', 'y'))
-       m_fid.createVariable('DCln_p', 'f8', ('time', 'z', 'x', 'y'))
-       m_fid.createVariable('DCln_t', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
+       #m_fid.createVariable('DCln_p', 'f8', ('time', 'z', 'x', 'y'))
+       #m_fid.createVariable('DCln_t', 'f8', ('time', 'z', 'x', 'y'))
        
        m_fid.close()
+       del(m_fid)
        
        return newFname
 
@@ -362,30 +372,33 @@ def store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF
                      q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
                      dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
                      rq = np.reshape(resVec[:,pp], (NZ+1, NX+1), order='F')
-                     dq = np.reshape(DCF[0][:,pp], (NZ+1, NX+1), order='F')
+                     #dq = np.reshape(DCF[0][:,pp], (NZ+1, NX+1), order='F')
+                     dq1 = np.reshape(DCF[0][:,0], (NZ+1, NX+1), order='F')
+                     dq2 = np.reshape(DCF[1][:,0], (NZ+1, NX+1), order='F')
 
                      if pp == 0:
                             m_fid.variables['u'][ff,:,:,0] = q
                             m_fid.variables['DuDt'][ff,:,:,0] = dqdt
                             m_fid.variables['Ru'][ff,:,:,0] = rq
-                            m_fid.variables['DCu'][ff,:,:,0] = dq
+                            m_fid.variables['DC1'][ff,:,:,0] = dq1
                      elif pp == 1:
                             m_fid.variables['w'][ff,:,:,0] = q
                             m_fid.variables['DwDt'][ff,:,:,0] = dqdt
                             m_fid.variables['Rw'][ff,:,:,0] = rq
-                            m_fid.variables['DCw'][ff,:,:,0] = dq
+                            m_fid.variables['DC2'][ff,:,:,0] = dq2
                      elif pp == 2:
                             m_fid.variables['ln_p'][ff,:,:,0] = q
                             m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
                             m_fid.variables['Rln_p'][ff,:,:,0] = rq
-                            m_fid.variables['DCln_p'][ff,:,:,0] = dq
+                            #m_fid.variables['DCln_p'][ff,:,:,0] = dq
                      else:
                             m_fid.variables['ln_t'][ff,:,:,0] = q
                             m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
                             m_fid.variables['Rln_t'][ff,:,:,0] = rq
-                            m_fid.variables['DCln_t'][ff,:,:,0] = dq
+                            #m_fid.variables['DCln_t'][ff,:,:,0] = dq
                             
               m_fid.close()
+              del(m_fid)
        except Exception as e:
               print(e)
               print('Could NOT store state to NC file!', newFname)
@@ -426,13 +439,7 @@ def runModel(TestName):
               FourierLin = False
               print('Uniform Fourier grid in the horizontal.')
               
-       method1 = False
-       method2 = True
-       inlineDCF = False
-       if method1:
-              print('Time integration by method 1.')
-       if method2:
-              print('Time integration by method 2.')
+       inlineDCF = True
        if inlineDCF:
               print('DynSGS coefficients updated inline with RK stage updates.')
        else:
@@ -471,7 +478,7 @@ def runModel(TestName):
        else:
               print('Legendre spectral derivative in the vertical.')
        
-       verticalStagger = True
+       verticalStagger = False
        if verticalStagger:
               useGuellrich = True
               useUniformSt = False
@@ -491,7 +498,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -2
+              rdex = -20
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -722,16 +729,10 @@ def runModel(TestName):
        DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        DDXMS_CFD, DDZMS_CFD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
-       
-       if HermFunc:
-              DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
-       else:
-              DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
-              #DDXM_OP = DDXMS_CFD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CFD)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
        NZI = NZ + 1
-       if verticalLegdGrid and verticalStagger:
+       if verticalLegdGrid:
               
               xiI, whf = derv.cheblb(NZI) #[-1 1]
               xiO, whf = derv.leglb(NZ) #[-1 1]
@@ -760,7 +761,13 @@ def runModel(TestName):
               DDZM_OP = sps.block_diag((DDZMO, DDZMI, DDZMO, DDZMI), format='csr')
        else:
               # Average the staggered operators
-              DDZM_OP = 1.0 * DDZMS1
+              #DDZM_OP = 1.0 * DDZMS1
+              DDZM_OP = 0.5 * (DDZMO + DDZMI)
+              
+       if HermFunc:
+              DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+       else:
+              DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
               
        #plt.plot(xi_lg, xi_lg, 'ko', xi_ch, xi_ch, 'ks')
        #plt.show()
@@ -805,6 +812,13 @@ def runModel(TestName):
        
        if not StaticSolve:
               
+              # KDtree lookups for filtering sweep
+              XMV = np.reshape(XL, (OPS,1), order='F')
+              ZMV = np.reshape(ZTL, (OPS,1), order='F')
+              XZV = np.hstack((XMV, ZMV))
+              
+              kdtxz = spk.KDTree(XZV)
+              
               # Compute DX and DZ grid length scales
               DX_min = 1.0 * np.min(np.abs(DXM))
               DZ_min = 1.0 * np.min(np.abs(DZM))
@@ -820,7 +834,8 @@ def runModel(TestName):
               print('Uniform grid lengths:',DX_wav,DZ_wav)
               
               DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_max
+              DL2 = 1.0 * DZ_avg
+              DLR = mt.sqrt(DL1 * DL2)
                      
               dS2 = 1.0 + np.power(REFS[6][0],2)
               S2 = np.reciprocal(dS2)
@@ -836,14 +851,18 @@ def runModel(TestName):
               # Compute mesh areas
               DAM = 1.0 / (abs(DIMS[1] - DIMS[0]) * DIMS[2]) * np.reshape(DXM * DZM, (1,OPS), order='F')
               
+              # Compute filtering regions
+              fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)                     
+
               # Create a container for these quantities
-              #DLD = (DL1, DL2, DL1**2, DL2**2, S, dS2, DAM)
-              
-              DLD = (np.reshape(1.0*DXM, (OPS,), order='F'), 
+              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS2, DAM, fltDex)
+              '''
+              ls = 1.0
+              DLD = (np.reshape(ls*DXM, (OPS,), order='F'), 
                      DL2, 
-                     np.reshape(np.power(1.0*DXM,2), (OPS,1), order='F'),
-                     DL2**2, S, dS2, DAM)
-              
+                     np.reshape(np.power(ls*DXM,2), (OPS,1), order='F'),
+                     DL2**2, S, dS2, DAM, fltDex)
+              '''
        # Get memory back
        del(DDXMS1); del(DDZMS1)
        del(DDXMS_CFD); del(DDZMS_CFD)
@@ -870,9 +889,6 @@ def runModel(TestName):
        INIT[wdex] = np.zeros((OPS,))
        INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
        INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-       
-       # Initialize damping coefficients
-       DCF = (np.zeros((OPS,4)), np.zeros((OPS,4)))
        
        if isRestart and StaticSolve:
               print('Restarting from previous solution...')
@@ -907,9 +923,9 @@ def runModel(TestName):
                      fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:,0], (OPS,), order='F')
                      
                      m_fid.close()
+                     del(m_fid)
               except:
                      print('Could NOT read restart NC file!', fname2Restart)
-                     m_fid.close()
        else:
              thisTime = IT
               
@@ -1130,8 +1146,7 @@ def runModel(TestName):
                      '''
               # Initialize local sound speed and time step
               #'''
-              T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
-              RdT = REFS[9][0] * (1.0 + T_ratio)
+              RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
               VSND = np.sqrt(PHYS[6] * RdT)
               VFLW = np.sqrt(np.power(fields[:,0] + hydroState[:,0], 2.0) + np.power(fields[:,1], 2.0))
               VWAV_max = bn.nanmax(VSND + VFLW)
@@ -1145,46 +1160,26 @@ def runModel(TestName):
               #'''
               
               ti = 0; ff = 0
-              DT0 = TOPT[0]
-              qnorm = 0.0
-              delFields0 = np.zeros(fields.shape)
-              rhsVec0 = np.copy(rhsVec)
               rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
                                                          PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
-              resVec = np.copy(rhsVec)
               fields0 = np.copy(fields)
-              state0 = fields0 + hydroState
-              
-              resVec0 = np.zeros(fields.shape)
+              rhsVec0 = np.copy(rhsVec)
+              resVec = np.copy(rhsVec)
+              state = fields + hydroState
               error = [np.linalg.norm(rhsVec)]
+              
+              # Initialize damping coefficients
+              DCF = rescf.computeResidualViscCoeffs(DIMS, rhsVec0, fields0, DLD, ebcDex[2], filteredCoeffs)
               
               while thisTime <= TOPT[4]:
                              
                      # Print out diagnostics every TOPT[5] steps
                      if ti % OTI == 0:
                             
-                            #print(delFields0[ebcDex[3]-10,2])
-                            #print(fields[ebcDex[3]-10,2])
-                            
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
                             error.append(err)
-                            
-                            # Check the NC file
-                            ww = 0
-                            good2open = False
-                            while good2open == False:
-                                   try:
-                                          m_fid = Dataset(newFname, 'r', format="NETCDF4")
-                                          good2open = True
-                                          m_fid.close()
-                                          del(m_fid)
-                                   except:
-                                          if ww == 0:
-                                                 print('PAUSED execution because NC file is not available...')
-                                          good2open = False
-                                          ww += 1
                             
                             # Store in the NC file
                             store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF)
@@ -1196,6 +1191,17 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
+                            fields, rhsVec, resVec, DCF = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                                                                    DLD, TOPT, fields0, rhsVec0, hydroState, DCF, \
+                                                                    zeroDex, ebcDex, filteredCoeffs, \
+                                                                    verticalStagger, diffusiveFlux)
+                                   
+                            ti += 1
+                            thisTime += TOPT[0]
+                            
+                            fields0 = np.copy(fields)
+                            rhsVec0 = np.copy(rhsVec)
+                            
                             # Compute a time step
                             try: 
                                    # Compute sound speed
@@ -1203,82 +1209,21 @@ def runModel(TestName):
                                    VSND = np.sqrt(PHYS[6] * RdT)
                                    
                                    # Compute flow speed
-                                   UD = np.abs(state0[:,0])
-                                   WD = np.abs(state0[:,1])
-                                   
-                                   try:
-                                          UD2 = np.power(UD,2.0)
-                                   except FloatingPointError:
-                                          UD2 = np.zeros(UD.shape)
-                                          
-                                   try:
-                                          WD2 = np.power(WD,2.0)
-                                   except FloatingPointError:
-                                          WD2 = np.zeros(WD.shape)
-                                   
-                                   VFLW = np.sqrt(UD2 + WD2)
+                                   UD = np.abs(state[:,0]); UD[UD < 1.0E-16] = 0.0
+                                   WD = np.abs(state[:,1]); WD[WD < 1.0E-16] = 0.0
+                                   VFLW = np.sqrt(bn.ss(state[:,0:2], axis=1))
                                    
                                    # Compute new time step based on updated sound speed
-                                   TOPT[0] = DTF * DLS / bn.nanmax(VSND + VFLW)
+                                   VWAV_max = bn.nanmax(VSND + VFLW)
+                                   newDT = DTF * DLS / VWAV_max
                                    
-                            except FloatingPointError as e:
-                                   print('Bad computation of local sound speed, no change in time step: ', e)
+                                   #print(newDT)
+                                   if not np.isnan(newDT) and not np.isinf(newDT):
+                                          TOPT[0] = newDT
+                                   
+                            except:
+                                   print('Bad computation of local sound speed, no change in time step.')
                                    print('Time: ', thisTime, ti)
-                                   TOPT[0] = DTF * DLS
-                            
-                            if method1:
-                                   fields = tint.computeTimeIntegrationNL1(DIMS, PHYS, REFS, REFG, \
-                                                                           DLD, TOPT, fields0, hydroState, \
-                                                                           zeroDex, ebcDex, filteredCoeffs, \
-                                                                           verticalStagger, DynSGS_RES)
-                                   
-                            if method2:
-                                   fields, rhsVec = tint.computeTimeIntegrationNL2(DIMS, PHYS, REFS, REFG, \
-                                                                           DLD, TOPT, fields0, hydroState, rhsVec0, DCF, \
-                                                                           zeroDex, ebcDex, inlineDCF, filteredCoeffs, \
-                                                                           verticalStagger, diffusiveFlux)
-                                   
-                            # Get solution update
-                            delFields = fields - fields0
-                            
-                            # Update time and solution counter
-                            DT = TOPT[0]
-                            thisTime += TOPT[0]
-                            DTL = DT + DT0
-                            
-                            #'''
-                            if method2 and not inlineDCF:
-                                   # Compute the updated RHS
-                                   #rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
-                                   #                                    PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
-                                          
-                                   # Compute averaged RHS
-                                   rhsAvg = DT / DTL * rhsVec + DT0 / DTL * rhsVec0
-                                          
-                                   # Normalization and bounding to DynSGS
-                                   stateAvg = DT / DTL * fields + DT0 / DTL * fields0
-                                   
-                                   # Compute residual and average
-                                   resVec = 1.0 / DTL * (delFields + delFields0) - rhsAvg
-                                   #resVec = (rhsVec - rhsAvg)
-                                   resAvg = DT / DTL * resVec + DT0 / DTL * resVec0
-                                   
-                                   if DynSGS_RES:
-                                          DCF = rescf.computeResidualViscCoeffs(DIMS, resAvg, qnorm, stateAvg, DLD, ebcDex[2], filteredCoeffs)                            
-                                   else:
-                                          DCF = rescf.computeResidualViscCoeffs(DIMS, rhsAvg, qnorm, stateAvg, DLD, ebcDex[2], filteredCoeffs)
-                            else:
-                                   rhsVec = np.copy(rhs)
-                                   resVec = 1.0 / DTL * (delFields + delFields0) - rhsVec
-                                   
-                            ti += 1
-                            
-                            DT0 = TOPT[0]
-                            fields0 = np.copy(fields)
-                            delFields0 = np.copy(delFields)
-                            rhsVec0 = np.copy(rhsVec)
-                            resVec0 = np.copy(resVec)
-                            state0 = fields0 + hydroState
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
@@ -1288,9 +1233,6 @@ def runModel(TestName):
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
-                     
-              # Close the output data file
-              m_fid.close()
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')

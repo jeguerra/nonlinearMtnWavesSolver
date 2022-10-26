@@ -85,7 +85,7 @@ class TestCase:
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(723, 96, 160.0, 35.0, 300.0, \
-                                      10000.0, 40000.0, 20.0,
+                                      10000.0, 40000.0, 10.0,
                                       4000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_transient')
               
               elif TestName == "3LayerTestTransient":
@@ -98,7 +98,7 @@ class TestCase:
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(723, 108, 160.0, 42.0, 300.0, \
-                                      10000.0, 40000.0, 5.0, \
+                                      10000.0, 40000.0, 10.0, \
                                       2500.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_transient')
               
               else:
@@ -141,7 +141,7 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = rlf * 1.0E-2
-              rdex = [0, 1, 3]
+              rdex = [0, 1, 2, 3]
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC, rdex)
               
               # Set the terrain options
@@ -168,7 +168,7 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.05 # seconds
               HR = 4.0 # hours              
-              DTF = 1.0 # scale time step              
+              DTF = 0.75 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

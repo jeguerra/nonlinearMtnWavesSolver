@@ -1424,6 +1424,7 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        PLU = scl.lu_factor(LDM)
        DDM = scl.lu_solve(PLU, RDM)
        
+       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
        
        return DDMC
@@ -1442,7 +1443,7 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        # Get the scale factor
        b = (np.amax(alpha) - np.min(alpha)) / abs(L2 - L1)
        
-       # Make a diagonal matrix of weights
+       # Make a diagonal matrix of weight
        W = np.diag(whf, k=0)
        
        # Compute the coefficients of spectral derivative in matrix form
@@ -1517,8 +1518,9 @@ def computeChebyshevDerivativeMatrix(DIMS):
        temp = (CT.T).dot(SDIFF)
        DDM = b * temp.dot(STR_C)
        
+       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
-
+       
        return DDMC, STR_C
 
 def computeFourierDerivativeMatrix(DIMS):
@@ -1574,6 +1576,7 @@ def computeLaguerreDerivativeMatrix(DIMS):
        temp = temp.dot(STR_L)       
        DDM = b * temp
        
+       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
        
        return DDMC.astype(np.float64), STR_L
@@ -1618,6 +1621,7 @@ def computeLegendreDerivativeMatrix(DIMS):
        temp = (LT.T).dot(SDIFF)
        DDM = b * temp.dot(STR_L)
        
+       #DDM1 = removeLeastSingularValue(DDM)
        DDMC = numericalCleanUp(DDM)
        
        return DDMC, STR_L

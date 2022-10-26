@@ -9,8 +9,6 @@ import sys
 import numpy as np
 import math as mt
 import computeDerivativeMatrix as derv
-from scipy import signal
-from scipy.interpolate import PchipInterpolator, Akima1DInterpolator, CubicSpline
 import matplotlib.pyplot as plt
 
 def computeTopographyOnGrid(REFS, opt):
@@ -51,13 +49,16 @@ def computeTopographyOnGrid(REFS, opt):
                      
               ii += 1
        
+       # Get the derivative
+       DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(xh, 4)
+       DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(xh, True, False, DDX_BC)
+       
        # Evaluate the function with different options
        if profile == 1:
               # Kaiser bell curve
               ht = h0 * sin2Dom
               # Take the derivative
-              fsp = CubicSpline(xh, ht, bc_type='clamped')
-              dhdx = fsp(xh, 1)
+              dhdx = DDX_CS @ ht
        elif profile == 2:
               # Schar mountain with analytical slope
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
@@ -75,8 +76,7 @@ def computeTopographyOnGrid(REFS, opt):
               ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps)
               ht = hf * h0 * sin2Dom * ht2
               # Take the derivative
-              fsp = CubicSpline(xh, ht, bc_type='clamped')
-              dhdx = fsp(xh, 1)
+              dhdx = DDX_CS @ ht
        elif profile == 4:
               # General even power exponential times a polynomial series
               ht = np.zeros(len(xh))

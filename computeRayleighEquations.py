@@ -12,8 +12,6 @@ Works the old fashioned way with lots of nested loops... so sue me!
 import math as mt
 import numpy as np
 import scipy.sparse as sps
-#from matplotlib import cm
-#import matplotlib.pyplot as plt
 
 def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
@@ -49,24 +47,32 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      if applyLateral:
                             # Left layer or right layer or not? [1 0]
                             if XRL >= dLayerR:
-                                   dNormX = (L2 - XRL) / width
+                                   dNormX = (L2 - XRL) / width - 0.5
+                                   # Evaluate the Rayleigh factor
+                                   #RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
+                                   RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
                             elif XRL <= dLayerL:
-                                   dNormX = (XRL - L1) / width
+                                   dNormX = (XRL - L1) / width - 0.5
+                                   # Evaluate the Rayleigh factor
+                                   #RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
+                                   RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
                             else:
                                    dNormX = 1.0
-                            # Evaluate the Rayleigh factor
-                            RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
+                                   RFX = 0.0
                      else:
                             RFX = 0.0
                      if applyTop:
                             # In the top layer?
                             if ZRL >= dLayerZ[jj]:
                                    # This maps [depth ZH] to [1 0]
-                                   dNormZ = (ZH - ZRL) / depth[jj]
+                                   dNormZ = (ZH - ZRL) / depth[jj] - 0.5
+                                   
+                                   # Evaluate the strength of the field
+                                   #RFZ = 1.0 - (mt.sin(0.5 * mt.pi * dNormZ))**RP
+                                   RFZ = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormZ))**RP)
                             else:
                                    dNormZ = 1.0
-                            # Evaluate the strength of the field
-                            RFZ = 1.0 - (mt.sin(0.5 * mt.pi * dNormZ))**RP
+                                   RFZ = 0.0
                      else:
                             RFZ = 0.0
                      
@@ -76,6 +82,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      RL[ii,jj] = np.amax([RFX, RFZ])
        
        '''
+       from matplotlib import cm
+       import matplotlib.pyplot as plt
        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
        ax.plot_surface(X, Z, RL, cmap=cm.seismic,
                        linewidth=0, antialiased=False)

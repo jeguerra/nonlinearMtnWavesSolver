@@ -116,7 +116,7 @@ h0 = 2500.0
 aC = 5000.0
 lC = 2.0 * mt.pi * 1.0E3
 kC = 1.5E+4
-HOPT = [h0, aC, lC, kC, False, 3]
+HOPT = [h0, aC, lC, kC, False, 2]
 
 DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 
@@ -157,8 +157,8 @@ plt.legend()
 
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.semilogy(xv, np.abs(DYD_SPT - dHdX), 'r--', label='Spectral Derivative')
-plt.semilogy(xv, np.abs(DYD_CS - dHdX), 'gs-', label='CS Derivative Error')
-plt.semilogy(xv, np.abs(DYD_QS - dHdX), 'bs-', label='QS Derivative Error')
+plt.semilogy(xv, np.abs(DYD_CS - dHdX), 'bs-', label='CS Derivative Error')
+plt.semilogy(xv, np.abs(DYD_QS - dHdX), 'gs-', label='QS Derivative Error')
 plt.grid(visible=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeErrorTestX.png")
@@ -198,11 +198,14 @@ DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 10)
 DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD1)
 DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD2)
 
+DDZ_AV = 0.5 * (DDZ_CFD3 + DDZ_QS)
+
 # Compute eigenspectra
 W1 = scl.eigvals(DDZ_CFD1)
 W2 = scl.eigvals(DDZ_CFD2)
 W3 = scl.eigvals(DDZ_CS)
 W4 = scl.eigvals(DDZ_QS)
+W5 = scl.eigvals(DDZ_AV)
 W6 = scl.eigvals(ZH * DDZ_LG)
 W7 = scl.eigvals(ZH * DDZ_CH)
 
@@ -211,6 +214,7 @@ plt.plot(np.real(W1), np.imag(W1), 'o', label='Compact FD4')
 plt.plot(np.real(W2), np.imag(W2), 'o', label='Compact FD6')
 plt.plot(np.real(W3), np.imag(W3), 'o', label='Cubic Spline') 
 plt.plot(np.real(W4), np.imag(W4), 'o', label='Quintic Clamped')
+plt.plot(np.real(W5), np.imag(W5), 'o', label='Average Derivative')
 plt.plot(np.real(W6), np.imag(W6), 'o', label='Legendre') 
 plt.plot(np.real(W7), np.imag(W7), 'o', label='Chebyshev')
 plt.grid(visible=True, which='both', axis='both')
@@ -241,6 +245,7 @@ DYD4 = DDZ_CS.dot(Y)
 DYD5 = DDZ_QS.dot(Y)
 DYD6 = ZH * DDZ_CH.dot(Y)
 DYD7 = ZH * DDZ_LG.dot(YL)
+DYD8 = DDZ_AV.dot(Y)
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(zv, Y, label='Function')
 plt.plot(zv, DY, 'r-', label='Analytical Derivative')
@@ -251,6 +256,7 @@ plt.plot(zv, DYD4, 'md--', label='Cubic Spline 1st Derivative')
 plt.plot(zv, DYD5, 'c+--', label='Quintic Spline 1st Derivative')
 plt.plot(zv, DYD6, 'rs--', label='Chebyshev Derivative')
 plt.plot(zvl, DYD7, 'ks--', label='Legendre Derivative')
+plt.plot(zv, DYD8, 'yh--', label='Averaged 1st Derivative')
 plt.xlabel('Domain')
 plt.ylabel('Functions')
 plt.title('Compact Finite Difference Derivative Test')
@@ -265,6 +271,7 @@ plt.semilogy(zv, np.abs(DYD4 - DY), 'md--', label='Cubic Spline Error')
 plt.semilogy(zv, np.abs(DYD5 - DY), 'c+--', label='Quintic Spline Error')
 plt.semilogy(zv, np.abs(DYD6 - DY), 'rs--', label='Chebyshev Spectral Error')
 plt.semilogy(zv, np.abs(DYD7 - DYL), 'ks--', label='Legendre Spectral Error')
+plt.semilogy(zv, np.abs(DYD8 - DY), 'yh--', label='Averaged Error')
 plt.xlabel('Domain')
 plt.ylabel('Error Magnitude')
 plt.title('Compact Finite Difference Derivative Test')

@@ -23,7 +23,7 @@ def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
        return sol
 
 def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
-       
+              
        for vv in range(4):
               if len(zeroDex[vv]) > 0:
                      DqDt[zeroDex[vv],vv] = 0.0
@@ -65,10 +65,19 @@ def computeRdT(q, RdT_bar, kap):
                      
        return RdT, T_ratio
 
-def computeFieldDerivatives(q, DDX, DDZ):
+def computeFieldDerivatives(q, DDX, DDZ, verticalStagger):
+       
+       if verticalStagger:
+              qs = np.reshape(q, (4 * q.shape[0], 1), order='F')
               
-       DqDx = DDX.dot(q)
-       DqDz = DDZ.dot(q)
+              DqDx = DDX.dot(q)
+              DqDz = DDZ.dot(qs)
+              
+              #DqDx = np.reshape(DqDx, q.shape, order='F')
+              DqDz = np.reshape(DqDz, q.shape, order='F')
+       else:
+              DqDx = DDX.dot(q)
+              DqDz = DDZ.dot(q)
        
        return DqDx, DqDz
 
@@ -84,10 +93,10 @@ def computeFieldDerivativeStag(q, DDX, DDZ):
                 
        return DqDx, DqDz
 
-def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, REFG, DCF):
+def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS):
        
        vd = np.hstack((PqPx, PqPz))
-       pvpx, dvdz = computeFieldDerivatives(vd, DDX, DDZ)
+       pvpx, dvdz = computeFieldDerivatives(vd, DDX, DDZ, False)
        
        P2qPx2 = pvpx[:,0:4]
        P2qPz2 = dvdz[:,4:] 
@@ -114,10 +123,7 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
        Q = fields + hydroState
        
        # Compute the updated RHS
-       if vertStagger:
-              PqPx, DqDz = computeFieldDerivativeStag(fields, DDX, DDZ)
-       else:
-              PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ)
+       PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ, vertStagger)
               
        if not isTFOpX:
               PqPx -= REFS[15] * DqDz
@@ -447,9 +453,12 @@ def computeRayleighTendency(REFG, fields):
 
 def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
        
-       #dhdx = REFS[6][0]
+       dhdx = REFS[6][0]
        S = DLD[4]
        dS2 = DLD[5]
+       
+       DDX = REFS[16]
+       SB = np.expand_dims(S, axis=1)
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]
@@ -458,8 +467,8 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
        
        DC1 = DCF[0] # coefficient to the X direction flux
        DC2 = DCF[1] # coefficient to the Z direction flux
-       mu_xb = DC1[bdex,:]
-       mu_xt = DC1[tdex,:] 
+       mu_xb = np.expand_dims(dS2, axis=1) * DC1[bdex,:]
+       mu_xt = 1.0 * DC1[tdex,:] 
        
        if isFluxDiv:
               #%% INTERIOR DIFFUSION
@@ -473,29 +482,15 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
               DqDt[tdex,0] = P2qPx2[tdex,0]
-              DqDt[tdex,1] = 0.0
+              DqDt[tdex,1] = P2qPx2[tdex,1]
               DqDt[tdex,2] = P2qPx2[tdex,2]
               DqDt[tdex,3] = P2qPx2[tdex,3]
               
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
               
-              # Compute directional derivatives
-              DDX = REFS[16]
-              SB = np.expand_dims(S, axis=1)
-              ISB = np.reciprocal(SB)
-              
               # On scalars
-              dqda = 1.0 * mu_xb * (DDX @ q[bdex,:])
+              dqda = mu_xb * SB * (DDX @ q[bdex,:])
               d2qda2 = SB * (DDX @ dqda)
-              
-              # On velocity
-              duda = 1.0 * mu_xb * (DDX @ (ISB * q[bdex,:]))
-              d2uda2 = SB * (DDX @ duda)
-       
-              DqDt[bdex,0] = d2uda2[:,0]
-              DqDt[bdex,1] = 0.0
-              DqDt[bdex,2] = d2qda2[:,2]
-              DqDt[bdex,3] = d2qda2[:,3]
        else:              
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
@@ -513,18 +508,17 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
               DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
        
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              
-              # Compute directional derivatives
-              DDX = REFS[16]
-              SB = np.expand_dims(S, axis=1)
+
+              # On scalars
               dqda = SB * (DDX @ q[bdex,:])
-              d2qda2 = 1.0 * (DDX @ dqda)
+              d2qda2 = mu_xb * SB * (DDX @ dqda)
+          
+       # Apply tendencies
+       DqDt[bdex,0] = d2qda2[:,0]
+       DqDt[bdex,1] = 0.0
+       DqDt[bdex,2] = d2qda2[:,2]
+       DqDt[bdex,3] = d2qda2[:,3]
        
-              DqDt[bdex,0] = mu_xb[:,0] * d2qda2[:,0]
-              DqDt[bdex,1] = 0.0
-              DqDt[bdex,2] = mu_xb[:,2] * d2qda2[:,2]
-              DqDt[bdex,3] = mu_xb[:,3] * d2qda2[:,3]
-              
        # Scale and apply coefficients
        DqDt[:,3] *= 0.71 / 0.4
 
