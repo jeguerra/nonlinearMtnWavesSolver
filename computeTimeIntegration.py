@@ -305,8 +305,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
        
-       #state = solB + init0
+       state = solB + init0
        res = (solB - sol0) / DT - rhs
-       dcf = rescf.computeResidualViscCoeffs(DIMS, res, solB, DLD, bdex, filteredCoeffs)
+       dcf = rescf.computeResidualViscCoeffs(DIMS, res, state, DLD, bdex, filteredCoeffs)
        
        return solB, rhs, res, dcf

@@ -426,7 +426,9 @@ def runModel(TestName):
               useGuellrich = True
               useUniformSt = False
        else:
-              RSBops = True # Turn off PyRSB SpMV
+              RSBops = False # Turn off PyRSB SpMV
+              
+       if RSBops:
               from rsb import rsb_matrix
        
        # Set the grid type
@@ -1120,8 +1122,12 @@ def runModel(TestName):
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
               
-              PPXM = rsb_matrix(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
-              PPZM = rsb_matrix(DDZMS_CS)
+              if RSBops:
+                  PPXM = rsb_matrix(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
+                  PPZM = rsb_matrix(DDZMS_CS)
+              else:
+                  PPXM = sps.bsr_array(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
+                  PPZM = sps.bsr_array(DDZMS_CS)
               
               # Initialize the perturbations
               if thisTime == 0.0:
