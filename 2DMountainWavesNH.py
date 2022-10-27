@@ -1126,8 +1126,8 @@ def runModel(TestName):
                   PPXM = rsb_matrix(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
                   PPZM = rsb_matrix(DDZMS_CS)
               else:
-                  PPXM = sps.bsr_array(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
-                  PPZM = sps.bsr_array(DDZMS_CS)
+                  PPXM = sps.csr_array(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
+                  PPZM = sps.csr_array(DDZMS_CS)
               
               # Initialize the perturbations
               if thisTime == 0.0:
