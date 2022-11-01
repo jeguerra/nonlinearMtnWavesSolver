@@ -500,7 +500,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -20
+              rdex = -10
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -858,14 +858,14 @@ def runModel(TestName):
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)                     
 
               # Create a container for these quantities
-              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex)
-              '''
+              #DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex)
+              #'''
               ls = 1.0
               DLD = (np.reshape(ls*DXM, (OPS,), order='F'), 
                      DL2, 
                      np.reshape(np.power(ls*DXM,2), (OPS,1), order='F'),
-                     DL2**2, S, dS2, DAM, fltDex)
-              '''
+                     DL2**2, S, dS, DAM, fltDex)
+              #'''
        # Get memory back
        del(DDXMS1); del(DDZMS1)
        del(DDXMS_CFD); del(DDZMS_CFD)

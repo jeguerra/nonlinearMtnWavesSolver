@@ -270,7 +270,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        state = solB + init0
        # Compute the residual using the average RHS over the time increment
-       res = (solB - sol0) / DT - rhsAvg
+       res = rhs0 - rhsAvg
        dcf = rescf.computeResidualViscCoeffs(DIMS, state, rhsAvg, res, DLD, bdex, filteredCoeffs)
        
        return solB, rhsAvg, res, dcf
