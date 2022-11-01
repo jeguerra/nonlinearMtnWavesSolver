@@ -169,7 +169,7 @@ class TestCase:
               DT = 0.05 # seconds
               HR = 4.0 # hours              
               DTF = 0.75 # scale time step              
-              intMethodOrder = 4
+              intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 5.0 # Time for diagnostic output
