@@ -66,17 +66,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               stateA = solA + init0
               rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA, stateA[:,0], stateA[:,1], ebcDex)
               rhsAdv = tendency.enforceTendencyBC(rhsAdv, zeroDex, ebcDex, dhdx)
-              
-              # Apply update
-              solB = sol2Update + DF * rhsAdv
                      
               # Compute internal force update
-              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solB, ebcDex)
+              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA, ebcDex)
               rhsIfc = tendency.enforceTendencyBC(rhsIfc, zeroDex, ebcDex, dhdx)
-              # Apply update
-              solB += 1.0 * DF * rhsIfc
 
-              #%% Update the diffusion coefficients
+              # Store the dynamic RHS
               rhsDyn = (rhsAdv + rhsIfc)
               
               #%% Compute diffusive update
@@ -93,7 +88,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
               # Apply update
-              solB += DF * rhsDif
+              solB = sol2Update + DF * (rhsDyn + rhsDif)
               
               # Apply Rayleigh damping layer implicitly
               RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
@@ -270,7 +265,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        state = solB + init0
        # Compute the residual using the average RHS over the time increment
-       res = rhs0 - rhsAvg
+       res = rhsAvg - rhs0
        dcf = rescf.computeResidualViscCoeffs(DIMS, state, rhsAvg, res, DLD, bdex, filteredCoeffs)
        
        return solB, rhsAvg, res, dcf

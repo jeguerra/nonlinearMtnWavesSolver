@@ -835,8 +835,8 @@ def runModel(TestName):
               DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
               print('Uniform grid lengths:',DX_wav,DZ_wav)
               
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
+              DL1 = 1.0 * DX_max
+              DL2 = 1.0 * DZ_max
               DLR = mt.sqrt(DL1 * DL2)
                      
               dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
@@ -1151,21 +1151,8 @@ def runModel(TestName):
                      
                      fields[:,3] = np.reshape(LPTF, (OPS,), order='F')
                      '''
-              # Initialize local sound speed and time step
-              #'''
-              RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
-              VSND = np.sqrt(PHYS[6] * RdT)
-              VFLW = np.sqrt(np.power(fields[:,0] + hydroState[:,0], 2.0) + np.power(fields[:,1], 2.0))
-              VWAV_max = bn.nanmax(VSND + VFLW)
-              TOPT[0] = DTF * DLS / VWAV_max
-              print('Initial time step by sound speed: ', str(DLS / VWAV_max) + ' (sec)')
-              print('Time stepper order: ', str(TOPT[3]))
-              print('Time step factor: ', str(DTF))
               
-              OTI = int(TOPT[5] / TOPT[0])
-              ITI = int(TOPT[6] / TOPT[0])
-              #'''
-              
+              # Initialize fields
               ti = 0; ff = 0
               rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
                                                          PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
@@ -1174,6 +1161,19 @@ def runModel(TestName):
               resVec = np.copy(rhsVec)
               state = fields + hydroState
               error = [np.linalg.norm(rhsVec)]
+              
+              # Initialize local sound speed and time step
+              RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
+              VSND = np.sqrt(PHYS[6] * RdT)
+              VFLW = np.sqrt(bn.ss(state[:,0:2], axis=1))
+              VWAV_max = bn.nanmax(VSND + VFLW)
+              TOPT[0] = DTF * DLS / VWAV_max
+              print('Initial time step by sound speed: ', str(DLS / VWAV_max) + ' (sec)')
+              print('Time stepper order: ', str(TOPT[3]))
+              print('Time step factor: ', str(DTF))
+              
+              OTI = int(TOPT[5] / TOPT[0])
+              ITI = int(TOPT[6] / TOPT[0])
               
               # Initialize damping coefficients
               DCF = rescf.computeResidualViscCoeffs(DIMS, fields0 + hydroState, rhsVec0, resVec, DLD, ebcDex[2], filteredCoeffs)
