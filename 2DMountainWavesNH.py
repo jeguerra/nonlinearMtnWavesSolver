@@ -480,7 +480,7 @@ def runModel(TestName):
        else:
               print('Legendre spectral derivative in the vertical.')
        
-       verticalStagger = False
+       verticalStagger = True
        if verticalStagger:
               useGuellrich = True
               useUniformSt = False
@@ -839,7 +839,8 @@ def runModel(TestName):
               DL2 = 1.0 * DZ_avg
               DLR = mt.sqrt(DL1 * DL2)
                      
-              dS2 = 1.0 + np.power(REFS[6][0],2)
+              dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
+              dS = np.sqrt(dS2)
               S2 = np.reciprocal(dS2)
               S = np.sqrt(S2)
               DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
@@ -857,7 +858,7 @@ def runModel(TestName):
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)                     
 
               # Create a container for these quantities
-              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS2, DAM, fltDex)
+              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex)
               '''
               ls = 1.0
               DLD = (np.reshape(ls*DXM, (OPS,), order='F'), 
@@ -1175,7 +1176,7 @@ def runModel(TestName):
               error = [np.linalg.norm(rhsVec)]
               
               # Initialize damping coefficients
-              DCF = rescf.computeResidualViscCoeffs(DIMS, rhsVec0, fields0, DLD, ebcDex[2], filteredCoeffs)
+              DCF = rescf.computeResidualViscCoeffs(DIMS, fields0 + hydroState, rhsVec0, resVec, DLD, ebcDex[2], filteredCoeffs)
               
               while thisTime <= TOPT[4]:
                              

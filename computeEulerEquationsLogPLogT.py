@@ -450,10 +450,9 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
        
        dhdx = REFS[6][0]
        S = DLD[4]
-       dS2 = DLD[5]
+       dS = DLD[5]
        
        DDX = REFS[16]
-       SB = np.expand_dims(S, axis=1)
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]
@@ -462,7 +461,7 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
        
        DC1 = DCF[0] # coefficient to the X direction flux
        DC2 = DCF[1] # coefficient to the Z direction flux
-       mu_xb = np.expand_dims(dS2, axis=1) * DC1[bdex,:]
+       mu_xb = dS * DC1[bdex,:]
        mu_xt = 1.0 * DC1[tdex,:] 
        
        if isFluxDiv:
@@ -484,8 +483,8 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
               
               # On scalars
-              dqda = mu_xb * SB * (DDX @ q[bdex,:])
-              d2qda2 = SB * (DDX @ dqda)
+              dqda = mu_xb * S * (DDX @ q[bdex,:])
+              d2qda2 = S * (DDX @ dqda)
        else:              
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
@@ -505,8 +504,8 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
 
               # On scalars
-              dqda = SB * (DDX @ q[bdex,:])
-              d2qda2 = mu_xb * SB * (DDX @ dqda)
+              dqda = S * (DDX @ q[bdex,:])
+              d2qda2 = mu_xb * S * (DDX @ dqda)
           
        # Apply tendencies
        DqDt[bdex,0] = d2qda2[:,0]
