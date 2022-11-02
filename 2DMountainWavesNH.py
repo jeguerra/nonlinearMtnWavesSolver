@@ -833,11 +833,7 @@ def runModel(TestName):
               print('Maximum grid lengths:',DX_max,DZ_max)
               DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
               DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
-              print('Uniform grid lengths:',DX_wav,DZ_wav)
-              
-              DL1 = 1.0 * DX_max
-              DL2 = 1.0 * DZ_max
-              DLR = mt.sqrt(DL1 * DL2)
+              print('Uniform grid lengths (m):',DX_wav,DZ_wav)
                      
               dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
               dS = np.sqrt(dS2)
@@ -845,8 +841,6 @@ def runModel(TestName):
               S = np.sqrt(S2)
               DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
               DX = DX_min
-              
-              print('Diffusion lengths: ', DL1, DL2)
                             
               # Smallest physical grid spacing in the 2D mesh
               DLS = min(DX, DZ)
@@ -855,7 +849,11 @@ def runModel(TestName):
               DAM = 1.0 / (abs(DIMS[1] - DIMS[0]) * DIMS[2]) * np.reshape(DXM * DZM, (1,OPS), order='F')
               
               # Compute filtering regions
-              fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)                     
+              DL1 = 1.0 * DX_max
+              DL2 = 1.0 * DZ_max
+              DLR = mt.sqrt(DL1 * DL2)
+              fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
+              print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)                     
 
               # Create a container for these quantities
               #DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex)

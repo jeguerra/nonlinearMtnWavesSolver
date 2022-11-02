@@ -24,7 +24,7 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        UD = np.abs(state[:,0]); UD[UD < 1.0E-16] = 0.0
        WD = np.abs(state[:,1]); WD[WD < 1.0E-16] = 0.0
        # Compute flow speed along terrain
-       #VD = np.sqrt(bn.ss(state[:,0:2], axis=1))
+       VD = np.sqrt(bn.ss(state[:,0:2], axis=1))
        
        # Compute absolute value of residuals
        ARES = np.abs(RES)
@@ -37,10 +37,6 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        CRES = bn.nanmax(NARES, axis=1)
        #CRES = bn.nanmean(NARES, axis=1) + bn.nanstd(NARES, axis=1)
        
-       # Apply flow acceleration dependence at the boundary
-       #RHSB = bn.nanmax(np.abs(RHS[bdex]), axis=1)
-       CRES[bdex] = 1.0 / bn.nanmax(UD) * UD[bdex]
-       
        if applyFilter:
               nbrDex = DLD[-1] # List of lists of indices to regions
        
@@ -48,9 +44,9 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
               CRESL = [bn.nanmax(CRES[reg]) for reg in nbrDex]
               CRES = np.array(CRESL)
        
-       # Interior flow speed coefficients
-       QMAX1 = 0.5 * DLD[0] * UD
-       QMAX2 = 0.5 * DLD[1] * WD
+       # Upper bound flow speed coefficients
+       QMAX1 = 0.5 * DLD[0] * UD; #QMAX1[bdex] = 0.5 * DLD[0][bdex] * VD[bdex]
+       QMAX2 = 0.5 * DLD[1] * WD; #QMAX2[bdex] = 0.5 * DLD[1] * VD[bdex]
        
        # Max norm of the limit coefficients
        QB1 = bn.nanmax(QMAX1)
