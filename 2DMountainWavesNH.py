@@ -68,9 +68,6 @@ schurName = localDir + 'SchurOps'
 fname2Restart = 'Simulation2Restart.nc'
 fname4Restart = 'SimulationTemp.nc'
 
-#import pnumpy as pnp
-#pnp.enable()
-
 def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
        
        # Make a figure of the temperature background
@@ -769,7 +766,7 @@ def runModel(TestName):
        if HermFunc:
               DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
-              DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+              DDXM_OP = DDXMS_QS# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
               
        #plt.plot(xi_lg, xi_lg, 'ko', xi_ch, xi_ch, 'ks')
        #plt.show()
@@ -851,7 +848,7 @@ def runModel(TestName):
               # Compute filtering regions
               DL1 = 1.0 * DX_max
               DL2 = 1.0 * DZ_max
-              DLR = mt.sqrt(DL1 * DL2)
+              DLR = mt.sqrt(DL1**2 + DL2**2)
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)                     
 
@@ -861,7 +858,7 @@ def runModel(TestName):
               ls = 1.0
               DLD = (np.reshape(ls*DXM, (OPS,), order='F'), 
                      DL2, 
-                     np.reshape(np.power(ls*DXM,2), (OPS,1), order='F'),
+                     np.reshape(np.power(ls*DXM,2), (OPS,), order='F'),
                      DL2**2, S, dS, DAM, fltDex)
               #'''
        # Get memory back
@@ -1174,7 +1171,8 @@ def runModel(TestName):
               ITI = int(TOPT[6] / TOPT[0])
               
               # Initialize damping coefficients
-              DCF = rescf.computeResidualViscCoeffs(DIMS, fields0 + hydroState, rhsVec0, resVec, DLD, ebcDex[2], filteredCoeffs)
+              state = fields0 + hydroState
+              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, rhsVec, resVec, DLD, ebcDex[2], filteredCoeffs)
               
               while thisTime <= TOPT[4]:
                              

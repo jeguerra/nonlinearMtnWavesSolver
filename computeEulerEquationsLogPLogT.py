@@ -33,7 +33,7 @@ def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
        DqDt[bdex,1] = dhdx * DqDt[bdex,0]
        
        for vv in range(4):
-              DqDt[:,vv][np.abs(DqDt[:,vv]) < 1.0E-16] = 0.0
+              DqDt[:,vv][np.abs(DqDt[:,vv]) <= 1.0E-16] = 0.0
        
        return DqDt
 
@@ -446,7 +446,10 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
+def computeDiffusionTendency(dqdx, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
+       
+       # Change floating point errors
+       np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
        
        dhdx = REFS[6][0]
        S = DLD[4]
@@ -483,7 +486,7 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
               
               # On scalars
-              dqda = mu_xb * S * (DDX @ q[bdex,:])
+              dqda = mu_xb * S * dqdx[bdex,:] #(DDX @ q[bdex,:])
               d2qda2 = S * (DDX @ dqda)
        else:              
               #%% INTERIOR DIFFUSION
@@ -504,7 +507,7 @@ def computeDiffusionTendency(q, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcD
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
 
               # On scalars
-              dqda = S * (DDX @ q[bdex,:])
+              dqda = S * dqdx[bdex,:] #(DDX @ q[bdex,:])
               d2qda2 = mu_xb * S * (DDX @ dqda)
           
        # Apply tendencies

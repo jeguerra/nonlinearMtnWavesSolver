@@ -60,7 +60,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               DF = coeff * DT
               
               #%% First dynamics update
-              PqPxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
+              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
+              PqPxA = DqDxA - REFS[15] * DqDzA
                                    
               # Compute advection update
               stateA = solA + init0
@@ -83,7 +84,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(PqPxA, DqDzA, DDXM_B, DDZM_B, REFS)
               
-              rhsDif = tendency.computeDiffusionTendency(solA, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+              rhsDif = tendency.computeDiffusionTendency(DqDxA, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
@@ -256,16 +257,16 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB, rhsAvg = ketcheson93(sol0)
+              solB, rhsB = ketcheson93(sol0)
        elif order == 4:
-              solB, rhsAvg = ketcheson104(sol0)
+              solB, rhsB = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
        
        state = solB + init0
        # Compute the residual using the average RHS over the time increment
-       res = (solB - sol0) / DT - 0.5 * (rhs0 + rhsAvg)
-       dcf = rescf.computeResidualViscCoeffs(DIMS, state, rhsAvg, res, DLD, bdex, filteredCoeffs)
+       res = (solB - sol0) / DT - rhsB
+       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsB, res, DLD, bdex, filteredCoeffs)
        
-       return solB, rhsAvg, res, dcf
+       return solB, rhsB, res, dcf
