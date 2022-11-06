@@ -60,8 +60,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               DF = coeff * DT
               
               #%% First dynamics update
-              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
-              PqPxA = DqDxA - REFS[15] * DqDzA
+              PqPxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
+              DqDxA = PqPxA + REFS[15] * DqDzA
                                    
               # Compute advection update
               stateA = solA + init0
@@ -111,19 +111,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                             sol = computeUpdate(c1, sol, sol)
                       
               return sol
-       
-       def ssprk32(sol):
-              rhs = np.copy(rhs0)
-              # Stage 1
-              sol1, rhs, res = computeUpdate(0.5, sol0, sol0, rhs)
-              # Stage 2
-              sol2, rhs, res = computeUpdate(0.5, sol1, sol1, rhs)
-              
-              # Stage 3
-              sol3 = 1.0 / 3.0 * sol + 2.0 / 3.0 * sol2
-              sol, rhs, res = computeUpdate(1.0 / 3.0, sol2, sol3, rhs)
-
-              return sol, rhs, res#, dcf
        
        def ssprk43(sol):
               rhs = 0.0
@@ -264,7 +251,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
        
+       # Compute the full state
        state = solB + init0
+              
+       # Enforce the kinematic BC to finish the update
+       solB = tendency.enforceEssentialBC(solB, state[:,0], zeroDex, ebcDex, dhdx)
+       
+       # Evaluate the finished RHS
+
        # Compute the residual using the average RHS over the time increment
        res = (solB - sol0) / DT - rhsB
        dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsB, res, DLD, bdex, filteredCoeffs)

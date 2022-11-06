@@ -110,8 +110,8 @@ def computeResidualViscCoeffs2(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
               CRES = np.array(CRESL)
        
        # Compute the anisotropic coefficients
-       QC1[:,1] = DLD[2] * CRES
-       QC2[:,1] = DLD[3] * CRES
+       QC1[:,1] = DLD[2] * CRES; #QC1[bdex,1] = QC1[bdex,0]
+       QC2[:,1] = DLD[3] * CRES; #QC2[bdex,1] = 0.0
        
        #%% LIMIT THE RESIDUAL COEFFICIENTS TO THE FLOW SPEED VALUES LOCALLY
        

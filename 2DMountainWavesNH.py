@@ -766,7 +766,7 @@ def runModel(TestName):
        if HermFunc:
               DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
-              DDXM_OP = DDXMS_QS# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+              DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
               
        #plt.plot(xi_lg, xi_lg, 'ko', xi_ch, xi_ch, 'ks')
        #plt.show()
