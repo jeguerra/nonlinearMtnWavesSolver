@@ -39,8 +39,9 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, rhs0, init0, DCF, zeroDex, ebcDex, \
+                              sol0, rhs0, res0, init0, DCF, zeroDex, ebcDex, \
                               filteredCoeffs, verticalStagger, diffusiveFlux):
+       
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
@@ -244,9 +245,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB, rhsB = ketcheson93(sol0)
+              solB, rhs = ketcheson93(sol0)
        elif order == 4:
-              solB, rhsB = ketcheson104(sol0)
+              solB, rhs = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
@@ -258,9 +259,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        solB = tendency.enforceEssentialBC(solB, state[:,0], zeroDex, ebcDex, dhdx)
        
        # Evaluate the finished RHS
+       rhsB, DqDx, DqDz = tendency.computeRHS(solB, init0, DDXM_B, DDZM_B, REFS[6][0], \
+                                                  PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
 
        # Compute the residual using the average RHS over the time increment
-       res = (solB - sol0) / DT - rhsB
-       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsB, res, DLD, bdex, filteredCoeffs)
+       np.seterr(all='ignore', divide='raise', over='raise', under='ignore', invalid='raise')
+       rhsAvg = 0.5 * (rhs0 + rhsB)
+       resB = (solB - sol0) / DT - rhsAvg
+       resAvg = 0.5 * (res0 + resB)
+       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsAvg, resAvg, DLD, bdex, filteredCoeffs)
        
-       return solB, rhsB, res, dcf
+       return solB, rhsB, resAvg, dcf

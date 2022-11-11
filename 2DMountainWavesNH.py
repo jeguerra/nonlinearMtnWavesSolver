@@ -773,11 +773,11 @@ def runModel(TestName):
        #input()
        
        #%% Prepare derivative operators for diffusion
-       PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
-       diffOps1 = (PPXMD, DDZMS_QS)
+       PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
+       diffOps1 = (PPXMD, DDZMS_CS)
        
        # Get the operator for the terrain diffusion
-       DDX_BC = np.copy(DDX_QS)
+       DDX_BC = np.copy(DDX_CS)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
@@ -1118,13 +1118,6 @@ def runModel(TestName):
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
               
-              if RSBops:
-                  PPXM = rsb_matrix(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
-                  PPZM = rsb_matrix(DDZMS_CS)
-              else:
-                  PPXM = sps.csr_array(DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS))
-                  PPZM = sps.csr_array(DDZMS_CS)
-              
               # Initialize the perturbations
               if thisTime == 0.0:
                      
@@ -1149,11 +1142,11 @@ def runModel(TestName):
               
               # Initialize fields
               ti = 0; ff = 0
-              rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, PPXM, PPZM, REFS[6][0], \
-                                                         PHYS, REFS, REFG, ebcDex, zeroDex, True, False, True)
+              rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
+                                                         PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
               fields0 = np.copy(fields)
               rhsVec0 = np.copy(rhsVec)
-              resVec = np.copy(rhsVec)
+              resVec0 = np.copy(rhsVec)
               state = fields + hydroState
               error = [np.linalg.norm(rhsVec)]
               
@@ -1195,15 +1188,15 @@ def runModel(TestName):
                      # Compute the solution within a time step
                      try:   
                             fields, rhsVec, resVec, DCF = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields0, rhsVec0, hydroState, DCF, \
-                                                                    zeroDex, ebcDex, filteredCoeffs, \
-                                                                    verticalStagger, diffusiveFlux)
+                                                                    DLD, TOPT, fields0, rhsVec0, resVec0, hydroState, DCF, \
+                                                                    zeroDex, ebcDex, filteredCoeffs, verticalStagger, diffusiveFlux)
                                    
                             ti += 1
                             thisTime += TOPT[0]
                             
                             fields0 = np.copy(fields)
                             rhsVec0 = np.copy(rhsVec)
+                            resVec0 = np.copy(resVec)
                             
                             # Compute a time step
                             try: 
