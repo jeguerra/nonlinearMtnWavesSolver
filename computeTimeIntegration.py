@@ -48,6 +48,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        RLM = REFG[4].data
        dhdx = REFS[6][0]
        bdex = ebcDex[2]
+       DQDZ = REFG[2]
        
        # Use multithreading on CPU
        DDXM_A = REFS[12][0]
@@ -56,7 +57,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        DDXM_B = REFS[13][0]
        DDZM_B = REFS[13][1]
        
-       def computeUpdate(coeff, solA, sol2Update, rhsA):
+       def computeUpdate(coeff, solA, sol2Update):
               
               DF = coeff * DT
               
@@ -116,15 +117,15 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        def ssprk43(sol):
               rhs = 0.0
               # Stage 1
-              sol1, rhs = computeUpdate(0.5, sol, sol, rhs)
+              sol1, rhs = computeUpdate(0.5, sol, sol)
               rhs += rhs
               # Stage 2
-              sol2, rhs = computeUpdate(0.5, sol1, sol1, rhs)
+              sol2, rhs = computeUpdate(0.5, sol1, sol1)
               rhs += rhs
               
               # Stage 3 from SSPRK32
               sols = 1.0 / 3.0 * sol + 2.0 / 3.0 * sol2
-              sol3, rhs = computeUpdate(1.0 / 3.0, sol2, sols, rhs)
+              sol3, rhs = computeUpdate(1.0 / 3.0, sol2, sols)
               rhs += rhs
               
               sols = 0.5 * (sol3 + sol)
@@ -133,31 +134,32 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #sol3, rhs, res = computeUpdate(1.0 / 6.0, sol2, sols, rhs)
               
               # Stage 4
-              sol4, rhs = computeUpdate(0.5, sols, sols, rhs)
+              sol4, rhs = computeUpdate(0.5, sols, sols)
               rhs += rhs
               
               res = sol4 - sol3
               rhsAvg = 0.25 * rhs
                                           
-              return sol4, rhs
+              return sol4, rhsAvg
        
        def ketcheson93(sol):
+              rhs = 0.0
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               
-              sol, rhs = computeUpdate(c1, sol, sol, 0.0)
+              sol, rhs = computeUpdate(c1, sol, sol)
               rhs += rhs
               sol1 = np.copy(sol)
               
               for ii in range(5):
-                     sol, rhs = computeUpdate(c1, sol, sol, rhs)
+                     sol, rhs = computeUpdate(c1, sol, sol)
                      rhs += rhs
                      
               # Compute stage 6* with linear combination
               sol = 0.6 * sol1 + 0.4 * sol
               
               for ii in range(3):
-                     sol, rhs = computeUpdate(c1, sol, sol, rhs)
+                     sol, rhs = computeUpdate(c1, sol, sol)
                      rhs += rhs
                      
               rhsAvg = 1.0/9.0 * rhs
@@ -172,18 +174,18 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               sol1 = np.copy(sol)
               sol2 = np.copy(sol)
               for ii in range(4):
-                     sol1, rhs = computeUpdate(c1, sol1, sol1, rhs)
+                     sol1, rhs = computeUpdate(c1, sol1, sol1)
                      rhs += rhs
               
               sol2 = 0.04 * sol2 + 0.36 * sol1
               sol1 = 15.0 * sol2 - 5.0 * sol1
               
               for ii in range(4):
-                     sol1, rhs = computeUpdate(c1, sol1, sol1, rhs)
+                     sol1, rhs = computeUpdate(c1, sol1, sol1)
                      rhs += rhs
                      
               sol = sol2 + 0.6 * sol1
-              sol, rhs = computeUpdate(0.1, sol1, sol, rhs)
+              sol, rhs = computeUpdate(0.1, sol1, sol)
               rhs += rhs
                             
               rhsAvg = 1.0/9.0 * rhs
@@ -245,9 +247,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB, rhs = ketcheson93(sol0)
+              solB, rhsAvg = ketcheson93(sol0)
        elif order == 4:
-              solB, rhs = ketcheson104(sol0)
+              solB, rhsAvg = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
@@ -259,14 +261,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        solB = tendency.enforceEssentialBC(solB, state[:,0], zeroDex, ebcDex, dhdx)
        
        # Evaluate the finished RHS
-       rhsB, DqDx, DqDz = tendency.computeRHS(solB, init0, DDXM_B, DDZM_B, REFS[6][0], \
-                                                  PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
+       #rhsB, DqDx, DqDz = tendency.computeRHS(solB, init0, DDXM_B, DDZM_B, REFS[6][0], \
+       #                                           PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
 
        # Compute the residual using the average RHS over the time increment
        np.seterr(all='ignore', divide='raise', over='raise', under='ignore', invalid='raise')
-       rhsAvg = 0.5 * (rhs0 + rhsB)
+       #rhsAvg = 0.5 * (rhs0 + rhsB)
        resB = (solB - sol0) / DT - rhsAvg
        resAvg = 0.5 * (res0 + resB)
        dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsAvg, resAvg, DLD, bdex, filteredCoeffs)
        
-       return solB, rhsB, resAvg, dcf
+       return solB, rhsAvg, resAvg, dcf

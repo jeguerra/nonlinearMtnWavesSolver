@@ -123,10 +123,10 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
-DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
-DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
+#DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
+DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, 0.0)
+#DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CS)
 
 DYD_CS = DDX_CS.dot(HofX)
 DYD_QS = DDX_QS.dot(HofX)
@@ -195,6 +195,7 @@ DDZ_CFD1 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 4)
 DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 6)
 DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 10)
 
+# Take boundary information from compact FD operators
 DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD1)
 DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD2)
 

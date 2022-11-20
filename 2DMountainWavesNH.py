@@ -17,11 +17,11 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 """
 # Set up the multithreading environment (physical cores only)
 import os
-os.environ["OMP_NUM_THREADS"] = "6"
-os.environ["OPENBLAS_NUM_THREADS"] = "6"
-os.environ["MKL_NUM_THREADS"] = "6"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "6"
-os.environ["NUMEXPR_NUM_THREADS"] = "6"
+os.environ["OMP_NUM_THREADS"] = "8"
+os.environ["OPENBLAS_NUM_THREADS"] = "8"
+os.environ["MKL_NUM_THREADS"] = "8"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "8"
+os.environ["NUMEXPR_NUM_THREADS"] = "8"
 
 import sys
 import time
@@ -742,11 +742,13 @@ def runModel(TestName):
               # Get the outer vertical derivative
               DDZ_O0, O_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
               DDZ_O1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiO, True, False, DDZ_O0)
+              #DDZ_O = 0.5 * (DDZ_O0 + DDZ_O1)
               
               # Get the inner vertical derivatie
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
               DDZ_I0, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
               DDZ_I1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiI, True, False, DDZ_I0)
+              #DDZ_I = 0.5 * (DDZ_I0 + DDZ_I1)
               
               O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
               I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
@@ -760,7 +762,6 @@ def runModel(TestName):
               DDZM_OP = sps.block_diag((DDZMO, DDZMI, DDZMO, DDZMI), format='csr')
        else:
               # Average the staggered operators
-              #DDZM_OP = 1.0 * DDZMS1
               DDZM_OP = 0.5 * (DDZMO + DDZMI)
               
        if HermFunc:
@@ -773,11 +774,11 @@ def runModel(TestName):
        #input()
        
        #%% Prepare derivative operators for diffusion
-       PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
-       diffOps1 = (PPXMD, DDZMS_CS)
+       PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+       diffOps1 = (PPXMD, DDZMS_QS)
        
        # Get the operator for the terrain diffusion
-       DDX_BC = np.copy(DDX_CS)
+       DDX_BC = np.copy(DDX_QS)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11

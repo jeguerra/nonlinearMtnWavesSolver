@@ -67,7 +67,7 @@ def computeRdT(q, RdT_bar, kap):
        return RdT, T_ratio
 
 def computeFieldDerivatives(q, DDX, DDZ, verticalStagger):
-       
+              
        if verticalStagger:
               qs = np.reshape(q, (4 * q.shape[0], 1), order='F')
               
@@ -85,7 +85,7 @@ def computeFieldDerivatives(q, DDX, DDZ, verticalStagger):
               
               DqDx = spk.dot_product_mkl(DDX, q)
               DqDz = spk.dot_product_mkl(DDZ, q)
-       
+              
        return DqDx, DqDz
 
 def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS):
@@ -415,8 +415,8 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        # Compute pressure gradient forces
        pgradx = RdT * PqPx[:,2]
        #pgradz = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
-       #pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))
+       pgradz = RdT * DqDz[:,2] - gc * T_ratio
+       #pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))
        
        DqDt = -(Uadvect + Wadvect)
        
