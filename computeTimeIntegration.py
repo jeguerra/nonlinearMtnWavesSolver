@@ -46,9 +46,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        order = TOPT[3]
        mu = REFG[3]
        RLM = REFG[4].data
+       
+       S = DLD[4]
        dhdx = REFS[6][0]
        bdex = ebcDex[2]
-       DQDZ = REFG[2]
+       SH = S * np.expand_dims(dhdx, axis=1)
        
        # Use multithreading on CPU
        DDXM_A = REFS[12][0]
@@ -63,7 +65,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% First dynamics update
               PqPxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
-              DqDxA = PqPxA + REFS[15] * DqDzA
                                    
               # Compute advection update
               stateA = solA + init0
@@ -78,15 +79,24 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsDyn = (rhsAdv + rhsIfc)
               
               #%% Compute diffusive update
+              
+              # Compute directional derivative along terrain
+              PqPxA[bdex,:] += SH * DqDzA[bdex,:]
+              
               if diffusiveFlux:
                      PqPxA *= DCF[0]
                      DqDzA *= DCF[1]
                             
-              # Compute diffusive tendency
+              # Compute derivatives of diffusive flux
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
               tendency.computeFieldDerivatives2(PqPxA, DqDzA, DDXM_B, DDZM_B, REFS)
               
-              rhsDif = tendency.computeDiffusionTendency(DqDxA, P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
+              # Second directional derivatives (of the diffusive fluxes)
+              P2qPx2[bdex,:] += SH * P2qPxz[bdex,:]
+              P2qPzx[bdex,:] += SH * P2qPz2[bdex,:]
+              
+              # Compute diffusive tendencies
+              rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
@@ -260,15 +270,10 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        # Enforce the kinematic BC to finish the update
        solB = tendency.enforceEssentialBC(solB, state[:,0], zeroDex, ebcDex, dhdx)
        
-       # Evaluate the finished RHS
-       #rhsB, DqDx, DqDz = tendency.computeRHS(solB, init0, DDXM_B, DDZM_B, REFS[6][0], \
-       #                                           PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
-
        # Compute the residual using the average RHS over the time increment
        np.seterr(all='ignore', divide='raise', over='raise', under='ignore', invalid='raise')
-       #rhsAvg = 0.5 * (rhs0 + rhsB)
        resB = (solB - sol0) / DT - rhsAvg
        resAvg = 0.5 * (res0 + resB)
-       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsAvg, resAvg, DLD, bdex, filteredCoeffs)
+       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, resAvg, DLD, bdex, filteredCoeffs)
        
        return solB, rhsAvg, resAvg, dcf

@@ -1166,7 +1166,7 @@ def runModel(TestName):
               
               # Initialize damping coefficients
               state = fields0 + hydroState
-              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, rhsVec, resVec, DLD, ebcDex[2], filteredCoeffs)
+              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, resVec, DLD, ebcDex[2], filteredCoeffs)
               
               while thisTime <= TOPT[4]:
                              

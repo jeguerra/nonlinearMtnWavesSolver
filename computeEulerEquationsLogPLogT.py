@@ -446,17 +446,12 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-def computeDiffusionTendency(dqdx, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
+def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
        
        # Change floating point errors
        np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
        
-       dhdx = REFS[6][0]
-       S = DLD[4]
-       dS = DLD[5]
-       
-       DDX = REFS[16]
-       
+       dS = DLD[5]       
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
@@ -479,15 +474,15 @@ def computeDiffusionTendency(dqdx, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, e
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
               DqDt[tdex,0] = P2qPx2[tdex,0]
-              DqDt[tdex,1] = P2qPx2[tdex,1]
+              DqDt[tdex,1] = 0.0
               DqDt[tdex,2] = P2qPx2[tdex,2]
               DqDt[tdex,3] = P2qPx2[tdex,3]
               
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              
-              # On scalars
-              dqda = mu_xb * S * dqdx[bdex,:] #(DDX @ q[bdex,:])
-              d2qda2 = S * (DDX @ dqda)
+              DqDt[bdex,0] = P2qPx2[bdex,0]
+              DqDt[bdex,1] = 0.0
+              DqDt[bdex,2] = P2qPx2[bdex,2]
+              DqDt[bdex,3] = P2qPx2[bdex,3]
        else:              
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
@@ -505,16 +500,10 @@ def computeDiffusionTendency(dqdx, P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, e
               DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
        
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-
-              # On scalars
-              dqda = S * dqdx[bdex,:] #(DDX @ q[bdex,:])
-              d2qda2 = mu_xb * S * (DDX @ dqda)
-          
-       # Apply tendencies
-       DqDt[bdex,0] = d2qda2[:,0]
-       DqDt[bdex,1] = 0.0
-       DqDt[bdex,2] = d2qda2[:,2]
-       DqDt[bdex,3] = d2qda2[:,3]
+              DqDt[bdex,0] = mu_xb[:,0] * P2qPx2[bdex,0]
+              DqDt[bdex,1] = 0.0
+              DqDt[bdex,2] = mu_xb[:,2] * P2qPx2[bdex,2]
+              DqDt[bdex,3] = mu_xb[:,3] * P2qPx2[bdex,3]
        
        # Scale and apply coefficients
        DqDt[:,3] *= 0.71 / 0.4

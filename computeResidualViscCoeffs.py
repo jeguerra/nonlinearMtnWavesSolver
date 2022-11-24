@@ -56,7 +56,7 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        
        return (CRES1, CRES2)
 
-def computeResidualViscCoeffs2(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
+def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, applyFilter):
        
        # Change floating point errors
        np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
@@ -86,7 +86,7 @@ def computeResidualViscCoeffs2(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
               QVL = [bn.nanmax(QC2[reg,0]) for reg in nbrDex]
               QC2[:,0] = np.array(QVL)
        
-       #%% RESIDUAL/RHS COEFFICIENTS
+       #%% COEFFICIENTS FIELD
        
        # Compute absolute value of residuals
        ARES = np.abs(RES)
