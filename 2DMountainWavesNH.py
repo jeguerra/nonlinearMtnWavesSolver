@@ -16,13 +16,14 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 @author: Jorge E. Guerra
 """
 # Set up the multithreading environment (physical cores only)
+'''
 import os
 os.environ["OMP_NUM_THREADS"] = "8"
 os.environ["OPENBLAS_NUM_THREADS"] = "8"
 os.environ["MKL_NUM_THREADS"] = "8"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "8"
 os.environ["NUMEXPR_NUM_THREADS"] = "8"
-
+'''
 import sys
 import time
 import shelve
@@ -742,13 +743,11 @@ def runModel(TestName):
               # Get the outer vertical derivative
               DDZ_O0, O_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
               DDZ_O1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiO, True, False, DDZ_O0)
-              #DDZ_O = 0.5 * (DDZ_O0 + DDZ_O1)
               
               # Get the inner vertical derivatie
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
               DDZ_I0, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
               DDZ_I1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiI, True, False, DDZ_I0)
-              #DDZ_I = 0.5 * (DDZ_I0 + DDZ_I1)
               
               O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
               I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
@@ -777,9 +776,6 @@ def runModel(TestName):
        PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
        diffOps1 = (PPXMD, DDZMS_QS)
        
-       # Get the operator for the terrain diffusion
-       DDX_BC = np.copy(DDX_QS)
-       
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
        
@@ -804,7 +800,6 @@ def runModel(TestName):
        # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
-       REFS.append(sps.csr_array(DDX_BC)) # index 16
        
        # Update REFG with the 2nd vertical derivative of backgrounds
        REFG.append(DDZMS1 @ DQDZ)
@@ -854,14 +849,14 @@ def runModel(TestName):
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)                     
 
               # Create a container for these quantities
-              #DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex)
-              #'''
+              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex)
+              '''
               ls = 1.0
               DLD = (np.reshape(ls*DXM, (OPS,), order='F'), 
                      DL2, 
                      np.reshape(np.power(ls*DXM,2), (OPS,), order='F'),
                      DL2**2, S, dS, DAM, fltDex)
-              #'''
+              '''
        # Get memory back
        del(DDXMS1); del(DDZMS1)
        del(DDXMS_CFD); del(DDZMS_CFD)

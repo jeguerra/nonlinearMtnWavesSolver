@@ -459,8 +459,8 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex,
        
        DC1 = DCF[0] # coefficient to the X direction flux
        DC2 = DCF[1] # coefficient to the Z direction flux
-       mu_xb = dS * DC1[bdex,:]
-       mu_xt = 1.0 * DC1[tdex,:] 
+       mu_xb = DC1[bdex,:]
+       mu_xt = DC1[tdex,:] 
        
        if isFluxDiv:
               #%% INTERIOR DIFFUSION
@@ -473,13 +473,13 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex,
                   
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = P2qPx2[tdex,0]
+              DqDt[tdex,0] = 2.0 * P2qPx2[tdex,0]
               DqDt[tdex,1] = 0.0
               DqDt[tdex,2] = P2qPx2[tdex,2]
               DqDt[tdex,3] = P2qPx2[tdex,3]
               
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,0] = P2qPx2[bdex,0]
+              DqDt[bdex,0] = 2.0 * P2qPx2[bdex,0]
               DqDt[bdex,1] = 0.0
               DqDt[bdex,2] = P2qPx2[bdex,2]
               DqDt[bdex,3] = P2qPx2[bdex,3]
@@ -494,13 +494,13 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex,
                   
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = mu_xt[:,0] * P2qPx2[tdex,0]
+              DqDt[tdex,0] = 2.0 * mu_xt[:,0] * P2qPx2[tdex,0]
               DqDt[tdex,1] = 0.0
               DqDt[tdex,2] = mu_xt[:,2] * P2qPx2[tdex,2]
               DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
        
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,0] = mu_xb[:,0] * P2qPx2[bdex,0]
+              DqDt[bdex,0] = 2.0 * mu_xb[:,0] * P2qPx2[bdex,0]
               DqDt[bdex,1] = 0.0
               DqDt[bdex,2] = mu_xb[:,2] * P2qPx2[bdex,2]
               DqDt[bdex,3] = mu_xb[:,3] * P2qPx2[bdex,3]

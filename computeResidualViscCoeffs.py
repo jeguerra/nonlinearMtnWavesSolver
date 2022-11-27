@@ -73,7 +73,7 @@ def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, applyFilter):
        VD = np.sqrt(bn.ss(state[:,0:2], axis=1))
        
        # Upper bound flow speed coefficients
-       QC1[:,0] = 0.5 * DLD[0] * UD; QC1[bdex,0] = 0.5 * DLD[0][bdex] * VD[bdex]
+       QC1[:,0] = 0.5 * DLD[0] * UD; QC1[bdex,0] = 0.5 * DLD[0] * VD[bdex]
        QC2[:,0] = 0.5 * DLD[1] * WD; QC2[bdex,0] = 0.0
        
        # Apply a region filter
@@ -110,11 +110,10 @@ def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, applyFilter):
               CRES = np.array(CRESL)
        
        # Compute the anisotropic coefficients
-       QC1[:,1] = DLD[2] * CRES; #QC1[bdex,1] = QC1[bdex,0]
-       QC2[:,1] = DLD[3] * CRES; #QC2[bdex,1] = 0.0
+       QC1[:,1] = DLD[2] * CRES
+       QC2[:,1] = DLD[3] * CRES
        
        #%% LIMIT THE RESIDUAL COEFFICIENTS TO THE FLOW SPEED VALUES LOCALLY
-       
        CRES1 = np.expand_dims(bn.nanmin(QC1, axis=1), axis=1)
        CRES2 = np.expand_dims(bn.nanmin(QC2, axis=1), axis=1)
        
