@@ -46,6 +46,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        order = TOPT[3]
        mu = REFG[3]
        RLM = REFG[4].data
+       ldex = REFG[5]
        
        S = DLD[4]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
@@ -271,8 +272,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        # Compute the residual using the average RHS over the time increment
        np.seterr(all='ignore', divide='raise', over='raise', under='ignore', invalid='raise')
-       resB = (solB - sol0) / DT - rhsAvg
+       resB = rhsAvg - rhs0 #(solB - sol0) / DT - rhsAvg
        resAvg = 0.5 * (res0 + resB)
-       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsAvg, DLD, bdex, filteredCoeffs)
+       rhsAvg = 0.5 * (rhs0 + rhsAvg)
+       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsAvg, DLD, bdex, ldex, filteredCoeffs)
        
        return solB, rhsAvg, resAvg, dcf

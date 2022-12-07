@@ -22,7 +22,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        NX = DIMS[3] + 1
        NZ = DIMS[4] + 1
        
-       RP = 4
+       RP = 3.0
+       C2 = 5.0
        
        # Get REFS data
        X = REFS[4]
@@ -48,14 +49,22 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             # Left layer or right layer or not? [1 0]
                             if XRL >= dLayerR:
                                    dNormX = (L2 - XRL) / width - 0.5
-                                   # Evaluate the Rayleigh factor
-                                   #RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
-                                   RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
+                                   
+                                   if dNormX >= 0.0:
+                                          RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
+                                   elif dNormX <= 0.0:
+                                          #dNormX += 0.5
+                                          #RFX = 2.0 - (1.0 - mt.exp(C2 * (2.0 * dNormX - 1.0)**2) / (1.0 - mt.exp(C2)))
+                                          RFX = 1.0
                             elif XRL <= dLayerL:
                                    dNormX = (XRL - L1) / width - 0.5
-                                   # Evaluate the Rayleigh factor
-                                   #RFX = 1.0 - (mt.sin(0.5 * mt.pi * dNormX))**RP
-                                   RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
+                                   
+                                   if dNormX >= 0.0:
+                                          RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
+                                   elif dNormX <= 0.0:
+                                          #dNormX += 0.5
+                                          #RFX = 2.0 - (1.0 - mt.exp(C2 * (2.0 * dNormX - 1.0)**2) / (1.0 - mt.exp(C2)))
+                                          RFX = 1.0
                             else:
                                    dNormX = 1.0
                                    RFX = 0.0
@@ -67,19 +76,28 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    # This maps [depth ZH] to [1 0]
                                    dNormZ = (ZH - ZRL) / depth[jj] - 0.5
                                    
-                                   # Evaluate the strength of the field
-                                   #RFZ = 1.0 - (mt.sin(0.5 * mt.pi * dNormZ))**RP
-                                   RFZ = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormZ))**RP)
+                                   if dNormZ >= 0.0:
+                                          RFZ = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormZ))**RP)
+                                   elif dNormZ <= 0.0:
+                                          #RFZ = 2.0 - (1.0 - mt.exp(C2 * (2.0 * (dNormZ + 0.5) - 1.0)**2) / (1.0 - mt.exp(C2)))
+                                          RFZ = 1.0
+                                          
                             else:
                                    dNormZ = 1.0
                                    RFZ = 0.0
                      else:
                             RFZ = 0.0
+                            
+                     if RFX < 0.0:
+                            RFX = 0.0
+                            
+                     if RFZ < 0.0:
+                            RFZ = 0.0
                      
                      # Set the field to max(lateral, top) to handle corners
                      RLX[ii,jj] = RFX
                      RLZ[ii,jj] = RFZ
-                     RL[ii,jj] = np.amax([RFX, RFZ])
+                     RL[ii,jj] = np.amax([RFX, RFZ, mt.sqrt(RFX * RFZ)])
        
        '''
        from matplotlib import cm
@@ -199,8 +217,8 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, ebcDex):
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        # Get the indices for the layer regions
-       ldex = np.argwhere(tempDiagonal)
+       ldex = np.nonzero(tempDiagonal)
        
-       return ROPS, RLM, GML, ldex
+       return ROPS, RLM, GML, ldex[0]
        
                             

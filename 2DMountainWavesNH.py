@@ -16,14 +16,14 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 @author: Jorge E. Guerra
 """
 # Set up the multithreading environment (physical cores only)
-'''
+#'''
 import os
 os.environ["OMP_NUM_THREADS"] = "8"
 os.environ["OPENBLAS_NUM_THREADS"] = "8"
 os.environ["MKL_NUM_THREADS"] = "8"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "8"
 os.environ["NUMEXPR_NUM_THREADS"] = "8"
-'''
+#'''
 import sys
 import time
 import shelve
@@ -424,7 +424,7 @@ def runModel(TestName):
               useGuellrich = True
               useUniformSt = False
        else:
-              RSBops = False # Turn off PyRSB SpMV
+              RSBops = True # Turn off PyRSB SpMV
               
        if RSBops:
               from rsb import rsb_matrix
@@ -480,8 +480,8 @@ def runModel(TestName):
        
        verticalStagger = True
        if verticalStagger:
-              useGuellrich = True
-              useUniformSt = False
+              useGuellrich = False
+              useUniformSt = True
               print('Staggered spectral method in the vertical.')
        else:
               useGuellrich = True
@@ -595,8 +595,7 @@ def runModel(TestName):
        if HermFunc and not FourierLin:
               DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
        elif FourierLin and not HermFunc:
-              DDX_1D, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, 0.0)
-              #DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
+              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
               DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
               DDX_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
@@ -697,7 +696,7 @@ def runModel(TestName):
        ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ebcDex)
        
        # Make a collection for background field derivatives
-       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX.flatten()]
+       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX]
               
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
@@ -731,7 +730,26 @@ def runModel(TestName):
        DDXMS_CFD, DDZMS_CFD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZI = NZ + 1
+       NZI = NZ - 1
+       
+       if verticalChebGrid:
+              
+              xiI, whf = derv.leglb(NZI) #[-1 1]
+              xiO, whf = derv.cheblb(NZ) #[-1 1]
+              
+              TMO, dummy = derv.legpolym(NZI, xiO, True)
+              TMI, dummy = derv.chebpolym(NZ+1, xiI, True)
+              
+              # Get the inner vertical derivatie
+              DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
+              DDZ_I0, I_TRANS = derv.computeLegendreDerivativeMatrix(DIMS_ST)
+              
+              O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
+              I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
+              
+              DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
+              dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
+              
        if verticalLegdGrid:
               
               xiI, whf = derv.cheblb(NZI) #[-1 1]
@@ -740,35 +758,29 @@ def runModel(TestName):
               TMO = derv.chebpolym(NZI+1, xiO)
               TMI, dummy = derv.legpolym(NZ, xiI, True)
               
-              # Get the outer vertical derivative
-              DDZ_O0, O_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
-              DDZ_O1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiO, True, False, DDZ_O0)
-              
               # Get the inner vertical derivatie
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
               DDZ_I0, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
-              DDZ_I1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiI, True, False, DDZ_I0)
               
               O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
               I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
               
               DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
               dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
-              dummy, DDZMO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_O0)
               
        if verticalStagger:
               # Staggered vertical operator
-              DDZM_OP = sps.block_diag((DDZMO, DDZMI, DDZMO, DDZMI), format='csr')
+              DDZM_OP = sps.block_diag((DDZMS1, DDZMS1, DDZMI, DDZMI), format='csr')
        else:
               # Average the staggered operators
-              DDZM_OP = 0.5 * (DDZMO + DDZMI)
+              DDZM_OP = 0.5 * (DDZMS1 + DDZMI)
               
        if HermFunc:
               DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
               DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
               
-       #plt.plot(xi_lg, xi_lg, 'ko', xi_ch, xi_ch, 'ks')
+       #plt.plot(xiI, xiI, 'ko', xiO, xiO, 'ks')
        #plt.show()
        #input()
        
@@ -844,7 +856,8 @@ def runModel(TestName):
               # Compute filtering regions
               DL1 = 1.0 * DX_max
               DL2 = 1.0 * DZ_max
-              DLR = mt.sqrt(DL1**2 + DL2**2)
+              #DLR = mt.sqrt(DL1**2 + DL2**2)
+              DLR = 2.0 * mt.sqrt(DL1 * DL2) # Twice the geometric mean as the damping radius
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)                     
 
@@ -1161,7 +1174,7 @@ def runModel(TestName):
               
               # Initialize damping coefficients
               state = fields0 + hydroState
-              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, resVec, DLD, ebcDex[2], filteredCoeffs)
+              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, resVec, DLD, ebcDex[2], REFG[5], filteredCoeffs)
               
               while thisTime <= TOPT[4]:
                              

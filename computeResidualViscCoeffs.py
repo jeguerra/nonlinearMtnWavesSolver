@@ -56,7 +56,7 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        
        return (CRES1, CRES2)
 
-def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, applyFilter):
+def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, ldex, applyFilter):
        
        # Change floating point errors
        np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
@@ -116,5 +116,9 @@ def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, applyFilter):
        #%% LIMIT THE RESIDUAL COEFFICIENTS TO THE FLOW SPEED VALUES LOCALLY
        CRES1 = np.expand_dims(bn.nanmin(QC1, axis=1), axis=1)
        CRES2 = np.expand_dims(bn.nanmin(QC2, axis=1), axis=1)
+       
+       #%% SET DAMPING WITHIN THE ABSORPTION LAYERS (CROSS DAMPING FOR DISPERSION)
+       #CRES1[ldex,0] = QC2[ldex,0]
+       #CRES2[ldex,0] = QC1[ldex,0]
        
        return (CRES1, CRES2)
