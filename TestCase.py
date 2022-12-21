@@ -141,7 +141,7 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = rlf * 1.0E-2
-              rdex = [0, 1, 2, 3]
+              rdex = [0, 1, 3]
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC, rdex)
               
               # Set the terrain options
@@ -167,14 +167,14 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 4.0 # hours              
+              HR = 5.0 #/ 3600.0 # hours              
               DTF = 0.75 # scale time step              
-              intMethodOrder = 3
+              intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 5.0 # Time for diagnostic output
               ITI = 5.0 # Time for image output
-              RTI = 1 # Stride for residual visc update
+              RTI = 2.0 * DT # Time for residual visc update
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI, RTI]
        

@@ -324,14 +324,8 @@ def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W
        PqPz = DqDz + DQDZ
        
        # Compute advection
-       try:
-              Uadvect = UM * PqPx
-       except FloatingPointError:
-              Uadvect = np.zeros(PqPx.shape)
-       try:
-              Wadvect = WM * PqPz
-       except FloatingPointError:
-              Wadvect = np.zeros(PqPz.shape)
+       Uadvect = UM * PqPx
+       Wadvect = WM * PqPz
        
        DqDt = -(Uadvect + Wadvect)
        
@@ -393,14 +387,8 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        PqPz = DqDz + DQDZ
        
        # Compute advection
-       try:
-              Uadvect = UM * PqPx
-       except FloatingPointError:
-              Uadvect = np.zeros(PqPx.shape)
-       try:
-              Wadvect = WM * PqPz
-       except FloatingPointError:
-              Wadvect = np.zeros(PqPz.shape)
+       Uadvect = UM * PqPx
+       Wadvect = WM * PqPz
               
        # Advection at inflow left boundary vanish
        Uadvect[ebcDex[0]] = 0.0

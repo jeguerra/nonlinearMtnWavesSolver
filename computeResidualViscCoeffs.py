@@ -9,7 +9,8 @@ Created on Sun Aug  4 13:59:02 2019
 import math as mt
 import numpy as np
 import bottleneck as bn
-from scipy import ndimage
+from numba import jit
+import sparse_dot_mkl as spk
 
 def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        
@@ -56,69 +57,55 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        
        return (CRES1, CRES2)
 
-def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, ldex, applyFilter):
+#@jit(nopython=True)
+def computeResidualViscCoeffs2(DIMS, state, RES, QR, DLD, bdex, ldex, applyFilter, RLM, DT):
        
        # Change floating point errors
-       np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
+       #np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
        
-       QC1 = np.empty((DIMS[5],2))
-       QC2 = np.empty((DIMS[5],2))
+       # Get the region indices map
+       maxL = DLD[-1][0]
+       lstL = DLD[-1][1]
        
-       #%% FLOW SPEED COEFFICIENTS
-       
-       # Compute flow speed components
-       UD = np.abs(state[:,0])
-       WD = np.abs(state[:,1])
        # Compute flow speed along terrain
-       VD = np.sqrt(bn.ss(state[:,0:2], axis=1))
-       
-       # Upper bound flow speed coefficients
-       QC1[:,0] = 0.5 * DLD[0] * UD; QC1[bdex,0] = 0.5 * DLD[0] * VD[bdex]
-       QC2[:,0] = 0.5 * DLD[1] * WD; QC2[bdex,0] = 0.0
-       
-       # Apply a region filter
-       if applyFilter:
-              nbrDex = DLD[-1] # List of lists of indices to regions
-       
-              # Apply the maximum filter over the precomputed regions
-              QVL = [bn.nanmax(QC1[reg,0]) for reg in nbrDex]
-              QC1[:,0] = np.array(QVL)
-              QVL = [bn.nanmax(QC2[reg,0]) for reg in nbrDex]
-              QC2[:,0] = np.array(QVL)
-       
-       #%% COEFFICIENTS FIELD
+       AV = np.abs(state[:,0:2])
+       UD = AV[:,0]
+       WD = AV[:,1]
        
        # Compute absolute value of residuals
        ARES = np.abs(RES)
        
-       # Compute the residual normalization based on the state
-       stateMean = DLD[-2] @ state
-       RMAX = bn.nanmax(np.abs(state - stateMean), axis=0)
-       RMAX[RMAX <= 1.0E-16] = 1.0
-       
        # Normalize each component residual and reduce to the measure on all variables
-       QR = np.diag(np.reciprocal(RMAX))
        NARES = ARES @ QR
-       CRES = bn.nanmax(NARES, axis=1); CRES[CRES <= 1.0E-16] = 0.0
+       Q_RES = bn.nanmax(NARES, axis=1)
        
-       # Apply a region filter
+       #%% Apply a region filter
        if applyFilter:
-              nbrDex = DLD[-1] # List of lists of indices to regions
+              nbrDex = DLD[-2] # List of lists of indices to regions
+              
+              ii = 0
+              LVAR = UD.shape[0] + WD.shape[0] + Q_RES.shape[0]
+              Q_REG = np.zeros((LVAR,maxL))
        
-              # Apply the maximum filter over the precomputed regions
-              CRESL = [bn.nanmax(CRES[reg]) for reg in nbrDex]
-              CRES = np.array(CRESL)
-       
-       # Compute the anisotropic coefficients
-       QC1[:,1] = DLD[2] * CRES
-       QC2[:,1] = DLD[3] * CRES
+              for reg in nbrDex:
+                     Q_REG[ii,0:lstL[ii]] = UD[reg]
+                     Q_REG[ii + UD.shape[0],0:lstL[ii]] = WD[reg]
+                     Q_REG[ii + UD.shape[0] + WD.shape[0],0:lstL[ii]] = Q_RES[reg]
+                     ii += 1
+                     
+              RVAR = bn.nanmax(Q_REG, axis=1)
+              UD = RVAR[0:UD.shape[0]]
+              WD = RVAR[UD.shape[0]:UD.shape[0] + WD.shape[0]]
+              Q_RES = RVAR[UD.shape[0] + WD.shape[0]:LVAR]
        
        #%% LIMIT THE RESIDUAL COEFFICIENTS TO THE FLOW SPEED VALUES LOCALLY
+       QC1 = np.stack((0.5 * DLD[0] * UD, DLD[2] * Q_RES), axis=-1)
+       QC2 = np.stack((0.5 * DLD[1] * WD, DLD[3] * Q_RES), axis=-1)
        CRES1 = np.expand_dims(bn.nanmin(QC1, axis=1), axis=1)
        CRES2 = np.expand_dims(bn.nanmin(QC2, axis=1), axis=1)
        
-       #%% SET DAMPING WITHIN THE ABSORPTION LAYERS (CROSS DAMPING FOR DISPERSION)
-       #CRES1[ldex,0] = QC2[ldex,0]
-       #CRES2[ldex,0] = QC1[ldex,0]
+       #%% SET DAMPING WITHIN THE ABSORPTION LAYERS
+       CRES1[ldex,0] = 0.5 * DLD[2] / DT * RLM[0,ldex]
+       CRES2[ldex,0] = 0.5 * DLD[3] / DT * WD[ldex] * RLM[0,ldex]
        
        return (CRES1, CRES2)

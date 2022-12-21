@@ -263,18 +263,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
-       
-       # Compute the full state
-       state = solB + init0
               
        # Enforce the kinematic BC to finish the update
-       solB = tendency.enforceEssentialBC(solB, state[:,0], zeroDex, ebcDex, REFS[6][0])
+       U = init0[:,0] + solB[:,0]
+       solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, REFS[6][0])
        
-       # Compute the residual using the average RHS over the time increment
-       np.seterr(all='ignore', divide='raise', over='raise', under='ignore', invalid='raise')
-       resB = rhsAvg - rhs0 #(solB - sol0) / DT - rhsAvg
-       resAvg = 0.5 * (res0 + resB)
-       rhsAvg = 0.5 * (rhs0 + rhsAvg)
-       dcf = rescf.computeResidualViscCoeffs2(DIMS, state, rhsAvg, DLD, bdex, ldex, filteredCoeffs)
-       
-       return solB, rhsAvg, resAvg, dcf
+       return solB, rhsAvg
