@@ -789,8 +789,12 @@ def runModel(TestName):
        #input()
        
        #%% Prepare derivative operators for diffusion
-       PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
-       diffOps1 = (PPXMD, DDZMS_CS)
+       if diffusiveFlux:
+              PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+              diffOps1 = (PPXMD, DDZMS_QS)
+       else:
+              PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
+              diffOps1 = (PPXMD, DDZMS_CS)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
@@ -848,20 +852,19 @@ def runModel(TestName):
               dS = np.sqrt(dS2)
               S2 = np.reciprocal(dS2)
               S = np.sqrt(S2)
-              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
-              DX = DX_min
                             
               # Smallest physical grid spacing in the 2D mesh
+              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
+              DX = DX_min
               DLS = min(DX, DZ)
               
               # Compute mesh areas
               DAM = 1.0 / (abs(DIMS[1] - DIMS[0]) * DIMS[2]) * np.reshape(DXM * DZM, (1,OPS), order='F')
               
               # Compute filtering regions
-              DL1 = 1.0 * DX_max
-              DL2 = 1.0 * DZ_max
-              DLR = mt.sqrt(DL1**2 + DL2**2)
-              #DLR = 2.0 * mt.sqrt(DL1 * DL2) # Twice the geometric mean as the damping radius
+              DL1 = 1.0 * DX_avg
+              DL2 = 1.0 * DZ_avg
+              DLR = 2.0 * mt.sqrt(DL1**2 + DL2**2)
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)
 
@@ -874,13 +877,7 @@ def runModel(TestName):
 
               # Create a container for these quantities
               DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex, (maxL,lstL))
-              '''
-              ls = 1.0
-              DLD = (np.reshape(ls*DXM, (OPS,), order='F'), 
-                     DL2, 
-                     np.reshape(np.power(ls*DXM,2), (OPS,), order='F'),
-                     DL2**2, S, dS, DAM, fltDex)
-              '''
+              
        # Get memory back
        del(DDXMS1); del(DDZMS1)
        del(DDXMS_CFD); del(DDZMS_CFD)
@@ -1166,16 +1163,16 @@ def runModel(TestName):
                                                          PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
               fields0 = np.copy(fields)
               rhsVec0 = np.copy(rhsVec)
-              resVec0 = np.copy(rhsVec)
+              resVec0 = np.zeros(rhsVec.shape)
               state = fields + hydroState
               error = [np.linalg.norm(rhsVec)]
               
               # Initialize local sound speed and time step
               RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
               VSND = np.sqrt(PHYS[6] * RdT)
-              VFLW = np.sqrt(bn.ss(state[:,0:2], axis=1))
-              VWAV_max = bn.nanmax(VSND + VFLW)
+              VWAV_max = bn.nanmax(VSND)
               TOPT[0] = DTF * DLS / VWAV_max
+              
               print('Initial time step by sound speed: ', str(DLS / VWAV_max) + ' (sec)')
               print('Time stepper order: ', str(TOPT[3]))
               print('Time step factor: ', str(DTF))
@@ -1188,8 +1185,9 @@ def runModel(TestName):
               RMAX[RMAX <= 1.0E-16] = 1.0
               QR = np.diag(np.reciprocal(RMAX))
               state = fields0 + hydroState
-              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, rhsVec0, QR, DLD, \
-                                                     ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, TOPT[0])
+              DCFC = 0.5 * TOPT[0] * VWAV_max**2
+              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, rhsVec0 @ QR, DLD, \
+                                                     ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, DCFC)
               
               while thisTime <= TOPT[4]:
                              
@@ -1211,28 +1209,24 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
-                            fields, rhsVec = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                            fields, rhsVec, resVec = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields0, rhsVec0, resVec0, hydroState, DCF, \
                                                                     zeroDex, ebcDex, filteredCoeffs, verticalStagger, diffusiveFlux)
-                                   
-                            
-                            # Compute in-step time averages 
-                            solAvg = 0.5 * (fields0 + fields)
-                            rhsAvg = 0.5 * (rhsVec + rhsVec0)
-                            resVec = rhsVec - rhsVec0 #(solB - sol0) / DT - rhsAvg
-                            resAvg = 0.5 * (resVec + resVec0)
                             
                             # Compute the full state
-                            steAvg = solAvg + hydroState
+                            state = fields + hydroState
                             
                             # Compute the residual normalization based on the state
-                            RMAX = bn.nanmax(np.abs(solAvg), axis=0)
+                            #fldAvg =  1.0 / abs((DIMS[1] - DIMS[0]) * DIMS[2]) * DAM @ fields
+                            #RMAX = bn.nanmax(np.abs(fields - fldAvg), axis=0)
+                            RMAX = bn.nanmax(np.abs(fields), axis=0)
                             RMAX[RMAX <= 1.0E-16] = 1.0
                             QR = np.diag(np.reciprocal(RMAX))
                             
                             # Compute the residual using the average RHS over the time increment
-                            DCF = rescf.computeResidualViscCoeffs2(DIMS, steAvg, resAvg, QR, DLD, \
-                                                                   ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, TOPT[0])
+                            resVec = resVec @ QR
+                            DCF = rescf.computeResidualViscCoeffs2(DIMS, state, resVec, DLD, \
+                                                                   ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, DCFC)
                             
                             # Compute a time step
                             try: 
@@ -1241,16 +1235,17 @@ def runModel(TestName):
                                    VSND = np.sqrt(PHYS[6] * RdT)
                                    
                                    # Compute flow speed
-                                   VFLW = np.sqrt(bn.ss(state[:,0:2], axis=1))
+                                   #VFLW = np.sqrt(bn.ss(state[:,0:2], axis=1))
                                    
                                    # Compute new time step based on updated sound speed
-                                   VWAV_max = bn.nanmax(VSND + VFLW)
+                                   VWAV_max = bn.nanmax(VSND)# + VFLW)
                                    newDT = DTF * DLS / VWAV_max
-                                   oldDT = TOPT[0]
                                    
                                    # Perform some checks before setting the new DT
                                    if not np.isnan(newDT) and not np.isinf(newDT):
                                           TOPT[0] = newDT
+                                          
+                                   DCFC = 0.5 * TOPT[0] * VWAV_max**2
                             
                             except:
                                    print('Bad computation of local sound speed, no change in time step.')

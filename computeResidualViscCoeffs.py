@@ -57,8 +57,8 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        
        return (CRES1, CRES2)
 
-#@jit(nopython=True)
-def computeResidualViscCoeffs2(DIMS, state, RES, QR, DLD, bdex, ldex, applyFilter, RLM, DT):
+@jit(nopython=True)
+def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, ldex, applyFilter, RLM, DCFC):
        
        # Change floating point errors
        #np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
@@ -75,9 +75,9 @@ def computeResidualViscCoeffs2(DIMS, state, RES, QR, DLD, bdex, ldex, applyFilte
        # Compute absolute value of residuals
        ARES = np.abs(RES)
        
-       # Normalize each component residual and reduce to the measure on all variables
-       NARES = ARES @ QR
-       Q_RES = bn.nanmax(NARES, axis=1)
+       # Reduce across the variables using the 1-norm
+       #Q_RES = bn.nansum(ARES, axis=1)
+       Q_RES = np.sum(ARES, axis=1)
        
        #%% Apply a region filter
        if applyFilter:
@@ -93,7 +93,8 @@ def computeResidualViscCoeffs2(DIMS, state, RES, QR, DLD, bdex, ldex, applyFilte
                      Q_REG[ii + UD.shape[0] + WD.shape[0],0:lstL[ii]] = Q_RES[reg]
                      ii += 1
                      
-              RVAR = bn.nanmax(Q_REG, axis=1)
+              #RVAR = bn.nanmax(Q_REG, axis=1)
+              RVAR = np.max(Q_REG.T)
               UD = RVAR[0:UD.shape[0]]
               WD = RVAR[UD.shape[0]:UD.shape[0] + WD.shape[0]]
               Q_RES = RVAR[UD.shape[0] + WD.shape[0]:LVAR]
@@ -104,8 +105,12 @@ def computeResidualViscCoeffs2(DIMS, state, RES, QR, DLD, bdex, ldex, applyFilte
        CRES1 = np.expand_dims(bn.nanmin(QC1, axis=1), axis=1)
        CRES2 = np.expand_dims(bn.nanmin(QC2, axis=1), axis=1)
        
+       #%% SET DAMPING ALONG THE TERRAIN SURFACE
+       #CRES1[bdex,0] = 0.5 * DLD[0] * UD[bdex]
+       #CRES2[bdex,0] = 0.5 * DLD[1] * WD[bdex]
+       
        #%% SET DAMPING WITHIN THE ABSORPTION LAYERS
-       CRES1[ldex,0] = 0.5 * DLD[2] / DT * RLM[0,ldex]
-       CRES2[ldex,0] = 0.5 * DLD[3] / DT * WD[ldex] * RLM[0,ldex]
+       CRES1[ldex,0] += DCFC * RLM[0,ldex]
+       CRES2[ldex,0] += DCFC * RLM[0,ldex]
        
        return (CRES1, CRES2)

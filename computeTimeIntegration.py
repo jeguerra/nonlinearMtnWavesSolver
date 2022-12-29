@@ -154,6 +154,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        def ketcheson93(sol):
               rhs = 0.0
+              res = 0.0
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               
@@ -162,45 +163,62 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               sol1 = np.copy(sol)
               
               for ii in range(5):
+                     rhs0 = np.copy(rhs)
                      sol, rhs = computeUpdate(c1, sol, sol)
                      rhs += rhs
+                     res += (rhs - rhs0)
                      
               # Compute stage 6* with linear combination
               sol = 0.6 * sol1 + 0.4 * sol
               
               for ii in range(3):
+                     rhs0 = np.copy(rhs)
                      sol, rhs = computeUpdate(c1, sol, sol)
                      rhs += rhs
+                     res += (rhs - rhs0)
                      
               rhsAvg = 1.0/9.0 * rhs
+              resAvg = 1.0/8.0 * res
                             
-              return sol, rhsAvg
+              return sol, rhsAvg, resAvg
        
        def ketcheson104(sol):
               rhs = 0.0
+              res = 0.0
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               
               sol1 = np.copy(sol)
               sol2 = np.copy(sol)
-              for ii in range(4):
+              
+              sol1, rhs = computeUpdate(c1, sol1, sol1)
+              rhs += rhs
+              
+              for ii in range(3):
+                     rhs0 = np.copy(rhs)
                      sol1, rhs = computeUpdate(c1, sol1, sol1)
                      rhs += rhs
+                     res += (rhs - rhs0)
               
               sol2 = 0.04 * sol2 + 0.36 * sol1
               sol1 = 15.0 * sol2 - 5.0 * sol1
               
               for ii in range(4):
+                     rhs0 = np.copy(rhs)
                      sol1, rhs = computeUpdate(c1, sol1, sol1)
                      rhs += rhs
+                     res += (rhs - rhs0)
                      
               sol = sol2 + 0.6 * sol1
+              rhs0 = np.copy(rhs)
               sol, rhs = computeUpdate(0.1, sol1, sol)
               rhs += rhs
+              res += (rhs - rhs0)
                             
               rhsAvg = 1.0/9.0 * rhs
+              resAvg = 1.0/8.0 * res
               
-              return sol, rhsAvg
+              return sol, rhsAvg, resAvg
        
        def ssprk54(sol):
               
@@ -257,9 +275,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB, rhsAvg = ketcheson93(sol0)
+              solB, rhsAvg, resAvg = ketcheson93(sol0)
        elif order == 4:
-              solB, rhsAvg = ketcheson104(sol0)
+              solB, rhsAvg, resAvg = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
@@ -268,4 +286,4 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        U = init0[:,0] + solB[:,0]
        solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, REFS[6][0])
        
-       return solB, rhsAvg
+       return solB, rhsAvg, resAvg
