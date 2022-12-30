@@ -174,7 +174,7 @@ class TestCase:
               ET = HR * 60 * 60 # End time in seconds
               OTI = 5.0 # Time for diagnostic output
               ITI = 5.0 # Time for image output
-              RTI = 2.0 * DT # Time for residual visc update
+              RTI = 1.0 # Time for time step and constant damping update
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI, RTI]
        

@@ -868,15 +868,21 @@ def runModel(TestName):
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)
 
+              # Manipulate arrays to enable numba acceleration for DynSGS
               maxL = 0
               lstL = []
               for dex in fltDex:
                      maxL0 = len(dex)
                      lstL += [maxL0]
                      maxL = np.amax([maxL,maxL0])
+              
+              import numba as nb
+              nb_list = nb.typed.List
+              lstL = np.array(lstL, dtype=np.int32)
+              regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
 
-              # Create a container for these quantities
-              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, fltDex, (maxL,lstL))
+              # Create a container for DynSGS scaling and region parameters
+              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, regDex, (maxL,lstL))
               
        # Get memory back
        del(DDXMS1); del(DDZMS1)
@@ -1159,40 +1165,27 @@ def runModel(TestName):
               
               # Initialize fields
               ti = 0; ff = 0
-              rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
-                                                         PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
               fields0 = np.copy(fields)
-              rhsVec0 = np.copy(rhsVec)
-              resVec0 = np.zeros(rhsVec.shape)
-              state = fields + hydroState
+              rhsVec0 = np.zeros(fields.shape)
+              resVec0 = np.zeros(fields.shape)
+              DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
+              DCFC= (0.0, 0.0, 0.0)
               error = [np.linalg.norm(rhsVec)]
               
-              # Initialize local sound speed and time step
-              RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
-              VSND = np.sqrt(PHYS[6] * RdT)
-              VWAV_max = bn.nanmax(VSND)
-              TOPT[0] = DTF * DLS / VWAV_max
-              
-              print('Initial time step by sound speed: ', str(DLS / VWAV_max) + ' (sec)')
               print('Time stepper order: ', str(TOPT[3]))
               print('Time step factor: ', str(DTF))
               
-              OTI = int(TOPT[5] / TOPT[0])
-              ITI = int(TOPT[6] / TOPT[0])
-              
-              # Initialize damping coefficients
-              RMAX = bn.nanmax(np.abs(fields), axis=0)
-              RMAX[RMAX <= 1.0E-16] = 1.0
-              QR = np.diag(np.reciprocal(RMAX))
-              state = fields0 + hydroState
-              DCFC = 0.5 * TOPT[0] * VWAV_max**2
-              DCF = rescf.computeResidualViscCoeffs2(DIMS, state, rhsVec0 @ QR, DLD, \
-                                                     ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, DCFC)
-              
+              interTime1 = 0.0
+              interTime2 = 0.0
+              interTime3 = 0.0
               while thisTime <= TOPT[4]:
-                             
-                     # Print out diagnostics every TOPT[5] steps
-                     if ti % OTI == 0:
+                     
+                     # Get the full state
+                     state = fields + hydroState
+                     AS = np.abs(state)
+                     
+                     # Print out diagnostics every TOPT[5] seconds
+                     if interTime1 >= TOPT[5] and ti > 0:
                             
                             message = ''
                             err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
@@ -1200,63 +1193,55 @@ def runModel(TestName):
                             error.append(err)
                             
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF)
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields0, rhsVec, resVec, DCF)
                             
                             ff += 1
-                                                 
-                     if ti % ITI == 0 and makePlots:
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
-                            
-                     # Compute the solution within a time step
-                     try:   
-                            fields, rhsVec, resVec = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields0, rhsVec0, resVec0, hydroState, DCF, \
-                                                                    zeroDex, ebcDex, filteredCoeffs, verticalStagger, diffusiveFlux)
-                            
-                            # Compute the full state
-                            state = fields + hydroState
-                            
-                            # Compute the residual normalization based on the state
-                            #fldAvg =  1.0 / abs((DIMS[1] - DIMS[0]) * DIMS[2]) * DAM @ fields
-                            #RMAX = bn.nanmax(np.abs(fields - fldAvg), axis=0)
-                            RMAX = bn.nanmax(np.abs(fields), axis=0)
-                            RMAX[RMAX <= 1.0E-16] = 1.0
-                            QR = np.diag(np.reciprocal(RMAX))
-                            
-                            # Compute the residual using the average RHS over the time increment
-                            resVec = resVec @ QR
-                            DCF = rescf.computeResidualViscCoeffs2(DIMS, state, resVec, DLD, \
-                                                                   ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, DCFC)
-                            
-                            # Compute a time step
+                            interTime1 = 0.0
+                     
+                     # Make a diagnostic plot                            
+                     if interTime2 >= TOPT[6] and makePlots:
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields0, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
+                            interTime2 = 0.0
+                     
+                     # Compute a time step
+                     if interTime3 >= TOPT[7] or ti == 0:
                             try: 
                                    # Compute sound speed
                                    RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
                                    VSND = np.sqrt(PHYS[6] * RdT)
                                    
-                                   # Compute flow speed
-                                   #VFLW = np.sqrt(bn.ss(state[:,0:2], axis=1))
-                                   
                                    # Compute new time step based on updated sound speed
-                                   VWAV_max = bn.nanmax(VSND)# + VFLW)
+                                   VWAV_max = bn.nanmax(VSND)
                                    newDT = DTF * DLS / VWAV_max
                                    
                                    # Perform some checks before setting the new DT
                                    if not np.isnan(newDT) and not np.isinf(newDT):
                                           TOPT[0] = newDT
                                           
-                                   DCFC = 0.5 * TOPT[0] * VWAV_max**2
-                            
+                                   # Constant sponge layer and interior diffusivity
+                                   VDM = bn.nanmax(AS[:,0:2],axis=0) 
+                                   DCFC = (0.5 * TOPT[0] * VWAV_max**2, 0.5 * TOPT[0] * VDM[0]**2, 0.5 * TOPT[0] * VDM[1]**2)
                             except:
                                    print('Bad computation of local sound speed, no change in time step.')
                                    print('Time: ', thisTime, ti)
                                    
-                            fields0 = np.copy(fields)
-                            rhsVec0 = np.copy(rhsVec)
-                            resVec0 = np.copy(resVec)
+                            interTime3 = 0.0
+                     
+                     # Compute the residual normalization based on the state
+                     RMAX = bn.nanmax(np.abs(fields), axis=0)
+                     RMAX[RMAX <= 1.0E-16] = 1.0
+                     QR = np.diag(np.reciprocal(RMAX))
+                     
+                     # Compute the residual using the average RHS over the time increment
+                     resVec = resVec @ QR
+                     DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, resVec, DLD, \
+                                                            ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, DCFC)
                             
-                            ti += 1
-                            thisTime += TOPT[0]
+                     # Compute the solution within a time step
+                     try:   
+                            fields, rhsVec, resVec = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                                                                    DLD, TOPT, fields0, rhsVec0, resVec0, hydroState, DCF, \
+                                                                    zeroDex, ebcDex, filteredCoeffs, verticalStagger, diffusiveFlux)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
@@ -1266,6 +1251,17 @@ def runModel(TestName):
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
+                            
+                     # Set the previous fields
+                     fields0 = np.copy(fields)
+                     rhsVec0 = np.copy(rhsVec)
+                     resVec0 = np.copy(resVec)
+                     
+                     ti += 1
+                     thisTime += TOPT[0]
+                     interTime1 += TOPT[0]
+                     interTime2 += TOPT[0]
+                     interTime3 += TOPT[0]
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')

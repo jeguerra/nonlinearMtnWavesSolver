@@ -6,11 +6,10 @@ Created on Sun Aug  4 13:59:02 2019
 @author: TempestGuerra
 """
 
-import math as mt
 import numpy as np
 import bottleneck as bn
-from numba import jit
-import sparse_dot_mkl as spk
+from numba import njit, prange
+#import sparse_dot_mkl as spk
 
 def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        
@@ -57,18 +56,33 @@ def computeResidualViscCoeffs(DIMS, state, RHS, RES, DLD, bdex, applyFilter):
        
        return (CRES1, CRES2)
 
-@jit(nopython=True)
-def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, ldex, applyFilter, RLM, DCFC):
+@njit(parallel=True)
+def computeRegionedArray(UD, WD, Q_RES, DLD, maxL, lstL, nbrDex):
+       
+       ii = 0
+       LVAR = Q_RES.shape[0]
+       Q_REG = np.zeros((LVAR,maxL,3))
+
+       for ii in prange(LVAR):
+              rdex = nbrDex[ii]
+              Q_REG[ii,0:lstL[ii],0] = UD[rdex]
+              Q_REG[ii,0:lstL[ii],1] = WD[rdex]
+              Q_REG[ii,0:lstL[ii],2] = Q_RES[rdex]
+              
+       return Q_REG, LVAR
+
+#@jit(nopython=True)
+def computeResidualViscCoeffs2(DIMS, AV, RES, DLD, bdex, ldex, applyFilter, RLM, DCFC):
        
        # Change floating point errors
        #np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
        
        # Get the region indices map
+       nbrDex = DLD[-2] # List of lists of indices to regions
        maxL = DLD[-1][0]
        lstL = DLD[-1][1]
        
        # Compute flow speed along terrain
-       AV = np.abs(state[:,0:2])
        UD = AV[:,0]
        WD = AV[:,1]
        
@@ -76,41 +90,32 @@ def computeResidualViscCoeffs2(DIMS, state, RES, DLD, bdex, ldex, applyFilter, R
        ARES = np.abs(RES)
        
        # Reduce across the variables using the 1-norm
-       #Q_RES = bn.nansum(ARES, axis=1)
-       Q_RES = np.sum(ARES, axis=1)
+       Q_RES = bn.nansum(ARES, axis=1)
+       #Q_RES = np.nansum(ARES, axis=1)
        
        #%% Apply a region filter
        if applyFilter:
-              nbrDex = DLD[-2] # List of lists of indices to regions
-              
-              ii = 0
-              LVAR = UD.shape[0] + WD.shape[0] + Q_RES.shape[0]
-              Q_REG = np.zeros((LVAR,maxL))
-       
-              for reg in nbrDex:
-                     Q_REG[ii,0:lstL[ii]] = UD[reg]
-                     Q_REG[ii + UD.shape[0],0:lstL[ii]] = WD[reg]
-                     Q_REG[ii + UD.shape[0] + WD.shape[0],0:lstL[ii]] = Q_RES[reg]
-                     ii += 1
-                     
-              #RVAR = bn.nanmax(Q_REG, axis=1)
-              RVAR = np.max(Q_REG.T)
-              UD = RVAR[0:UD.shape[0]]
-              WD = RVAR[UD.shape[0]:UD.shape[0] + WD.shape[0]]
-              Q_RES = RVAR[UD.shape[0] + WD.shape[0]:LVAR]
+              Q_REG, LVAR = computeRegionedArray(UD, WD, Q_RES, DLD, maxL, lstL, nbrDex)
+              RVAR = bn.nanmax(Q_REG, axis=1)
+              UD = RVAR[:,0]
+              WD = RVAR[:,1]
+              Q_RES = RVAR[:,2]
        
        #%% LIMIT THE RESIDUAL COEFFICIENTS TO THE FLOW SPEED VALUES LOCALLY
        QC1 = np.stack((0.5 * DLD[0] * UD, DLD[2] * Q_RES), axis=-1)
        QC2 = np.stack((0.5 * DLD[1] * WD, DLD[3] * Q_RES), axis=-1)
-       CRES1 = np.expand_dims(bn.nanmin(QC1, axis=1), axis=1)
-       CRES2 = np.expand_dims(bn.nanmin(QC2, axis=1), axis=1)
+       QC = np.vstack((QC1,QC2))
+       QCM = bn.nanmin(QC, axis=1)
        
-       #%% SET DAMPING ALONG THE TERRAIN SURFACE
-       #CRES1[bdex,0] = 0.5 * DLD[0] * UD[bdex]
-       #CRES2[bdex,0] = 0.5 * DLD[1] * WD[bdex]
+       CRES1 = np.expand_dims(QCM[0:Q_RES.shape[0]], axis=1)
+       CRES2 = np.expand_dims(QCM[Q_RES.shape[0]:], axis=1)
+       
+       #%% SET INTERIOR CONSTANT DAMPING
+       CRES1 += DCFC[1]
+       CRES2 += DCFC[2]
        
        #%% SET DAMPING WITHIN THE ABSORPTION LAYERS
-       CRES1[ldex,0] += DCFC * RLM[0,ldex]
-       CRES2[ldex,0] += DCFC * RLM[0,ldex]
+       CRES1[ldex,0] += DCFC[0] * RLM[0,ldex]
+       CRES2[ldex,0] += DCFC[0] * RLM[0,ldex]
        
        return (CRES1, CRES2)
