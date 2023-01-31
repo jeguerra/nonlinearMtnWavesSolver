@@ -27,7 +27,7 @@ def function1(x):
        B = 8.0
        C = 5.0
        
-       x2 = np.multiply(x, x)
+       x2 = x*x
        
        Y = A * np.exp(-C * x) + \
        np.cos(B * mt.pi * x2)
@@ -36,6 +36,11 @@ def function1(x):
        term1 = (2*B) * mt.pi * x
        term2 = np.sin(B * mt.pi * x2)
        DY -= np.multiply(term1, term2)
+       
+       for ii in range(len(x)):
+              if x[ii] >= 0.5:
+                     Y[ii] = 1.0
+                     DY[ii] = 0.0
 
        return Y, DY
 
@@ -281,72 +286,3 @@ plt.legend()
 #plt.savefig("DerivativeTestZ_CFD.png")
 
 plt.show()
-
-#%% LAGUERRE FUNCTION DERIVATIVE TEST
-NZ = 17
-DIMS[-1] = NZ
-import HerfunChebNodesWeights as hcl
-
-xi2, whf = hcl.leglb(NZ) #[-1 1]
-zv2 = (0.5 * (xi2 + 1.0))
-Y2, DY2 = function2(zv2, 1.0)
-DDZ_LD, LD_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
-DYD_LD = ZH * DDZ_LD.dot(Y2)
-
-NZC = NZ - 1
-DIMS[-1] = NZC
-xi3, whf = hcl.cheblb(NZC) #[-1 1]
-zv3 = (0.5 * (xi3 + 1.0))
-Y3, DY3 = function2(zv3, 1.0)
-DDZ_CH, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-
-NZL = 16
-xi, whf = hcl.lgfunclb(NZL) #[0 inf]
-DIMS[-1] = NZL
-zv1 = 1.0 / np.amax(xi) * xi
-Y1, DY1 = function2(zv1, 1.0)
-DDZ_LG, LG_TRANS = derv.computeLaguerreDerivativeMatrix(DIMS)
-DYD_LG = ZH * DDZ_LG.dot(Y1)
-
-CTM = hcl.chebpolym(NZC+1, -xi2) # interpolate to legendre grid
-LTM, dummy = hcl.legpolym(NZ, xi3, True) # interpolate to chebyshev grid
-
-LG2CH_INT = (LTM.T).dot(LD_TRANS)
-CH2LG_INT = (CTM).dot(CH_TRANS)
-
-DDZ_CHS = CH2LG_INT.dot(DDZ_CH).dot(LG2CH_INT)
-DDZ_CHS = derv.numericalCleanUp(DDZ_CHS)
-DYD_CH = ZH * DDZ_CH.dot(Y3)
-DYD_CHS = ZH * DDZ_CHS.dot(Y2)
-
-STG_D = DDZ_LD - DDZ_CHS
-
-plt.figure(figsize=(8, 6), tight_layout=True)
-#plt.plot(zv2, Y2, label='Function')
-plt.plot(zv2, DY2, 'rs-', label='Analytical Derivative')
-plt.plot(zv1, DYD_LG, 'ko--', label='Laguerre Derivative')
-plt.plot(zv2, DYD_LD, 'bo--', label='Legendre Derivative')
-plt.plot(zv3, DYD_CH, 'go--', label='Chebyshev Derivative')
-plt.plot(zv2, DYD_CHS, 'gs--', label='Staggered Chebyshev Derivative')
-#plt.ylim([1.5*min(DY2), 1.5*max(DY2)])
-plt.xlabel('Domain')
-plt.ylabel('Functions')
-plt.title('Spectral Derivative Test')
-plt.grid(visible=True, which='both', axis='both')
-plt.legend()
-#plt.savefig("DerivativeTestZ_Laguerre-Legendre.png")
-
-#%% Report eigenvalues
-plt.show()
-'''
-import scipy.sparse.linalg as spl
-DDZM = DDZ_LG.astype(dtype=np.double)
-DZ_eig = spl.eigs(DDZM, k=8, which='LM', return_eigenvectors=False)
-print('Laguerre vertical derivative eigenvalues', DZ_eig)
-DDZM = DDZ_1D.astype(dtype=np.double)
-DZ_eig = spl.eigs(DDZM, k=8, which='LM', return_eigenvectors=False)
-print('Chebyshev vertical derivative eigenvalues', DZ_eig)
-DDZM = DDZ_LG.astype(dtype=np.double)
-DZ_eig = spl.eigs(DDZM, k=8, which='LM', return_eigenvectors=False)
-print('Legendre vertical derivative eigenvalues', DZ_eig)
-'''

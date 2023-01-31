@@ -53,8 +53,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    if dNormX >= 0.0:
                                           RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
-                                          #dNormX += 0.5
-                                          #RFX = 2.0 - (1.0 - mt.exp(C2 * (2.0 * dNormX - 1.0)**2) / (1.0 - mt.exp(C2)))
+                                          #RFX = 1.0 - 16.0 * dNormX**4
                                           RFX = 1.0
                             elif XRL <= dLayerL:
                                    dNormX = (XRL - L1) / width - 0.5
@@ -62,8 +61,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    if dNormX >= 0.0:
                                           RFX = 1.0 / (1.0 + 0.25 * (mt.tan(1.0 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
-                                          #dNormX += 0.5
-                                          #RFX = 2.0 - (1.0 - mt.exp(C2 * (2.0 * dNormX - 1.0)**2) / (1.0 - mt.exp(C2)))
+                                          #RFX = 1.0 - (2.0 * dNormX)**8
                                           RFX = 1.0
                             else:
                                    dNormX = 1.0
@@ -177,7 +175,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        '''                  
        return (GML, GMLX, GMLZ), RL, RLX, RLZ
 
-def computeRayleighEquations(DIMS, REFS, depth, RLOPT, ebcDex):
+def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        # Get options data
        width = RLOPT[1]
        applyTop = RLOPT[2]
@@ -194,25 +192,9 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT, ebcDex):
        # Compute the diagonal for full Rayleigh field
        tempDiagonal = np.reshape(RL, (OPS,), order='F')
        
-       # Clean up the Rayleigh layers
-       #tempDiagonal[ebcDex[0]] = 0.0
-       #tempDiagonal[ebcDex[1]] = 0.0
-       #tempDiagonal[ebcDex[2]] = 0.0
-       #tempDiagonal[ebcDex[3]] = 0.0
-       
        # Compute the matrix operator
        RLM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
 
-       '''
-       # Compute the diagonal for lateral Rayleigh field
-       tempDiagonal = np.reshape(RLX, (OPS,), order='F')
-       # Compute the matrix operator
-       RLXM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       # Compute the diagonal for vertical Rayleigh field
-       tempDiagonal = np.reshape(RLZ, (OPS,), order='F')
-       # Compute the matrix operator
-       RLZM = sps.spdiags(tempDiagonal, 0, OPS, OPS)
-       '''
        # Store the diagonal blocks corresponding to Rayleigh damping terms
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        

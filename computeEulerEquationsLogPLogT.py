@@ -8,7 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 import numpy as np
 import warnings
 import scipy.sparse as sps
-import sparse_dot_mkl as spk
+#import sparse_dot_mkl as spk
 #import matplotlib.pyplot as plt
 
 def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
@@ -19,8 +19,11 @@ def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
                      sol[zeroDex[vv],vv] = 0.0
        
        bdex = ebcDex[2]       
-       sol[bdex,1] = dhdx * U[bdex]
+       #sol[bdex,1] = dhdx * U[bdex]
        
+       sol[bdex,0] = -U[bdex]
+       sol[bdex,1] = 0.0
+              
        return sol
 
 def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
@@ -30,10 +33,10 @@ def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
                      DqDt[zeroDex[vv],vv] = 0.0
        
        bdex = ebcDex[2]  
-       DqDt[bdex,1] = dhdx * DqDt[bdex,0]
+       #DqDt[bdex,1] = dhdx * DqDt[bdex,0]
        
-       for vv in range(4):
-              DqDt[:,vv][np.abs(DqDt[:,vv]) <= 1.0E-16] = 0.0
+       DqDt[bdex,0] = 0.0
+       DqDt[bdex,1] = 0.0
        
        return DqDt
 
@@ -332,7 +335,7 @@ def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W
        return DqDt
 
 # Fully explicit evaluation of the non linear internal forcing
-def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, ebcDex):
+def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields):
        # Get physical constants
        gc = PHYS[0]
        kap = PHYS[4]
@@ -350,9 +353,8 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, 
        
        # Compute pressure gradient forces
        pgradx = RdT * PqPx[:,2]
-       #pgradz = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
-       pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       #pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))      
+       pgradz = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
+       #pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
        DqDt = np.zeros(fields.shape)
        
@@ -363,7 +365,7 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, 
        # Pressure (mass) equation
        DqDt[:,2] = -gam * divergence
        
-       return DqDt
+       return DqDt, RdT
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
 def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields, U, W, ebcDex):
@@ -404,7 +406,6 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFS, REFG, fields,
        pgradx = RdT * PqPx[:,2]
        #pgradz = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       #pgradz = RdT * DqDz[:,2] + 0.5 * (RdT * DQDZ[:,2] + gc * (1.0 - T_ratio))
        
        DqDt = -(Uadvect + Wadvect)
        
@@ -439,16 +440,10 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex,
        # Change floating point errors
        np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
        
-       dS = DLD[5]       
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
        DqDt = np.zeros(P2qPx2.shape)
-       
-       DC1 = DCF[0] # coefficient to the X direction flux
-       DC2 = DCF[1] # coefficient to the Z direction flux
-       mu_xb = DC1[bdex,:]
-       mu_xt = DC1[tdex,:] 
        
        if isFluxDiv:
               #%% INTERIOR DIFFUSION
@@ -458,40 +453,45 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex,
               # Diffusion of scalars (broken up into anisotropic components
               DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
               DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
-                  
-              #'''        
+              #'''   
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = 2.0 * P2qPx2[tdex,0]
+              DqDt[tdex,0] = 0.0 #P2qPx2[tdex,0]
               DqDt[tdex,1] = 0.0
               DqDt[tdex,2] = P2qPx2[tdex,2]
               DqDt[tdex,3] = P2qPx2[tdex,3]
               
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,0] = 2.0 * P2qPx2[bdex,0]
+              DqDt[bdex,0] = 0.0 #P2qPx2[bdex,0]
               DqDt[bdex,1] = 0.0
               DqDt[bdex,2] = P2qPx2[bdex,2]
               DqDt[bdex,3] = P2qPx2[bdex,3]
+              #'''
        else:              
+              DC1 = DCF[0][:,0] # coefficient to the X direction flux
+              DC2 = DCF[1][:,0] # coefficient to the Z direction flux
+              mu_xb = DC1[bdex]
+              mu_xt = DC1[tdex] 
+              
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
-              DqDt[:,0] = DC1[:,0] * (2.0 * P2qPx2[:,0]) + DC2[:,0] * (P2qPzx[:,1] + P2qPz2[:,0])
-              DqDt[:,1] = DC1[:,1] * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2[:,1] * (2.0 * P2qPz2[:,1])
+              DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPzx[:,1] + P2qPz2[:,0])
+              DqDt[:,1] = DC1 * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2 * (2.0 * P2qPz2[:,1])
               # Diffusion of scalars (broken up into anisotropic components
-              DqDt[:,2] = DC1[:,2] * P2qPx2[:,2] + DC2[:,2] * P2qPz2[:,2]
-              DqDt[:,3] = DC1[:,3] * P2qPx2[:,3] + DC2[:,3] * P2qPz2[:,3]
+              DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
+              DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
                   
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = 2.0 * mu_xt[:,0] * P2qPx2[tdex,0]
+              DqDt[tdex,0] = mu_xt * P2qPx2[tdex,0]
               DqDt[tdex,1] = 0.0
-              DqDt[tdex,2] = mu_xt[:,2] * P2qPx2[tdex,2]
-              DqDt[tdex,3] = mu_xt[:,3] * P2qPx2[tdex,3]
+              DqDt[tdex,2] = mu_xt * P2qPx2[tdex,2]
+              DqDt[tdex,3] = mu_xt * P2qPx2[tdex,3]
        
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,0] = 2.0 * mu_xb[:,0] * P2qPx2[bdex,0]
+              DqDt[bdex,0] = mu_xb * P2qPx2[bdex,0]
               DqDt[bdex,1] = 0.0
-              DqDt[bdex,2] = mu_xb[:,2] * P2qPx2[bdex,2]
-              DqDt[bdex,3] = mu_xb[:,3] * P2qPx2[bdex,3]
+              DqDt[bdex,2] = mu_xb * P2qPx2[bdex,2]
+              DqDt[bdex,3] = mu_xb * P2qPx2[bdex,3]
        
        # Scale and apply coefficients
        DqDt[:,3] *= 0.71 / 0.4

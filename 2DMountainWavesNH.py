@@ -256,11 +256,12 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, dca, dcb, NX, NZ, 
        return
 
 def displayResiduals(message, RHS, thisTime, DT, OPS, udex, wdex, pdex, tdex):
-       err = np.linalg.norm(RHS) / mt.sqrt(OPS)
-       err1 = np.linalg.norm(RHS[udex]) / mt.sqrt(OPS)
-       err2 = np.linalg.norm(RHS[wdex]) / mt.sqrt(OPS)
-       err3 = np.linalg.norm(RHS[pdex]) / mt.sqrt(OPS)
-       err4 = np.linalg.norm(RHS[tdex]) / mt.sqrt(OPS)
+       RHSA = np.abs(RHS)
+       err = bn.nanmax(RHSA)# / mt.sqrt(OPS)
+       err1 = bn.nanmax(RHSA[udex])# / mt.sqrt(OPS)
+       err2 = bn.nanmax(RHSA[wdex])# / mt.sqrt(OPS)
+       err3 = bn.nanmax(RHSA[pdex])# / mt.sqrt(OPS)
+       err4 = bn.nanmax(RHSA[tdex])# / mt.sqrt(OPS)
        if message != '':
               print(message)
        print('Time (min): %4.2f, DT (sec): %4.3E, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
@@ -405,8 +406,8 @@ def store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF
        return
 
 def runModel(TestName):
-       import TestCase
        
+       import TestCase
        thisTest = TestCase.TestCase(TestName)
        
        # Set the solution type (MUTUALLY EXCLUSIVE)
@@ -423,12 +424,21 @@ def runModel(TestName):
               RSBops = False
               useGuellrich = True
               useUniformSt = False
-              print('Static solution with Guellrich vertical coordinate.')
+              verticalStagger = False
        else:
               RSBops = True # Turn off PyRSB SpMV
-              useGuellrich = False
-              useUniformSt = True
-              print('Transient solution with uniform vertical stretching.')
+              verticalStagger = False
+              if verticalStagger:
+                     useGuellrich = False
+                     useUniformSt = True
+              else:
+                     useGuellrich = False
+                     useUniformSt = True
+              
+       if verticalStagger:
+              print('Staggered spectral method in the vertical.')
+       else:
+              print('Colocated spectral method in the vertical.')
               
        if RSBops:
               from rsb import rsb_matrix
@@ -463,7 +473,7 @@ def runModel(TestName):
        else:
               print('No spatial filter on DynSGS coefficients.')
               
-       DynSGS_RES = True
+       DynSGS_RES = False
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
        else:
@@ -477,20 +487,12 @@ def runModel(TestName):
               
        verticalChebGrid = False
        verticalLegdGrid = True
-       if verticalChebGrid and not verticalLegdGrid:
+       if verticalChebGrid:
               print('Chebyshev spectral derivative in the vertical.')
-       else:
+       elif verticalLegdGrid:
               print('Legendre spectral derivative in the vertical.')
-       
-       if NonLinSolve:
-              verticalStagger = True
        else:
-              verticalStagger = False
-              
-       if verticalStagger:
-              print('Staggered spectral method in the vertical.')
-       else:
-              print('Colocated spectral method in the vertical.')
+              print('Regular uniform grid in the vertical...')
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = thisTest.solType['SolveFull']
@@ -502,7 +504,7 @@ def runModel(TestName):
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
        if isRestart:
-              rdex = -10
+              rdex = -1
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -552,6 +554,8 @@ def runModel(TestName):
        if verticalChebGrid:
               DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
        elif verticalLegdGrid:
+              DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
+       else:
               DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
                      
        DDXP, DDX2P = derv.computeCubicSplineDerivativeMatrix(REF0[0], True, False, 0.0)
@@ -625,7 +629,8 @@ def runModel(TestName):
                      coords.computeGuellrichDomain2D(DIMS, REFS[0], REFS[1], zRay, HofX, dHdX, StaticSolve)
        
        if useUniformSt:
-              XL, ZTL, DZT, sigma, ZRL, DXM, DZM = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+              XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
+                     coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        
        # Update the REFS collection
        REFS.append(XL) # index 4
@@ -697,7 +702,7 @@ def runModel(TestName):
        #input()
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ebcDex)
+       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT)
        
        # Make a collection for background field derivatives
        REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX]
@@ -754,7 +759,7 @@ def runModel(TestName):
               DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
               dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
               
-       if verticalLegdGrid:
+       elif verticalLegdGrid:
               
               xiI, whf = derv.cheblb(NZI) #[-1 1]
               xiO, whf = derv.leglb(NZ) #[-1 1]
@@ -766,47 +771,54 @@ def runModel(TestName):
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
               DDZ_I0, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
               
+              # Can we use a lower order method in the staggering?
+              DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(xiI, 6)
+              DDZ_I1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiI, True, False, DDZ_BC)
+              DDZ_I1 *= 2.0 / DIMS[2]
+              
               O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
               I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
               
               DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
               dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
+       else:
+              DDZMI = 0.5 * (DDZMS_QS + DDZMS_CFD)
               
-       if verticalStagger:
+              
+       if verticalStagger and (verticalLegdGrid or verticalChebGrid):
               # Staggered vertical operator
               DDZM_OP = sps.block_diag((DDZMS1, DDZMS1, DDZMI, DDZMI), format='csr')
+              #DDZM_OP = sps.block_diag((DDZMS_QS, DDZMS_QS, DDZMI, DDZMI), format='csr')
        else:
               # Average the staggered operators
               DDZM_OP = 0.5 * (DDZMS1 + DDZMI)
+              #DDZM_OP = 0.5 * (DDZMS_QS + DDZMS_CFD)
               
        if HermFunc:
-              DDXM_OP = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+              DDXM_OP = 1.0 * DDXMS1# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
-              DDXM_OP = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+              DDXM_OP = 0.5 * (DDXMS_QS + DDXMS_CFD)# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZM_OPA)
               
        #plt.plot(xiI, xiI, 'ko', xiO, xiO, 'ks')
        #plt.show()
        #input()
        
        #%% Prepare derivative operators for diffusion
-       if diffusiveFlux:
-              PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
-              diffOps1 = (PPXMD, DDZMS_QS)
-       else:
-              PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
-              diffOps1 = (PPXMD, DDZMS_CS)
+       PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
+       diffOps1 = (PPXMD, DDZMS_CS)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
        
+       #%% Store operators for use
        if not StaticSolve and RSBops:
               # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(DDXM_OP,shape=DDXM_OP.shape), \
-                           rsb_matrix(DDZM_OP,shape=DDZM_OP.shape)))
+              REFS.append((rsb_matrix(DDXM_OP, shape=DDXM_OP.shape), \
+                           rsb_matrix(DDZM_OP, shape=DDZM_OP.shape))) # index 12
               
               diffOps2 = (rsb_matrix(diffOps1[0], shape=diffOps1[0].shape), 
                           rsb_matrix(diffOps1[1], shape=diffOps1[1].shape))
-              REFS.append(diffOps2)
+              REFS.append(diffOps2) # index 13
               del(diffOps2)
        elif not StaticSolve and not RSBops:
               # Native sparse
@@ -821,18 +833,11 @@ def runModel(TestName):
        REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
        
-       # Update REFG with the 2nd vertical derivative of backgrounds
-       REFG.append(DDZMS1 @ DQDZ)
+       # Update REFG the terrain BC derivative
+       REFG.append(rsb_matrix(DDX_QS, shape=DDX_QS.shape))
        REFG.append(RLOPT[-1])
        
        if not StaticSolve:
-              
-              # KDtree lookups for filtering sweep
-              XMV = np.reshape(XL, (OPS,1), order='F')
-              ZMV = np.reshape(ZTL, (OPS,1), order='F')
-              XZV = np.hstack((XMV, ZMV))
-              
-              kdtxz = spk.KDTree(XZV)
               
               # Compute DX and DZ grid length scales
               DX_min = 1.0 * np.min(np.abs(DXM))
@@ -858,38 +863,34 @@ def runModel(TestName):
               DX = DX_min
               DLS = min(DX, DZ)
               
-              # Compute mesh areas
-              DAM = 1.0 / (abs(DIMS[1] - DIMS[0]) * DIMS[2]) * np.reshape(DXM * DZM, (1,OPS), order='F')
+              # Compute mesh averaging array
+              DAM = 0.5 * np.reshape(DXM * DZM, (OPS,), order='F')
               
-              # Compute filtering regions
+              # Compute filtering regions by KDtree lookups
+              XMV = np.reshape(XL, (OPS,1), order='F')
+              ZMV = np.reshape(ZTL, (OPS,1), order='F')
+              XZV = np.hstack((XMV, ZMV))
+              
+              kdtxz = spk.KDTree(XZV)
               DL1 = 1.0 * DX_avg
               DL2 = 1.0 * DZ_avg
-              DLR = 2.0 * mt.sqrt(DL1**2 + DL2**2)
+              DLR = 1.0 * mt.sqrt(DX_avg**2 + DZ_avg**2)
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)
 
               # Manipulate arrays to enable numba acceleration for DynSGS
-              maxL = 0
-              lstL = []
-              for dex in fltDex:
-                     maxL0 = len(dex)
-                     lstL += [maxL0]
-                     maxL = np.amax([maxL,maxL0])
-              
               import numba as nb
               nb_list = nb.typed.List
-              lstL = np.array(lstL, dtype=np.int32)
               regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
 
               # Create a container for DynSGS scaling and region parameters
-              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, regDex, (maxL,lstL))
+              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, regDex)
               
        # Get memory back
        del(DDXMS1); del(DDZMS1)
        del(DDXMS_CFD); del(DDZMS_CFD)
        del(DDXMS_QS); del(DDZMS_QS)
        del(diffOps1)
-       del(PPXMD)
        
        #%% SOLUTION INITIALIZATION
        physDOF = numVar * OPS
@@ -1140,13 +1141,17 @@ def runModel(TestName):
        #%% Transient solutions       
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
+              # Change floating point errors
+              np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
               
               # Initialize the perturbations
               if thisTime == 0.0:
                      
                      # Initialize fields
                      if withHydroState:
-                            fields[ubdex,1] = -dWBC
+                            #fields[ubdex,1] = -dWBC
+                            fields[ubdex,0] = -hydroState[ubdex,0]
+                            fields[ubdex,1] = 0.0
                      else:
                             fields[:,0] = hydroState[:,0]
                             fields[ubdex,1] = -dWBC
@@ -1166,8 +1171,8 @@ def runModel(TestName):
               # Initialize fields
               ti = 0; ff = 0
               fields0 = np.copy(fields)
-              rhsVec0 = np.zeros(fields.shape)
-              resVec0 = np.zeros(fields.shape)
+              rhsVec0 = np.copy(rhsVec)
+              #resVec0 = np.zeros(fields.shape)
               DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
               DCFC= (0.0, 0.0, 0.0)
               error = [np.linalg.norm(rhsVec)]
@@ -1184,17 +1189,29 @@ def runModel(TestName):
                      state = fields + hydroState
                      AS = np.abs(state)
                      
+                     # Compute the residual normalization based on the state
+                     FMAX = bn.nanmax(np.abs(state), axis=0)
+                     FMAX[2:] = 1.0
+                     FMAX[FMAX <= 1.0E-10] = 1.0
+                     QF = np.diag(np.reciprocal(FMAX))
+                     
+                     # Compute the residual using the average RHS over the time increment
+                     if DynSGS_RES:
+                            magVec = resVec @ QF
+                     else:
+                            magVec = rhsVec @ QF
+                     
                      # Print out diagnostics every TOPT[5] seconds
                      if interTime1 >= TOPT[5] and ti > 0:
                             
                             message = ''
-                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
+                            err = displayResiduals(message, np.reshape(magVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
                             error.append(err)
                             
                             # Store in the NC file
                             store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields0, rhsVec, resVec, DCF)
-                            
+                                                        
                             ff += 1
                             interTime1 = 0.0
                      
@@ -1218,30 +1235,34 @@ def runModel(TestName):
                                    if not np.isnan(newDT) and not np.isinf(newDT):
                                           TOPT[0] = newDT
                                           
-                                   # Constant sponge layer and interior diffusivity
-                                   VDM = bn.nanmax(AS[:,0:2],axis=0) 
-                                   DCFC = (0.5 * TOPT[0] * VWAV_max**2, 0.5 * TOPT[0] * VDM[0]**2, 0.5 * TOPT[0] * VDM[1]**2)
+                                   # Constant sponge layer diffusivity
+                                   DCFC = (TOPT[0] * VWAV_max**2, VSND.astype(np.float64))
                             except:
                                    print('Bad computation of local sound speed, no change in time step.')
                                    print('Time: ', thisTime, ti)
                                    
                             interTime3 = 0.0
-                     
-                     # Compute the residual normalization based on the state
-                     RMAX = bn.nanmax(np.abs(fields), axis=0)
-                     RMAX[RMAX <= 1.0E-16] = 1.0
-                     QR = np.diag(np.reciprocal(RMAX))
-                     
-                     # Compute the residual using the average RHS over the time increment
-                     resVec = resVec @ QR
-                     DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, resVec, DLD, \
+                            
+                     DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, magVec, DLD, \
                                                             ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, DCFC)
                             
                      # Compute the solution within a time step
                      try:   
-                            fields, rhsVec, resVec = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields0, rhsVec0, resVec0, hydroState, DCF, \
+                            fields = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                                                                    DLD, TOPT, fields0, hydroState, DCF, \
                                                                     zeroDex, ebcDex, filteredCoeffs, verticalStagger, diffusiveFlux)
+                                   
+                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
+                                                                PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True)
+                            
+                            #delFields = fields - fields0
+                            #resVec = delFields / TOPT[0] - 0.5 * (rhsVec + rhsVec0)
+                            resVec = 0.5 * (rhsVec - rhsVec0)
+                            
+                            # Set the previous fields
+                            fields0 = np.copy(fields)
+                            rhsVec0 = np.copy(rhsVec)
+                            #resVec0 = np.copy(resVec)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
@@ -1251,11 +1272,6 @@ def runModel(TestName):
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
-                            
-                     # Set the previous fields
-                     fields0 = np.copy(fields)
-                     rhsVec0 = np.copy(rhsVec)
-                     resVec0 = np.copy(resVec)
                      
                      ti += 1
                      thisTime += TOPT[0]

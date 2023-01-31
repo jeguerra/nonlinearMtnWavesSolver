@@ -37,6 +37,7 @@ def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
               x = np.linspace(L1, L2, num=NX+1, endpoint=True)
        else:
               a = np.linspace(L1, L2, num=NX+1, endpoint=True)
+              
               b = a / L2
               x = b - 1 / (4.0 * mt.pi) * np.sin(2.0 * mt.pi * b)
               x *= L2

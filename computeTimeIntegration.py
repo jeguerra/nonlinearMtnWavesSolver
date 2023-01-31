@@ -39,18 +39,18 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, rhs0, res0, init0, DCF, zeroDex, ebcDex, \
+                              sol0, init0, DCF, zeroDex, ebcDex, \
                               filteredCoeffs, verticalStagger, diffusiveFlux):
        
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
        RLM = REFG[4].data
-       ldex = REFG[5]
        
        S = DLD[4]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
        bdex = ebcDex[2]
+       tdex = ebcDex[3]
        
        # Use multithreading on CPU
        DDXM_A = REFS[12][0]
@@ -61,17 +61,26 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        def computeUpdate(coeff, solA, sol2Update):
               
+              # Change floating point errors
+              np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
+              
               DF = coeff * DT
               
               #%% First dynamics update
-              PqPxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
+              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
+              PqPxA = DqDxA - REFS[15] * DqDzA
+              
+              # Apply Rayleigh damping layer implicitly
+              RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
+              PqPxA[:,REFG[-1]] *= RayDamp.T
+              DqDzA[:,REFG[-1]] *= RayDamp.T
                                    
               # Compute advection update
               stateA = solA + init0
               rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA, stateA[:,0], stateA[:,1], ebcDex)
                      
               # Compute internal force update
-              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA, ebcDex)
+              rhsIfc, RdT = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA)
 
               # Store the dynamic RHS
               rhsDyn = (rhsAdv + rhsIfc)
@@ -79,13 +88,18 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% Compute diffusive update
               
+              Psr = init0[:,2] * (1.0 + np.expm1(solA[:,2], dtype=np.longdouble))
+              Rho = np.expand_dims(Psr / RdT, axis=1)
+              invRho = np.reciprocal(Rho)
+
               # Compute directional derivative along terrain
-              PqPxA[bdex,:] += dhdx * DqDzA[bdex,:]
-              PqPxA[bdex,:] *= S
+              PqPxA[bdex,:] = S * DqDxA[bdex,:]
               
               if diffusiveFlux:
                      PqPxA *= DCF[0]
                      DqDzA *= DCF[1]
+                     PqPxA *= Rho
+                     DqDzA *= Rho
                             
               # Compute derivatives of diffusive flux
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
@@ -93,7 +107,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Second directional derivatives (of the diffusive fluxes)
               P2qPx2[bdex,:] += dhdx * P2qPxz[bdex,:]; P2qPx2[bdex,:] *= S
-              P2qPzx[bdex,:] += dhdx * P2qPz2[bdex,:]; P2qPx2[bdex,:] *= S
+              P2qPzx[bdex,:] += dhdx * P2qPz2[bdex,:]; P2qPzx[bdex,:] *= S
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
@@ -101,12 +115,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
               # Apply update
+              rhsDif *= invRho
               solB = sol2Update + DF * (rhsDyn + rhsDif)
-              
+              #'''
               # Apply Rayleigh damping layer implicitly
-              RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
-              rdex = REFG[-1]
-              solB[:,rdex] = np.copy(RayDamp.T * solB[:,rdex])
+              state = solB + init0
+              solB[:,REFG[-1]] *= RayDamp.T
               
               return solB, rhsDyn
        
@@ -153,38 +167,24 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               return sol4, rhsAvg
        
        def ketcheson93(sol):
-              rhs = 0.0
-              res = 0.0
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               
               sol, rhs = computeUpdate(c1, sol, sol)
-              rhs += rhs
               sol1 = np.copy(sol)
               
               for ii in range(5):
-                     rhs0 = np.copy(rhs)
                      sol, rhs = computeUpdate(c1, sol, sol)
-                     rhs += rhs
-                     res += (rhs - rhs0)
                      
               # Compute stage 6* with linear combination
               sol = 0.6 * sol1 + 0.4 * sol
               
               for ii in range(3):
-                     rhs0 = np.copy(rhs)
                      sol, rhs = computeUpdate(c1, sol, sol)
-                     rhs += rhs
-                     res += (rhs - rhs0)
-                     
-              rhsAvg = 1.0/9.0 * rhs
-              resAvg = 1.0/8.0 * res
                             
-              return sol, rhsAvg, resAvg
+              return sol
        
        def ketcheson104(sol):
-              rhs = 0.0
-              res = 0.0
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               
@@ -192,33 +192,20 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               sol2 = np.copy(sol)
               
               sol1, rhs = computeUpdate(c1, sol1, sol1)
-              rhs += rhs
               
               for ii in range(3):
-                     rhs0 = np.copy(rhs)
                      sol1, rhs = computeUpdate(c1, sol1, sol1)
-                     rhs += rhs
-                     res += (rhs - rhs0)
               
               sol2 = 0.04 * sol2 + 0.36 * sol1
               sol1 = 15.0 * sol2 - 5.0 * sol1
               
               for ii in range(4):
-                     rhs0 = np.copy(rhs)
                      sol1, rhs = computeUpdate(c1, sol1, sol1)
-                     rhs += rhs
-                     res += (rhs - rhs0)
                      
               sol = sol2 + 0.6 * sol1
-              rhs0 = np.copy(rhs)
               sol, rhs = computeUpdate(0.1, sol1, sol)
-              rhs += rhs
-              res += (rhs - rhs0)
-                            
-              rhsAvg = 1.0/9.0 * rhs
-              resAvg = 1.0/8.0 * res
               
-              return sol, rhsAvg, resAvg
+              return sol
        
        def ssprk54(sol):
               
@@ -275,15 +262,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB, rhsAvg, resAvg = ketcheson93(sol0)
+              solB = ketcheson93(sol0)
        elif order == 4:
-              solB, rhsAvg, resAvg = ketcheson104(sol0)
+              solB = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
-              
-       # Enforce the kinematic BC to finish the update
-       U = init0[:,0] + solB[:,0]
-       solB = tendency.enforceEssentialBC(solB, U, zeroDex, ebcDex, REFS[6][0])
        
-       return solB, rhsAvg, resAvg
+       return solB

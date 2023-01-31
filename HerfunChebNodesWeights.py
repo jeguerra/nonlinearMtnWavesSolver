@@ -7,12 +7,11 @@ Created on Wed Jul 17 16:07:48 2019
 """
 
 import numpy as np
-from numpy import multiply as mul
 import math as mt
 from scipy.special import roots_hermite
 from scipy.special import roots_genlaguerre
 from scipy.special import roots_legendre
-#from scipy import linalg as las
+from numba import njit
 
 def lgfunclb(NX):
        
@@ -183,7 +182,7 @@ def legpolym(ND, xi, fullMat):
        poly0 = np.ones(NX)
        poly1 = xi
        dpoly0 = np.zeros(NX)
-       dpoly1 = np.ones(NX)
+       dpoly1 = np.copy(poly0)
                         
        # Initialize the output matrices if needed
        if fullMat:

@@ -72,7 +72,6 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        elif bcType == 2:
               if isInflow:
                      # Inflow condition on UWPT TRANSIENT SOLUTION
-                     '''
                      rowsOutU = set(uldex1)
                      rowsOutW = set(np.concatenate((uldex1,utdex)))
                      rowsOutP = set(uldex1)
@@ -81,31 +80,16 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, top)))
-                     '''
-                     rowsOutU = set(np.concatenate((uldex1,urdex1)))
-                     rowsOutW = set(np.concatenate((utdex,ubdex)))
-                     rowsOutP = set()
-                     rowsOutT = set()
-                     # Indexing for static solver
-                     left = uldex1
-                     right = urdex1
-                     top = utdex + iW*OPS
-                     bott = ubdex + iW*OPS
-                     rowsOutBC = set(np.concatenate((left, right, top, bott)))
-                    
               else:
                      # Pinned condition on UWPT TRANSIENT SOLUTION
                      rowsOutU = set(np.concatenate((uldex1,urdex1)))
                      rowsOutW = set(np.concatenate((uldex1,urdex1,utdex)))
-                     #rowsOutP = set(np.concatenate((uldex1,urdex1)))
-                     rowsOutP = set()
+                     rowsOutP = set(np.concatenate((uldex1,urdex1)))
                      rowsOutT = set(np.concatenate((uldex1,urdex1)))
               
                       # Indexing for static solver
-                     #left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
-                     #right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iP*OPS, urdex1 + iT*OPS))
-                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iT*OPS))
-                     right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iT*OPS))
+                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+                     right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iP*OPS, urdex1 + iT*OPS))
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, right, top)))
               #'''
