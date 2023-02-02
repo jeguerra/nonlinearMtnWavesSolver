@@ -419,21 +419,16 @@ def runModel(TestName):
        # Set the use of a persistent hydrostatic background:
        withHydroState = True
        
+       useGuellrich = True
+       useUniformSt = False
+       
        # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
        if StaticSolve and not NonLinSolve:
               RSBops = False
-              useGuellrich = True
-              useUniformSt = False
               verticalStagger = False
        else:
-              RSBops = True # Turn off PyRSB SpMV
+              RSBops = False # Turn off PyRSB SpMV
               verticalStagger = False
-              if verticalStagger:
-                     useGuellrich = False
-                     useUniformSt = True
-              else:
-                     useGuellrich = False
-                     useUniformSt = True
               
        if verticalStagger:
               print('Staggered spectral method in the vertical.')
@@ -473,7 +468,7 @@ def runModel(TestName):
        else:
               print('No spatial filter on DynSGS coefficients.')
               
-       DynSGS_RES = False
+       DynSGS_RES = True
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
        else:
@@ -485,8 +480,8 @@ def runModel(TestName):
        else:
               print('Diffusion by product of coefficients with 2nd derivatives.')
               
-       verticalChebGrid = False
-       verticalLegdGrid = True
+       verticalChebGrid = True
+       verticalLegdGrid = False
        if verticalChebGrid:
               print('Chebyshev spectral derivative in the vertical.')
        elif verticalLegdGrid:
@@ -723,23 +718,24 @@ def runModel(TestName):
        
        #%% DIFFERENTIATION OPERATORS
        DDX_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-       DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
+       DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1] / DIMS[2], 4)
        DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD4)
-       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD4)
+       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1] / DIMS[2], True, False, DDZ_CFD4)
        
        DDX_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1] / DIMS[2], 6)
        DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD6)
-       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD6)
+       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1] / DIMS[2], True, False, DDZ_CFD6)
        
        # Derivative operators for dynamics
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
-       DDXMS_CFD, DDZMS_CFD = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
+       DDXMS_CFD4, DDZMS_CFD4 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD4, DDZ_CFD4)
+       DDXMS_CFD6, DDZMS_CFD6 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZI = NZ + 1
+       NZI = int(1.5*NZ)
        
        if verticalChebGrid:
               
@@ -771,41 +767,37 @@ def runModel(TestName):
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
               DDZ_I0, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
               
-              # Can we use a lower order method in the staggering?
-              DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(xiI, 6)
-              DDZ_I1, dummy = derv.computeQuinticSplineDerivativeMatrix(xiI, True, False, DDZ_BC)
-              DDZ_I1 *= 2.0 / DIMS[2]
-              
               O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
               I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
               
               DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
               dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
        else:
-              DDZMI = 0.5 * (DDZMS_QS + DDZMS_CFD)
+              DDZMI = 0.5 * (DDZMS_QS + DDZMS_CFD6)
               
               
        if verticalStagger and (verticalLegdGrid or verticalChebGrid):
               # Staggered vertical operator
               DDZM_OP = sps.block_diag((DDZMS1, DDZMS1, DDZMI, DDZMI), format='csr')
-              #DDZM_OP = sps.block_diag((DDZMS_QS, DDZMS_QS, DDZMI, DDZMI), format='csr')
        else:
               # Average the staggered operators
               DDZM_OP = 0.5 * (DDZMS1 + DDZMI)
-              #DDZM_OP = 0.5 * (DDZMS_QS + DDZMS_CFD)
               
        if HermFunc:
               DDXM_OP = 1.0 * DDXMS1# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
-              DDXM_OP = 0.5 * (DDXMS_QS + DDXMS_CFD)# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZM_OPA)
+              DDXM_OP = 0.5 * (DDXMS_QS + DDXMS_CFD6)# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZM_OPA)
               
        #plt.plot(xiI, xiI, 'ko', xiO, xiO, 'ks')
        #plt.show()
        #input()
        
        #%% Prepare derivative operators for diffusion
-       PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
-       diffOps1 = (PPXMD, DDZMS_CS)
+       DDXD = 0.5 * (DDXMS_CS + DDXMS_CFD4)
+       DDZD = 0.5 * (DDZMS_CS + DDZMS_CFD4)
+       PPXMD = DDXD - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZD)
+       diffOps1 = (PPXMD, DDZD)
+       del(DDXD); del(DDZD)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
@@ -834,7 +826,7 @@ def runModel(TestName):
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
        
        # Update REFG the terrain BC derivative
-       REFG.append(rsb_matrix(DDX_QS, shape=DDX_QS.shape))
+       REFG.append(DDX_QS)
        REFG.append(RLOPT[-1])
        
        if not StaticSolve:
@@ -873,8 +865,8 @@ def runModel(TestName):
               
               kdtxz = spk.KDTree(XZV)
               DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
-              DLR = 1.0 * mt.sqrt(DX_avg**2 + DZ_avg**2)
+              DL2 = 1.0 * DZ_max
+              DLR = 2.0 * mt.sqrt(DL1**2 + DL1**2)
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)
 
@@ -888,7 +880,9 @@ def runModel(TestName):
               
        # Get memory back
        del(DDXMS1); del(DDZMS1)
-       del(DDXMS_CFD); del(DDZMS_CFD)
+       del(DDXMS_CFD4); del(DDZMS_CFD4)
+       del(DDXMS_CFD6); del(DDZMS_CFD6)
+       del(DDXMS_CS); del(DDZMS_CS)
        del(DDXMS_QS); del(DDZMS_QS)
        del(diffOps1)
        

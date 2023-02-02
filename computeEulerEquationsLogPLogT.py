@@ -8,7 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 import numpy as np
 import warnings
 import scipy.sparse as sps
-#import sparse_dot_mkl as spk
+import sparse_dot_mkl as spk
 #import matplotlib.pyplot as plt
 
 def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
@@ -74,20 +74,20 @@ def computeFieldDerivatives(q, DDX, DDZ, verticalStagger):
        if verticalStagger:
               qs = np.reshape(q, (4 * q.shape[0], 1), order='F')
               
-              DqDx = DDX.dot(q)
-              DqDz = DDZ.dot(qs)
+              #DqDx = DDX.dot(q)
+              #DqDz = DDZ.dot(qs)
               
-              #DqDx = spk.dot_product_mkl(DDX, q)
-              #DqDz = spk.dot_product_mkl(DDZ, qs)
+              DqDx = spk.dot_product_mkl(DDX, q)
+              DqDz = spk.dot_product_mkl(DDZ, qs)
               
               #DqDx = np.reshape(DqDx, q.shape, order='F')
               DqDz = np.reshape(DqDz, q.shape, order='F')
        else:
-              DqDx = DDX.dot(q)
-              DqDz = DDZ.dot(q)
+              #DqDx = DDX.dot(q)
+              #DqDz = DDZ.dot(q)
               
-              #DqDx = spk.dot_product_mkl(DDX, q)
-              #DqDz = spk.dot_product_mkl(DDZ, q)
+              DqDx = spk.dot_product_mkl(DDX, q)
+              DqDz = spk.dot_product_mkl(DDZ, q)
               
        return DqDx, DqDz
 

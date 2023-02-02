@@ -46,7 +46,7 @@ def computeGuellrichDomain2D(DIMS, x, z, zRay, hx, dhdx, StaticSolve):
        NZ = DIMS[4] + 1
        
        # Compute the flat XZ mesh (computational domain)
-       HTZL, dummy = np.meshgrid(hx / ZH,z)
+       HTZL, dummy = np.meshgrid(hx, z)
        XL, ZL = np.meshgrid(x,z)
        
        # Make the global array of terrain height and slope features
@@ -62,7 +62,7 @@ def computeGuellrichDomain2D(DIMS, x, z, zRay, hx, dhdx, StaticSolve):
               ZTL[rr,:] = (dzdh[rr,0] * hx) + ZL[rr,:]
               DZT[rr,:] = dzdh[rr,0] * dhdx
        
-       dxidz = 1.0 + (HTZL * d_dzdh_dxi)
+       dxidz = ZH * (1.0 + (HTZL / ZH * d_dzdh_dxi))
        sigma = np.reciprocal(dxidz)
               
        #plt.plot(z, dzdh[:,0])
