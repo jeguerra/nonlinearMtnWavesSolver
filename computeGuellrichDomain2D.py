@@ -62,7 +62,7 @@ def computeGuellrichDomain2D(DIMS, x, z, zRay, hx, dhdx, StaticSolve):
               ZTL[rr,:] = (dzdh[rr,0] * hx) + ZL[rr,:]
               DZT[rr,:] = dzdh[rr,0] * dhdx
        
-       dxidz = ZH * (1.0 + (HTZL / ZH * d_dzdh_dxi))
+       dxidz = (1.0 + (HTZL / ZH * d_dzdh_dxi))
        sigma = np.reciprocal(dxidz)
               
        #plt.plot(z, dzdh[:,0])

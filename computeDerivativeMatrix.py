@@ -1477,7 +1477,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
        # Initialize grid and make column vector
        xi, wcp = cheblb(NZ)
        
-       b = 2.0
+       b = 2.0 / ZH
    
        # Get the Chebyshev transformation matrix
        CT = chebpolym(NZ+1, xi)
@@ -1550,7 +1550,7 @@ def computeLaguerreDerivativeMatrix(DIMS):
        LT = lgfuncm(NM-1, xi, True)
               
        # Get the scale factor
-       b = max(xi)
+       b = max(xi) / ZH
        
        # Make a diagonal matrix of weights
        W = np.diag(wlf, k=0)
@@ -1590,7 +1590,7 @@ def computeLegendreDerivativeMatrix(DIMS):
        xi, wlf = leglb(NZ)
        LT, DLT = legpolym(NZ, xi, True)
        
-       b = 2.0
+       b = 2.0 / ZH
        
        # Make a diagonal matrix of weights
        W = np.diag(wlf, k=0)

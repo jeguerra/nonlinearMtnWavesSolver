@@ -480,8 +480,8 @@ def runModel(TestName):
        else:
               print('Diffusion by product of coefficients with 2nd derivatives.')
               
-       verticalChebGrid = True
-       verticalLegdGrid = False
+       verticalChebGrid = False
+       verticalLegdGrid = True
        if verticalChebGrid:
               print('Chebyshev spectral derivative in the vertical.')
        elif verticalLegdGrid:
@@ -718,14 +718,14 @@ def runModel(TestName):
        
        #%% DIFFERENTIATION OPERATORS
        DDX_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-       DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1] / DIMS[2], 4)
+       DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
        DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD4)
-       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1] / DIMS[2], True, False, DDZ_CFD4)
+       DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD4)
        
        DDX_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1] / DIMS[2], 6)
+       DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        DDX_QS, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD6)
-       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1] / DIMS[2], True, False, DDZ_CFD6)
+       DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD6)
        
        # Derivative operators for dynamics
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
@@ -735,7 +735,7 @@ def runModel(TestName):
        DDXMS_CFD6, DDZMS_CFD6 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZI = int(1.5*NZ)
+       NZI = int(1*NZ)
        
        if verticalChebGrid:
               
@@ -743,7 +743,7 @@ def runModel(TestName):
               xiO, whf = derv.cheblb(NZ) #[-1 1]
               
               TMO, dummy = derv.legpolym(NZI, xiO, True)
-              TMI, dummy = derv.chebpolym(NZ+1, xiI, True)
+              TMI = derv.chebpolym(NZ+1, xiI)
               
               # Get the inner vertical derivatie
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
