@@ -427,7 +427,7 @@ def runModel(TestName):
               RSBops = False
               verticalStagger = False
        else:
-              RSBops = False # Turn off PyRSB SpMV
+              RSBops = True # Turn off PyRSB SpMV
               verticalStagger = False
               
        if verticalStagger:
@@ -445,14 +445,8 @@ def runModel(TestName):
               FourierLin = False
               print('Hermite Function grid in the horizontal.')
        else:
-              FourierLin = False
+              FourierLin = True
               print('Uniform Fourier grid in the horizontal.')
-              
-       inlineDCF = True
-       if inlineDCF:
-              print('DynSGS coefficients updated inline with RK stage updates.')
-       else:
-              print('DynSGS coefficients updated on full time step updates.')
               
        # Set residual diffusion switch
        DynSGS = thisTest.solType['DynSGS']
@@ -561,11 +555,11 @@ def runModel(TestName):
        zRay = DIMS[2] - RLOPT[0]
        
        if useGuellrich:
-              xl, ztl, dzt, sig, ZRL, DXM, DZM = \
+              xl, ztl, dzt, sig, ZRL = \
                      coords.computeGuellrichDomain2D(DIM0, REF0[0], REF0[1], zRay, hx, dhx, StaticSolve)
        
        if useUniformSt:
-              xl, ztl, dzt, sig, ZRL, DXM, DZM = \
+              xl, ztl, dzt, sig, ZRL = \
                      coords.computeStretchedDomain2D(DIM0, REF0, zRay, hx, dhx)
        
        REF0.append(xl)
@@ -620,11 +614,11 @@ def runModel(TestName):
        zRay = DIMS[2] - RLOPT[0]
        
        if useGuellrich:
-              XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
+              XL, ZTL, DZT, sigma, ZRL = \
                      coords.computeGuellrichDomain2D(DIMS, REFS[0], REFS[1], zRay, HofX, dHdX, StaticSolve)
        
        if useUniformSt:
-              XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
+              XL, ZTL, DZT, sigma, ZRL = \
                      coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        
        # Update the REFS collection
@@ -735,7 +729,7 @@ def runModel(TestName):
        DDXMS_CFD6, DDZMS_CFD6 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZI = int(1*NZ)
+       NZI = int(1.25*NZ)
        
        if verticalChebGrid:
               
@@ -757,31 +751,41 @@ def runModel(TestName):
               
        elif verticalLegdGrid:
               
-              xiI, whf = derv.cheblb(NZI) #[-1 1]
               xiO, whf = derv.leglb(NZ) #[-1 1]
+              xiI1, whf = derv.cheblb(NZI) #[-1 1]
+              xiI2, whf = derv.leglb(NZI) #[-1 1]
               
-              TMO = derv.chebpolym(NZI+1, xiO)
-              TMI, dummy = derv.legpolym(NZ, xiI, True)
+              TMO1 = derv.chebpolym(NZI+1, xiO)
+              TMO2, dummy = derv.legpolym(NZI, xiO, True)
+              TMI1, dummy = derv.legpolym(NZ, xiI1, True)
+              TMI2, dummy = derv.legpolym(NZ, xiI2, True)
               
               # Get the inner vertical derivatie
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
-              DDZ_I0, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
+              DDZ_I1, I_TRANS1 = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
+              DDZ_I2, I_TRANS2 = derv.computeLegendreDerivativeMatrix(DIMS_ST)
               
-              O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
-              I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
+              O2I_INT1 = (TMI1.T).dot(VTRANS) # Outer to Internal grid
+              O2I_INT2 = (TMI2.T).dot(VTRANS) # Outer to Internal grid
+              I2O_INT1 = (TMO1.T).dot(I_TRANS1) # Inner to Outer grid 1
+              I2O_INT2 = (TMO2.T).dot(I_TRANS2) # Inner to Outer grid 1
               
-              DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
-              dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
+              DDZ_I1 = I2O_INT1.dot(DDZ_I1).dot(O2I_INT1)
+              dummy, DDZMI1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I1)
+              
+              DDZ_I2 = I2O_INT2.dot(DDZ_I2).dot(O2I_INT2)
+              dummy, DDZMI2 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I2)
        else:
               DDZMI = 0.5 * (DDZMS_QS + DDZMS_CFD6)
               
               
        if verticalStagger and (verticalLegdGrid or verticalChebGrid):
               # Staggered vertical operator
-              DDZM_OP = sps.block_diag((DDZMS1, DDZMS1, DDZMI, DDZMI), format='csr')
+              #DDZM_DIV = 0.5 * (DDZMS_QS + DDZMS_CFD6)
+              DDZM_OP = sps.block_diag((DDZMI2, DDZMS1, DDZMI2, DDZMS1), format='csr')
        else:
               # Average the staggered operators
-              DDZM_OP = 0.5 * (DDZMS1 + DDZMI)
+              DDZM_OP = 0.5 * (DDZMI1 + DDZMI2)
               
        if HermFunc:
               DDXM_OP = 1.0 * DDXMS1# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
@@ -832,14 +836,16 @@ def runModel(TestName):
        if not StaticSolve:
               
               # Compute DX and DZ grid length scales
-              DX_min = 1.0 * np.min(np.abs(DXM))
-              DZ_min = 1.0 * np.min(np.abs(DZM))
+              DXV = np.diff(REFS[0])
+              DZV = np.diff(REFS[1])
+              DX_min = 1.0 * np.min(DXV)
+              DZ_min = 1.0 * np.min(DZV)
               print('Minimum grid lengths:',DX_min,DZ_min)
-              DX_avg = 1.0 * np.mean(np.abs(DXM))
-              DZ_avg = 1.0 * np.mean(np.abs(DZM))
+              DX_avg = 1.0 * np.mean(DXV)
+              DZ_avg = 1.0 * np.mean(DZV)
               print('Average grid lengths:',DX_avg,DZ_avg)
-              DX_max = 1.0 * np.max(np.abs(DXM))
-              DZ_max = 1.0 * np.max(np.abs(DZM))
+              DX_max = 1.0 * np.max(DXV)
+              DZ_max = 1.0 * np.max(DZV)
               print('Maximum grid lengths:',DX_max,DZ_max)
               DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
               DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
@@ -855,9 +861,6 @@ def runModel(TestName):
               DX = DX_min
               DLS = min(DX, DZ)
               
-              # Compute mesh averaging array
-              DAM = 0.5 * np.reshape(DXM * DZM, (OPS,), order='F')
-              
               # Compute filtering regions by KDtree lookups
               XMV = np.reshape(XL, (OPS,1), order='F')
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
@@ -865,8 +868,8 @@ def runModel(TestName):
               
               kdtxz = spk.KDTree(XZV)
               DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_max
-              DLR = 2.0 * mt.sqrt(DL1**2 + DL1**2)
+              DL2 = 1.0 * DZ_avg
+              DLR = mt.sqrt(DX_max**2 + DZ_max**2)
               fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
               print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)
 
@@ -876,7 +879,7 @@ def runModel(TestName):
               regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
 
               # Create a container for DynSGS scaling and region parameters
-              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, DAM, regDex)
+              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, regDex)
               
        # Get memory back
        del(DDXMS1); del(DDZMS1)
@@ -1184,16 +1187,16 @@ def runModel(TestName):
                      AS = np.abs(state)
                      
                      # Compute the residual normalization based on the state
-                     FMAX = bn.nanmax(np.abs(state), axis=0)
-                     FMAX[2:] = 1.0
-                     FMAX[FMAX <= 1.0E-10] = 1.0
-                     QF = np.diag(np.reciprocal(FMAX))
+                     #FMAX = bn.nanmax(np.abs(state), axis=0)
+                     #FMAX[2:] = 1.0
+                     #FMAX[FMAX <= 1.0E-10] = 1.0
+                     #QF = np.diag(np.reciprocal(FMAX))
                      
                      # Compute the residual using the average RHS over the time increment
                      if DynSGS_RES:
-                            magVec = resVec @ QF
+                            magVec = np.copy(resVec)# @ QF
                      else:
-                            magVec = rhsVec @ QF
+                            magVec = np.copy(rhsVec)# @ QF
                      
                      # Print out diagnostics every TOPT[5] seconds
                      if interTime1 >= TOPT[5] and ti > 0:
@@ -1230,7 +1233,7 @@ def runModel(TestName):
                                           TOPT[0] = newDT
                                           
                                    # Constant sponge layer diffusivity
-                                   DCFC = (TOPT[0] * VWAV_max**2, VSND.astype(np.float64))
+                                   DCFC = (0.5 * TOPT[0] * VWAV_max**2, VSND.astype(np.float64))
                             except:
                                    print('Bad computation of local sound speed, no change in time step.')
                                    print('Time: ', thisTime, ti)

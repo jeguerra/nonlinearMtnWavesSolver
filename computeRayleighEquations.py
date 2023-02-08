@@ -40,7 +40,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        RLX = np.zeros((NZ, NX))
        RLZ = np.zeros((NZ, NX))
        
-       for ii in range(0,NZ):
+       for ii in range(1,NZ):
               for jj in range(0,NX):
                      # Get this X location
                      XRL = X[ii,jj]

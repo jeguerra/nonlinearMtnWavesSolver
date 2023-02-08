@@ -41,7 +41,7 @@ def computeRegionFilterBound(UD, WD, Q_RES, DLD, nbrDex, LVAR):
               
        return Q1, Q2
 
-def computeResidualViscCoeffs2(DIMS, AV, MAG, DLD, bdex, ldex, applyFilter, RLM, DCFC):
+def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, applyFilter, RLM, DCFC):
        
        # Get the region indices map
        nbrDex = DLD[-1] # List of lists of indices to regions
@@ -54,8 +54,8 @@ def computeResidualViscCoeffs2(DIMS, AV, MAG, DLD, bdex, ldex, applyFilter, RLM,
        AMAG = np.abs(MAG)
        LVAR = MAG.shape[0]
        
-       # Reduce across the variables using the 1-norm
-       Q_RES = bn.nansum(AMAG, axis=1)
+       # Diffusion proportional to the residual entropy
+       Q_RES = PHYS[2] * AMAG[:,3] #bn.nansum(AMAG[:,2:], axis=1)
        
        #%% Filter to spatial regions and apply stability bounds
        CRES1, CRES2 = computeRegionFilterBound(UD, WD, Q_RES, DLD, nbrDex, LVAR)

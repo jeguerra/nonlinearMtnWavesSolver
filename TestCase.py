@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(691, 84, 155.0, 35.0, 300.0, \
+                     self.setUserData(763, 84, 205.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 10.0,
                                       4000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
@@ -168,7 +168,7 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.05 # seconds
               HR = 5.0 #/ 3600.0 # hours              
-              DTF = 0.75 # scale time step              
+              DTF = 0.5 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

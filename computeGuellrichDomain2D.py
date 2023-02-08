@@ -74,11 +74,7 @@ def computeGuellrichDomain2D(DIMS, x, z, zRay, hx, dhdx, StaticSolve):
        
        ZRL = (dzdh * hx) + zRay
        
-       # Compute the local grid lengths at each node
-       DXM = np.gradient(XL, np.arange(XL.shape[1]), axis=1, edge_order=1)
-       DZM = np.gradient(ZTL, np.arange(ZTL.shape[0]), axis=0, edge_order=1)
-       
-       return XL, ZTL, DZT, sigma, ZRL, DXM, DZM
+       return XL, ZTL, DZT, sigma, ZRL
 
 def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
        # Get data from DIMS and REFS
@@ -112,8 +108,4 @@ def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
        # Compute the coordinate surface at the edge of the Rayleigh layer
        ZRL = (1.0 - zRay / ZH) * hx + zRay
        
-       # Compute the local grid lengths at each node
-       DXM = np.gradient(XL, np.arange(XL.shape[1]), axis=1, edge_order=1)
-       DZM = np.gradient(ZTL, np.arange(ZTL.shape[0]), axis=0, edge_order=1)
-       
-       return XL, ZTL, DZT, sigma, ZRL, DXM, DZM
+       return XL, ZTL, DZT, sigma, ZRL

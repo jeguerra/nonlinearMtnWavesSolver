@@ -209,52 +209,78 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        def ssprk54(sol):
               
-              rhs = 0.0
-              
               # Stage 1
               b10 = 0.391752226571890
-              sol1, rhs = computeUpdate(b10, sol, sol, rhs)
-              rhs += rhs
+              sol1, rhs = computeUpdate(b10, sol, sol)
               
               # Stage 2
               a0 = 0.444370493651235
               a1 = 0.555629506348765
               sols = a0 * sol + a1 * sol1
               b21 = 0.368410593050371
-              sol2, rhs = computeUpdate(b21, sol1, sols, rhs)
-              rhs += rhs
+              sol2, rhs = computeUpdate(b21, sol1, sols)
               
               # Stage 3
               a0 = 0.620101851488403
               a2 = 0.379898148511597
               sols = a0 * sol + a2 * sol2
               b32 = 0.251891774271694
-              sol3, rhs = computeUpdate(b32, sol2, sols, rhs)
-              rhs += rhs
+              sol3, rhs = computeUpdate(b32, sol2, sols)
               
               # Stage 4
-              a40 = 0.178079954393132
-              a43 = 0.821920045606868
-              sols = a40 * sol + a43 * sol3
+              a0 = 0.178079954393132
+              a3 = 0.821920045606868
+              sols = a0 * sol + a3 * sol3
               b43 = 0.544974750228521
-              sol4, rhs = computeUpdate(b43, sol3, sols, rhs)
+              sol4, rhs = computeUpdate(b43, sol3, sols)
               fun3 = (sol4 - sols) / b43
-              rhs += rhs
               
               # Stage 5
-              a52 = 0.517231671970585
-              a53 = 0.096059710526147
-              a54 = 0.386708617503269
+              a2 = 0.517231671970585
+              a3 = 0.096059710526147
+              a4 = 0.386708617503269
               b53 = 0.063692468666290
               b54 = 0.226007483236906
-              sols = a52 * sol2 + a53 * sol3 + a54 * sol4
-              funs = DT * (b53 * fun3)
-              sol5, rhs = computeUpdate(b54, sol4, sols + funs, rhs)
-              rhs += rhs
+              sols = a2 * sol2 + a3 * sol3 + a4 * sol4
+              funs = b53 * fun3
+              sol5, rhs = computeUpdate(b54, sol4, sols + funs)
               
-              rhsAvg = 0.2 * rhs
+              return sol5
+       
+       def ssprk63(sol):
               
-              return sol5, rhsAvg
+              # Stage 1
+              b10 = 0.284220721334261
+              sol1, rhs = computeUpdate(b10, sol, sol)
+              
+              # Stage 2
+              b21 = 0.284220721334261
+              sol2, rhs = computeUpdate(b21, sol1, sol1)
+              
+              # Stage 3
+              b32 = 0.284220721334261
+              sol3, rhs = computeUpdate(b32, sol2, sol2)
+              
+              # Stage 4
+              a0 = 0.476769811285196
+              a1 = 0.098511733286064
+              a3 = 0.424718455428740
+              sols = a0 * sol + a1 * sol1 + a3 * sol3
+              b43 =  0.120713785765930
+              sol4, rhs = computeUpdate(b43, sol3, sols)
+              
+              # Stage 5
+              b54 = 0.284220721334261
+              sol5, rhs = computeUpdate(b54, sol4, sol4)
+              
+              # Stage 6
+              a2 = 0.155221702560091
+              a5 = 0.844778297439909
+              sols = a2 * sol2 + a5 * sol5
+              b65 =  0.240103497065900
+              sol6, rhs = computeUpdate(b65, sol5, sols)
+              
+              return sol6
 
        #%% THE MAIN TIME INTEGRATION STAGES
        
@@ -262,9 +288,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB = ketcheson93(sol0)
+              solB = ssprk63(sol0) #ketcheson93(sol0)
        elif order == 4:
-              solB = ketcheson104(sol0)
+              solB = ssprk54(sol0) #ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)
