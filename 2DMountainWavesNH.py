@@ -788,9 +788,11 @@ def runModel(TestName):
               DDZM_OP = 0.5 * (DDZMI1 + DDZMI2)
               
        if HermFunc:
-              DDXM_OP = 1.0 * DDXMS1# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+              DDXM_OP = DDXMS1# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
-              DDXM_OP = 0.5 * (DDXMS_QS + DDXMS_CFD6)# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZM_OPA)
+              DDXA = 0.5 * (DDXMS_QS + DDXMS_CFD6)
+              DDZA = 0.5 * (DDZMS_QS + DDZMS_CFD6)
+              DDXM_OP = DDXA# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZA)
               
        #plt.plot(xiI, xiI, 'ko', xiO, xiO, 'ks')
        #plt.show()
@@ -866,12 +868,34 @@ def runModel(TestName):
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
               XZV = np.hstack((XMV, ZMV))
               
-              kdtxz = spk.KDTree(XZV)
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
+              DL1 = mt.sqrt(2.0) * DX_avg
+              DL2 = mt.sqrt(2.0) * DZ_avg
               DLR = mt.sqrt(DX_max**2 + DZ_max**2)
-              fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
-              print('Diffusion regions dimensions (m): ', DL1, DL2, DLR)
+              
+              import matplotlib.path as pth
+              dx = 2.0 * mt.pi * DL1
+              dz = 2.0 * mt.pi * DL2
+              fltDex = []
+              for nn in np.arange(XZV.shape[0]):
+                     node = XZV[nn,:]
+                     verts = np.array([(node[0] + dx, node[1] - dz), \
+                              (node[0] + dx, node[1] + dz), \
+                              (node[0] - dx, node[1] + dz), \
+                              (node[0] - dx, node[1] - dz)])
+                     this_box = pth.Path(verts)
+                     region = this_box.contains_points(XZV)
+                     regDex = np.nonzero(region == True)[0].tolist()
+                     fltDex += [regDex]
+                     #plt.fill(verts[:,0], verts[:,1], color='orange')
+                     #plt.scatter(node[0], node[1], s=50, c='black')
+                     #plt.scatter(XZV[regDex,0], XZV[regDex,1], s=10, c='blue')
+                     #plt.show()
+                     #input('Diffusion region check.')
+              
+              #input(fltDex)
+              #kdtxz = spk.KDTree(XZV)
+              #fltDex = kdtxz.query_ball_tree(kdtxz, r=DLR)
+              print('Diffusion regions dimensions (m): ', DL1, DL2, dx, dz, DLR)
 
               # Manipulate arrays to enable numba acceleration for DynSGS
               import numba as nb
@@ -1241,7 +1265,7 @@ def runModel(TestName):
                             interTime3 = 0.0
                             
                      DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, magVec, DLD, \
-                                                            ebcDex[2], REFG[5], filteredCoeffs, REFG[4].data, DCFC)
+                                                            ebcDex[2], REFG[5], filteredCoeffs, REFG[4][0].data, DCFC)
                             
                      # Compute the solution within a time step
                      try:   

@@ -9,7 +9,8 @@ import numpy as np
 import warnings
 import scipy.sparse as sps
 import sparse_dot_mkl as spk
-#import matplotlib.pyplot as plt
+# Change floating point errors
+np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
 def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
               
@@ -44,7 +45,6 @@ def computeRdT(q, RdT_bar, kap):
        
        # Compute pressure gradient force scaling (buoyancy)
        with warnings.catch_warnings():
-              np.seterr(all='raise')
               
               earg = kap * q[:,2] + q[:,3]
               try:
@@ -436,9 +436,6 @@ def computeRayleighTendency(REFG, fields):
        return DqDt
 
 def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex, DLD, DCF, isFluxDiv):
-       
-       # Change floating point errors
-       np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]

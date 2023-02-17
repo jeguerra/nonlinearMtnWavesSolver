@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(763, 84, 205.0, 35.0, 300.0, \
+                     self.setUserData(823, 84, 205.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 10.0,
                                       4000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
@@ -141,7 +141,7 @@ class TestCase:
               applyTop = True
               applyLateral = True
               mu = rlf * 1.0E-2
-              rdex = [0, 1, 2, 3]
+              rdex = [1]
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC, rdex)
               
               # Set the terrain options

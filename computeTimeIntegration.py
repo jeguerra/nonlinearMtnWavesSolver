@@ -13,6 +13,8 @@ import bottleneck as bn
 import matplotlib.pyplot as plt
 import computeEulerEquationsLogPLogT as tendency
 import computeResidualViscCoeffs as rescf
+# Change floating point errors
+np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
 def plotRHS(x, rhs, ebcDex, label):
        plim = 2.0E4
@@ -45,7 +47,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
-       RLM = REFG[4].data
+       RLMX = REFG[4][1].data
+       RLMZ = REFG[4][2].data
        
        S = DLD[4]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
@@ -61,19 +64,15 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              # Change floating point errors
-              np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
-              
               DF = coeff * DT
               
               #%% First dynamics update
               DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
               PqPxA = DqDxA - REFS[15] * DqDzA
               
-              # Apply Rayleigh damping layer implicitly
-              RayDamp = np.reciprocal(1.0 + DF * mu * RLM)
-              PqPxA[:,REFG[-1]] *= RayDamp.T
-              DqDzA[:,REFG[-1]] *= RayDamp.T
+              # Apply Rayleigh damping layer implicitly to derivatives
+              RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
+              RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
                                    
               # Compute advection update
               stateA = solA + init0
@@ -88,11 +87,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% Compute diffusive update
               
-              Psr = init0[:,2] * (1.0 + np.expm1(solA[:,2], dtype=np.longdouble))
+              Psr = init0[:,2] * (1.0 + np.expm1(solA[:,2]))
               Rho = np.expand_dims(Psr / RdT, axis=1)
               invRho = np.reciprocal(Rho)
 
               # Compute directional derivative along terrain
+              #DqDxA = PqPxA[bdex,:] + dhdx * DqDzA[bdex,:] 
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
               
               if diffusiveFlux:
@@ -119,8 +119,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB = sol2Update + DF * (rhsDyn + rhsDif)
               #'''
               # Apply Rayleigh damping layer implicitly
-              state = solB + init0
-              solB[:,REFG[-1]] *= RayDamp.T
+              #state = solB + init0
+              solB[:,0] *= RayDX.T
+              solB[:,1] *= RayDZ.T
               
               return solB, rhsDyn
        
@@ -209,9 +210,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        def ssprk54(sol):
               
-              # Stage 1
+              # Stage 1 predictor
               b10 = 0.391752226571890
               sol1, rhs = computeUpdate(b10, sol, sol)
+              # Stage 1 corrector
+              solp = sol + 0.5 * (sol1 - sol)
+              sol1, rhs = computeUpdate(0.5 * b10, sol1, solp)
               
               # Stage 2
               a0 = 0.444370493651235
