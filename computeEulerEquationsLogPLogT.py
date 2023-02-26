@@ -8,7 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 import numpy as np
 import warnings
 import scipy.sparse as sps
-import sparse_dot_mkl as spk
+#import sparse_dot_mkl as spk
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
@@ -491,6 +491,6 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex,
               DqDt[bdex,3] = mu_xb * P2qPx2[bdex,3]
        
        # Scale and apply coefficients
-       DqDt[:,3] *= 0.71 / 0.4
+       #DqDt[:,3] *= 0.71 / 0.4
 
        return DqDt

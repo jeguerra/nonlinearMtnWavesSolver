@@ -84,22 +84,22 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(823, 84, 205.0, 35.0, 300.0, \
+                     self.setUserData(763, 92, 145.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 10.0,
-                                      4000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                                      5000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 98, 150.0, 42.0, 300.0, \
                                       10000.0, 25000.0, 10.0, \
-                                      4000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_transient')
+                                      5000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_transient')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -174,7 +174,7 @@ class TestCase:
               ET = HR * 60 * 60 # End time in seconds
               OTI = 5.0 # Time for diagnostic output
               ITI = 5.0 # Time for image output
-              RTI = 0.5 # Time for time step and constant damping update
+              RTI = 0.2 # Time for time step and constant damping update
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI, RTI]
        

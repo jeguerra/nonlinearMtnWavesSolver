@@ -15,7 +15,7 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-fname = 'Simulation2Plot.nc'
+fname = 'Simulation2View1.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -57,8 +57,8 @@ sgsname = 'SGS-PT.gif'
 runPertb = True
 runSGS = False
 
-runPar = True
-runSer = False
+runPar = False
+runSer = True
 
 def plotPertb(tt):
        fig = plt.figure(figsize=(16.0, 8.0))

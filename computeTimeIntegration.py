@@ -6,13 +6,9 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
-import math as mt
-import scipy.sparse as sps
-import time as tm
-import bottleneck as bn
 import matplotlib.pyplot as plt
 import computeEulerEquationsLogPLogT as tendency
-import computeResidualViscCoeffs as rescf
+
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
@@ -92,7 +88,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               invRho = np.reciprocal(Rho)
 
               # Compute directional derivative along terrain
-              #DqDxA = PqPxA[bdex,:] + dhdx * DqDzA[bdex,:] 
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
               
               if diffusiveFlux:
@@ -294,7 +289,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        elif order == 3:
               solB = ssprk63(sol0) #ketcheson93(sol0)
        elif order == 4:
-              solB = ssprk54(sol0) #ketcheson104(sol0)
+              #solB = ssprk54(sol0) 
+              solB = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               solB = ketchesonM2(sol0)

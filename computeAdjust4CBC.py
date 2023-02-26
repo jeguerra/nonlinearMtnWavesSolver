@@ -43,12 +43,21 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
               print('Inflow boundary configuration.')
        else:
               print('Horiztonally pinned state boundary configuration.')
+              
+       rowsOutU = set(uldex2)
+       rowsOutW = set(np.concatenate((uldex2,utdex)))
+       rowsOutP = set()
+       rowsOutT = set()
+       # Indexing for static solver
+       left = np.concatenate((uldex2, uldex2 + iW*OPS))
+       top = utdex + iW*OPS
+       rowsOutBC = set(np.concatenate((left, top)))
        
+       '''
        # BC indices for static solution (per variable)
        if bcType == 1:
               if isInflow:
                      # Inflow condition on UWPT STATIC SOLUTION
-                     #'''
                      rowsOutU = set(uldex2)
                      rowsOutW = set(np.concatenate((uldex2,utdex)))
                      rowsOutP = set(uldex2)
@@ -92,7 +101,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iP*OPS, urdex1 + iT*OPS))
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, right, top)))
-              #'''
+       '''
               
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)
