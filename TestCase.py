@@ -167,14 +167,14 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.05 # seconds
-              HR = 5.0 #/ 3600.0 # hours              
-              DTF = 0.5 # scale time step              
+              HR = 4.0 #/ 3600.0 # hours              
+              DTF = 0.8 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 5.0 # Time for diagnostic output
+              OTI = 10.0 # Time for diagnostic output
               ITI = 5.0 # Time for image output
-              RTI = 0.2 # Time for time step and constant damping update
+              RTI = 0.5 # Time for time step and constant damping update
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI, RTI]
        

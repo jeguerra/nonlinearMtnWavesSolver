@@ -27,7 +27,7 @@ def computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D):
               DDZ_OP[np.ix_(ddex,ddex)] = SIGMA.dot(DDZ_1D)
               
        # Make the operators sparse
-       DDZM = DDZ_OP.tocsr()
+       DDZM = sps.csr_array(DDZ_OP); del(DDZ_OP)
            
        # Horizontal Derivative
        DDX_OP = sps.lil_array((OPS,OPS))
@@ -37,7 +37,7 @@ def computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D):
               DDX_OP[np.ix_(ddex,ddex)] = DDX_1D
               
        # Make the operators sparse
-       DDXM = DDX_OP.tocsr()
+       DDXM = sps.csr_array(DDX_OP); del(DDX_OP)
 
        return DDXM, DDZM
 

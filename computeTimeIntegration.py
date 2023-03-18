@@ -8,6 +8,7 @@ Created on Tue Aug 13 10:09:52 2019
 import numpy as np
 import matplotlib.pyplot as plt
 import computeEulerEquationsLogPLogT as tendency
+import time
 
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
@@ -38,7 +39,7 @@ def plotRHS(x, rhs, ebcDex, label):
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, DCF, zeroDex, ebcDex, \
-                              filteredCoeffs, verticalStagger, diffusiveFlux):
+                              filteredCoeffs, verticalStagger, diffusiveFlux, RSBops):
        
        DT = TOPT[0]
        order = TOPT[3]
@@ -49,7 +50,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        S = DLD[4]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
        bdex = ebcDex[2]
-       tdex = ebcDex[3]
        
        # Use multithreading on CPU
        DDXM_A = REFS[12][0]
@@ -63,8 +63,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               DF = coeff * DT
               
               #%% First dynamics update
-              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger)
+              #st = time.time()
+              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger, RSBops)
               PqPxA = DqDxA - REFS[15] * DqDzA
+              #et = time.time()
+              #print(et - st)
+              #input('DERIVATIVE OPERATION TIMING CHECK:')
               
               # Apply Rayleigh damping layer implicitly to derivatives
               RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
@@ -95,10 +99,13 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DqDzA *= DCF[1]
                      PqPxA *= Rho
                      DqDzA *= Rho
+              else:
+                     PqPxA *= Rho
+                     DqDzA *= Rho
                             
               # Compute derivatives of diffusive flux
               P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
-              tendency.computeFieldDerivatives2(PqPxA, DqDzA, DDXM_B, DDZM_B, REFS)
+              tendency.computeFieldDerivatives2(PqPxA, DqDzA, DDXM_B, DDZM_B, REFS, RSBops)
               
               # Second directional derivatives (of the diffusive fluxes)
               P2qPx2[bdex,:] += dhdx * P2qPxz[bdex,:]; P2qPx2[bdex,:] *= S
@@ -117,6 +124,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #state = solB + init0
               solB[:,0] *= RayDX.T
               solB[:,1] *= RayDZ.T
+              solB[:,3] *= RayDX.T
+              solB[:,3] *= RayDZ.T
               
               return solB, rhsDyn
        
@@ -135,18 +144,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               return sol
        
        def ssprk43(sol):
-              rhs = 0.0
               # Stage 1
               sol1, rhs = computeUpdate(0.5, sol, sol)
-              rhs += rhs
               # Stage 2
               sol2, rhs = computeUpdate(0.5, sol1, sol1)
-              rhs += rhs
               
               # Stage 3 from SSPRK32
               sols = 1.0 / 3.0 * sol + 2.0 / 3.0 * sol2
               sol3, rhs = computeUpdate(1.0 / 3.0, sol2, sols)
-              rhs += rhs
               
               sols = 0.5 * (sol3 + sol)
               # Stage 3
@@ -155,12 +160,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Stage 4
               sol4, rhs = computeUpdate(0.5, sols, sols)
-              rhs += rhs
-              
-              res = sol4 - sol3
-              rhsAvg = 0.25 * rhs
                                           
-              return sol4, rhsAvg
+              return sol4
        
        def ketcheson93(sol):
               # Ketchenson, 2008 10.1137/07070485X
@@ -187,7 +188,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               sol1 = np.copy(sol)
               sol2 = np.copy(sol)
               
-              sol1, rhs = computeUpdate(c1, sol1, sol1)
+              sol1, rhsA = computeUpdate(c1, sol1, sol1)
               
               for ii in range(3):
                      sol1, rhs = computeUpdate(c1, sol1, sol1)
@@ -199,7 +200,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      sol1, rhs = computeUpdate(c1, sol1, sol1)
                      
               sol = sol2 + 0.6 * sol1
-              sol, rhs = computeUpdate(0.1, sol1, sol)
+              sol, rhsB = computeUpdate(0.1, sol1, sol)
               
               return sol
        
@@ -207,7 +208,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Stage 1 predictor
               b10 = 0.391752226571890
-              sol1, rhs = computeUpdate(b10, sol, sol)
+              sol1, rhsA = computeUpdate(b10, sol, sol)
               # Stage 1 corrector
               solp = sol + 0.5 * (sol1 - sol)
               sol1, rhs = computeUpdate(0.5 * b10, sol1, solp)
@@ -234,15 +235,18 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               sol4, rhs = computeUpdate(b43, sol3, sols)
               fun3 = (sol4 - sols) / b43
               
+              # Stage corrector
+              solp = sols + 0.5 * (sol4 - sols)
+              sol4, rhs = computeUpdate(0.5 * b43, sol4, solp)
+              
               # Stage 5
               a2 = 0.517231671970585
               a3 = 0.096059710526147
               a4 = 0.386708617503269
               b53 = 0.063692468666290
               b54 = 0.226007483236906
-              sols = a2 * sol2 + a3 * sol3 + a4 * sol4
-              funs = b53 * fun3
-              sol5, rhs = computeUpdate(b54, sol4, sols + funs)
+              sols = a2 * sol2 + a3 * sol3 + a4 * sol4 + b53 * fun3
+              sol5, rhsB = computeUpdate(b54, sol4, sols)
               
               return sol5
        
@@ -250,7 +254,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Stage 1
               b10 = 0.284220721334261
-              sol1, rhs = computeUpdate(b10, sol, sol)
+              sol1, rhsA = computeUpdate(b10, sol, sol)
+              
+              # Stage 1 corrector
+              solp = sol + 0.5 * (sol1 - sol)
+              sol1, rhs = computeUpdate(0.5 * b10, sol1, solp)
               
               # Stage 2
               b21 = 0.284220721334261
@@ -277,8 +285,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               a5 = 0.844778297439909
               sols = a2 * sol2 + a5 * sol5
               b65 =  0.240103497065900
-              sol6, rhs = computeUpdate(b65, sol5, sols)
-              
+              sol6, rhsB = computeUpdate(b65, sol5, sols)
+       
               return sol6
 
        #%% THE MAIN TIME INTEGRATION STAGES
@@ -287,7 +295,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               solB = ketchesonM2(sol0)
        elif order == 3:
-              solB = ssprk63(sol0) #ketcheson93(sol0)
+              solB = ssprk63(sol0) 
+              #solB = ketcheson93(sol0)
        elif order == 4:
               #solB = ssprk54(sol0) 
               solB = ketcheson104(sol0)

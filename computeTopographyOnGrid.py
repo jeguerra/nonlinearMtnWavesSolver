@@ -54,14 +54,14 @@ def computeTopographyOnGrid(REFS, opt):
        #DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(xh, True, False, DDX_BC)
        
        DDX_BC, DDX2A_BC = derv.computeCubicSplineDerivativeMatrix(xh, True, False, 0.0)
-       DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(xh, True, False, DDX_BC)
+       #DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(xh, True, False, DDX_BC)
        
        # Evaluate the function with different options
        if profile == 1:
               # Kaiser bell curve
               ht = h0 * sin2Dom
               # Take the derivative
-              dhdx = DDX_QS @ ht
+              dhdx = DDX_BC @ ht
        elif profile == 2:
               # Schar mountain with analytical slope
               ht1 = h0 * np.exp(-1.0 / aC**2.0 * np.power(xh, 2.0))
@@ -79,7 +79,7 @@ def computeTopographyOnGrid(REFS, opt):
               ht2 = 1.0 + hs * np.power(np.cos(mt.pi / lC * xh), ps)
               ht = hf * h0 * sin2Dom * ht2
               # Take the derivative
-              dhdx = DDX_QS @ ht
+              dhdx = DDX_BC @ ht
        elif profile == 4:
               # General even power exponential times a polynomial series
               ht = np.zeros(len(xh))

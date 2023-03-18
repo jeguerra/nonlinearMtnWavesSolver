@@ -8,7 +8,7 @@ Created on Mon Jul 22 13:11:11 2019
 import numpy as np
 import warnings
 import scipy.sparse as sps
-#import sparse_dot_mkl as spk
+import sparse_dot_mkl as spk
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
@@ -69,32 +69,34 @@ def computeRdT(q, RdT_bar, kap):
                      
        return RdT, T_ratio
 
-def computeFieldDerivatives(q, DDX, DDZ, verticalStagger):
-              
+def computeFieldDerivatives(q, DDX, DDZ, verticalStagger, RSBops):
+                     
        if verticalStagger:
               qs = np.reshape(q, (4 * q.shape[0], 1), order='F')
               
-              DqDx = DDX.dot(q)
-              DqDz = DDZ.dot(qs)
-              
-              #DqDx = spk.dot_product_mkl(DDX, q)
-              #DqDz = spk.dot_product_mkl(DDZ, qs)
+              if RSBops:
+                     DqDx = DDX.dot(q)
+                     DqDz = DDZ.dot(qs)
+              else:
+                     DqDx = spk.dot_product_mkl(DDX, q)
+                     DqDz = spk.dot_product_mkl(DDZ, qs)
               
               #DqDx = np.reshape(DqDx, q.shape, order='F')
               DqDz = np.reshape(DqDz, q.shape, order='F')
        else:
-              DqDx = DDX.dot(q)
-              DqDz = DDZ.dot(q)
-              
-              #DqDx = spk.dot_product_mkl(DDX, q)
-              #DqDz = spk.dot_product_mkl(DDZ, q)
+              if RSBops:
+                     DqDx = DDX.dot(q)
+                     DqDz = DDZ.dot(q)
+              else:
+                     DqDx = spk.dot_product_mkl(DDX, q)
+                     DqDz = spk.dot_product_mkl(DDZ, q)
               
        return DqDx, DqDz
 
-def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS):
+def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, RSBops):
        
        vd = np.hstack((PqPx, PqPz))
-       pvpx, dvdz = computeFieldDerivatives(vd, DDX, DDZ, False)
+       pvpx, dvdz = computeFieldDerivatives(vd, DDX, DDZ, False, RSBops)
        
        P2qPx2 = pvpx[:,0:4]
        P2qPz2 = dvdz[:,4:] 
@@ -115,13 +117,13 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, isTFOpX):
+def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, isTFOpX, RSBops):
        
        # Compute flow speed
        Q = fields + hydroState
        
        # Compute the updated RHS
-       PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ, vertStagger)
+       PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ, vertStagger, RSBops)
               
        if not isTFOpX:
               PqPx -= REFS[15] * DqDz
@@ -479,13 +481,13 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, REFS, REFG, ebcDex,
                   
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = mu_xt * P2qPx2[tdex,0]
+              DqDt[tdex,0] = 0.0 #mu_xt * P2qPx2[tdex,0]
               DqDt[tdex,1] = 0.0
               DqDt[tdex,2] = mu_xt * P2qPx2[tdex,2]
               DqDt[tdex,3] = mu_xt * P2qPx2[tdex,3]
        
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,0] = mu_xb * P2qPx2[bdex,0]
+              DqDt[bdex,0] = 0.0 #mu_xb * P2qPx2[bdex,0]
               DqDt[bdex,1] = 0.0
               DqDt[bdex,2] = mu_xb * P2qPx2[bdex,2]
               DqDt[bdex,3] = mu_xb * P2qPx2[bdex,3]
