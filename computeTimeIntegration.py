@@ -44,6 +44,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
+       DQDZ = REFG[2]
        RLMX = REFG[4][1].data
        RLMZ = REFG[4][2].data
        
@@ -55,31 +56,45 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        DDXM_A = REFS[12][0]
        DDZM_A = REFS[12][1]  
 
-       DDXM_B = REFS[13][0]
-       DDZM_B = REFS[13][1]
+       #DDXM_B = REFS[13][0]
+       #DDZM_B = REFS[13][1]
+       
+       DD1 = REFS[12][2]
+       DD2 = REFS[13][2]
        
        def computeUpdate(coeff, solA, sol2Update):
               
               DF = coeff * DT
               
-              #%% First dynamics update
-              #st = time.time()
-              DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger, RSBops)
-              PqPxA = DqDxA - REFS[15] * DqDzA
-              #et = time.time()
-              #print(et - st)
-              #input('DERIVATIVE OPERATION TIMING CHECK:')
+              # Compute pressure gradient force scaling (buoyancy)
+              RdT, T_ratio = tendency.computeRdT(solA, REFS[9][0], PHYS[4])
               
-              # Apply Rayleigh damping layer implicitly to derivatives
+              # Compute local Rayleigh factors
               RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
               RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
+              
+              #%% First dynamics update
+              if verticalStagger:
+                     #st = time.time()
+                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger, RSBops)
+                     #et = time.time()
+                     #print(et - st)
+                     #input('DERIVATIVE OPERATION TIMING CHECK:')
+              else:
+                     Dq = DD1.dot(solA)
+                     DqDxA = Dq[:DIMS[5]]
+                     DqDzA = Dq[DIMS[5]:]
+              
+              # Adjust horizontal partial to terrain curves
+              PqPxA = DqDxA - REFS[15] * DqDzA
                                    
               # Compute advection update
               stateA = solA + init0
-              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA, stateA[:,0], stateA[:,1], ebcDex)
-                     
+              PqPzA = DqDzA + DQDZ
+              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, PqPzA, solA, stateA[:,0], stateA[:,1], ebcDex)
+                                   
               # Compute internal force update
-              rhsIfc, RdT = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, REFS, REFG, solA)
+              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, RdT, T_ratio)
 
               # Store the dynamic RHS
               rhsDyn = (rhsAdv + rhsIfc)
@@ -104,8 +119,15 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DqDzA *= Rho
                             
               # Compute derivatives of diffusive flux
-              P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
-              tendency.computeFieldDerivatives2(PqPxA, DqDzA, DDXM_B, DDZM_B, REFS, RSBops)
+              #P2qPx2, P2qPz2, P2qPzx, P2qPxz = \
+              #tendency.computeFieldDerivatives2(PqPxA, DqDzA, DDXM_B, DDZM_B, REFS, RSBops)
+              
+              Dq = np.column_stack((PqPxA,DqDzA))
+              DDq = DD2.dot(Dq)
+              P2qPx2 = DDq[:DIMS[5],:4]
+              P2qPzx = DDq[:DIMS[5],4:]
+              P2qPxz = DDq[DIMS[5]:,:4]
+              P2qPz2 = DDq[DIMS[5]:,4:]
               
               # Second directional derivatives (of the diffusive fluxes)
               P2qPx2[bdex,:] += dhdx * P2qPxz[bdex,:]; P2qPx2[bdex,:] *= S
@@ -113,7 +135,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                               REFS, REFG, ebcDex, DLD, DCF, diffusiveFlux)
+                                                         ebcDex, DLD, DCF, diffusiveFlux)
               rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
               
               # Apply update

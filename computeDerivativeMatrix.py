@@ -530,9 +530,9 @@ def computeSpectralElementDerivativeMatrix(dom, NE, nonCoincident, endsLaguerre,
        else:
               domain = edom
                      
-       DDMSA = numericalCleanUp(GDMS)
+       #DDMSA = numericalCleanUp(GDMS)
        
-       return DDMSA, domain
+       return GDMS, domain
 
 # Computes Clamped Quintic Spline 1st derivative matrix
 def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
@@ -760,9 +760,9 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               DDM[-1,:] = np.copy(D1B)
        
        #DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM)
+       DDM = numericalCleanUp(DDM)
                      
-       return DDMC, AIB
+       return DDM, AIB
 
 # Computes Cubic Spline 1st derivative matrix
 def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
@@ -874,9 +874,9 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               DDM[N-1,N-1] += 1.0 / hn      
        
        #DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM)
+       DDM = numericalCleanUp(DDM)
 
-       return DDMC, AIB
+       return DDM, AIB
 
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
@@ -1425,9 +1425,9 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        DDM = scl.lu_solve(PLU, RDM)
        
        #DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM)
+       DDM = numericalCleanUp(DDM)
        
-       return DDMC
+       return DDM
 
 def computeHermiteFunctionDerivativeMatrix(DIMS):
        
@@ -1464,9 +1464,9 @@ def computeHermiteFunctionDerivativeMatrix(DIMS):
        DDM = b * temp
        
        #DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM)
+       #DDMC = numericalCleanUp(DDM)
        
-       return DDMC.astype(np.float64), STR_H
+       return DDM.astype(np.float64), STR_H
 
 def computeChebyshevDerivativeMatrix(DIMS):
        
@@ -1481,6 +1481,7 @@ def computeChebyshevDerivativeMatrix(DIMS):
    
        # Get the Chebyshev transformation matrix
        CT = chebpolym(NZ+1, xi)
+       CT = numericalCleanUp(CT)
    
        # Make a diagonal matrix of weights
        W = np.diag(wcp)
@@ -1511,17 +1512,17 @@ def computeChebyshevDerivativeMatrix(DIMS):
               SDIFF[ii,ii+1] = A / c
     
        # Chebyshev spectral transform in matrix form
-       temp = CT.dot(W)
-       STR_C = S.dot(temp)
+       temp = CT @ W
+       STR_C = S @ temp
        # Chebyshev spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       temp = (CT.T).dot(SDIFF)
-       DDM = b * temp.dot(STR_C)
+       temp = CT.T @ SDIFF
+       DDM = b * temp @ STR_C
        
        #DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM)
+       #DDMC = numericalCleanUp(DDM)
        
-       return DDMC, STR_C
+       return DDM, STR_C
 
 def computeFourierDerivativeMatrix(DIMS):
        
@@ -1535,9 +1536,9 @@ def computeFourierDerivativeMatrix(DIMS):
        DFT = np.fft.fft(np.eye(NX+1), axis=0)
        DDM = np.fft.ifft(1j * KDM.dot(DFT), axis=0)
        
-       DDMC = numericalCleanUp(DDM)
+       #DDMC = numericalCleanUp(DDM)
        
-       return np.real(DDMC), DFT
+       return np.real(DDM), DFT
 
 def computeLaguerreDerivativeMatrix(DIMS):
        
@@ -1577,9 +1578,9 @@ def computeLaguerreDerivativeMatrix(DIMS):
        DDM = b * temp
        
        #DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM)
+       #DDMC = numericalCleanUp(DDM)
        
-       return DDMC.astype(np.float64), STR_L
+       return DDM.astype(np.float64), STR_L
 
 def computeLegendreDerivativeMatrix(DIMS):
        
@@ -1589,6 +1590,7 @@ def computeLegendreDerivativeMatrix(DIMS):
        
        xi, wlf = leglb(NZ)
        LT, DLT = legpolym(NZ, xi, True)
+       LT = numericalCleanUp(LT)
        
        b = 2.0 / ZH
        
@@ -1614,16 +1616,16 @@ def computeLegendreDerivativeMatrix(DIMS):
               SDIFF[rr-1,:] += (A / B) * SDIFF[rr+1,:]
               
        # Legendre spectral transform in matrix form
-       temp = (LT).dot(W)
-       STR_L = S.dot(temp)
+       temp = LT @ W
+       STR_L = S @ temp
        # Legendre spatial derivative based on spectral differentiation
        # Domain scale factor included here
-       temp = (LT.T).dot(SDIFF)
-       DDM = b * temp.dot(STR_L)
+       temp = LT.T @ SDIFF
+       DDM = b * temp @ STR_L
        
        #DDM1 = removeLeastSingularValue(DDM)
-       DDMC = numericalCleanUp(DDM)
+       #DDMC = numericalCleanUp(DDM)
        
-       return DDMC, STR_L
+       return DDM, STR_L
        
        

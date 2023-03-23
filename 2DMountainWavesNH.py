@@ -464,7 +464,7 @@ def runModel(TestName):
        else:
               print('Diffusion coefficients by RHS evaluation.')
               
-       diffusiveFlux = False
+       diffusiveFlux = True
        if diffusiveFlux:
               print('Diffusion by gradient of diffusive flux.')
        else:
@@ -721,11 +721,9 @@ def runModel(TestName):
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
-       #DDXMS_CFD4, DDZMS_CFD4 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD4, DDZ_CFD4)
-       #DDXMS_CFD6, DDZMS_CFD6 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CFD6, DDZ_CFD6)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZI = int(1.25*NZ)
+       NZI = int(1.5 * NZ)
        
        if verticalChebGrid:
               
@@ -737,15 +735,15 @@ def runModel(TestName):
               
               # Get the inner vertical derivatie
               DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
-              DDZ_I0, I_TRANS = derv.computeLegendreDerivativeMatrix(DIMS_ST)
+              DDZ_I, I_TRANS = derv.computeLegendreDerivativeMatrix(DIMS_ST)
               
               O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
               I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
               
-              DDZ_I = I2O_INT.dot(DDZ_I0).dot(O2I_INT)
+              DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
               dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
               
-       elif verticalLegdGrid:
+       if verticalLegdGrid:
               
               xiO, whf = derv.leglb(NZ) #[-1 1]
               xiI, whf = derv.cheblb(NZI) #[-1 1]
@@ -762,13 +760,11 @@ def runModel(TestName):
               
               DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
               dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
-       else:
-              DDZM_OP = DDZMS_QS
               
               
-       if verticalStagger and (verticalLegdGrid or verticalChebGrid):
+       if verticalStagger:
               # Staggered vertical operator
-              DDZM_OP = sps.block_diag((DDZMI, DDZMI, DDZMS1, DDZMS1), format='csr')
+              DDZM_OP = sps.block_diag((DDZMS1, DDZMI, DDZMS1, DDZMI), format='csr')
        else:
               # Average the staggered operators
               DDZM_OP = 0.5 * (DDZMS1 + DDZMI)
@@ -787,10 +783,8 @@ def runModel(TestName):
               PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
               diffOps1 = (PPXMD, DDZMS_CS)
        else:
-              PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
-              #PPXMD2 = PPXMD.dot(PPXMD)
-              #PPZMD2 = DDZMS_CS.dot(DDXMS_CS)
-              diffOps1 = (PPXMD, DDZMS_CS)
+              PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+              diffOps1 = (PPXMD, DDZMS_QS)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
@@ -798,23 +792,26 @@ def runModel(TestName):
        #%% Store operators for use
        if not StaticSolve and RSBops:
               # Multithreaded enabled for transient solution
+              if verticalStagger:
+                     DDOP = sps.vstack((DDXM_OP,DDZMS1))
+              else:
+                     DDOP = sps.vstack((DDXM_OP,DDZM_OP))
+                     
               REFS.append((rsb_matrix(DDXM_OP, shape=DDXM_OP.shape), \
-                           rsb_matrix(DDZM_OP, shape=DDZM_OP.shape))) # index 12
+                           rsb_matrix(DDZM_OP, shape=DDZM_OP.shape), \
+                           rsb_matrix(DDOP, shape=DDOP.shape))) # index 12
               
+              DDOP = sps.vstack(diffOps1)
               diffOps2 = (rsb_matrix(diffOps1[0], shape=diffOps1[0].shape), 
-                          rsb_matrix(diffOps1[1], shape=diffOps1[1].shape))
-              diffOps2[0].autotune()
-              diffOps2[1].autotune()
+                          rsb_matrix(diffOps1[1], shape=diffOps1[1].shape),
+                          rsb_matrix(DDOP, shape=DDOP.shape))
+              
               REFS.append(diffOps2) # index 13
               del(diffOps2)
-       elif not StaticSolve and not RSBops:
+       else:
               # Native sparse
-              REFS.append((DDXM_OP, DDZM_OP))
-              REFS.append(diffOps1)
-       else: 
-              # Matrix derivative operators in native format
-              REFS.append(diffOps1[0]) # index 12
-              REFS.append(diffOps1[1]) # index 13
+              REFS.append((DDXM_OP, DDZM_OP)) # index 12
+              REFS.append(diffOps1) # index 13
               
        # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(DZT) # index 14
