@@ -421,18 +421,13 @@ def runModel(TestName):
        # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
        if StaticSolve and not NonLinSolve:
               RSBops = False
-              verticalStagger = False
        else:
               RSBops = True # Turn off PyRSB SpMV
-              verticalStagger = True
               
        if RSBops:
               from rsb import rsb_matrix
               
-       if verticalStagger:
-              print('Staggered spectral method in the vertical.')
-       else:
-              print('Colocated spectral method in the vertical.')
+       print('Colocated spectral method in the vertical.')
        
        # Set the grid type
        HermFunc = thisTest.solType['HermFuncGrid']
@@ -761,13 +756,8 @@ def runModel(TestName):
               DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
               dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
               
-              
-       if verticalStagger:
-              # Staggered vertical operator
-              DDZM_OP = sps.block_diag((DDZMS1, DDZMI, DDZMS1, DDZMI), format='csr')
-       else:
-              # Average the staggered operators
-              DDZM_OP = 0.5 * (DDZMS1 + DDZMI)
+       
+       DDZM_OP = DDZMI
               
        if HermFunc:
               DDXM_OP = DDXMS1
@@ -792,25 +782,23 @@ def runModel(TestName):
        #%% Store operators for use
        if not StaticSolve and RSBops:
               # Multithreaded enabled for transient solution
-              if verticalStagger:
-                     DDOP = sps.vstack((DDXM_OP,DDZMS1))
-              else:
-                     DDOP = sps.vstack((DDXM_OP,DDZM_OP))
-                     
-              REFS.append((rsb_matrix(DDXM_OP, shape=DDXM_OP.shape), \
-                           rsb_matrix(DDZM_OP, shape=DDZM_OP.shape), \
-                           rsb_matrix(DDOP, shape=DDOP.shape))) # index 12
+              
+              DDOP = sps.vstack((DDXM_OP,DDZM_OP)) 
+              DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+              DDOP.autotune(nrhs=numVar)
+              REFS.append(DDOP) # index 12
               
               DDOP = sps.vstack(diffOps1)
-              diffOps2 = (rsb_matrix(diffOps1[0], shape=diffOps1[0].shape), 
-                          rsb_matrix(diffOps1[1], shape=diffOps1[1].shape),
-                          rsb_matrix(DDOP, shape=DDOP.shape))
+              DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+              DDOP.autotune(nrhs=2*numVar)
+              REFS.append(DDOP) # index 13
               
-              REFS.append(diffOps2) # index 13
-              del(diffOps2)
+              del(DDOP)
        else:
               # Native sparse
-              REFS.append((DDXM_OP, DDZM_OP)) # index 12
+              DDOP = sps.vstack((DDXM_OP,DDZM_OP))
+              REFS.append(DDOP) # index 12
+              DDOP = sps.vstack(diffOps1)
               REFS.append(diffOps1) # index 13
               
        # Store the terrain profile and operators used on the terrain (diffusion)
@@ -856,7 +844,6 @@ def runModel(TestName):
               
               DL1 = 1.0 * DX_avg
               DL2 = 1.0 * DZ_avg
-              DLR = mt.sqrt(DX_max**2 + DZ_max**2)
               
               import matplotlib.path as pth
               dx = mt.pi * DL1
@@ -879,7 +866,7 @@ def runModel(TestName):
                      #plt.show()
                      #input('Diffusion region check.')
               
-              print('Diffusion regions dimensions (m): ', DL1, DL2, dx, dz, DLR)
+              print('Diffusion regions dimensions (m): ', DL1, DL2, dx, dz)
 
               # Manipulate arrays to enable numba acceleration for DynSGS
               import numba as nb
@@ -897,7 +884,6 @@ def runModel(TestName):
        del(DDXM_OP); del(DDZM_OP)
        del(DDXMS_CS); del(DDZMS_CS)
        del(DDXMS_QS); del(DDZMS_QS)
-       del(diffOps1)
        del(dummy)
        
        #%% SOLUTION INITIALIZATION
@@ -1172,7 +1158,7 @@ def runModel(TestName):
                             
                      state = fields + hydroState
                             
-                     rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
+                     rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, diffOps1[0], diffOps1[1], REFS[6][0], \
                                                          PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True, RSBops)
                      resVec = np.zeros(rhsVec.shape)
                      DCF = rescf.computeResidualViscCoeffs2(DIMS, np.abs(state), rhsVec, DLD, \
@@ -1239,11 +1225,11 @@ def runModel(TestName):
  
                             fields = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, np.copy(fields), hydroState, DCF, \
-                                                                    zeroDex, ebcDex, filteredCoeffs, verticalStagger, diffusiveFlux, RSBops)
+                                                                    zeroDex, ebcDex, filteredCoeffs, diffusiveFlux, RSBops)
                             
                             # Compute the local RHS
                             rhsVec0 = rhsVec
-                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[13][0], REFS[13][1], REFS[6][0], \
+                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, diffOps1[0], diffOps1[1], REFS[6][0], \
                                                                 PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True, RSBops)
                                    
                             AS = np.abs(fields + hydroState)

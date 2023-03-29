@@ -39,7 +39,7 @@ def plotRHS(x, rhs, ebcDex, label):
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, DCF, zeroDex, ebcDex, \
-                              filteredCoeffs, verticalStagger, diffusiveFlux, RSBops):
+                              filteredCoeffs, diffusiveFlux, RSBops):
        
        DT = TOPT[0]
        order = TOPT[3]
@@ -51,16 +51,10 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        S = DLD[4]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
        bdex = ebcDex[2]
-       
-       # Use multithreading on CPU
-       DDXM_A = REFS[12][0]
-       DDZM_A = REFS[12][1]  
 
-       #DDXM_B = REFS[13][0]
-       #DDZM_B = REFS[13][1]
-       
-       DD1 = REFS[12][2]
-       DD2 = REFS[13][2]
+       # Stacked derivative operators
+       DD1 = REFS[12]
+       DD2 = REFS[13]
        
        def computeUpdate(coeff, solA, sol2Update):
               
@@ -74,16 +68,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
               
               #%% First dynamics update
-              if verticalStagger:
-                     #st = time.time()
-                     DqDxA, DqDzA = tendency.computeFieldDerivatives(solA, DDXM_A, DDZM_A, verticalStagger, RSBops)
-                     #et = time.time()
-                     #print(et - st)
-                     #input('DERIVATIVE OPERATION TIMING CHECK:')
-              else:
-                     Dq = DD1.dot(solA)
-                     DqDxA = Dq[:DIMS[5]]
-                     DqDzA = Dq[DIMS[5]:]
+              Dq = DD1.dot(solA)
+              DqDxA = Dq[:DIMS[5]]
+              DqDzA = Dq[DIMS[5]:]
               
               # Adjust horizontal partial to terrain curves
               PqPxA = DqDxA - REFS[15] * DqDzA
