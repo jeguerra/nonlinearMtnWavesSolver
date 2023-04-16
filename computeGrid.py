@@ -41,7 +41,7 @@ def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
               b = a / L2
               x = b - 1 / (4.0 * mt.pi) * np.sin(2.0 * mt.pi * b)
               x *= L2
-              #print(x)
+              #input(x)
        
        # Return the REFS structure
        REFS = [x, z]

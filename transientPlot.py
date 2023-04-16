@@ -40,14 +40,15 @@ th = TH - np.exp(LNT)
 # Get the upper and lower bounds for TH
 clim1 = th.min()
 clim2 = th.max()
+clim = 0.25*max(abs(clim1),abs(clim2))
 
 imgname = 'toanimate.png'
 THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = True
-runSGS = False
+runPertb = False
+runSGS = True
 
 runPar = False
 runSer = True
@@ -57,14 +58,14 @@ fig = plt.figure(figsize=(16.0, 8.0))
 def plotPertb(tt):
        plt.gca().clear()
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-       plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 101, cmap=cm.prism, vmin=clim1, vmax=clim2)
+       plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 201, cmap='RdGy', vmin=-clim, vmax=+clim)
        
        #norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
        #plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e', cax=plt.gca())
        
-       plt.contour(m2k * X, m2k * Z, TH[tt,:,:], 21, colors='white', linewidths=1.0)
+       #plt.contour(m2k * X, m2k * Z, TH[tt,:,:], 21, colors='black', linewidths=1.0)
        
-       plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='white')
+       plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
        plt.xlim(-50.0, 50.0)
        plt.ylim(0.0, 25.0)
@@ -98,7 +99,7 @@ if runPertb:
               print('Attempt parallel processing...')
               imglist = Parallel(n_jobs=4)(delayed(plotPertb)(tt) for tt in range(len(times)))
        
-       imageio.mimsave(thname, imglist, fps=20)
+       imageio.mimsave(thname, imglist, fps=30)
        
 #%% Contour animation of the normalized SGS
 if runSGS:

@@ -392,22 +392,18 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF, i
               DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
               #'''   
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = 0.0 #P2qPx2[tdex,0]
-              DqDt[tdex,1] = 0.0
+              DqDt[tdex,:] = 0.0
               DqDt[tdex,2] = P2qPx2[tdex,2]
-              DqDt[tdex,3] = P2qPx2[tdex,3]
               
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,0] = 0.0 #P2qPx2[bdex,0]
-              DqDt[bdex,1] = 0.0
+              DqDt[bdex,:] = 0.0
               DqDt[bdex,2] = P2qPx2[bdex,2]
-              DqDt[bdex,3] = P2qPx2[bdex,3]
               #'''
        else:              
               DC1 = DCF[0][:,0] # coefficient to the X direction flux
               DC2 = DCF[1][:,0] # coefficient to the Z direction flux
               mu_xb = DC1[bdex]
-              mu_xt = DC1[tdex] 
+              mu_xt = DC1[tdex]
               
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
@@ -419,16 +415,12 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF, i
                   
               #'''        
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,0] = 0.0 #mu_xt * P2qPx2[tdex,0]
-              DqDt[tdex,1] = 0.0
+              DqDt[tdex,:] = 0.0
               DqDt[tdex,2] = mu_xt * P2qPx2[tdex,2]
-              DqDt[tdex,3] = mu_xt * P2qPx2[tdex,3]
        
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,0] = 0.0 #mu_xb * P2qPx2[bdex,0]
-              DqDt[bdex,1] = 0.0
+              DqDt[bdex,:] = 0.0
               DqDt[bdex,2] = mu_xb * P2qPx2[bdex,2]
-              DqDt[bdex,3] = mu_xb * P2qPx2[bdex,3]
        
        # Scale and apply coefficients
        #DqDt[:,3] *= 0.71 / 0.4

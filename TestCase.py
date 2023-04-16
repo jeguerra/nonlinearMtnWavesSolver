@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(763, 92, 145.0, 35.0, 300.0, \
+                     self.setUserData(823, 92, 145.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 10.0,
                                       5000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
@@ -118,7 +118,7 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -L2
+              L1 = -0.75 * L2
               ZH = 1.0E+3 * ZF # In km
               OPS = (NX + 1) * (NZ + 1)
               iU = 0
@@ -166,9 +166,9 @@ class TestCase:
               self.HOPT = [h0, aC, lC, kC, withWindow, Mountain]
               
               #% Transient solve parameters
-              DT = 0.05 # seconds
+              DT = 0.025 # seconds
               HR = 5.0 #/ 3600.0 # hours              
-              DTF = 0.5 # scale time step              
+              DTF = 0.75 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

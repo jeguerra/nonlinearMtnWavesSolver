@@ -447,7 +447,7 @@ def runModel(TestName):
               print('Flow-Dependent Diffusion Model.')
               
        # Spatial filtering for DynSGS coefficients
-       filteredCoeffs = True
+       filteredCoeffs = False
        if filteredCoeffs:
               print('Spatially filtered DynSGS coefficients.')
        else:
@@ -706,58 +706,65 @@ def runModel(TestName):
        DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
        DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD4)
        DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD4)
+       DDX = 0.5 * (DDX_CFD4 + DDX_CS)
+       DDZ = 0.5 * (DDZ_CFD4 + DDZ_CS)
+       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX, DDZ)
        
        DDX_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
        DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD6)
        DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD6)
+       DDX = 0.5 * (DDX_CFD6 + DDX_QS)
+       DDZ = 0.5 * (DDZ_CFD6 + DDZ_QS)
+       DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX, DDZ)
        
-       # Derivative operators for dynamics
+       # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
-       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
-       DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZI = int(1.5 * NZ)
-       
-       if verticalChebGrid:
-              
-              xiI, whf = derv.leglb(NZI) #[-1 1]
-              xiO, whf = derv.cheblb(NZ) #[-1 1]
-              
-              TMO, dummy = derv.legpolym(NZI, xiO, True)
-              TMI = derv.chebpolym(NZ+1, xiI)
-              
-              # Get the inner vertical derivatie
-              DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
-              DDZ_I, I_TRANS = derv.computeLegendreDerivativeMatrix(DIMS_ST)
-              
-              O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
-              I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
-              
-              DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
-              dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
-              
-       if verticalLegdGrid:
-              
-              xiO, whf = derv.leglb(NZ) #[-1 1]
-              xiI, whf = derv.cheblb(NZI) #[-1 1]
-              
-              TMO = derv.chebpolym(NZI+1, xiO)
-              TMI, dummy = derv.legpolym(NZ, xiI, True)
-              
-              # Get the inner vertical derivatie
-              DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
-              DDZ_I, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
-              
-              O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
-              I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid 1
-              
-              DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
-              dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
-              
-       
-       DDZM_OP = DDZMI
+       for vv in np.arange(2):
+              NZI = int((1.5 + 0.5 * vv) * NZ)
+              if verticalChebGrid:
+                     
+                     xiI, whf = derv.leglb(NZI) #[-1 1]
+                     xiO, whf = derv.cheblb(NZ) #[-1 1]
+                     
+                     TMO, dummy = derv.legpolym(NZI, xiO, True)
+                     TMI = derv.chebpolym(NZ+1, xiI)
+                     
+                     # Get the inner vertical derivatie
+                     DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
+                     DDZ_I, I_TRANS = derv.computeLegendreDerivativeMatrix(DIMS_ST)
+                     
+                     O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
+                     I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
+                     
+                     DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
+                     dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
+                     
+              if verticalLegdGrid:
+                     
+                     xiO, whf = derv.leglb(NZ) #[-1 1]
+                     xiI, whf = derv.cheblb(NZI) #[-1 1]
+                     
+                     TMO = derv.chebpolym(NZI+1, xiO)
+                     TMI, dummy = derv.legpolym(NZ, xiI, True)
+                     
+                     # Get the inner vertical derivatie
+                     DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
+                     DDZ_I, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
+                     
+                     O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
+                     I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid 1
+                     
+                     DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
+                     dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
+                     
+              if vv == 0:
+                     DDZM_OP = DDZMI
+              else:
+                     DDZM_OP += DDZMI
+       DDZM_OP *= 0.5
               
        if HermFunc:
               DDXM_OP = DDXMS1
@@ -880,6 +887,7 @@ def runModel(TestName):
        print(DDXM_OP.nnz, DDZM_OP.nnz)
               
        # Get memory back
+       del(DDX); del(DDZ)
        del(DDXMS1); del(DDZMS1)
        del(DDXM_OP); del(DDZM_OP)
        del(DDXMS_CS); del(DDZMS_CS)
