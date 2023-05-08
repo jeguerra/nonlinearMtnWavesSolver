@@ -15,7 +15,7 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-fname = 'Simulation2View1.nc'
+fname = 'Simulation2View3.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -47,8 +47,8 @@ THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
 
-runPertb = False
-runSGS = True
+runPertb = True
+runSGS = False
 
 runPar = False
 runSer = True
@@ -56,7 +56,7 @@ runSer = True
 fig = plt.figure(figsize=(16.0, 8.0))
 
 def plotPertb(tt):
-       plt.gca().clear()
+       fig.gca().clear()
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
        plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 201, cmap='RdGy', vmin=-clim, vmax=+clim)
        
@@ -99,7 +99,7 @@ if runPertb:
               print('Attempt parallel processing...')
               imglist = Parallel(n_jobs=4)(delayed(plotPertb)(tt) for tt in range(len(times)))
        
-       imageio.mimsave(thname, imglist, fps=30)
+       imageio.mimsave(thname, imglist, duration=33)
        
 #%% Contour animation of the normalized SGS
 if runSGS:

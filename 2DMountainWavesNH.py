@@ -15,23 +15,18 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 
 @author: Jorge E. Guerra
 """
-'''
 import os
-os.environ["MKL_NUM_THREADS"] = "16"
-os.environ["OMP_NUM_THREADS"] = "16"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "16"
-os.environ["NUMEXPR_NUM_THREADS"] = "16"
-'''
-# Set up the multithreading environment (physical cores only)
 import sys
 import time
 import shelve
 import shutil
 import math as mt
 import numpy as np
+import cupy as cp
 import bottleneck as bn
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
+import sparse_dot_mkl as spk
 from matplotlib import cm
 import matplotlib.pyplot as plt
 # Import from the local library of routines
@@ -45,7 +40,6 @@ from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeRayleighEquations import computeRayleighEquations
-import computeResidualViscCoeffs as rescf
 
 # Numerical stuff
 import computeDiskPartSchur as dsolver
@@ -57,11 +51,11 @@ import faulthandler; faulthandler.enable()
 
 from netCDF4 import Dataset
 
+# Set up the multithreading environment (physical cores only)
+os.environ["OMP_NUM_THREADS"] = "14"
+
 # Disk settings
-#localDir = '/scratch/opbuffer/' # NOAA laptop
-localDir = '/home/scratch/' # Home super desktop
-#localDir = '/Users/TempestGuerra/scratch/' # Davis Macbook Pro
-#localDir = '/home/jeguerra/scratch/'
+localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 fname2Restart = 'Simulation2Restart.nc'
@@ -302,7 +296,6 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
               print('Data output to: ', newFname)
        except PermissionError:
               print('Deleting corrupt NC file... from failed run.')
-              import os
               os.remove(fname)
               m_fid = Dataset(newFname, 'w', format="NETCDF4")
               
@@ -706,24 +699,25 @@ def runModel(TestName):
        DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
        DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD4)
        DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD4)
-       DDX = 0.5 * (DDX_CFD4 + DDX_CS)
-       DDZ = 0.5 * (DDZ_CFD4 + DDZ_CS)
-       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX, DDZ)
+       #DDX = 0.5 * (DDX_CFD4 + DDX_CS)
+       #DDZ = 0.5 * (DDZ_CFD4 + DDZ_CS)
+       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        
        DDX_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
        DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD6)
        DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD6)
-       DDX = 0.5 * (DDX_CFD6 + DDX_QS)
-       DDZ = 0.5 * (DDZ_CFD6 + DDZ_QS)
-       DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX, DDZ)
+       #DDX = 0.5 * (DDX_CFD6 + DDX_QS)
+       #DDZ = 0.5 * (DDZ_CFD6 + DDZ_QS)
+       DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       for vv in np.arange(2):
-              NZI = int((1.5 + 0.5 * vv) * NZ)
+       NM = 2
+       for vv in np.arange(NM):
+              NZI = int((1.75 + 0.5 * vv) * NZ)
               if verticalChebGrid:
                      
                      xiI, whf = derv.leglb(NZI) #[-1 1]
@@ -764,7 +758,7 @@ def runModel(TestName):
                      DDZM_OP = DDZMI
               else:
                      DDZM_OP += DDZMI
-       DDZM_OP *= 0.5
+       DDZM_OP *= 1.0 / NM
               
        if HermFunc:
               DDXM_OP = DDXMS1
@@ -776,12 +770,10 @@ def runModel(TestName):
        #input()
        
        #%% Prepare derivative operators for diffusion
-       if diffusiveFlux:
-              PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
-              diffOps1 = (PPXMD, DDZMS_CS)
-       else:
-              PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
-              diffOps1 = (PPXMD, DDZMS_QS)
+       PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
+       diffOps1 = (PPXMD, DDZMS_CS)
+       PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
+       diffOps2 = (PPXMD, DDZMS_QS)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
        REFS.append(diffOps1) # index 11
@@ -800,20 +792,24 @@ def runModel(TestName):
               DDOP.autotune(nrhs=2*numVar)
               REFS.append(DDOP) # index 13
               
-              del(DDOP)
+              DDOP = sps.vstack(diffOps2)
+              DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+              DDOP.autotune(nrhs=numVar)
+              REFS.append(DDOP) # index 14
        else:
               # Native sparse
               DDOP = sps.vstack((DDXM_OP,DDZM_OP))
               REFS.append(DDOP) # index 12
               DDOP = sps.vstack(diffOps1)
-              REFS.append(diffOps1) # index 13
+              REFS.append(DDOP) # index 13
+              DDOP = sps.vstack(diffOps2)
+              REFS.append(DDOP) # index 14
               
        # Store the terrain profile and operators used on the terrain (diffusion)
-       REFS.append(DZT) # index 14
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
        
        # Update REFG the terrain BC derivative
-       REFG.append(DDX_QS)
+       REFG.append(DDX_CS)
        REFG.append(RLOPT[-1])
               
        if not StaticSolve:
@@ -849,13 +845,14 @@ def runModel(TestName):
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
               XZV = np.hstack((XMV, ZMV))
               
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
+              DL1 = 1.0 * DX_wav
+              DL2 = 1.0 * DZ_wav
               
               import matplotlib.path as pth
-              dx = mt.pi * DL1
-              dz = mt.pi * DL2
+              dx = 1.0 * mt.pi * DL1
+              dz = 1.0 * mt.pi * DL2
               fltDex = []
+              regLen = 0
               for nn in np.arange(XZV.shape[0]):
                      node = XZV[nn,:]
                      #'''
@@ -867,11 +864,7 @@ def runModel(TestName):
                      region = rectangle.contains_points(XZV)
                      regDex = np.nonzero(region == True)[0].tolist()
                      fltDex += [regDex]
-                     #plt.fill(verts[:,0], verts[:,1], color='orange')
-                     #plt.scatter(node[0], node[1], s=50, c='black')
-                     #plt.scatter(XZV[regDex,0], XZV[regDex,1], s=10, c='blue')
-                     #plt.show()
-                     #input('Diffusion region check.')
+                     regLen = max(len(regDex), regLen)
               
               print('Diffusion regions dimensions (m): ', DL1, DL2, dx, dz)
 
@@ -879,15 +872,17 @@ def runModel(TestName):
               import numba as nb
               nb_list = nb.typed.List
               regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
+              #regDex_gpu = [np.array(dex, dtype=np.int32) for dex in fltDex]
 
               # Create a container for DynSGS scaling and region parameters
-              DLD = (DL1, DL2, DL1**2, DL2**2, S, dS, regDex)
+              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, regLen, regDex)
        
        print('Check number of non-zeros in derivative operator matrices: ')
        print(DDXM_OP.nnz, DDZM_OP.nnz)
               
        # Get memory back
-       del(DDX); del(DDZ)
+       del(DDOP)
+       del(diffOps1); del(diffOps2)
        del(DDXMS1); del(DDZMS1)
        del(DDXM_OP); del(DDZM_OP)
        del(DDXMS_CS); del(DDZMS_CS)
@@ -960,7 +955,7 @@ def runModel(TestName):
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
                                                   PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False, RSBops)
               RHS = np.reshape(rhs, (physDOF,), order='F')
-              err = displayResiduals('Current function evaluation residual: ', RHS, \
+              displayResiduals('Current function evaluation residual: ', RHS, \
                                      thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
               del(U); del(fields); del(rhs)
               
@@ -1106,12 +1101,12 @@ def runModel(TestName):
               
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
-              err = displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
+              displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
                                                   PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False, RSBops)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
-              err = displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
+              displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
               del(rhs)
               
               # Check the change in the solution
@@ -1120,6 +1115,9 @@ def runModel(TestName):
        #%% Transient solutions       
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
+              
+              #RLM_gpu = cp.asarray(REFG[4][0].data)
+              RLM = REFG[4][0].data
               
               # NetCDF restart for transient runs
               if isRestart:
@@ -1163,16 +1161,26 @@ def runModel(TestName):
                             fields[ubdex,1] = -dWBC
                             fields[:,2] = hydroState[:,2]
                             fields[:,3] = hydroState[:,3]
-                            
-                     state = fields + hydroState
-                            
-                     rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, diffOps1[0], diffOps1[1], REFS[6][0], \
+                     
+                     rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[11][0], REFS[11][1], REFS[6][0], \
                                                          PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True, RSBops)
-                     resVec = np.zeros(rhsVec.shape)
-                     DCF = rescf.computeResidualViscCoeffs2(DIMS, np.abs(state), rhsVec, DLD, \
-                                                            ebcDex[2], REFG[5], filteredCoeffs, REFG[4][0].data, (0.0,0.0))
+                     
+                     rhsVec0 = np.zeros(rhsVec.shape)
+                     resVec = rhsVec - rhsVec0
                      thisTime = IT
                      
+              # Compute sound speed
+              RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
+              
+              # Compute maximum squared sound speed
+              VWAV_max = bn.nanmax(PHYS[6] * RdT)
+              
+              # Perform some checks before setting the new DT
+              if not np.isnan(VWAV_max) and VWAV_max > 0.0:
+                     TOPT[0] = DTF * DLS / mt.sqrt(VWAV_max)
+                     
+              DCF = (np.zeros((OPS,1)),np.zeros((OPS,1)))
+              
               # Initialize output to NetCDF
               newFname = initializeNetCDF(fname4Restart, thisTime, NX, NZ, XL, ZTL, hydroState)
        
@@ -1183,7 +1191,6 @@ def runModel(TestName):
               
               interTime1 = 0.0
               interTime2 = 0.0
-              interTime3 = 0.0
               while thisTime <= TOPT[4]:
                      
                      # Print out diagnostics every TOPT[5] seconds
@@ -1192,9 +1199,20 @@ def runModel(TestName):
                             message = ''
                             displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
+                                   
+                            # Compute and apply SVD based filtering
+                            fields_gpu = cp.asarray(fields)
+                            for vv in range(numVar):
+                                   q = cp.reshape(fields_gpu[:,vv], (NZ+1, NX+1), order='F')
+                                   svdq = cp.linalg.svd(q, full_matrices=False)
+                                   sdex = cp.nonzero(svdq[1] >= np.nanmedian(svdq[1]))
+                                   qf = svdq[0][:,sdex].dot(cp.diag(svdq[1][sdex]))
+                                   fields_gpu[:,vv] = cp.reshape(qf.dot(svdq[2][sdex,:]),(OPS,),order='F')
+                            
+                            fields_plot = fields_gpu.get()
                             
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF)
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields_plot, rhsVec, resVec, DCF)
                                                         
                             ff += 1
                             interTime1 = 0.0
@@ -1203,53 +1221,13 @@ def runModel(TestName):
                      if interTime2 >= TOPT[6] and makePlots:
                             makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
                             interTime2 = 0.0
-                     
-                     # Compute a time step
-                     if interTime3 >= TOPT[7] or ti == 0:
-                            try: 
-                                   # Compute sound speed
-                                   RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
-                                   VSND = np.sqrt(PHYS[6] * RdT)
-                                   
-                                   # Compute new time step based on updated sound speed
-                                   VWAV_max = bn.nanmax(VSND)
-                                   newDT = DTF * DLS / VWAV_max
-                                   
-                                   # Perform some checks before setting the new DT
-                                   if not np.isnan(newDT) and not np.isinf(newDT):
-                                          TOPT[0] = newDT
-                                          
-                                   # Constant sponge layer diffusivity
-                                   DCFC = (TOPT[0] * VWAV_max**2, VSND.astype(np.float64))
-
-                            except:
-                                   print('Bad computation of local sound speed, no change in time step.')
-                                   print('Time: ', thisTime, ti)
-                                   
-                            interTime3 = 0.0
                             
                      # Compute the solution within a time step
                      try:   
- 
-                            fields = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, np.copy(fields), hydroState, DCF, \
+                            fields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                                                                    DLD, TOPT, fields, hydroState, rhsVec, DCF, \
                                                                     zeroDex, ebcDex, filteredCoeffs, diffusiveFlux, RSBops)
                             
-                            # Compute the local RHS
-                            rhsVec0 = rhsVec
-                            rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, diffOps1[0], diffOps1[1], REFS[6][0], \
-                                                                PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True, RSBops)
-                                   
-                            AS = np.abs(fields + hydroState)
-                            resVec = 0.5 * (rhsVec - rhsVec0)
-                            
-                            if DynSGS_RES:
-                                   magVec = np.copy(resVec)
-                            else:
-                                   magVec = np.copy(rhsVec)
-                                   
-                            DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, magVec, DLD, \
-                                                                   ebcDex[2], REFG[5], filteredCoeffs, REFG[4][0].data, DCFC)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
@@ -1264,7 +1242,6 @@ def runModel(TestName):
                      thisTime += TOPT[0]
                      interTime1 += TOPT[0]
                      interTime2 += TOPT[0]
-                     interTime3 += TOPT[0]
                      
               # Reshape back to a column vector after time loop
               SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')

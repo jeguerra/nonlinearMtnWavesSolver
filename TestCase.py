@@ -86,7 +86,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(823, 92, 145.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 10.0,
-                                      5000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -99,7 +99,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(683, 98, 150.0, 42.0, 300.0, \
                                       10000.0, 25000.0, 10.0, \
-                                      5000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_transient')
+                                      5000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -168,13 +168,12 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.025 # seconds
               HR = 5.0 #/ 3600.0 # hours              
-              DTF = 0.75 # scale time step              
+              DTF = 0.8 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 10.0 # Time for diagnostic output
               ITI = 5.0 # Time for image output
-              RTI = 0.5 # Time for time step and constant damping update
               
-              self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI, RTI]
+              self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI]
        

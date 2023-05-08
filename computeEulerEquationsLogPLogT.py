@@ -120,7 +120,7 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
               PqPx -= REFS[15] * DqDz
                             
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFG[2], RdT, T_ratio, \
-                                                       fields, Q[:,0], Q[:,1], ebcDex)
+                                                       fields, Q, ebcDex)
        if withRay:
               rhsVec += computeRayleighTendency(REFG, fields)
        
@@ -307,12 +307,12 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Fully explicit evaluation of the non linear advection
-njit(parallel=True)
-def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, U, W, ebcDex):
+@njit(parallel=True)
+def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state, ebcDex):
        
        # Compute advective (multiplicative) operators
-       UM = np.expand_dims(U,1)
-       WM = np.expand_dims(W,1)
+       UM = np.column_stack((state[:,0],state[:,0],state[:,0],state[:,0]))
+       WM = np.column_stack((state[:,1],state[:,1],state[:,1],state[:,1]))
        
        # Compute advection
        Uadvect = UM * PqPx
@@ -349,11 +349,11 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio):
        return DqDt
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio, fields, U, W, ebcDex):
+def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio, fields, state, ebcDex):
 
        # Compute complete vertical partial
        PqPz = DqDz + DQDZ
-       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, U, W, ebcDex)
+       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state, ebcDex)
        
        DqDt += computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio)
        
