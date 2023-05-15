@@ -147,14 +147,17 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DDq = DD2.dot(Dq)
               else:
                      DDq = spk.dot_product_mkl(DD2, Dq)
-              P2qPx2 = DDq[:DIMS[5],:4]
-              P2qPzx = DDq[:DIMS[5],4:]
-              P2qPxz = DDq[DIMS[5]:,:4]
-              P2qPz2 = DDq[DIMS[5]:,4:]
+                     
+              # Column 1
+              P2qPx2 = DDq[:OPS,:4]
+              P2qPzx = DDq[OPS:,:4]
+              # Column 2
+              P2qPxz = DDq[:OPS,4:]
+              P2qPz2 = DDq[OPS:,4:]
               
               # Second directional derivatives (of the diffusive fluxes)
-              P2qPx2[bdex,:] += dhdx * P2qPxz[bdex,:]; P2qPx2[bdex,:] *= S
-              P2qPzx[bdex,:] += dhdx * P2qPz2[bdex,:]; P2qPzx[bdex,:] *= S
+              P2qPx2[bdex,:] += dhdx * P2qPzx[bdex,:]; P2qPx2[bdex,:] *= S
+              P2qPxz[bdex,:] += dhdx * P2qPz2[bdex,:]; P2qPxz[bdex,:] *= S
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \

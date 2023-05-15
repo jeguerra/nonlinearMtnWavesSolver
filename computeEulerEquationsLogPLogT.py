@@ -6,7 +6,6 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
-import warnings
 import scipy.sparse as sps
 import sparse_dot_mkl as spk
 from numba import njit
