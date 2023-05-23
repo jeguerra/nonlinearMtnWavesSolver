@@ -83,10 +83,15 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     # STRATIFICATION BY TEMPERATURE SOUNDING
+                     # REGIONAL SCALE
                      self.setUserData(823, 92, 145.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 10.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     # MICRO SCALE
+                     #self.setUserData(823, 72, 20.0, 2.0, 300.0, \
+                     #                 250.0, 1000.0, 1.0E+1,
+                     #                 50.0, 0.01, 0.0065, 0.002, 1, 500.0, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -159,6 +164,8 @@ class TestCase:
               elif Mountain == 3:
                      aC = 5000.0
                      lC = 2.0 * mt.pi * 1.0E3
+                     #aC = 500.0
+                     #lC = 2.0 * mt.pi * 2.0E2
               else:
                      aC = 5000.0
                      lC = 4000.0

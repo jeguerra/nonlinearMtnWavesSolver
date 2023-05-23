@@ -79,6 +79,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Compute local Rayleigh factors
               RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
               RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
+              RayD = np.reciprocal(1.0 + DF * mu * RLM)[0,:]
               
               #%% First dynamics update
               if RSBops:
@@ -172,8 +173,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #state = solB + init0
               solB[:,0] *= RayDX.T
               solB[:,1] *= RayDZ.T
-              solB[:,3] *= RayDX.T
-              solB[:,3] *= RayDZ.T
+              solB[:,3] *= RayD.T
               
               return solB
        

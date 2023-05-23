@@ -40,7 +40,7 @@ th = TH - np.exp(LNT)
 # Get the upper and lower bounds for TH
 clim1 = th.min()
 clim2 = th.max()
-clim = 0.25*max(abs(clim1),abs(clim2))
+clim = 0.5*max(abs(clim1),abs(clim2))
 
 imgname = 'toanimate.png'
 THname = 'TotalPT.gif'

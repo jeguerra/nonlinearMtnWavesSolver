@@ -44,14 +44,17 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        else:
               print('Horiztonally pinned state boundary configuration.')
               
-       rowsOutU = set(uldex2)
-       rowsOutW = set(np.concatenate((uldex2,utdex)))
-       rowsOutP = set()
-       rowsOutT = set()
+       # Inflow condition on UWPT STATIC SOLUTION
+       rowsOutU = set(np.concatenate((uldex2,urdex2)))
+       rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
+       rowsOutP = set(np.concatenate((uldex2,urdex2)))
+       rowsOutT = set(np.concatenate((uldex2,urdex2)))
+
        # Indexing for static solver
-       left = np.concatenate((uldex2, uldex2 + iW*OPS))
+       left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
+       right = np.concatenate((urdex2, urdex2 + iW*OPS, urdex2 + iP*OPS, urdex2 + iT*OPS))
        top = utdex + iW*OPS
-       rowsOutBC = set(np.concatenate((left, top)))
+       rowsOutBC = set(np.concatenate((left, right, top)))
        
        '''
        # BC indices for static solution (per variable)
@@ -73,7 +76,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      rowsOutP = set(np.concatenate((uldex2,urdex2)))
                      rowsOutT = set(np.concatenate((uldex2,urdex2)))
               
-                      # Indexing for static solver
+                     # Indexing for static solver
                      left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
                      right = np.concatenate((urdex2, urdex2 + iW*OPS, urdex2 + iP*OPS, urdex2 + iT*OPS))
                      top = utdex + iW*OPS
