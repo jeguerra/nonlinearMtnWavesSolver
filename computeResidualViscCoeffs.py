@@ -112,12 +112,10 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, applyFilter, RLM,
               
               CRES_gpu = cp.asarray(CRES)
               CRES = cp.nanmax(CRES_gpu, axis=1, keepdims=False)
-              #CRES = np.nanmean(CRES_gpu, axis=1, keepdims=False)
-              #CRES = cp.nanmedian(CRES_gpu, axis=1, keepdims=False)
        
-       # Gather back to the CPU
-       CRES1 = cp.expand_dims(CRES[:,0], axis=1).get()
-       CRES2 = cp.expand_dims(CRES[:,1], axis=1).get()
+              # Gather back to the CPU
+              CRES1 = cp.expand_dims(CRES[:,0], axis=1).get()
+              CRES2 = cp.expand_dims(CRES[:,1], axis=1).get()
        
        # Augment damping to the sponge layers
        CRES1[ldex,0] += DCFC * RLM[0,ldex]

@@ -8,6 +8,7 @@ Created on Wed Mar 31 08:25:38 2021
 import os
 import imageio.v2 as imageio
 import numpy as np
+import scipy.linalg as scl
 import matplotlib as mpl
 from matplotlib import cm
 import matplotlib.pyplot as plt
@@ -15,7 +16,7 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-fname = 'Simulation2View3.nc'
+fname = 'Simulation2View4.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -40,7 +41,7 @@ th = TH - np.exp(LNT)
 # Get the upper and lower bounds for TH
 clim1 = th.min()
 clim2 = th.max()
-clim = 0.5*max(abs(clim1),abs(clim2))
+clim = 0.25*max(abs(clim1),abs(clim2))
 
 imgname = 'toanimate.png'
 THname = 'TotalPT.gif'
@@ -56,9 +57,19 @@ runSer = True
 fig = plt.figure(figsize=(16.0, 8.0))
 
 def plotPertb(tt):
+       
+       th2plot = np.ma.getdata(th[tt,:,:])
+       '''
+       mr = 20
+       nm = th2plot.shape
+       U, s, Vh = scl.svd(th2plot)
+       S = scl.diagsvd(s[0:mr], mr, mr)
+       th2plot = U[:,0:mr].dot(S)
+       th2plot = th2plot.dot(Vh[0:mr,:])
+       '''
        fig.gca().clear()
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-       plt.contourf(1.0E-3*X, 1.0E-3*Z, th[tt,:,:], 201, cmap='RdGy', vmin=-clim, vmax=+clim)
+       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 201, cmap='RdGy', vmin=-clim, vmax=+clim)
        
        #norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
        #plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e', cax=plt.gca())

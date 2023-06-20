@@ -12,34 +12,21 @@ from numba import njit
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
-def enforceEssentialBC(sol, U, zeroDex, ebcDex, dhdx):
-              
-       # Enforce essential boundary conditions
-       for vv in range(4):
-              if len(zeroDex[vv]) > 0:
-                     sol[zeroDex[vv],vv] = 0.0
+def enforceBC_RHS(rhs, ebcDex):
        
-       bdex = ebcDex[2]       
-       #sol[bdex,1] = dhdx * U[bdex]
+       ldex = ebcDex[0]
+       rdex = ebcDex[1]
+       bdex = ebcDex[2]
+       #tdex = ebcDex[3]
+       vdex = np.concatenate((ebcDex[2], ebcDex[3]))
        
-       sol[bdex,0] = -U[bdex]
-       sol[bdex,1] = 0.0
-              
-       return sol
-
-def enforceTendencyBC(DqDt, zeroDex, ebcDex, dhdx):
-              
-       for vv in range(4):
-              if len(zeroDex[vv]) > 0:
-                     DqDt[zeroDex[vv],vv] = 0.0
+       rhs[ldex,:] = 0.0
+       rhs[rdex,1] = 0.0
+       rhs[bdex,0] = 0.0
+       rhs[vdex,1] = 0.0
+       rhs[bdex,3] = 0.0
        
-       bdex = ebcDex[2]  
-       #DqDt[bdex,1] = dhdx * DqDt[bdex,0]
-       
-       DqDt[bdex,0] = 0.0
-       DqDt[bdex,1] = 0.0
-       
-       return DqDt
+       return rhs
 
 @njit(parallel=True)
 def computeRdT(q, RdT_bar, kap):
@@ -104,7 +91,7 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zeroDex, withRay, vertStagger, isTFOpX, RSBops):
+def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, vertStagger, isTFOpX, RSBops):
        
        # Compute flow speed
        Q = fields + hydroState
@@ -119,11 +106,9 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, ebcDex, zer
               PqPx -= REFS[15] * DqDz
                             
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFG[2], RdT, T_ratio, \
-                                                       fields, Q, ebcDex)
+                                                       fields, Q)
        if withRay:
               rhsVec += computeRayleighTendency(REFG, fields)
-       
-       rhsVec = enforceTendencyBC(rhsVec, zeroDex, ebcDex, dhdx)
        
        return rhsVec, PqPx, DqDz
 
@@ -307,7 +292,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
 
 # Fully explicit evaluation of the non linear advection
 @njit(parallel=True)
-def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state, ebcDex):
+def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
        
        # Compute advective (multiplicative) operators
        UM = np.column_stack((state[:,0],state[:,0],state[:,0],state[:,0]))
@@ -333,7 +318,6 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio):
        
        # Compute pressure gradient forces
        pgradx = RdT * PqPx[:,2]
-       #pgradz = RdT * (DqDz[:,2] + DQDZ[:,2]) + gc
        pgradz = RdT * DqDz[:,2] - gc * T_ratio
        
        DqDt = np.zeros(PqPx.shape)
@@ -348,11 +332,11 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio):
        return DqDt
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio, fields, state, ebcDex):
+def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio, fields, state):
 
        # Compute complete vertical partial
        PqPz = DqDz + DQDZ
-       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state, ebcDex)
+       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state)
        
        DqDt += computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio)
        
@@ -362,7 +346,7 @@ def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
        mu = np.expand_dims(REFG[3],0)
-       ROP = REFG[4]
+       ROP = REFG[4][0]
        rdex = REFG[-1]
        
        DqDt = np.zeros(fields.shape)
@@ -373,13 +357,13 @@ def computeRayleighTendency(REFG, fields):
               
        return DqDt
 
-@njit(parallel=True)
+#@njit(parallel=True)
 def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF, isFluxDiv):
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
-       DqDt = np.zeros(P2qPx2.shape)
+       DqDt = np.empty(P2qPx2.shape)
        
        if isFluxDiv:
               #%% INTERIOR DIFFUSION
@@ -391,18 +375,14 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF, i
               DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
               #'''   
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,:] = 0.0
-              DqDt[tdex,2] = P2qPx2[tdex,2]
+              DqDt[tdex,:] = P2qPx2[tdex,:]
               
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,:] = 0.0
-              DqDt[bdex,2] = P2qPx2[bdex,2]
+              DqDt[bdex,:] = P2qPx2[bdex,:]
               #'''
        else:              
               DC1 = DCF[0][:,0] # coefficient to the X direction flux
               DC2 = DCF[1][:,0] # coefficient to the Z direction flux
-              mu_xb = DC1[bdex]
-              mu_xt = DC1[tdex]
               
               #%% INTERIOR DIFFUSION
               # Diffusion of u-w vector
@@ -412,14 +392,14 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF, i
               DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
               DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
                   
-              #'''        
+              mu_xb = DCF[0][bdex,:]
+              mu_xt = DCF[0][tdex,:]
+              
               #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,:] = 0.0
-              DqDt[tdex,2] = mu_xt * P2qPx2[tdex,2]
+              DqDt[tdex,:] = mu_xt * P2qPx2[tdex,:]
        
               #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,:] = 0.0
-              DqDt[bdex,2] = mu_xb * P2qPx2[bdex,2]
+              DqDt[bdex,:] = mu_xb * P2qPx2[bdex,:]
        
        # Scale and apply coefficients
        #DqDt[:,3] *= 0.71 / 0.4

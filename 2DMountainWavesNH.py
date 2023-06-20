@@ -26,7 +26,6 @@ import cupy as cp
 import bottleneck as bn
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
-import sparse_dot_mkl as spk
 from matplotlib import cm
 import matplotlib.pyplot as plt
 # Import from the local library of routines
@@ -50,9 +49,6 @@ import computeTimeIntegration as tint
 import faulthandler; faulthandler.enable()
 
 from netCDF4 import Dataset
-
-# Set up the multithreading environment (physical cores only)
-os.environ["OMP_NUM_THREADS"] = "14"
 
 # Disk settings
 localDir = '/home/jeguerra/scratch/'
@@ -85,7 +81,6 @@ def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
        plt.tight_layout()
        plt.savefig('python results/Temperature_Background.png')
        plt.show()
-       sys.exit(2)
 
        return       
 
@@ -452,7 +447,7 @@ def runModel(TestName):
        else:
               print('Diffusion coefficients by RHS evaluation.')
               
-       diffusiveFlux = True
+       diffusiveFlux = False
        if diffusiveFlux:
               print('Diffusion by gradient of diffusive flux.')
        else:
@@ -523,6 +518,9 @@ def runModel(TestName):
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 2 * DIMS[4], DIMS[5]]
        REF0 = computeGrid(DIM0, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
        
+       DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REF0[0], 6)
+       DDXP, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REF0[0], True, False, DDX_BC)
+       
        # Get the double resolution operator here
        if verticalChebGrid:
               DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
@@ -531,7 +529,6 @@ def runModel(TestName):
        else:
               DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
                      
-       DDXP, DDX2P = derv.computeCubicSplineDerivativeMatrix(REF0[0], True, False, 0.0)
        REF0.append(DDXP)
        REF0.append(DDZP)
        
@@ -551,7 +548,7 @@ def runModel(TestName):
        REF0.append(dhx)
        REF0.append(sig)
        
-       tz, dtz, dtz2 = \
+       tz, dtz = \
               computeTemperatureProfileOnGrid(PHYS, REF0, Z_in, T_in, smooth3Layer, uniformStrat, RLOPT, StaticSolve)
               
        dlpz, lpz, pz, dlptz, lpt, pt, rho = \
@@ -567,7 +564,7 @@ def runModel(TestName):
        ax[1,0].plot(REF0[1], uz)
        ax[1,1].plot(REF0[1], tz)
        plt.show()
-       input('Check background profiles.')
+       input('Check double resolution background profiles...')
        '''
        #%% SET UP THE GRID AND INDEX VECTORS
        REFS = computeGrid(DIMS, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
@@ -624,7 +621,7 @@ def runModel(TestName):
        
        #%% MAKE THE INITIAL/BACKGROUND STATE ON COMPUTATIONAL GRID
        # Map the sounding to the computational vertical 2D grid [0 H]
-       TZ, DTDZ, D2TDZ2 = \
+       TZ, DTDZ = \
               computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat, RLOPT, StaticSolve)
        
        #makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ)
@@ -644,12 +641,21 @@ def runModel(TestName):
               DUDZ[:,cc] = dUdz(ZTL[:,cc])
               LOGP[:,cc] = LPZ(ZTL[:,cc])
               LOGT[:,cc] = LPT(ZTL[:,cc])
-       '''       
-       dUdz = np.expand_dims(duz, axis=1)
-       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, 0, ZTL, ITRANS)
-       
+       '''      
+       #'''
+       # Compute the background (initial) fields
+       U = 3.0 * (np.expand_dims(uz, axis=1) - JETOPS[0])
+       UZ = computeColumnInterp(DIM0, REF0[1], U, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
+       dUdz = 3.0 * np.expand_dims(duz, axis=1)
+       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
+       LPZ = np.expand_dims(lpz, axis=1)
+       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
+       LPT = np.expand_dims(lpt, axis=1)
+       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)       
+       #'''
        # Compute thermodynamic gradients (no interpolation!)
        PORZ = PHYS[3] * TZ
+       PBAR = np.exp(LOGP) # Hydrostatic pressure
        DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
        DLTDZ = np.reciprocal(TZ) * DTDZ
        DLPTDZ = DLTDZ - PHYS[4] * DLPDZ
@@ -660,20 +666,15 @@ def runModel(TestName):
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
-       
-       # Compute the background (initial) fields
-       U = np.expand_dims(uz, axis=1)
-       UZ = computeColumnInterp(DIM0, REF0[1], U, 0, ZTL, ITRANS)
-       LPZ = np.expand_dims(lpz, axis=1)
-       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, 0, ZTL, ITRANS)
-       LPT = np.expand_dims(lpt, axis=1)
-       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, 0, ZTL, ITRANS)       
-       PBAR = np.exp(LOGP) # Hydrostatic pressure
-       
-       #plt.contourf(XL, ZTL, LOGT)
-       #plt.show()
-       #input()
-       
+       '''
+       fig, axs = plt.subplots(1,4)
+       axs[0].plot(XL[0,:], LOGT[0,:], XL[1,:], UZ[1,:])
+       axs[1].plot(XL[0,:], LOGT[0,:], XL[1,:], LOGT[1,:])
+       axs[2].plot(XL[0,:], LOGT[0,:], XL[1,:], LOGP[1,:])
+       axs[3].plot(XL[0,:], TZ[0,:], XL[1,:], TZ[1,:])
+       plt.show()
+       print('Check interpolated background fields...')
+       '''
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT)
        
@@ -715,9 +716,9 @@ def runModel(TestName):
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NM = 2
-       for vv in np.arange(NM):
-              NZI = int((1.75 + 0.5 * vv) * NZ)
+       NZIL = (NZ-4, NZ-1, NZ+1, NZ+4)
+       DDZM_OP = DDZMS1
+       for NZI in NZIL:
               if verticalChebGrid:
                      
                      xiI, whf = derv.leglb(NZI) #[-1 1]
@@ -754,11 +755,9 @@ def runModel(TestName):
                      DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
                      dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
                      
-              if vv == 0:
-                     DDZM_OP = DDZMI
-              else:
-                     DDZM_OP += DDZMI
-       DDZM_OP *= 1.0 / NM
+              DDZM_OP += DDZMI
+       
+       DDZM_OP *= 1.0 / (len(NZIL) + 1)
               
        if HermFunc:
               DDXM_OP = DDXMS1
@@ -779,23 +778,54 @@ def runModel(TestName):
        REFS.append(diffOps1) # index 11
        
        #%% Store operators for use
-       if not StaticSolve and RSBops:
+       if NonLinSolve:
               # Multithreaded enabled for transient solution
-              
-              DDOP = sps.vstack((DDXM_OP,DDZM_OP)) 
-              DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
-              DDOP.autotune(nrhs=numVar)
-              REFS.append(DDOP) # index 12
-              
-              DDOP = sps.vstack(diffOps1)
-              DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
-              DDOP.autotune(nrhs=2*numVar)
-              REFS.append(DDOP) # index 13
-              
-              DDOP = sps.vstack(diffOps2)
-              DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
-              DDOP.autotune(nrhs=numVar)
-              REFS.append(DDOP) # index 14
+              if RSBops:
+                     DDOP = sps.vstack((DDXM_OP,DDZM_OP), format='csr')
+                     DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+                     DDOP.autotune(nrhs=numVar)
+                     REFS.append(DDOP) # index 12
+                     
+                     DDOP = sps.vstack(diffOps1, format='csr')
+                     DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+                     DDOP.autotune(nrhs=2*numVar)
+                     REFS.append(DDOP) # index 13
+                     
+                     DDOP = sps.vstack(diffOps2, format='csr')
+                     DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+                     DDOP.autotune(nrhs=2*numVar)
+                     REFS.append(DDOP) # index 14
+              else:
+                     import torch
+                     DDOP = sps.vstack((DDXM_OP,DDZM_OP), format='coo') 
+                     ind = np.vstack((DDOP.row, DDOP.col))
+                     val = DDOP.data
+                     DDOP = torch.sparse_coo_tensor(ind, val)
+                     DDOP = DDOP.to_sparse_csr()
+                     
+                     REFS.append(DDOP) # index 12
+                     del(DDOP)
+                     
+                     DDOP = sps.vstack(diffOps1, format='coo')
+                     ind = np.vstack((DDOP.row, DDOP.col))
+                     val = DDOP.data
+                     DDOP = torch.sparse_coo_tensor(ind, val)
+                     DDOP = DDOP.to_sparse_csr()
+                     
+                     REFS.append(DDOP) # index 13
+                     del(DDOP)
+                     
+                     DDOP = sps.vstack(diffOps2, format='coo')
+                     ind = np.vstack((DDOP.row, DDOP.col))
+                     val = DDOP.data
+                     DDOP = torch.sparse_coo_tensor(ind, val)
+                     DDOP = DDOP.to_sparse_csr()
+                     
+                     REFS.append(DDOP) # index 14
+                     del(DDOP)
+                     
+                     del(val)
+                     del(ind)
        else:
               # Native sparse
               DDOP = sps.vstack((DDXM_OP,DDZM_OP))
@@ -831,7 +861,6 @@ def runModel(TestName):
               print('Uniform grid lengths (m):',DX_wav,DZ_wav)
                      
               dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
-              dS = np.sqrt(dS2)
               S2 = np.reciprocal(dS2)
               S = np.sqrt(S2)
                             
@@ -953,7 +982,7 @@ def runModel(TestName):
               #'''
               # Compute the RHS for this iteration
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False, RSBops)
+                                                  PHYS, REFS, REFG, True, False, False, RSBops)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               displayResiduals('Current function evaluation residual: ', RHS, \
                                      thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1103,7 +1132,7 @@ def runModel(TestName):
               message = 'Residual 2-norm BEFORE Newton step:'
               displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, ebcDex, zeroDex, True, False, False, RSBops)
+                                                  PHYS, REFS, REFG, True, False, False, RSBops)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1153,9 +1182,9 @@ def runModel(TestName):
               else:
                      # Initialize fields
                      if withHydroState:
-                            #fields[ubdex,1] = -dWBC
                             fields[ubdex,0] = -hydroState[ubdex,0]
                             fields[ubdex,1] = 0.0
+                            #fields[ubdex,1] = -dWBC
                      else:
                             fields[:,0] = hydroState[:,0]
                             fields[ubdex,1] = -dWBC
@@ -1163,7 +1192,8 @@ def runModel(TestName):
                             fields[:,3] = hydroState[:,3]
                      
                      rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[11][0], REFS[11][1], REFS[6][0], \
-                                                         PHYS, REFS, REFG, ebcDex, zeroDex, False, False, True, RSBops)
+                                                         PHYS, REFS, REFG, False, False, True, RSBops)
+                     rhsVec = eqs.enforceBC_RHS(rhsVec, ebcDex)
                      
                      rhsVec0 = np.zeros(rhsVec.shape)
                      resVec = rhsVec - rhsVec0
@@ -1226,7 +1256,7 @@ def runModel(TestName):
                      try:   
                             fields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields, hydroState, rhsVec, DCF, \
-                                                                    zeroDex, ebcDex, filteredCoeffs, diffusiveFlux, RSBops)
+                                                                    ebcDex, filteredCoeffs, diffusiveFlux, RSBops)
                             
                             
                      except Exception:
@@ -1263,7 +1293,9 @@ def runModel(TestName):
               rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
               rdb['LMS'] = LMS
-              rdb['DCF'] = DCF
+              if NonLinSolve:
+                     rdb['DCF1'] = DCF[0]
+                     rdb['DCF2'] = DCF[1]
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]
@@ -1375,7 +1407,7 @@ if __name__ == '__main__':
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
        TestName = 'UniformTestTransient'
-       #TestName = '3LayerTest'
+       #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

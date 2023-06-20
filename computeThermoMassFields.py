@@ -40,9 +40,9 @@ def computePfromSensibleT(DDZ, TZ, AC, P0):
        bdex = range(0,NE)
        
        # Compute the forcing due to matching at the model top
-       f1 = lnP0 * DDZ[:,0]
+       f1 = lnP0 * DOP[:,0]
        f2 = dpdZ_H / DDZ[NE,NE] * DDZ[:,NE]
-       F = tempBarI - f1 - f2
+       F = tempBarI #- f1 - f2
        # Solve the system for lnP
        ln_pBar[idex] = AC * lan.solve(DOPS, (F[1:NE]).astype(dtype=np.float64))
        

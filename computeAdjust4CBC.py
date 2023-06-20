@@ -36,33 +36,15 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
        urdex2 = np.array(range(ubdex[-1]+1, OPS))
        
        # Index all boundary DOF that can be diffused on
-       diffDex = (uldex1, urdex1, ubdex, utdex)
+       diffDex = (uldex2, urdex2, ubdex, utdex)
        
-       isInflow = True
-       if isInflow:
-              print('Inflow boundary configuration.')
-       else:
-              print('Horiztonally pinned state boundary configuration.')
-              
-       # Inflow condition on UWPT STATIC SOLUTION
-       rowsOutU = set(np.concatenate((uldex2,urdex2)))
-       rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
-       rowsOutP = set(np.concatenate((uldex2,urdex2)))
-       rowsOutT = set(np.concatenate((uldex2,urdex2)))
-
-       # Indexing for static solver
-       left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
-       right = np.concatenate((urdex2, urdex2 + iW*OPS, urdex2 + iP*OPS, urdex2 + iT*OPS))
-       top = utdex + iW*OPS
-       rowsOutBC = set(np.concatenate((left, right, top)))
-       
-       '''
+       isInflow = False
        # BC indices for static solution (per variable)
        if bcType == 1:
               if isInflow:
                      # Inflow condition on UWPT STATIC SOLUTION
                      rowsOutU = set(uldex2)
-                     rowsOutW = set(np.concatenate((uldex2,utdex)))
+                     rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
                      rowsOutP = set(uldex2)
                      rowsOutT = set(uldex2)
                      # Indexing for static solver
@@ -70,7 +52,7 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, top)))
               else:
-                     # Inflow condition on UWPT STATIC SOLUTION
+                     # Lateral pinned condition on UWPT STATIC SOLUTION
                      rowsOutU = set(np.concatenate((uldex2,urdex2)))
                      rowsOutW = set(np.concatenate((uldex2,urdex2,utdex)))
                      rowsOutP = set(np.concatenate((uldex2,urdex2)))
@@ -82,29 +64,17 @@ def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, right, top)))
        elif bcType == 2:
-              if isInflow:
-                     # Inflow condition on UWPT TRANSIENT SOLUTION
-                     rowsOutU = set(uldex1)
-                     rowsOutW = set(np.concatenate((uldex1,utdex)))
-                     rowsOutP = set(uldex1)
-                     rowsOutT = set(uldex1)
-                     # Indexing for static solver
-                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
-                     top = utdex + iW*OPS
-                     rowsOutBC = set(np.concatenate((left, top)))
-              else:
-                     # Pinned condition on UWPT TRANSIENT SOLUTION
-                     rowsOutU = set(np.concatenate((uldex1,urdex1)))
-                     rowsOutW = set(np.concatenate((uldex1,urdex1,utdex)))
-                     rowsOutP = set(np.concatenate((uldex1,urdex1)))
-                     rowsOutT = set(np.concatenate((uldex1,urdex1)))
-              
-                      # Indexing for static solver
-                     left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
-                     right = np.concatenate((urdex1, urdex1 + iW*OPS, urdex1 + iP*OPS, urdex1 + iT*OPS))
-                     top = utdex + iW*OPS
-                     rowsOutBC = set(np.concatenate((left, right, top)))
-       '''
+              # Inflow condition on UWPT TRANSIENT SOLUTION
+              rowsOutU = set(np.concatenate((uldex1,ubdex,utdex)))
+              rowsOutW = set(np.concatenate((uldex1,urdex1,utdex)))
+              rowsOutP = set(uldex1)
+              rowsOutT = set(np.concatenate((uldex1,ubdex,utdex)))
+              # Indexing for static solver
+              left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+              right = urdex1 + iW*OPS
+              top = np.concatenate((utdex, utdex + iW*OPS, utdex + iT*OPS))
+              botm = np.concatenate((ubdex, ubdex + iW*OPS, ubdex + iT*OPS))
+              rowsOutBC = set(np.concatenate((left, right, top, botm)))
               
        # Indexing arrays for static solution
        ubcDex = rowsAll.difference(rowsOutU); ubcDex = sorted(ubcDex)

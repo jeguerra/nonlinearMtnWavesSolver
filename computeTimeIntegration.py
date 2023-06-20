@@ -6,15 +6,18 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
+import torch
 import math as mt
 import matplotlib.pyplot as plt
-import sparse_dot_mkl as spk
 import bottleneck as bn
 import computeResidualViscCoeffs as rescf
 import computeEulerEquationsLogPLogT as tendency
 
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
+
+torch.set_num_threads(12)
+torch.set_num_interop_threads(8)
 
 def plotRHS(x, rhs, ebcDex, label):
        plim = 2.0E4
@@ -41,7 +44,7 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, init0, rhs0, DCF, zeroDex, ebcDex, \
+                              sol0, init0, rhs0, DCF, ebcDex, \
                               filteredCoeffs, diffusiveFlux, RSBops):
        
        OPS = DIMS[-1]
@@ -56,12 +59,19 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        LS = DLD[4]
        S = DLD[5]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
+       
+       ldex = ebcDex[0]
+       rdex = ebcDex[1]
        bdex = ebcDex[2]
+       tdex = ebcDex[3]
+       vdex = np.concatenate((ebcDex[2], ebcDex[3]))
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
-       DD2 = REFS[14] # First derivatives for diffusion gradient
-       #DD3 = REFS[14]
+       if diffusiveFlux:
+              DD2 = REFS[13] # First derivatives for diffusion gradient
+       else:
+              DD2 = REFS[14]
        
        rhs1 = 0.0
        res = 0.0
@@ -76,16 +86,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Compute pressure gradient force scaling (buoyancy)
               RdT, T_ratio = tendency.computeRdT(solA, REFS[9][0], PHYS[4])
               
-              # Compute local Rayleigh factors
-              RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
-              RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
-              RayD = np.reciprocal(1.0 + DF * mu * RLM)[0,:]
-              
               #%% First dynamics update
               if RSBops:
                      Dq = DD1.dot(solA)
               else:
-                     Dq = spk.dot_product_mkl(DD1, solA)
+                     Dq = torch.matmul(DD1, torch.from_numpy(solA)).numpy()
+                     
               DqDxA = Dq[:DIMS[5],:]
               DqDzA = Dq[DIMS[5]:,:]
               
@@ -95,14 +101,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                                    
               # Compute advection update
               stateA = solA + init0
-              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, PqPzA, solA, stateA, ebcDex)
+              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, PqPzA, solA, stateA)
                                    
               # Compute internal force update
               rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, RdT, T_ratio)
 
               # Store the dynamic RHS
               rhsDyn = (rhsAdv + rhsIfc)
-              rhsDyn = tendency.enforceTendencyBC(rhsDyn, zeroDex, ebcDex, REFS[6][0])
+              rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               #%% Compute the DynSGS coefficients at the top update
               if topUpdate:
@@ -117,18 +123,16 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      if not np.isnan(VWAV_max) and VWAV_max > 0.0:
                             DT = LS / mt.sqrt(VWAV_max)
                      
-                     rhs1 = np.copy(rhsDyn)
+                     rhs1 = rhsDyn
                      res = rhs1 - rhs0
                      AS = np.abs(solA + init0)
-                     DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, res, DLD, \
+                     DCF1 = rescf.computeResidualViscCoeffs2(DIMS, AS, res, DLD, \
                                                             ebcDex[2], REFG[5], filteredCoeffs, RLM, DCFC)
+                     DCF = (0.5 * (DCF[0] + DCF1[0]), 0.5 * (DCF[1] + DCF1[1]))
+       
                      topUpdate = False
               
               #%% Compute diffusive update
-              
-              Psr = init0[:,2] * (1.0 + np.expm1(solA[:,2]))
-              Rho = np.expand_dims(Psr / RdT, axis=1)
-              invRho = np.reciprocal(Rho)
 
               # Compute directional derivative along terrain
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
@@ -136,18 +140,13 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               if diffusiveFlux:
                      PqPxA *= DCF[0]
                      DqDzA *= DCF[1]
-                     PqPxA *= Rho
-                     DqDzA *= Rho
-              else:
-                     PqPxA *= Rho
-                     DqDzA *= Rho
-                            
+              
               # Compute derivatives of diffusive flux
               Dq = np.column_stack((PqPxA,DqDzA))
               if RSBops:
                      DDq = DD2.dot(Dq)
               else:
-                     DDq = spk.dot_product_mkl(DD2, Dq)
+                     DDq = torch.matmul(DD2, torch.from_numpy(Dq)).numpy()
                      
               # Column 1
               P2qPx2 = DDq[:OPS,:4]
@@ -163,17 +162,30 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                          ebcDex, DLD, DCF, diffusiveFlux)
-              rhsDif = tendency.enforceTendencyBC(rhsDif, zeroDex, ebcDex, REFS[6][0])
+              rhsDif = tendency.enforceBC_RHS(rhsDif, ebcDex)
+              # Compute total RHS and apply BC
+              rhs = (rhsDyn + rhsDif)
               
-              # Apply update
-              rhsDif *= invRho
-              solB = sol2Update + DF * (rhsDyn + rhsDif)
-              #'''
+              # Apply stage update
+              solB = sol2Update + DF * rhs
+              
+              # Compute local Rayleigh factors
+              #RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
+              #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
+              RayD = np.reciprocal(1.0 + DF * mu * RLM)[0,:]              
+
               # Apply Rayleigh damping layer implicitly
-              #state = solB + init0
-              solB[:,0] *= RayDX.T
-              solB[:,1] *= RayDZ.T
+              solB[:,0] *= RayD.T
+              solB[:,1] *= RayD.T
+              solB[:,2] *= RayD.T
               solB[:,3] *= RayD.T
+              
+              # Apply BC to update
+              solB[ldex,:] = 0.0
+              solB[rdex,1] = 0.0
+              solB[bdex,0] = -init0[bdex,0]
+              solB[vdex,1] = 0.0
+              solB[vdex,3] = 0.0
               
               return solB
        
