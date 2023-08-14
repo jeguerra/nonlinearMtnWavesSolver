@@ -434,13 +434,6 @@ def runModel(TestName):
        else:
               print('Flow-Dependent Diffusion Model.')
               
-       # Spatial filtering for DynSGS coefficients
-       filteredCoeffs = False
-       if filteredCoeffs:
-              print('Spatially filtered DynSGS coefficients.')
-       else:
-              print('No spatial filter on DynSGS coefficients.')
-              
        DynSGS_RES = True
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
@@ -775,7 +768,7 @@ def runModel(TestName):
        diffOps2 = (PPXMD, DDZMS_QS)
        
        REFS.append((DDXMS1, DDZMS1)) # index 10
-       REFS.append(diffOps1) # index 11
+       REFS.append((sps.csr_matrix(diffOps1[0]), sps.csr_matrix(diffOps1[1]))) # index 11
        
        #%% Store operators for use
        if NonLinSolve:
@@ -822,7 +815,6 @@ def runModel(TestName):
                      DDOP = DDOP.to_sparse_csr()
                      
                      REFS.append(DDOP) # index 14
-                     del(DDOP)
                      
                      del(val)
                      del(ind)
@@ -1256,7 +1248,7 @@ def runModel(TestName):
                      try:   
                             fields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields, hydroState, rhsVec, DCF, \
-                                                                    ebcDex, filteredCoeffs, diffusiveFlux, RSBops)
+                                                                    ebcDex, diffusiveFlux, RSBops)
                             
                             
                      except Exception:

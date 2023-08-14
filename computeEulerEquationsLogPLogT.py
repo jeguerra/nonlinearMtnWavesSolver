@@ -17,8 +17,8 @@ def enforceBC_RHS(rhs, ebcDex):
        ldex = ebcDex[0]
        rdex = ebcDex[1]
        bdex = ebcDex[2]
-       #tdex = ebcDex[3]
-       vdex = np.concatenate((ebcDex[2], ebcDex[3]))
+       tdex = ebcDex[3]
+       vdex = np.concatenate((bdex, tdex))
        
        rhs[ldex,:] = 0.0
        rhs[rdex,1] = 0.0
@@ -291,18 +291,15 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Fully explicit evaluation of the non linear advection
-@njit(parallel=True)
+#@njit(parallel=True)
 def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
        
        # Compute advective (multiplicative) operators
-       UM = np.column_stack((state[:,0],state[:,0],state[:,0],state[:,0]))
-       WM = np.column_stack((state[:,1],state[:,1],state[:,1],state[:,1]))
+       UM = np.expand_dims(state[:,0], axis=1)
+       WM = np.expand_dims(state[:,1], axis=1)
        
        # Compute advection
-       Uadvect = UM * PqPx
-       Wadvect = WM * PqPz
-       
-       DqDt = -(Uadvect + Wadvect)
+       DqDt = -(UM * PqPx + WM * PqPz)
        
        return DqDt
 
@@ -313,21 +310,15 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio):
        gc = PHYS[0]
        gam = PHYS[6]
        
-       # Compute local divergence
-       divergence = PqPx[:,0] + DqDz[:,1]
-       
-       # Compute pressure gradient forces
-       pgradx = RdT * PqPx[:,2]
-       pgradz = RdT * DqDz[:,2] - gc * T_ratio
-       
        DqDt = np.zeros(PqPx.shape)
        
        # Horizontal momentum equation
-       DqDt[:,0] = -pgradx
+       DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
-       DqDt[:,1] = -pgradz
+       DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
        # Pressure (mass) equation
-       DqDt[:,2] = -gam * divergence
+       DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
+       # Potential temperature equation (material derivative)
        
        return DqDt
 

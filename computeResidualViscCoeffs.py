@@ -11,29 +11,8 @@ import bottleneck as bn
 from numba import njit, prange
 import cupy as cp
 
-def computeRegionFilterBound_GPU(UD, WD, Q_RES, DLD, nbrDex, LVAR):
-       
-       # SEND THESE ARRAYS TO THE GPU
-       coef_array1 = np.column_stack((DLD[2] * Q_RES,0.5 * DLD[0] * UD))
-       coef_array2 = np.column_stack((DLD[3] * Q_RES,0.5 * DLD[1] * WD))
-       
-       Q1 = np.empty((LVAR,1))
-       Q2 = np.empty((LVAR,1))
-       
-       for ii in np.arange(LVAR):
-              # Get the region index
-              rdex = nbrDex[ii]
-              
-              Q = np.nanquantile(coef_array1[rdex,:],0.95,axis=0)
-              Q1[ii,0] = Q.min()
-              Q = np.nanquantile(coef_array2[rdex,:],0.95,axis=0)
-              Q2[ii,0] = Q.min()
-              
-       # BRING RETURN ARRAYS FROM THE GPU
-       return Q1, Q2
-
 @njit(parallel=True)
-def computeRegionFilterBound_CPU(UD, WD, Q_RES, DLD, nbrDex, LVAR):
+def computeRegionFilterBound1(UD, WD, Q_RES, DLD, nbrDex, LVAR):
               
        Q1 = np.empty((LVAR,1))
        Q2 = np.empty((LVAR,1))
@@ -55,34 +34,32 @@ def computeRegionFilterBound_CPU(UD, WD, Q_RES, DLD, nbrDex, LVAR):
        return Q1, Q2
 
 @njit(parallel=True)
-def computeRegionFilter(CRES1, CRES2, nbrDex, LVAR):
-
-       Q1 = np.empty((LVAR,1))
-       Q2 = np.empty((LVAR,1))
+def computeRegionFilter1(Q, CR00, CR10, CR01, CR11, nbrDex, LVAR):
        
        for ii in prange(LVAR):
               # Get the region index
               rdex = nbrDex[ii]
-              
-              Q1[ii,0] = np.nanquantile(CRES1[rdex],0.95)
-              Q2[ii,0] = np.nanquantile(CRES2[rdex],0.95)
-              
-       return Q1, Q2
-
-@njit(parallel=True)
-def computeRegionFilter2(CRES, nbrDex, LVAR, RDIM):
-
-       Q = np.full((LVAR,RDIM,2),np.nan)
-       
-       for ii in prange(LVAR):
-              # Get the region index
-              rdex = nbrDex[ii]
-              Q[ii,:len(rdex),0] = CRES[rdex,0]
-              Q[ii,:len(rdex),1] = CRES[rdex,1]
+              Q[ii,0,0,:len(rdex)] = CR00[rdex]
+              Q[ii,1,0,:len(rdex)] = CR01[rdex]
+              Q[ii,0,1,:len(rdex)] = CR10[rdex]
+              Q[ii,1,1,:len(rdex)] = CR11[rdex]
               
        return Q
 
-def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, applyFilter, RLM, DCFC):
+@njit(parallel=True)
+def computeRegionFilter2(Q2FILT, nbrDex, LVAR, RDIM):
+
+       QFILT = np.full((LVAR,RDIM,2),np.nan)
+       
+       for ii in prange(LVAR):
+              # Get the region index
+              rdex = nbrDex[ii]
+              QFILT[ii,:len(rdex),0] = Q2FILT[rdex,0]
+              QFILT[ii,:len(rdex),1] = Q2FILT[rdex,1]
+              
+       return QFILT
+
+def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC):
        
        # Get the region indices map
        nbrDex = DLD[-1] # List of lists of indices to regions
@@ -95,33 +72,34 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, applyFilter, RLM,
        # Diffusion proportional to the residual entropy
        Q_RES = PHYS[2] * AMAG
        
+       #%% Compare residual coefficients to upwind
+       CD = 0.5
+       CRES = np.full((LVAR,2,2,RDIM), np.nan)
+       CRES00 = DLD[2] * Q_RES
+       CRES01 = CD * DLD[0] * AV[:,0]
+       CRES10 = DLD[3] * Q_RES
+       CRES11 = CD * DLD[1] * AV[:,1]
+       
+       CRES = computeRegionFilter1(CRES, CRES00, CRES10, CRES01, CRES11, nbrDex, LVAR)
+       
+       CRES = bn.nanmax(CRES, axis=3)
+       CRES = bn.nanmin(CRES, axis=1)
+       
+       #CRES = bn.nanmin(CRES, axis=1)
+       #CRES = bn.nanmax(CRES, axis=2)
+       
+       '''
        #%% Filter to spatial regions and apply stability bounds
        if applyFilter:
-              CRES1, CRES2 = computeRegionFilterBound_CPU(AV[:,0], AV[:,1], Q_RES, DLD, nbrDex, LVAR)
-       else:
-              CRES = np.empty((LVAR,2,2))
-              CD = 0.5
-              CRES[:,0,0] = DLD[2] * Q_RES
-              CRES[:,1,0] = CD * DLD[0] * AV[:,0]
-              CRES[:,0,1] = DLD[3] * Q_RES
-              CRES[:,1,1] = CD * DLD[1] * AV[:,1]
-              CRES_gpu = cp.asarray(CRES)
-              
-              CRES = cp.nanmin(CRES_gpu,axis=1).get()
               CRES = computeRegionFilter2(CRES, nbrDex, LVAR, RDIM)
-              
-              CRES_gpu = cp.asarray(CRES)
-              CRES = cp.nanmax(CRES_gpu, axis=1, keepdims=False)
-       
-              # Gather back to the CPU
-              CRES1 = cp.expand_dims(CRES[:,0], axis=1).get()
-              CRES2 = cp.expand_dims(CRES[:,1], axis=1).get()
+              CRES = CD * bn.nanmax(CRES, axis=1)
+       '''       
+       # Give the correct dimensions for operations
+       CRES1 = np.expand_dims(CRES[:,0], axis=1)
+       CRES2 = np.expand_dims(CRES[:,1], axis=1)
        
        # Augment damping to the sponge layers
        CRES1[ldex,0] += DCFC * RLM[0,ldex]
        CRES2[ldex,0] += DCFC * RLM[0,ldex]
-       
-       CRES = None
-       CRES_gpu = None
-       
-       return (CRES1,CRES2)
+              
+       return (CD * CRES1,CD * CRES2)

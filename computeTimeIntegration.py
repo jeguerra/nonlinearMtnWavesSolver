@@ -44,8 +44,8 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, init0, rhs0, DCF, ebcDex, \
-                              filteredCoeffs, diffusiveFlux, RSBops):
+                              sol0, init0, rhs0, DCF0, ebcDex, \
+                              diffusiveFlux, RSBops):
        
        OPS = DIMS[-1]
        DT = TOPT[0]
@@ -64,7 +64,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        rdex = ebcDex[1]
        bdex = ebcDex[2]
        tdex = ebcDex[3]
-       vdex = np.concatenate((ebcDex[2], ebcDex[3]))
+       vdex = np.concatenate((bdex, tdex))
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
@@ -83,6 +83,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               nonlocal topUpdate,rhs1,res,DCF, DT
               DF = coeff * DT
               
+              # Compute total state
+              stateA = solA + init0
+              
               # Compute pressure gradient force scaling (buoyancy)
               RdT, T_ratio = tendency.computeRdT(solA, REFS[9][0], PHYS[4])
               
@@ -100,7 +103,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               PqPzA = DqDzA + DQDZ
                                    
               # Compute advection update
-              stateA = solA + init0
               rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, PqPzA, solA, stateA)
                                    
               # Compute internal force update
@@ -124,11 +126,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                             DT = LS / mt.sqrt(VWAV_max)
                      
                      rhs1 = rhsDyn
+                     # Define residual as the timestep change in the RHS
                      res = rhs1 - rhs0
-                     AS = np.abs(solA + init0)
+                     # Define residual new RHS
+                     #res = rhsDyn
+                     AS = np.abs(solA)# + init0)
                      DCF1 = rescf.computeResidualViscCoeffs2(DIMS, AS, res, DLD, \
-                                                            ebcDex[2], REFG[5], filteredCoeffs, RLM, DCFC)
-                     DCF = (0.5 * (DCF[0] + DCF1[0]), 0.5 * (DCF[1] + DCF1[1]))
+                                                            bdex, REFG[5], RLM, DCFC)
+                     DCF = (0.5 * (DCF0[0] + DCF1[0]), 0.5 * (DCF0[1] + DCF1[1]))
        
                      topUpdate = False
               
@@ -181,11 +186,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB[:,3] *= RayD.T
               
               # Apply BC to update
-              solB[ldex,:] = 0.0
-              solB[rdex,1] = 0.0
-              solB[bdex,0] = -init0[bdex,0]
-              solB[vdex,1] = 0.0
-              solB[vdex,3] = 0.0
+              solB[ldex,:] = 0.0 # All variables to background at inflow
+              solB[rdex,1] = 0.0 # No vertical velocity at outflow
+              solB[bdex,0] = -init0[bdex,0] # No total horizontal velocity at ground
+              solB[vdex,1] = 0.0 # No vertical velocity at ground AND model top
+              solB[bdex,3] = 0.0 # No potential temperature at ground
               
               return solB
        
@@ -352,15 +357,15 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        # Compute dynamics update
        if order == 2:
-              solB = ketchesonM2(sol0)
+              sol1 = ketchesonM2(sol0)
        elif order == 3:
               #solB = ssprk63(sol0) 
-              solB = ketcheson93(sol0)
+              sol1 = ketcheson93(sol0)
        elif order == 4:
               #solB = ssprk54(sol0) 
-              solB = ketcheson104(sol0)
+              sol1 = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
-              solB = ketchesonM2(sol0)
+              sol1 = ketchesonM2(sol0)
               
-       return solB, rhs1, res, DCF, DT
+       return sol1, rhs1, res, DCF, DT
