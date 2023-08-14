@@ -58,7 +58,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        
        LS = DLD[4]
        S = DLD[5]
-       dhdx = np.expand_dims(REFS[6][0], axis=1)
+       dhdx = np.abs(np.expand_dims(REFS[6][0], axis=1))
+       TF = bn.nanmax(dhdx)
        
        ldex = ebcDex[0]
        rdex = ebcDex[1]

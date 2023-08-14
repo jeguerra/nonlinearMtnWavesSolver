@@ -22,7 +22,6 @@ import shelve
 import shutil
 import math as mt
 import numpy as np
-import cupy as cp
 import bottleneck as bn
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
@@ -866,12 +865,13 @@ def runModel(TestName):
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
               XZV = np.hstack((XMV, ZMV))
               
-              DL1 = 1.0 * DX_wav
-              DL2 = 1.0 * DZ_wav
+              # Reference grid scale lengths
+              DL1 = 0.5 * DX_wav
+              DL2 = 0.5 * DZ_wav
               
               import matplotlib.path as pth
-              dx = 1.0 * mt.pi * DL1
-              dz = 1.0 * mt.pi * DL2
+              dx = 2.0 * mt.pi * DL1
+              dz = 2.0 * mt.pi * DL2
               fltDex = []
               regLen = 0
               for nn in np.arange(XZV.shape[0]):

@@ -9,7 +9,6 @@ Created on Sun Aug  4 13:59:02 2019
 import numpy as np
 import bottleneck as bn
 from numba import njit, prange
-import cupy as cp
 
 @njit(parallel=True)
 def computeRegionFilterBound1(UD, WD, Q_RES, DLD, nbrDex, LVAR):
@@ -67,19 +66,16 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
        # Compute absolute value of residuals
        AMAG = np.abs(MAG[:,3])
        LVAR = MAG.shape[0]
-       RDIM = DLD[-2]
        
        # Diffusion proportional to the residual entropy
-       Pr = 0.71
+       #Pr = 0.71
        Q_RES = PHYS[2] * AMAG
        
        #%% Compare residual coefficients to upwind
-       CD = 0.5
-       #CRES = np.full((LVAR,2,2,RDIM), np.nan)
        CRES00 = DLD[2] * Q_RES
-       CRES01 = CD * DLD[0] * AV[:,0]
+       CRES01 = DLD[0] * AV[:,0]
        CRES10 = DLD[3] * Q_RES
-       CRES11 = CD * DLD[1] * AV[:,1]
+       CRES11 = DLD[1] * AV[:,1]
        
        CRES = computeRegionFilter1(CRES, CRES00, CRES10, CRES01, CRES11, nbrDex, LVAR)
        
@@ -91,8 +87,8 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
        #CRES = bn.nanmax(CRES, axis=2)
        
        # Give the correct dimensions for operations
-       CRES1 = Pr * np.expand_dims(CRES[:,0], axis=1)
-       CRES2 = Pr * np.expand_dims(CRES[:,1], axis=1)
+       CRES1 = np.expand_dims(CRES[:,0], axis=1)
+       CRES2 = np.expand_dims(CRES[:,1], axis=1)
        
        # Augment damping to the sponge layers
        CRES1[ldex,0] += DCFC * RLM[0,ldex]
