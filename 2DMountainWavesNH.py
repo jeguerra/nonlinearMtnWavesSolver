@@ -1140,6 +1140,9 @@ def runModel(TestName):
               #RLM_gpu = cp.asarray(REFG[4][0].data)
               RLM = REFG[4][0].data
               
+              # Initialize residual coefficient storage
+              CRES = np.full((fields.shape[0],2,2,DLD[-2]), np.nan)
+              
               # NetCDF restart for transient runs
               if isRestart:
                      rhsVec = np.empty(fields.shape)
@@ -1201,8 +1204,6 @@ def runModel(TestName):
               if not np.isnan(VWAV_max) and VWAV_max > 0.0:
                      TOPT[0] = DTF * DLS / mt.sqrt(VWAV_max)
                      
-              DCF = (np.zeros((OPS,1)),np.zeros((OPS,1)))
-              
               # Initialize output to NetCDF
               newFname = initializeNetCDF(fname4Restart, thisTime, NX, NZ, XL, ZTL, hydroState)
        
@@ -1215,39 +1216,11 @@ def runModel(TestName):
               interTime2 = 0.0
               while thisTime <= TOPT[4]:
                      
-                     # Print out diagnostics every TOPT[5] seconds
-                     if interTime1 >= TOPT[5] or ti == 0:
-                            
-                            message = ''
-                            displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
-                                                   thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
-                                   
-                            # Compute and apply SVD based filtering
-                            fields_gpu = cp.asarray(fields)
-                            for vv in range(numVar):
-                                   q = cp.reshape(fields_gpu[:,vv], (NZ+1, NX+1), order='F')
-                                   svdq = cp.linalg.svd(q, full_matrices=False)
-                                   sdex = cp.nonzero(svdq[1] >= np.nanmedian(svdq[1]))
-                                   qf = svdq[0][:,sdex].dot(cp.diag(svdq[1][sdex]))
-                                   fields_gpu[:,vv] = cp.reshape(qf.dot(svdq[2][sdex,:]),(OPS,),order='F')
-                            
-                            fields_plot = fields_gpu.get()
-                            
-                            # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields_plot, rhsVec, resVec, DCF)
-                                                        
-                            ff += 1
-                            interTime1 = 0.0
-                     
-                     # Make a diagnostic plot                            
-                     if interTime2 >= TOPT[6] and makePlots:
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
-                            interTime2 = 0.0
                             
                      # Compute the solution within a time step
                      try:   
                             fields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields, hydroState, rhsVec, DCF, \
+                                                                    DLD, TOPT, fields, hydroState, rhsVec, CRES, \
                                                                     ebcDex, diffusiveFlux, RSBops)
                             
                             
@@ -1259,6 +1232,36 @@ def runModel(TestName):
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
+                            
+                     # Print out diagnostics every TOPT[5] seconds
+                     if interTime1 >= TOPT[5] or ti == 0:
+                            
+                            message = ''
+                            displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
+                                                   thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
+                                   
+                            # Compute and apply SVD based filtering
+                            '''
+                            fields_gpu = cp.asarray(fields)
+                            for vv in range(numVar):
+                                   q = cp.reshape(fields_gpu[:,vv], (NZ+1, NX+1), order='F')
+                                   svdq = cp.linalg.svd(q, full_matrices=False)
+                                   sdex = cp.nonzero(svdq[1] >= np.nanmedian(svdq[1]))
+                                   qf = svdq[0][:,sdex].dot(cp.diag(svdq[1][sdex]))
+                                   fields_gpu[:,vv] = cp.reshape(qf.dot(svdq[2][sdex,:]),(OPS,),order='F')
+                            
+                            fields_plot = fields_gpu.get()
+                            '''
+                            # Store in the NC file
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF)
+                                                        
+                            ff += 1
+                            interTime1 = 0.0
+                     
+                     # Make a diagnostic plot                            
+                     if interTime2 >= TOPT[6] and makePlots:
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
+                            interTime2 = 0.0
                      
                      ti += 1
                      thisTime += TOPT[0]

@@ -59,7 +59,7 @@ def computeRegionFilter2(Q2FILT, nbrDex, LVAR, RDIM):
               
        return QFILT
 
-def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC):
+def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
        
        # Get the region indices map
        nbrDex = DLD[-1] # List of lists of indices to regions
@@ -70,11 +70,12 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC):
        RDIM = DLD[-2]
        
        # Diffusion proportional to the residual entropy
+       Pr = 0.71
        Q_RES = PHYS[2] * AMAG
        
        #%% Compare residual coefficients to upwind
        CD = 0.5
-       CRES = np.full((LVAR,2,2,RDIM), np.nan)
+       #CRES = np.full((LVAR,2,2,RDIM), np.nan)
        CRES00 = DLD[2] * Q_RES
        CRES01 = CD * DLD[0] * AV[:,0]
        CRES10 = DLD[3] * Q_RES
@@ -82,24 +83,19 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC):
        
        CRES = computeRegionFilter1(CRES, CRES00, CRES10, CRES01, CRES11, nbrDex, LVAR)
        
+       # Compute regions THEN compare coefficients
        CRES = bn.nanmax(CRES, axis=3)
        CRES = bn.nanmin(CRES, axis=1)
-       
+       # Compare coefficients THEN compute regions
        #CRES = bn.nanmin(CRES, axis=1)
        #CRES = bn.nanmax(CRES, axis=2)
        
-       '''
-       #%% Filter to spatial regions and apply stability bounds
-       if applyFilter:
-              CRES = computeRegionFilter2(CRES, nbrDex, LVAR, RDIM)
-              CRES = CD * bn.nanmax(CRES, axis=1)
-       '''       
        # Give the correct dimensions for operations
-       CRES1 = np.expand_dims(CRES[:,0], axis=1)
-       CRES2 = np.expand_dims(CRES[:,1], axis=1)
+       CRES1 = Pr * np.expand_dims(CRES[:,0], axis=1)
+       CRES2 = Pr * np.expand_dims(CRES[:,1], axis=1)
        
        # Augment damping to the sponge layers
        CRES1[ldex,0] += DCFC * RLM[0,ldex]
        CRES2[ldex,0] += DCFC * RLM[0,ldex]
               
-       return (CD * CRES1,CD * CRES2)
+       return (CRES1,CRES2)

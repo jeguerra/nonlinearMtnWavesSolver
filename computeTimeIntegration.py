@@ -44,7 +44,7 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, init0, rhs0, DCF0, ebcDex, \
+                              sol0, init0, rhs0, CRES, ebcDex, \
                               diffusiveFlux, RSBops):
        
        OPS = DIMS[-1]
@@ -76,7 +76,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        rhs1 = 0.0
        res = 0.0
        topUpdate = True
-       DCF = (np.zeros((OPS,1)),np.zeros((OPS,1)))
+       DCF = (np.empty((OPS,1)),np.empty((OPS,1)))
        
        def computeUpdate(coeff, solA, sol2Update):
               
@@ -131,9 +131,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      # Define residual new RHS
                      #res = rhsDyn
                      AS = np.abs(solA)# + init0)
-                     DCF1 = rescf.computeResidualViscCoeffs2(DIMS, AS, res, DLD, \
-                                                            bdex, REFG[5], RLM, DCFC)
-                     DCF = (0.5 * (DCF0[0] + DCF1[0]), 0.5 * (DCF0[1] + DCF1[1]))
+                     DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, res, DLD, \
+                                                            bdex, REFG[5], RLM, DCFC, CRES)
        
                      topUpdate = False
               
