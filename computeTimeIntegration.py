@@ -44,22 +44,21 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
-                              sol0, init0, rhs0, CRES, ebcDex, \
-                              diffusiveFlux, RSBops):
+                              sol0, init0, rhs0, CRES, ebcDex, RSBops):
        
        OPS = DIMS[-1]
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
        DQDZ = REFG[2]
-       RLMX = REFG[4][1].data
-       RLMZ = REFG[4][2].data
+       #RLMX = REFG[4][1].data
+       #RLMZ = REFG[4][2].data
        RLM = REFG[4][0].data
        
        LS = DLD[4]
        S = DLD[5]
-       dhdx = np.abs(np.expand_dims(REFS[6][0], axis=1))
-       TF = bn.nanmax(dhdx)
+       dhdx = np.expand_dims(REFS[6][0], axis=1)
+       #TF = bn.nanmax(dhdx)
        
        ldex = ebcDex[0]
        rdex = ebcDex[1]
@@ -69,10 +68,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
-       if diffusiveFlux:
-              DD2 = REFS[13] # First derivatives for diffusion gradient
-       else:
-              DD2 = REFS[14]
+       DD2 = REFS[13] # First derivatives for diffusion gradient
        
        rhs1 = 0.0
        res = 0.0
@@ -142,9 +138,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Compute directional derivative along terrain
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
               
-              if diffusiveFlux:
-                     PqPxA *= DCF[0]
-                     DqDzA *= DCF[1]
+              # Compute diffusive fluxes
+              PqPxA *= DCF[0]
+              DqDzA *= DCF[1]
               
               # Compute derivatives of diffusive flux
               Dq = np.column_stack((PqPxA,DqDzA))
@@ -166,7 +162,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                         ebcDex, DLD, DCF, diffusiveFlux)
+                                                         ebcDex, DLD, DCF)
               rhsDif = tendency.enforceBC_RHS(rhsDif, ebcDex)
               # Compute total RHS and apply BC
               rhs = (rhsDyn + rhsDif)

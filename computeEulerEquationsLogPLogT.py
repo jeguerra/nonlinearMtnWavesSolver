@@ -349,50 +349,25 @@ def computeRayleighTendency(REFG, fields):
        return DqDt
 
 #@njit(parallel=True)
-def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF, isFluxDiv):
+def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF):
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
-       DqDt = np.empty(P2qPx2.shape)
+       DqDt = np.zeros(P2qPx2.shape)
        
-       if isFluxDiv:
-              #%% INTERIOR DIFFUSION
-              # Diffusion of u-w vector
-              DqDt[:,0] = (2.0 * P2qPx2[:,0]) + (P2qPzx[:,1] + P2qPz2[:,0])
-              DqDt[:,1] = (P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1])
-              # Diffusion of scalars (broken up into anisotropic components
-              DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
-              DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
-              #'''   
-              #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,:] = P2qPx2[tdex,:]
-              
-              #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,:] = P2qPx2[bdex,:]
-              #'''
-       else:              
-              DC1 = DCF[0][:,0] # coefficient to the X direction flux
-              DC2 = DCF[1][:,0] # coefficient to the Z direction flux
-              
-              #%% INTERIOR DIFFUSION
-              # Diffusion of u-w vector
-              DqDt[:,0] = DC1 * (2.0 * P2qPx2[:,0]) + DC2 * (P2qPzx[:,1] + P2qPz2[:,0])
-              DqDt[:,1] = DC1 * (P2qPx2[:,1] + P2qPxz[:,0]) + DC2 * (2.0 * P2qPz2[:,1])
-              # Diffusion of scalars (broken up into anisotropic components
-              DqDt[:,2] = DC1 * P2qPx2[:,2] + DC2 * P2qPz2[:,2]
-              DqDt[:,3] = DC1 * P2qPx2[:,3] + DC2 * P2qPz2[:,3]
-                  
-              mu_xb = DCF[0][bdex,:]
-              mu_xt = DCF[0][tdex,:]
-              
-              #%% TOP DIFFUSION (flow along top edge)
-              DqDt[tdex,:] = mu_xt * P2qPx2[tdex,:]
+       #%% INTERIOR DIFFUSION
+       # Diffusion of u-w vector
+       DqDt[:,0] = (2.0 * P2qPx2[:,0]) + (P2qPzx[:,1] + P2qPz2[:,0])
+       DqDt[:,1] = (P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1])
+       # Diffusion of scalars (broken up into anisotropic components
+       DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
+       DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
+       #'''   
+       #%% TOP DIFFUSION (flow along top edge)
+       DqDt[tdex,:] = P2qPx2[tdex,:]
        
-              #%% BOTTOM DIFFUSION (flow along the terrain surface)
-              DqDt[bdex,:] = mu_xb * P2qPx2[bdex,:]
-       
-       # Scale and apply coefficients
-       #DqDt[:,3] *= 0.71 / 0.4
+       #%% BOTTOM DIFFUSION (flow along the terrain surface)
+       DqDt[bdex,:] = P2qPx2[bdex,:]
 
        return DqDt

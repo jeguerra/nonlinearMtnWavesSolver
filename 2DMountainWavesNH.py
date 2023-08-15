@@ -439,12 +439,6 @@ def runModel(TestName):
        else:
               print('Diffusion coefficients by RHS evaluation.')
               
-       diffusiveFlux = False
-       if diffusiveFlux:
-              print('Diffusion by gradient of diffusive flux.')
-       else:
-              print('Diffusion by product of coefficients with 2nd derivatives.')
-              
        verticalChebGrid = False
        verticalLegdGrid = True
        if verticalChebGrid:
@@ -866,12 +860,12 @@ def runModel(TestName):
               XZV = np.hstack((XMV, ZMV))
               
               # Reference grid scale lengths
-              DL1 = 0.5 * DX_wav
-              DL2 = 0.5 * DZ_wav
+              DL1 = 0.5 * DX_avg
+              DL2 = 0.5 * DZ_avg
               
               import matplotlib.path as pth
-              dx = 2.0 * mt.pi * DL1
-              dz = 2.0 * mt.pi * DL2
+              dx = 1.0 * mt.pi * DX_max
+              dz = 1.0 * mt.pi * DZ_max
               fltDex = []
               regLen = 0
               for nn in np.arange(XZV.shape[0]):
@@ -1220,8 +1214,8 @@ def runModel(TestName):
                      # Compute the solution within a time step
                      try:   
                             fields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields, hydroState, rhsVec, CRES, \
-                                                                    ebcDex, diffusiveFlux, RSBops)
+                                                                    DLD, TOPT, fields, hydroState, rhsVec, \
+                                                                    CRES, ebcDex, RSBops)
                             
                             
                      except Exception:

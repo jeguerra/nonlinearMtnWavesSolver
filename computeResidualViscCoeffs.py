@@ -68,14 +68,13 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
        LVAR = MAG.shape[0]
        
        # Diffusion proportional to the residual entropy
-       #Pr = 0.71
        Q_RES = PHYS[2] * AMAG
        
        #%% Compare residual coefficients to upwind
        CRES00 = DLD[2] * Q_RES
-       CRES01 = DLD[0] * AV[:,0]
+       CRES01 = 0.5 * DLD[0] * AV[:,0]
        CRES10 = DLD[3] * Q_RES
-       CRES11 = DLD[1] * AV[:,1]
+       CRES11 = 0.5 * DLD[1] * AV[:,1]
        
        CRES = computeRegionFilter1(CRES, CRES00, CRES10, CRES01, CRES11, nbrDex, LVAR)
        
