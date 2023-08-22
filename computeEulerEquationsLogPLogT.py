@@ -20,6 +20,7 @@ def enforceBC_RHS(rhs, ebcDex):
        tdex = ebcDex[3]
        vdex = np.concatenate((bdex, tdex))
        
+       # Tendencies consistent with field conditions
        rhs[ldex,:] = 0.0
        rhs[rdex,1] = 0.0
        rhs[bdex,0] = 0.0
@@ -28,7 +29,6 @@ def enforceBC_RHS(rhs, ebcDex):
        
        return rhs
 
-@njit(parallel=True)
 def computeRdT(q, RdT_bar, kap):
        
        # Compute pressure gradient force scaling (buoyancy)              
@@ -291,7 +291,6 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Fully explicit evaluation of the non linear advection
-#@njit(parallel=True)
 def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
        
        # Compute advective (multiplicative) operators
@@ -304,14 +303,11 @@ def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
        return DqDt
 
 # Fully explicit evaluation of the non linear internal forcing
-@njit(parallel=True)
-def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio):
+def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt):
        # Get physical constants
        gc = PHYS[0]
        gam = PHYS[6]
-       
-       DqDt = np.zeros(PqPx.shape)
-       
+              
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
@@ -329,7 +325,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio,
        PqPz = DqDz + DQDZ
        DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state)
        
-       DqDt += computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio)
+       DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
        
        return DqDt
 

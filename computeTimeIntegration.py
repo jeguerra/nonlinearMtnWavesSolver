@@ -51,7 +51,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        order = TOPT[3]
        mu = REFG[3]
        DQDZ = REFG[2]
-       #RLMX = REFG[4][1].data
+       RLMX = REFG[4][1].data
        #RLMZ = REFG[4][2].data
        RLM = REFG[4][0].data
        
@@ -97,16 +97,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Complete advective partial derivatives
               PqPxA = DqDxA - REFS[15] * DqDzA
-              PqPzA = DqDzA + DQDZ
+              #PqPzA = DqDzA + DQDZ
                                    
-              # Compute advection update
-              rhsAdv = tendency.computeAdvectionLogPLogT_Explicit(PHYS, PqPxA, PqPzA, solA, stateA)
-                                   
-              # Compute internal force update
-              rhsIfc = tendency.computeInternalForceLogPLogT_Explicit(PHYS, PqPxA, DqDzA, RdT, T_ratio)
+              # Compute local RHS
+              rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, RdT, T_ratio, solA, stateA)
 
               # Store the dynamic RHS
-              rhsDyn = (rhsAdv + rhsIfc)
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               #%% Compute the DynSGS coefficients at the top update
@@ -171,22 +167,22 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB = sol2Update + DF * rhs
               
               # Compute local Rayleigh factors
-              #RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
+              RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
               #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
               RayD = np.reciprocal(1.0 + DF * mu * RLM)[0,:]              
 
               # Apply Rayleigh damping layer implicitly
-              solB[:,0] *= RayD.T
+              solB[:,0] *= RayDX.T
               solB[:,1] *= RayD.T
-              solB[:,2] *= RayD.T
-              solB[:,3] *= RayD.T
+              solB[:,2] *= RayDX.T
+              solB[:,3] *= RayDX.T
               
               # Apply BC to update
               solB[ldex,:] = 0.0 # All variables to background at inflow
               solB[rdex,1] = 0.0 # No vertical velocity at outflow
               solB[bdex,0] = -init0[bdex,0] # No total horizontal velocity at ground
               solB[vdex,1] = 0.0 # No vertical velocity at ground AND model top
-              solB[bdex,3] = 0.0 # No potential temperature at ground
+              solB[bdex,3] = 0.0 # Scalar perturbations vanish at the ground
               
               return solB
        

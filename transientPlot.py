@@ -16,7 +16,7 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-fname = 'Simulation2View1.nc'
+fname = 'Simulation2View5.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -41,7 +41,7 @@ th = TH - np.exp(LNT)
 # Get the upper and lower bounds for TH
 clim1 = th.min()
 clim2 = th.max()
-clim = 0.25*max(abs(clim1),abs(clim2))
+clim = 0.1*max(abs(clim1),abs(clim2))
 
 imgname = 'toanimate.png'
 THname = 'TotalPT.gif'

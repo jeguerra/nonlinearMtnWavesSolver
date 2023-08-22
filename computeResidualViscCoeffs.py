@@ -85,12 +85,12 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
        #CRES = bn.nanmin(CRES, axis=1)
        #CRES = bn.nanmax(CRES, axis=2)
        
+       # Augment damping to the sponge layers
+       CRES[ldex,0] += DCFC * RLM[0,ldex]
+       CRES[ldex,1] += DCFC * RLM[0,ldex]
+       
        # Give the correct dimensions for operations
        CRES1 = np.expand_dims(CRES[:,0], axis=1)
        CRES2 = np.expand_dims(CRES[:,1], axis=1)
-       
-       # Augment damping to the sponge layers
-       CRES1[ldex,0] += DCFC * RLM[0,ldex]
-       CRES2[ldex,0] += DCFC * RLM[0,ldex]
               
-       return (CRES1,CRES2)
+       return (0.5 * CRES1, 0.5 * CRES2)

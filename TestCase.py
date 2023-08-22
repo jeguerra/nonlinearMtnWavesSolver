@@ -79,7 +79,7 @@ class TestCase:
                      # Wave breaking in uniform stratification
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': False, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             

@@ -860,11 +860,11 @@ def runModel(TestName):
               XZV = np.hstack((XMV, ZMV))
               
               # Reference grid scale lengths
-              DL1 = 0.5 * DX_avg
-              DL2 = 0.5 * DZ_avg
+              DL1 = 1.0 * DX_avg
+              DL2 = 1.0 * DZ_avg
               
               import matplotlib.path as pth
-              dx = 1.0 * mt.pi * DX_max
+              dx = 2.0 * mt.pi * DX_max
               dz = 1.0 * mt.pi * DZ_max
               fltDex = []
               regLen = 0
