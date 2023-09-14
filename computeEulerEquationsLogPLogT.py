@@ -82,10 +82,10 @@ def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, RSBops):
 
 def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
        
-       TQ = SOLT + INIT
+       #TQ = SOLT + INIT
        # Make the total quatities
-       U = TQ[udex]
-       W = TQ[wdex]
+       U = SOLT[udex]
+       W = SOLT[wdex]
        
        fields = np.reshape(SOLT, (len(udex), 4), order='F')
 
@@ -94,7 +94,8 @@ def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
 def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, vertStagger, isTFOpX, RSBops):
        
        # Compute flow speed
-       Q = fields + hydroState
+       Q = np.copy(fields)
+       Q[:,2:] += hydroState[:,2:]
        
        # Compute pressure gradient force scaling (buoyancy)
        RdT, T_ratio = computeRdT(fields, REFS[9][0], PHYS[4])
@@ -322,7 +323,9 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt):
 def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio, fields, state):
 
        # Compute complete vertical partial
-       PqPz = DqDz + DQDZ
+       PqPz = np.copy(DqDz)
+       PqPz[:,2:] += DQDZ[:,2:]
+       
        DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state)
        
        DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)

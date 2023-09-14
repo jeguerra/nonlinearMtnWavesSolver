@@ -630,9 +630,9 @@ def runModel(TestName):
        '''      
        #'''
        # Compute the background (initial) fields
-       U = 3.0 * (np.expand_dims(uz, axis=1) - JETOPS[0])
+       U = 5.0 * (np.expand_dims(uz, axis=1) - JETOPS[0])
        UZ = computeColumnInterp(DIM0, REF0[1], U, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
-       dUdz = 3.0 * np.expand_dims(duz, axis=1)
+       dUdz = 5.0 * np.expand_dims(duz, axis=1)
        DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
        LPZ = np.expand_dims(lpz, axis=1)
        LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
@@ -860,11 +860,11 @@ def runModel(TestName):
               XZV = np.hstack((XMV, ZMV))
               
               # Reference grid scale lengths
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
+              DL1 = 2.0 * DX_avg
+              DL2 = 2.0 * DZ_avg
               
               import matplotlib.path as pth
-              dx = 2.0 * mt.pi * DX_max
+              dx = 1.0 * mt.pi * DX_max
               dz = 1.0 * mt.pi * DZ_max
               fltDex = []
               regLen = 0
@@ -1135,7 +1135,7 @@ def runModel(TestName):
               RLM = REFG[4][0].data
               
               # Initialize residual coefficient storage
-              CRES = np.full((fields.shape[0],2,2,DLD[-2]), np.nan)
+              CRES = np.zeros((fields.shape[0],2))
               
               # NetCDF restart for transient runs
               if isRestart:
@@ -1171,7 +1171,8 @@ def runModel(TestName):
               else:
                      # Initialize fields
                      if withHydroState:
-                            fields[ubdex,0] = -hydroState[ubdex,0]
+                            fields[:,0] = hydroState[:,0]
+                            fields[ubdex,0] = 0.0
                             fields[ubdex,1] = 0.0
                             #fields[ubdex,1] = -dWBC
                      else:

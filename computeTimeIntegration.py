@@ -52,7 +52,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        mu = REFG[3]
        DQDZ = REFG[2]
        RLMX = REFG[4][1].data
-       #RLMZ = REFG[4][2].data
+       RLMZ = REFG[4][2].data
        RLM = REFG[4][0].data
        
        LS = DLD[4]
@@ -68,7 +68,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
-       DD2 = REFS[13] # First derivatives for diffusion gradient
+       DD2 = REFS[14] # First derivatives for diffusion gradient
        
        rhs1 = 0.0
        res = 0.0
@@ -81,7 +81,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               DF = coeff * DT
               
               # Compute total state
-              stateA = solA + init0
+              stateA = np.copy(solA)
+              stateA[:,2:] += init0[:,2:]
               
               # Compute pressure gradient force scaling (buoyancy)
               RdT, T_ratio = tendency.computeRdT(solA, REFS[9][0], PHYS[4])
@@ -97,7 +98,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Complete advective partial derivatives
               PqPxA = DqDxA - REFS[15] * DqDzA
-              #PqPzA = DqDzA + DQDZ
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, RdT, T_ratio, solA, stateA)
@@ -108,24 +108,26 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #%% Compute the DynSGS coefficients at the top update
               if topUpdate:
                      
-                     # Compute new time step based on updated sound speed
+                     # Compute new time step based on median local sound speed
                      VWAV_max = bn.nanmax(PHYS[6] * RdT)
-                            
+                     #VWAV_med = bn.nanmedian(PHYS[6] * RdT)
+                     '''
+                     # Control for sound speed (meters per second)
+                     if VWAV_max > 400.0 or VWAV_max < 250.0: 
+                            VWAV_max = bn.nanmax(PHYS[6] * REFS[9][0])
+                     '''      
                      # Constant sponge layer diffusivity
-                     DCFC = DT * VWAV_max
+                     DCFC = 0.5 * DT * VWAV_max
                      
                      # Perform some checks before setting the new DT
                      if not np.isnan(VWAV_max) and VWAV_max > 0.0:
                             DT = LS / mt.sqrt(VWAV_max)
                      
-                     rhs1 = rhsDyn
                      # Define residual as the timestep change in the RHS
-                     res = rhs1 - rhs0
-                     # Define residual new RHS
-                     #res = rhsDyn
-                     AS = np.abs(solA)# + init0)
-                     DCF = rescf.computeResidualViscCoeffs2(DIMS, AS, res, DLD, \
+                     res = rhsDyn - rhs0
+                     DCF = rescf.computeResidualViscCoeffs2(DIMS, res, DLD, \
                                                             bdex, REFG[5], RLM, DCFC, CRES)
+                     rhs1 = np.copy(rhsDyn)
        
                      topUpdate = False
               
@@ -165,24 +167,20 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Apply stage update
               solB = sol2Update + DF * rhs
-              
-              # Compute local Rayleigh factors
-              RayDX = np.reciprocal(1.0 + DF * mu * RLMX)[0,:]
-              #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
-              RayD = np.reciprocal(1.0 + DF * mu * RLM)[0,:]              
-
-              # Apply Rayleigh damping layer implicitly
-              solB[:,0] *= RayDX.T
-              solB[:,1] *= RayD.T
-              solB[:,2] *= RayDX.T
-              solB[:,3] *= RayDX.T
-              
+              '''
               # Apply BC to update
-              solB[ldex,:] = 0.0 # All variables to background at inflow
-              solB[rdex,1] = 0.0 # No vertical velocity at outflow
-              solB[bdex,0] = -init0[bdex,0] # No total horizontal velocity at ground
-              solB[vdex,1] = 0.0 # No vertical velocity at ground AND model top
-              solB[bdex,3] = 0.0 # Scalar perturbations vanish at the ground
+              solB[ldex,0] = init0[ldex,0]
+              #solB[ldex,1] = 0.0 # Background inflow condition
+              
+              solB[rdex,0] = init0[ldex,0] # Outflow condition
+              #solB[rdex,1] = 0.0 # Background outflow condition
+              
+              solB[bdex,0] = 0.0 # No total horizontal velocity at ground
+              solB[bdex,1] = 0.0 # No total horizontal velocity at ground
+              solB[bdex,3] = 0.0 # Potential temp vanishes at the ground
+              
+              solB[tdex,1] = 0.0 # No vertical velocity at ground AND model top
+              '''
               
               return solB
        
@@ -359,5 +357,16 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        else:
               print('Invalid time integration order. Going with 2.')
               sol1 = ketchesonM2(sol0)
+              
+       # Compute local Rayleigh factors
+       RayDX = np.reciprocal(1.0 + DT * mu * RLMX)[0,:]
+       #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
+       RayD = np.reciprocal(1.0 + DT * mu * RLM)[0,:]              
+
+       # Apply Rayleigh damping layer implicitly
+       sol1[:,0] = RayDX.T * sol1[:,0] + (1.0 - RayDX.T) * init0[:,0]
+       sol1[:,1] *= RayD.T
+       sol1[:,2] *= RayDX.T
+       sol1[:,3] *= RayD.T
               
        return sol1, rhs1, res, DCF, DT

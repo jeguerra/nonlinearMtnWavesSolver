@@ -8,7 +8,7 @@ Created on Sun Aug  4 13:59:02 2019
 
 import numpy as np
 import bottleneck as bn
-from numba import njit, prange
+from numba import njit, prange, set_num_threads, get_num_threads
 
 @njit(parallel=True)
 def computeRegionFilterBound1(UD, WD, Q_RES, DLD, nbrDex, LVAR):
@@ -33,32 +33,31 @@ def computeRegionFilterBound1(UD, WD, Q_RES, DLD, nbrDex, LVAR):
        return Q1, Q2
 
 @njit(parallel=True)
-def computeRegionFilter1(Q, CR00, CR10, CR01, CR11, nbrDex, LVAR):
+def computeRegionFilter1(Q, QR, DLD, nbrDex, LVAR):
        
        for ii in prange(LVAR):
-              # Get the region index
-              rdex = nbrDex[ii]
-              Q[ii,0,0,:len(rdex)] = CR00[rdex]
-              Q[ii,1,0,:len(rdex)] = CR01[rdex]
-              Q[ii,0,1,:len(rdex)] = CR10[rdex]
-              Q[ii,1,1,:len(rdex)] = CR11[rdex]
+              # Compute the given filter over the region
+              gval = np.nanmax(QR[nbrDex[ii]])
+              
+              Q[ii,0] = DLD[2] * gval
+              Q[ii,1] = DLD[3] * gval
               
        return Q
 
 @njit(parallel=True)
 def computeRegionFilter2(Q2FILT, nbrDex, LVAR, RDIM):
 
-       QFILT = np.full((LVAR,RDIM,2),np.nan)
+       QFILT = np.full((LVAR,2,RDIM),np.nan)
        
        for ii in prange(LVAR):
               # Get the region index
               rdex = nbrDex[ii]
-              QFILT[ii,:len(rdex),0] = Q2FILT[rdex,0]
-              QFILT[ii,:len(rdex),1] = Q2FILT[rdex,1]
+              QFILT[ii,0,:len(rdex)] = Q2FILT[rdex,0]
+              QFILT[ii,1,:len(rdex)] = Q2FILT[rdex,1]
               
        return QFILT
 
-def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
+def computeResidualViscCoeffs2(PHYS, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
        
        # Get the region indices map
        nbrDex = DLD[-1] # List of lists of indices to regions
@@ -70,27 +69,20 @@ def computeResidualViscCoeffs2(PHYS, AV, MAG, DLD, bdex, ldex, RLM, DCFC, CRES):
        # Diffusion proportional to the residual entropy
        Q_RES = PHYS[2] * AMAG
        
-       #%% Compare residual coefficients to upwind
-       CRES00 = DLD[2] * Q_RES
-       CRES01 = 0.5 * DLD[0] * AV[:,0]
-       CRES10 = DLD[3] * Q_RES
-       CRES11 = 0.5 * DLD[1] * AV[:,1]
+       set_num_threads(8)
+       CRES = computeRegionFilter1(CRES, Q_RES, DLD, nbrDex, LVAR)
        
-       CRES = computeRegionFilter1(CRES, CRES00, CRES10, CRES01, CRES11, nbrDex, LVAR)
-       
-       # Compute regions THEN compare coefficients
-       CRES = bn.nanmax(CRES, axis=3)
-       CRES = bn.nanmin(CRES, axis=1)
-       # Compare coefficients THEN compute regions
-       #CRES = bn.nanmin(CRES, axis=1)
-       #CRES = bn.nanmax(CRES, axis=2)
-       
+       CR = CRES[:,0]
+       CRES[CR > DCFC,0] = DCFC
+       CR = CRES[:,1]
+       CRES[CR > DCFC,1] = DCFC
+
        # Augment damping to the sponge layers
-       CRES[ldex,0] += DCFC * RLM[0,ldex]
-       CRES[ldex,1] += DCFC * RLM[0,ldex]
+       CRES[ldex,:] += np.expand_dims(DCFC * RLM[0,ldex], axis=1)
+       #CRES[ldex,1] += DCFC * RLM[0,ldex]
        
        # Give the correct dimensions for operations
        CRES1 = np.expand_dims(CRES[:,0], axis=1)
        CRES2 = np.expand_dims(CRES[:,1], axis=1)
               
-       return (0.5 * CRES1, 0.5 * CRES2)
+       return (CRES1, CRES2)

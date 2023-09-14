@@ -79,14 +79,14 @@ class TestCase:
                      # Wave breaking in uniform stratification
                      self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': False, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # REGIONAL SCALE
-                     self.setUserData(823, 92, 145.0, 36.0, 300.0, \
+                     self.setUserData(848, 92, 145.0, 36.0, 300.0, \
                                       10000.0, 25000.0, 1.0,
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.25E+4, 'uwpt_static')
                             
                      # MICRO SCALE
                      #self.setUserData(823, 72, 20.0, 2.0, 300.0, \
@@ -139,7 +139,7 @@ class TestCase:
               TH = TTP + GAMS * (self.Z_in[3] - self.Z_in[2])
               self.T_in = (T0, TTP, TTP, TH)
               
-              # Background wind profil e
+              # Background wind profile
               self.JETOPS = (10.0, 16.822, 1.386, 15.0)
               
               # Set the Rayleigh options
@@ -176,7 +176,7 @@ class TestCase:
               DT = 0.025 # seconds
               HR = 5.0 #/ 3600.0 # hours              
               DTF = 0.75 # scale time step              
-              intMethodOrder = 4
+              intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 10.0 # Time for diagnostic output
