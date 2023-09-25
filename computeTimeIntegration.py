@@ -43,7 +43,7 @@ def plotRHS(x, rhs, ebcDex, label):
        
        return
        
-def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
+def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
                               sol0, init0, rhs0, CRES, ebcDex, RSBops):
        
        OPS = DIMS[-1]
@@ -55,16 +55,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        RLMZ = REFG[4][2].data
        RLM = REFG[4][0].data
        
-       LS = DLD[4]
        S = DLD[5]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
        #TF = bn.nanmax(dhdx)
        
-       ldex = ebcDex[0]
-       rdex = ebcDex[1]
        bdex = ebcDex[2]
-       tdex = ebcDex[3]
-       vdex = np.concatenate((bdex, tdex))
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
@@ -73,12 +68,10 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        rhs1 = 0.0
        res = 0.0
        topUpdate = True
-       DCF = (np.empty((OPS,1)),np.empty((OPS,1)))
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              nonlocal topUpdate,rhs1,res,DCF, DT
-              DF = coeff * DT
+              nonlocal topUpdate,rhs1,res,CRES,DT
               
               # Compute total state
               stateA = np.copy(solA)
@@ -109,23 +102,19 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               if topUpdate:
                      
                      # Compute new time step based on median local sound speed
-                     VWAV_max = bn.nanmax(PHYS[6] * RdT)
+                     VWAV_max2 = bn.nanmax(PHYS[6] * RdT)
                      #VWAV_med = bn.nanmedian(PHYS[6] * RdT)
-                     '''
-                     # Control for sound speed (meters per second)
-                     if VWAV_max > 400.0 or VWAV_max < 250.0: 
-                            VWAV_max = bn.nanmax(PHYS[6] * REFS[9][0])
-                     '''      
-                     # Constant sponge layer diffusivity
-                     DCFC = 0.5 * DT * VWAV_max
                      
                      # Perform some checks before setting the new DT
-                     if not np.isnan(VWAV_max) and VWAV_max > 0.0:
-                            DT = LS / mt.sqrt(VWAV_max)
+                     if not np.isnan(VWAV_max2) and VWAV_max2 > 0.0:
+                            DT = DTF * DLD[4] / mt.sqrt(VWAV_max2)
+                            
+                     # Constant sponge layer diffusivity
+                     DCFC = 0.5 * DT * VWAV_max2
                      
                      # Define residual as the timestep change in the RHS
-                     res = rhsDyn - rhs0
-                     DCF = rescf.computeResidualViscCoeffs2(DIMS, res, DLD, \
+                     res = np.copy(rhsDyn)
+                     CRES = rescf.computeResidualViscCoeffs2(DIMS, res, DLD, \
                                                             bdex, REFG[5], RLM, DCFC, CRES)
                      rhs1 = np.copy(rhsDyn)
        
@@ -137,8 +126,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
               
               # Compute diffusive fluxes
-              PqPxA *= DCF[0]
-              DqDzA *= DCF[1]
+              PqPxA *= CRES[:,0,:]
+              DqDzA *= CRES[:,1,:]
               
               # Compute derivatives of diffusive flux
               Dq = np.column_stack((PqPxA,DqDzA))
@@ -160,27 +149,13 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                         ebcDex, DLD, DCF)
+                                                         ebcDex, DLD)
               rhsDif = tendency.enforceBC_RHS(rhsDif, ebcDex)
               # Compute total RHS and apply BC
               rhs = (rhsDyn + rhsDif)
               
               # Apply stage update
-              solB = sol2Update + DF * rhs
-              '''
-              # Apply BC to update
-              solB[ldex,0] = init0[ldex,0]
-              #solB[ldex,1] = 0.0 # Background inflow condition
-              
-              solB[rdex,0] = init0[ldex,0] # Outflow condition
-              #solB[rdex,1] = 0.0 # Background outflow condition
-              
-              solB[bdex,0] = 0.0 # No total horizontal velocity at ground
-              solB[bdex,1] = 0.0 # No total horizontal velocity at ground
-              solB[bdex,3] = 0.0 # Potential temp vanishes at the ground
-              
-              solB[tdex,1] = 0.0 # No vertical velocity at ground AND model top
-              '''
+              solB = sol2Update + coeff * DT * rhs
               
               return solB
        
@@ -369,4 +344,4 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        sol1[:,2] *= RayDX.T
        sol1[:,3] *= RayD.T
               
-       return sol1, rhs1, res, DCF, DT
+       return sol1, rhs1, res, CRES, DT

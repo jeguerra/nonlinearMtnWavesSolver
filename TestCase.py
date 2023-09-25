@@ -84,8 +84,8 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # REGIONAL SCALE
-                     self.setUserData(848, 92, 145.0, 36.0, 300.0, \
-                                      10000.0, 25000.0, 1.0,
+                     self.setUserData(848, 92, 140.0, 36.0, 300.0, \
+                                      10000.0, 20000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.25E+4, 'uwpt_static')
                             
                      # MICRO SCALE

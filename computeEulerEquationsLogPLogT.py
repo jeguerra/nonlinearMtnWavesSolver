@@ -22,10 +22,8 @@ def enforceBC_RHS(rhs, ebcDex):
        
        # Tendencies consistent with field conditions
        rhs[ldex,:] = 0.0
-       rhs[rdex,1] = 0.0
-       rhs[bdex,0] = 0.0
+       rhs[vdex,0] = 0.0
        rhs[vdex,1] = 0.0
-       rhs[bdex,3] = 0.0
        
        return rhs
 
@@ -348,7 +346,7 @@ def computeRayleighTendency(REFG, fields):
        return DqDt
 
 #@njit(parallel=True)
-def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD, DCF):
+def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD):
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]

@@ -356,9 +356,8 @@ def store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF
                      q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
                      dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
                      rq = np.reshape(resVec[:,pp], (NZ+1, NX+1), order='F')
-                     #dq = np.reshape(DCF[0][:,pp], (NZ+1, NX+1), order='F')
-                     dq1 = np.reshape(DCF[0][:,0], (NZ+1, NX+1), order='F')
-                     dq2 = np.reshape(DCF[1][:,0], (NZ+1, NX+1), order='F')
+                     dq1 = np.reshape(DCF[:,0,0], (NZ+1, NX+1), order='F')
+                     dq2 = np.reshape(DCF[:,1,0], (NZ+1, NX+1), order='F')
 
                      if pp == 0:
                             m_fid.variables['u'][ff,:,:,0] = q
@@ -860,12 +859,12 @@ def runModel(TestName):
               XZV = np.hstack((XMV, ZMV))
               
               # Reference grid scale lengths
-              DL1 = 2.0 * DX_avg
-              DL2 = 2.0 * DZ_avg
+              DL1 = 1.0 * DX_avg
+              DL2 = 1.0 * DZ_avg
               
               import matplotlib.path as pth
-              dx = 1.0 * mt.pi * DX_max
-              dz = 1.0 * mt.pi * DZ_max
+              dx = 0.5 * mt.pi * DX_avg
+              dz = 0.5 * mt.pi * DZ_avg
               fltDex = []
               regLen = 0
               for nn in np.arange(XZV.shape[0]):
@@ -1135,7 +1134,7 @@ def runModel(TestName):
               RLM = REFG[4][0].data
               
               # Initialize residual coefficient storage
-              CRES = np.zeros((fields.shape[0],2))
+              CRES = np.zeros((fields.shape[0],2,1))
               
               # NetCDF restart for transient runs
               if isRestart:
@@ -1160,9 +1159,8 @@ def runModel(TestName):
                             resVec[:,2] = np.reshape(m_fid.variables['Rln_p'][rdex,:,:,0], (OPS,), order='F')
                             resVec[:,3] = np.reshape(m_fid.variables['Rln_t'][rdex,:,:,0], (OPS,), order='F')
                             
-                            DC1 = np.reshape(m_fid.variables['DuDt'][rdex,:,:,0], (OPS,1), order='F')
-                            DC2 = np.reshape(m_fid.variables['DwDt'][rdex,:,:,0], (OPS,1), order='F')
-                            DCF = (DC1,DC2)
+                            CRES[:,0,0] = np.reshape(m_fid.variables['DC1'][rdex,:,:,0], (OPS,), order='F')
+                            CRES[:,1,0] = np.reshape(m_fid.variables['DC2'][rdex,:,:,0], (OPS,), order='F')
                             
                             m_fid.close()
                             del(m_fid)
@@ -1214,8 +1212,8 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
-                            fields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields, hydroState, rhsVec, \
+                            fields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                                                                    DLD, DTF, TOPT, fields, hydroState, rhsVec, \
                                                                     CRES, ebcDex, RSBops)
                             
                             
@@ -1248,7 +1246,7 @@ def runModel(TestName):
                             fields_plot = fields_gpu.get()
                             '''
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF)
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, CRES)
                                                         
                             ff += 1
                             interTime1 = 0.0
