@@ -43,7 +43,7 @@ def plotRHS(x, rhs, ebcDex, label):
        
        return
        
-def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
+def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, rhs0, CRES, ebcDex, RSBops):
        
        OPS = DIMS[-1]
@@ -57,21 +57,21 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
        
        S = DLD[5]
        dhdx = np.expand_dims(REFS[6][0], axis=1)
-       #TF = bn.nanmax(dhdx)
        
        bdex = ebcDex[2]
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
-       DD2 = REFS[14] # First derivatives for diffusion gradient
+       DD2 = REFS[13] # First derivatives for diffusion gradient
        
        rhs1 = 0.0
        res = 0.0
-       topUpdate = True
+       DynSGS_Update = True
+       Residual_Update = True
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              nonlocal topUpdate,rhs1,res,CRES,DT
+              nonlocal DynSGS_Update, Residual_Update,rhs1,res,CRES,DT
               
               # Compute total state
               stateA = np.copy(solA)
@@ -98,27 +98,26 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
               # Store the dynamic RHS
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
+              if Residual_Update:
+                     res = rhs0 - 0.5 * (rhs0 + rhsDyn)
+                     Residual_Update = False
+              
               #%% Compute the DynSGS coefficients at the top update
-              if topUpdate:
+              if DynSGS_Update:
                      
-                     # Compute new time step based on median local sound speed
-                     VWAV_max2 = bn.nanmax(PHYS[6] * RdT)
-                     #VWAV_med = bn.nanmedian(PHYS[6] * RdT)
-                     
-                     # Perform some checks before setting the new DT
-                     if not np.isnan(VWAV_max2) and VWAV_max2 > 0.0:
-                            DT = DTF * DLD[4] / mt.sqrt(VWAV_max2)
+                     DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, sol0, DLD, DT)
                             
-                     # Constant sponge layer diffusivity
-                     DCFC = 0.5 * DT * VWAV_max2
+                     # Constant sponge layer diffusivity on max kinetic energy
+                     sol_norm = bn.nanmax(solA, axis=0)
+                     DCFC = 0.5 * DLD[4] * VWAV_max
                      
                      # Define residual as the timestep change in the RHS
-                     res = np.copy(rhsDyn)
-                     CRES = rescf.computeResidualViscCoeffs2(DIMS, res, DLD, \
+                     bnd = np.abs(solA)# + np.expand_dims(VWAV_fld, axis=1)
+                     CRES = rescf.computeResidualViscCoeffs2(DIMS, rhsDyn, bnd, sol_norm, DLD, \
                                                             bdex, REFG[5], RLM, DCFC, CRES)
                      rhs1 = np.copy(rhsDyn)
        
-                     topUpdate = False
+                     DynSGS_Update = False
               
               #%% Compute diffusive update
 
@@ -238,36 +237,36 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
               
               # Stage 1 predictor
               b10 = 0.391752226571890
-              sol1, rhsA = computeUpdate(b10, sol, sol)
+              sol1 = computeUpdate(b10, sol, sol)
               # Stage 1 corrector
               solp = sol + 0.5 * (sol1 - sol)
-              sol1, rhs = computeUpdate(0.5 * b10, sol1, solp)
+              sol1  = computeUpdate(0.5 * b10, sol1, solp)
               
               # Stage 2
               a0 = 0.444370493651235
               a1 = 0.555629506348765
               sols = a0 * sol + a1 * sol1
               b21 = 0.368410593050371
-              sol2, rhs = computeUpdate(b21, sol1, sols)
+              sol2 = computeUpdate(b21, sol1, sols)
               
               # Stage 3
               a0 = 0.620101851488403
               a2 = 0.379898148511597
               sols = a0 * sol + a2 * sol2
               b32 = 0.251891774271694
-              sol3, rhs = computeUpdate(b32, sol2, sols)
+              sol3 = computeUpdate(b32, sol2, sols)
               
               # Stage 4
               a0 = 0.178079954393132
               a3 = 0.821920045606868
               sols = a0 * sol + a3 * sol3
               b43 = 0.544974750228521
-              sol4, rhs = computeUpdate(b43, sol3, sols)
+              sol4 = computeUpdate(b43, sol3, sols)
               fun3 = (sol4 - sols) / b43
               
               # Stage corrector
               solp = sols + 0.5 * (sol4 - sols)
-              sol4, rhs = computeUpdate(0.5 * b43, sol4, solp)
+              sol4 = computeUpdate(0.5 * b43, sol4, solp)
               
               # Stage 5
               a2 = 0.517231671970585
@@ -276,7 +275,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
               b53 = 0.063692468666290
               b54 = 0.226007483236906
               sols = a2 * sol2 + a3 * sol3 + a4 * sol4 + b53 * fun3
-              sol5, rhsB = computeUpdate(b54, sol4, sols)
+              sol5 = computeUpdate(b54, sol4, sols)
               
               return sol5
        
@@ -284,10 +283,10 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
               
               # Stage 1
               b10 = 0.284220721334261
-              sol1 = computeUpdate(0.5 * b10, sol, sol)
-              
+              sol1 = computeUpdate(b10, sol, sol)
               # Stage 1 corrector
-              sol1 = computeUpdate(0.5 * b10, sol1, sol1)
+              solp = sol + 0.5 * (sol1 - sol)
+              sol1 = computeUpdate(0.5 * b10, sol1, solp)
               
               # Stage 2
               b21 = 0.284220721334261
@@ -324,24 +323,24 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, DTF, TOPT, \
        if order == 2:
               sol1 = ketchesonM2(sol0)
        elif order == 3:
-              #solB = ssprk63(sol0) 
+              #sol1 = ssprk63(sol0) 
               sol1 = ketcheson93(sol0)
        elif order == 4:
-              #solB = ssprk54(sol0) 
+              #sol1 = ssprk54(sol0) 
               sol1 = ketcheson104(sol0)
        else:
               print('Invalid time integration order. Going with 2.')
               sol1 = ketchesonM2(sol0)
               
        # Compute local Rayleigh factors
-       RayDX = np.reciprocal(1.0 + DT * mu * RLMX)[0,:]
+       #RayDX = np.reciprocal(1.0 + DT * mu * RLMX)[0,:]
        #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
        RayD = np.reciprocal(1.0 + DT * mu * RLM)[0,:]              
 
        # Apply Rayleigh damping layer implicitly
-       sol1[:,0] = RayDX.T * sol1[:,0] + (1.0 - RayDX.T) * init0[:,0]
+       sol1[:,0] = RayD.T * sol1[:,0] + (1.0 - RayD.T) * init0[:,0]
        sol1[:,1] *= RayD.T
-       sol1[:,2] *= RayDX.T
+       #sol1[:,2] *= RayD.T
        sol1[:,3] *= RayD.T
               
        return sol1, rhs1, res, CRES, DT

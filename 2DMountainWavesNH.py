@@ -701,7 +701,7 @@ def runModel(TestName):
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZIL = (NZ-4, NZ-1, NZ+1, NZ+4)
+       NZIL = (NZ+2, NZ+5, NZ+8)
        DDZM_OP = DDZMS1
        for NZI in NZIL:
               if verticalChebGrid:
@@ -712,7 +712,7 @@ def runModel(TestName):
                      TMO, dummy = derv.legpolym(NZI, xiO, True)
                      TMI = derv.chebpolym(NZ+1, xiI)
                      
-                     # Get the inner vertical derivatie
+                     # Get the inner vertical derivative
                      DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
                      DDZ_I, I_TRANS = derv.computeLegendreDerivativeMatrix(DIMS_ST)
                      
@@ -730,7 +730,7 @@ def runModel(TestName):
                      TMO = derv.chebpolym(NZI+1, xiO)
                      TMI, dummy = derv.legpolym(NZ, xiI, True)
                      
-                     # Get the inner vertical derivatie
+                     # Get the inner vertical derivative
                      DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
                      DDZ_I, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
                      
@@ -825,71 +825,6 @@ def runModel(TestName):
        # Update REFG the terrain BC derivative
        REFG.append(DDX_CS)
        REFG.append(RLOPT[-1])
-              
-       if not StaticSolve:
-              
-              # Compute DX and DZ grid length scales
-              DXV = np.diff(REFS[0])
-              DZV = np.diff(REFS[1])
-              DX_min = 1.0 * np.min(DXV)
-              DZ_min = 1.0 * np.min(DZV)
-              print('Minimum grid lengths:',DX_min,DZ_min)
-              DX_avg = 1.0 * np.mean(DXV)
-              DZ_avg = 1.0 * np.mean(DZV)
-              print('Average grid lengths:',DX_avg,DZ_avg)
-              DX_max = 1.0 * np.max(DXV)
-              DZ_max = 1.0 * np.max(DZV)
-              print('Maximum grid lengths:',DX_max,DZ_max)
-              DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
-              DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
-              print('Uniform grid lengths (m):',DX_wav,DZ_wav)
-                     
-              dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
-              S2 = np.reciprocal(dS2)
-              S = np.sqrt(S2)
-                            
-              # Smallest physical grid spacing in the 2D mesh
-              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
-              DX = DX_min
-              DLS = min(DX, DZ)
-              
-              # Compute filtering regions by KDtree lookups
-              XMV = np.reshape(XL, (OPS,1), order='F')
-              ZMV = np.reshape(ZTL, (OPS,1), order='F')
-              XZV = np.hstack((XMV, ZMV))
-              
-              # Reference grid scale lengths
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
-              
-              import matplotlib.path as pth
-              dx = 0.5 * mt.pi * DX_avg
-              dz = 0.5 * mt.pi * DZ_avg
-              fltDex = []
-              regLen = 0
-              for nn in np.arange(XZV.shape[0]):
-                     node = XZV[nn,:]
-                     #'''
-                     verts = np.array([(node[0] + dx, node[1] - dz), \
-                              (node[0] + dx, node[1] + dz), \
-                              (node[0] - dx, node[1] + dz), \
-                              (node[0] - dx, node[1] - dz)])
-                     rectangle = pth.Path(verts)
-                     region = rectangle.contains_points(XZV)
-                     regDex = np.nonzero(region == True)[0].tolist()
-                     fltDex += [regDex]
-                     regLen = max(len(regDex), regLen)
-              
-              print('Diffusion regions dimensions (m): ', DL1, DL2, dx, dz)
-
-              # Manipulate arrays to enable numba acceleration for DynSGS
-              import numba as nb
-              nb_list = nb.typed.List
-              regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
-              #regDex_gpu = [np.array(dex, dtype=np.int32) for dex in fltDex]
-
-              # Create a container for DynSGS scaling and region parameters
-              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, regLen, regDex)
        
        print('Check number of non-zeros in derivative operator matrices: ')
        print(DDXM_OP.nnz, DDZM_OP.nnz)
@@ -1130,6 +1065,69 @@ def runModel(TestName):
        elif NonLinSolve:
               print('Starting Nonlinear Transient Solver...')
               
+              # Compute DX and DZ grid length scales
+              DXV = np.diff(REFS[0])
+              DZV = np.diff(REFS[1])
+              DX_min = 1.0 * np.min(DXV)
+              DZ_min = 1.0 * np.min(DZV)
+              print('Minimum grid lengths:',DX_min,DZ_min)
+              DX_avg = 1.0 * np.mean(DXV)
+              DZ_avg = 1.0 * np.mean(DZV)
+              print('Average grid lengths:',DX_avg,DZ_avg)
+              DX_max = 1.0 * np.max(DXV)
+              DZ_max = 1.0 * np.max(DZV)
+              print('Maximum grid lengths:',DX_max,DZ_max)
+              DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
+              DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
+              print('Uniform grid lengths (m):',DX_wav,DZ_wav)
+                     
+              dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
+              S2 = np.reciprocal(dS2)
+              S = np.sqrt(S2)
+                            
+              # Smallest physical grid spacing in the 2D mesh
+              DX = DX_min
+              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
+              DLS = min(DX, DZ)
+              
+              # Compute filtering regions by KDtree lookups
+              XMV = np.reshape(XL, (OPS,1), order='F')
+              ZMV = np.reshape(ZTL, (OPS,1), order='F')
+              XZV = np.hstack((XMV, ZMV))
+              
+              # DynSGS filter scale lengths
+              DL1 = 1.0 * DX_avg
+              DL2 = 1.0 * (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_avg
+              
+              import matplotlib.path as pth
+              dx = 2.0 * mt.pi * DL1
+              dz = 2.0 * mt.pi * DL2
+              fltDex = []
+              regLen = 0
+              for nn in np.arange(XZV.shape[0]):
+                     node = XZV[nn,:]
+                     #'''
+                     verts = np.array([(node[0] + dx, node[1] - dz), \
+                              (node[0] + dx, node[1] + dz), \
+                              (node[0] - dx, node[1] + dz), \
+                              (node[0] - dx, node[1] - dz)])
+                     rectangle = pth.Path(verts)
+                     region = rectangle.contains_points(XZV)
+                     regDex = np.nonzero(region == True)[0].tolist()
+                     fltDex += [regDex]
+                     regLen = max(len(regDex), regLen)
+              
+              print('Diffusion regions dimensions (m): ', DL1, DL2)
+
+              # Manipulate arrays to enable numba acceleration for DynSGS
+              import numba as nb
+              nb_list = nb.typed.List
+              regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
+              #regDex_gpu = [np.array(dex, dtype=np.int32) for dex in fltDex]
+
+              # Create a container for DynSGS scaling and region parameters
+              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, regLen, regDex)
+              
               #RLM_gpu = cp.asarray(REFG[4][0].data)
               RLM = REFG[4][0].data
               
@@ -1179,23 +1177,14 @@ def runModel(TestName):
                             fields[:,2] = hydroState[:,2]
                             fields[:,3] = hydroState[:,3]
                      
-                     rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[11][0], REFS[11][1], REFS[6][0], \
-                                                         PHYS, REFS, REFG, False, False, True, RSBops)
-                     rhsVec = eqs.enforceBC_RHS(rhsVec, ebcDex)
-                     
-                     rhsVec0 = np.zeros(rhsVec.shape)
-                     resVec = rhsVec - rhsVec0
+                     rhsVec = np.zeros(fields.shape)
+                     resVec = np.zeros(fields.shape)
                      thisTime = IT
                      
               # Compute sound speed
               RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
               
-              # Compute maximum squared sound speed
-              VWAV_max = bn.nanmax(PHYS[6] * RdT)
-              
-              # Perform some checks before setting the new DT
-              if not np.isnan(VWAV_max) and VWAV_max > 0.0:
-                     TOPT[0] = DTF * DLS / mt.sqrt(VWAV_max)
+              TOPT[0], VWAV_fld, VWAV_max = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, TOPT[0])
                      
               # Initialize output to NetCDF
               newFname = initializeNetCDF(fname4Restart, thisTime, NX, NZ, XL, ZTL, hydroState)
@@ -1204,6 +1193,7 @@ def runModel(TestName):
               ti = 0; ff = 0
               print('Time stepper order: ', str(TOPT[3]))
               print('Time step factor: ', str(DTF))
+              print('Initial time step:', str(TOPT[0]))
               
               interTime1 = 0.0
               interTime2 = 0.0
@@ -1213,7 +1203,7 @@ def runModel(TestName):
                      # Compute the solution within a time step
                      try:   
                             fields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, DTF, TOPT, fields, hydroState, rhsVec, \
+                                                                    DLD, TOPT, fields, hydroState, rhsVec, \
                                                                     CRES, ebcDex, RSBops)
                             
                             

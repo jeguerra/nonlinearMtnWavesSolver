@@ -6,9 +6,9 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import numpy as np
+import bottleneck as bn
 import scipy.sparse as sps
 import sparse_dot_mkl as spk
-from numba import njit
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
@@ -22,10 +22,25 @@ def enforceBC_RHS(rhs, ebcDex):
        
        # Tendencies consistent with field conditions
        rhs[ldex,:] = 0.0
-       rhs[vdex,0] = 0.0
+       rhs[bdex,0] = 0.0
        rhs[vdex,1] = 0.0
        
        return rhs
+
+def computeNewTimeStep(PHYS, RdT, fields, DLD, DT):
+       
+       # Compute new time step based on median local sound speed
+       VWAV_fld = np.sqrt(PHYS[6] * RdT)
+       VFLW_adv = np.sqrt(bn.ss(fields[:,0:2], axis=1))
+       VWAV_max = bn.nanmax(VWAV_fld + VFLW_adv)
+                            
+       # Perform some checks before setting the new DT
+       if not np.isnan(VWAV_max) and VWAV_max > 0.0:
+              DT = DLD[4] / VWAV_max
+       else:
+              DT *= 1.0
+              
+       return DT, VWAV_fld, VWAV_max
 
 def computeRdT(q, RdT_bar, kap):
        
