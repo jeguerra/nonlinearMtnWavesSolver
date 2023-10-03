@@ -1095,15 +1095,21 @@ def runModel(TestName):
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
               XZV = np.hstack((XMV, ZMV))
               
+              DXV = 0.5 * np.gradient(XL, axis=1, edge_order=2)
+              DZV = 0.5 * np.gradient(ZTL, axis=0, edge_order=2)
+              DA = np.reshape(DXV * DZV, (OPS,), order='F')
+              
               # DynSGS filter scale lengths
-              DL1 = 1.0 * DX_max
-              DL2 = 1.0 * (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_max
+              DL1 = 1.0 * DX_avg
+              DL2 = 1.0 * DZ_avg
               
               import matplotlib.path as pth
               dx = 1.0 * mt.pi * DL1
               dz = 1.0 * mt.pi * DL2
               fltDex = []
               regLen = 0
+              sigma2 = DL1*DL2
+              gaussf = 0.5 / (mt.pi * sigma2)
               for nn in np.arange(XZV.shape[0]):
                      node = XZV[nn,:]
                      #'''
@@ -1115,6 +1121,10 @@ def runModel(TestName):
                      region = rectangle.contains_points(XZV)
                      regDex = np.nonzero(region == True)[0].tolist()
                      fltDex += [regDex]
+                     xc2 = np.power(XZV[regDex,0] - node[0], 2.0)
+                     zc2 = np.power(XZV[regDex,1] - node[1], 2.0)
+                     gkernel = DA[regDex] * gaussf * np.exp(-0.5 / sigma2 * (xc2 + zc2))
+                     fltDms += [gkernel]
                      regLen = max(len(regDex), regLen)
               
               print('Diffusion regions dimensions (m): ', DL1, DL2)
@@ -1123,10 +1133,10 @@ def runModel(TestName):
               import numba as nb
               nb_list = nb.typed.List
               regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
-              #regDex_gpu = [np.array(dex, dtype=np.int32) for dex in fltDex]
+              regDms = nb_list(np.array(dms, dtype=np.float64) for dms in fltDms)
 
               # Create a container for DynSGS scaling and region parameters
-              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, regLen, regDex)
+              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, regLen, regDex, regDms)
               
               #RLM_gpu = cp.asarray(REFG[4][0].data)
               RLM = REFG[4][0].data
