@@ -1096,12 +1096,12 @@ def runModel(TestName):
               XZV = np.hstack((XMV, ZMV))
               
               # DynSGS filter scale lengths
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_avg
+              DL1 = 1.0 * DX_max
+              DL2 = 1.0 * (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_max
               
               import matplotlib.path as pth
-              dx = 2.0 * mt.pi * DL1
-              dz = 2.0 * mt.pi * DL2
+              dx = 1.0 * mt.pi * DL1
+              dz = 1.0 * mt.pi * DL2
               fltDex = []
               regLen = 0
               for nn in np.arange(XZV.shape[0]):
