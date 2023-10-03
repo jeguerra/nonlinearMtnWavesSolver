@@ -109,12 +109,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                             
                      # Constant sponge layer diffusivity on max kinetic energy
                      sol_norm = bn.nanmax(solA, axis=0)
-                     DCFC = 0.5 * DLD[4] * VWAV_max
+                     #DCFC = 0.5 * DLD[4] * VWAV_max
                      
                      # Define residual as the timestep change in the RHS
                      bnd = np.abs(solA)# + np.expand_dims(VWAV_fld, axis=1)
                      CRES = rescf.computeResidualViscCoeffs2(DIMS, rhsDyn, bnd, sol_norm, DLD, \
-                                                            bdex, REFG[5], RLM, DCFC, CRES)
+                                                            bdex, REFG[5], RLM, VWAV_max, CRES)
                      rhs1 = np.copy(rhsDyn)
        
                      DynSGS_Update = False
