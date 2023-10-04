@@ -1107,6 +1107,7 @@ def runModel(TestName):
               dx = 1.0 * mt.pi * DL1
               dz = 1.0 * mt.pi * DL2
               fltDex = []
+              fltDms = []
               regLen = 0
               sigma2 = DL1*DL2
               gaussf = 0.5 / (mt.pi * sigma2)
@@ -1121,10 +1122,17 @@ def runModel(TestName):
                      region = rectangle.contains_points(XZV)
                      regDex = np.nonzero(region == True)[0].tolist()
                      fltDex += [regDex]
+                     
+                     # Gaussian filter kernel
                      xc2 = np.power(XZV[regDex,0] - node[0], 2.0)
                      zc2 = np.power(XZV[regDex,1] - node[1], 2.0)
-                     gkernel = DA[regDex] * gaussf * np.exp(-0.5 / sigma2 * (xc2 + zc2))
-                     fltDms += [gkernel]
+                     gkernel = DA[regDex] * gaussf * \
+                               np.exp(-0.5 * (xc2 / DL1**2 + zc2 / DL2**2))
+                               
+                     # Function mean kernel
+                     mkernel = DA[regDex] / (4.0 * dx * dz) * np.ones(len(regDex))
+                     
+                     fltDms += [mkernel]
                      regLen = max(len(regDex), regLen)
               
               print('Diffusion regions dimensions (m): ', DL1, DL2)

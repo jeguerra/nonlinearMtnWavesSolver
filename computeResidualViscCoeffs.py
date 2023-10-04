@@ -19,12 +19,12 @@ def computeRegionFilter1(Q, QR, QB, DLD, LVAR, sval):
        for ii in prange(LVAR):
               # Compute the given filter over the region
               #gval = np.nanmedian(QR[fltDex[ii]])
-              #uval = np.nanmedian(QB[fltDex[ii],0])
-              #wval = np.nanmedian(QB[fltDex[ii],1])
+              uval = np.nanmedian(QB[fltDex[ii],0])
+              wval = np.nanmedian(QB[fltDex[ii],1])
               
               gval = fltKrl[ii] @ QR[fltDex[ii]]
-              uval = fltKrl[ii] @ QB[fltDex[ii],0]
-              wval = fltKrl[ii] @ QB[fltDex[ii],1]
+              #uval = fltKrl[ii] @ QB[fltDex[ii],0]
+              #wval = fltKrl[ii] @ QB[fltDex[ii],1]
               
               Q[ii,0,0] = min(DLD[2] * gval, 0.5 * DLD[0] * uval)
               Q[ii,1,0] = min(DLD[3] * gval, 0.5 * DLD[1] * wval)
@@ -46,7 +46,7 @@ def computeResidualViscCoeffs2(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX
        CRES = computeRegionFilter1(CRES, Q_RES, Q_BND, DLD, LVAR, SMAX)
 
        # Augment damping to the sponge layers
-       CRES[ldex,0,0] = 0.5 * DLD[4] * SMAX * RLM[0,ldex]
-       CRES[ldex,1,0] = 0.5 * DLD[4] * SMAX * RLM[0,ldex]
+       CRES[ldex,0,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
+       CRES[ldex,1,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
               
        return CRES
