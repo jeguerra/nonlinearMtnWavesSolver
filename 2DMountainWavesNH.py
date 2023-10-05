@@ -1095,9 +1095,9 @@ def runModel(TestName):
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
               XZV = np.hstack((XMV, ZMV))
               
-              DXV = 0.5 * np.gradient(XL, axis=1, edge_order=2)
-              DZV = 0.5 * np.gradient(ZTL, axis=0, edge_order=2)
-              DA = np.reshape(DXV * DZV, (OPS,), order='F')
+              DXV = 2.0 * np.gradient(XL, axis=1, edge_order=2)
+              DZV = 2.0 * np.gradient(ZTL, axis=0, edge_order=2)
+              DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
               DL1 = 1.0 * DX_avg
