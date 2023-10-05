@@ -1095,8 +1095,16 @@ def runModel(TestName):
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
               XZV = np.hstack((XMV, ZMV))
               
-              DXV = 2.0 * np.gradient(XL, axis=1, edge_order=2)
-              DZV = 2.0 * np.gradient(ZTL, axis=0, edge_order=2)
+              # Forward differences
+              DXV1 = np.diff(XL, axis=1, append=np.expand_dims(XL[:,-1],axis=1))
+              DZV1 = np.diff(ZTL, axis=0, append=np.expand_dims(ZTL[-1,:],axis=0))
+              # Backward differences
+              DXV2 = np.diff(np.flip(XL, axis=1), axis=1, append=np.expand_dims(XL[:,0],axis=1))
+              DZV2 = np.diff(np.flip(ZTL, axis=0), axis=0, append=np.expand_dims(ZTL[0,:],axis=0))
+              # Average F-B differences to center at nodes
+              DXV = 0.5 * (DXV1 + np.abs(DXV2))
+              DZV = 0.5 * (DZV1 + np.abs(DZV2))
+              
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
