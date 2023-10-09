@@ -111,8 +111,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      sol_norm = np.nanmax(solA, axis=0, keepdims=True)
                      
                      # Define residual as the timestep change in the RHS
-                     bnd = np.abs(solA)
-                     CRES, res = rescf.computeResidualViscCoeffs(DIMS, res, bnd, sol_norm, DLD, \
+                     bnd_vels = np.abs(solA)
+                     CRES, res = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, bnd_vels, sol_norm, DLD, \
                                                             bdex, REFG[5], RLM, VWAV_max, CRES)
                      rhs1 = np.copy(rhsDyn)
        

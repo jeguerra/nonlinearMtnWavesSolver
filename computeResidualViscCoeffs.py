@@ -41,7 +41,8 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
        # Diffusion proportional to the residual entropy
        Q_NOR = np.where(NOR > 0.0, NOR, 1.0)
        N_RES = np.abs(RES) / Q_NOR
-       #Q_RES = bn.nanmax(N_RES, axis=1)
+       
+       #input(bn.nanmax(N_RES, axis=0))
        
        # Compute filtering convolution
        set_num_threads(8)

@@ -1246,7 +1246,7 @@ def runModel(TestName):
                      if interTime1 >= TOPT[5] or ti == 0:
                             
                             message = ''
-                            displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), \
+                            displayResiduals(message, np.reshape(resVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
                                    
                             # Compute and apply SVD based filtering
