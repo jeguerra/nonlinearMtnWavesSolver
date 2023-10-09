@@ -6,6 +6,7 @@ Created on Sun Aug  4 13:59:02 2019
 @author: TempestGuerra
 """
 
+byLocalFilter = False
 import numpy as np
 import bottleneck as bn
 from numba import njit, prange, set_num_threads
@@ -20,11 +21,10 @@ def computeRegionFilter(Q, QR, QB, DLD, LVAR, sval):
               # Compute the given filter over the region
               gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
               
-              #gval = np.nanmedian(QR[fltDex[ii]])
+              #gval = np.nanmax(np.nanmax(QR[fltDex[ii],:]))
               #uval = np.nanmax(QB[fltDex[ii],0])
               #wval = np.nanmax(QB[fltDex[ii],1])
               
-              #gval = fltKrl[ii] @ rval #QR[fltDex[ii]]
               uval = fltKrl[ii] @ QB[fltDex[ii],0]
               wval = fltKrl[ii] @ QB[fltDex[ii],1]
               
@@ -32,6 +32,19 @@ def computeRegionFilter(Q, QR, QB, DLD, LVAR, sval):
               Q[ii,1,0] = min(DLD[3] * gval, 0.5 * DLD[1] * wval)
               
        return Q
+   
+@njit(parallel=True)
+def computeRegionFilterOne(Q, DLD, LVAR):
+       
+       fval = np.empty(Q.shape)
+       fltDex = DLD[-2]
+       fltKrl = DLD[-1]
+       
+       for ii in prange(LVAR):
+              # Compute the given filter over the region
+              fval[ii] = fltKrl[ii] @ Q[fltDex[ii],:]
+              
+       return fval
 
 def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX, CRES):
        
@@ -42,11 +55,19 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
        Q_NOR = np.where(NOR > 0.0, NOR, 1.0)
        N_RES = np.abs(RES) / Q_NOR
        
-       #input(bn.nanmax(N_RES, axis=0))
-       
-       # Compute filtering convolution
-       set_num_threads(8)
-       CRES = computeRegionFilter(CRES, N_RES, Q_BND, DLD, LVAR, SMAX)
+       if byLocalFilter:
+           set_num_threads(8)
+           CRES = computeRegionFilter(CRES, N_RES, Q_BND, DLD, LVAR, SMAX)
+       else:
+           Q_RES = bn.nanmax(N_RES, axis=1) 
+           qr = DLD[2] * Q_RES
+           qb = 0.5 * DLD[0] * Q_BND[:,0]
+           CRES[:,0,0] = np.where(qr > qb, qb, qr)
+           qr = DLD[3] * Q_RES
+           qb = 0.5 * DLD[1] * Q_BND[:,1]
+           CRES[:,1,0] = np.where(qr > qb, qb, qr)
+           
+           CRES[:,:,0] = computeRegionFilterOne(CRES[:,:,0])
 
        # Augment damping to the sponge layers
        CRES[ldex,0,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
