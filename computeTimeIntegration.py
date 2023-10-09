@@ -108,12 +108,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, sol0, DLD, DT)
                             
                      # Constant sponge layer diffusivity on max kinetic energy
-                     sol_norm = bn.nanmax(solA, axis=0)
-                     #DCFC = 0.5 * DLD[4] * VWAV_max
+                     sol_norm = np.nanmax(solA, axis=0, keepdims=True)
                      
                      # Define residual as the timestep change in the RHS
-                     bnd = np.abs(solA)# + np.expand_dims(VWAV_fld, axis=1)
-                     CRES = rescf.computeResidualViscCoeffs2(DIMS, rhsDyn, bnd, sol_norm, DLD, \
+                     bnd = np.abs(solA)
+                     CRES, res = rescf.computeResidualViscCoeffs(DIMS, res, bnd, sol_norm, DLD, \
                                                             bdex, REFG[5], RLM, VWAV_max, CRES)
                      rhs1 = np.copy(rhsDyn)
        
@@ -340,7 +339,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        # Apply Rayleigh damping layer implicitly
        sol1[:,0] = RayD.T * sol1[:,0] + (1.0 - RayD.T) * init0[:,0]
        sol1[:,1] *= RayD.T
-       #sol1[:,2] *= RayD.T
+       sol1[:,2] *= RayD.T
        sol1[:,3] *= RayD.T
               
        return sol1, rhs1, res, CRES, DT

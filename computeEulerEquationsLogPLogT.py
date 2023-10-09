@@ -27,7 +27,7 @@ def enforceBC_RHS(rhs, ebcDex):
        
        return rhs
 
-def computeNewTimeStep(PHYS, RdT, fields, DLD, DT):
+def computeNewTimeStep(PHYS, RdT, fields, DLD, DT0):
        
        # Compute new time step based on median local sound speed
        VWAV_fld = np.sqrt(PHYS[6] * RdT)
@@ -39,6 +39,10 @@ def computeNewTimeStep(PHYS, RdT, fields, DLD, DT):
               DT = DLD[4] / VWAV_max
        else:
               DT *= 1.0
+              
+       #if DT / DT0 < 0.25:
+       #       import sys
+       #       sys.exit()
               
        return DT, VWAV_fld, VWAV_max
 

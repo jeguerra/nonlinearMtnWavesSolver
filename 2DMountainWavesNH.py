@@ -1108,8 +1108,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
+              DL1 = 1.0 * DX_max
+              DL2 = 1.0 * DZ_max
               
               import matplotlib.path as pth
               dx = 1.0 * mt.pi * DL1
@@ -1138,7 +1138,7 @@ def runModel(TestName):
                                np.exp(-0.5 * (xc2 / DL1**2 + zc2 / DL2**2))
                                
                      # Function mean kernel
-                     mkernel = DA[regDex] / (4.0 * dx * dz) * np.ones(len(regDex))
+                     mkernel = DA[regDex] / (4.0 * dx * dz)
                      
                      fltDms += [mkernel]
                      regLen = max(len(regDex), regLen)
