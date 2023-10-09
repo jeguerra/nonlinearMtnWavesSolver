@@ -12,7 +12,7 @@ import bottleneck as bn
 from numba import njit, prange, set_num_threads
 
 @njit(parallel=True)
-def computeRegionFilter(Q, QR, QB, DLD, LVAR, sval):
+def computeRegionFilter(Q, QR, QB, DLD, LVAR):
        
        fltDex = DLD[-2]
        fltKrl = DLD[-1]
@@ -57,7 +57,7 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
        
        if byLocalFilter:
            set_num_threads(8)
-           CRES = computeRegionFilter(CRES, N_RES, Q_BND, DLD, LVAR, SMAX)
+           CRES = computeRegionFilter(CRES, N_RES, Q_BND, DLD, LVAR)
        else:
            Q_RES = bn.nanmax(N_RES, axis=1) 
            qr = DLD[2] * Q_RES
@@ -67,7 +67,7 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
            qb = 0.5 * DLD[1] * Q_BND[:,1]
            CRES[:,1,0] = np.where(qr > qb, qb, qr)
            
-           CRES[:,:,0] = computeRegionFilterOne(CRES[:,:,0])
+           CRES[:,:,0] = computeRegionFilterOne(CRES[:,:,0], DLD, LVAR)
 
        # Augment damping to the sponge layers
        CRES[ldex,0,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
