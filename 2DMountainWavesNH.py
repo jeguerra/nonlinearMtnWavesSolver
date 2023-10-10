@@ -1108,8 +1108,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 1.0 * DX_max
-              DL2 = 1.0 * DZ_max
+              DL1 = 1.0 * DX_avg
+              DL2 = 1.0 * DZ_avg
               
               import matplotlib.path as pth
               dx = 1.0 * mt.pi * DL1

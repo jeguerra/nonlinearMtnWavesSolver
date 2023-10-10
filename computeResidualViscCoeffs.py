@@ -6,7 +6,7 @@ Created on Sun Aug  4 13:59:02 2019
 @author: TempestGuerra
 """
 
-byLocalFilter = False
+byLocalFilter = True
 import numpy as np
 import bottleneck as bn
 from numba import njit, prange, set_num_threads
@@ -73,4 +73,4 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
        CRES[ldex,0,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
        CRES[ldex,1,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
               
-       return CRES, N_RES
+       return CRES, Q_NOR

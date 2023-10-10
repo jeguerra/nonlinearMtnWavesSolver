@@ -102,9 +102,9 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(823, 98, 145.0, 36.0, 300.0, \
-                                      10000.0, 25000.0, 10.0, \
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                     self.setUserData(848, 92, 140.0, 40.0, 300.0, \
+                                      10000.0, 20000.0, 1.0,
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.25E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
