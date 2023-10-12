@@ -12,7 +12,7 @@ import bottleneck as bn
 from numba import njit, prange, set_num_threads
 
 @njit(parallel=True)
-def computeRegionFilter(Q, QR, QB, DLD, LVAR):
+def computeRegionFilter(Q, QR, QA, DLD, LVAR):
        
        fltDex = DLD[-2]
        fltKrl = DLD[-1]
@@ -20,13 +20,12 @@ def computeRegionFilter(Q, QR, QB, DLD, LVAR):
        for ii in prange(LVAR):
               # Compute the given filter over the region
               gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
-              
-              #gval = np.nanmax(np.nanmax(QR[fltDex[ii],:]))
-              #uval = np.nanmax(QB[fltDex[ii],0])
-              #wval = np.nanmax(QB[fltDex[ii],1])
-              
-              uval = fltKrl[ii] @ QB[fltDex[ii],0]
-              wval = fltKrl[ii] @ QB[fltDex[ii],1]
+              # Local function average
+              uval = fltKrl[ii] @ QA[fltDex[ii],0]
+              wval = fltKrl[ii] @ QA[fltDex[ii],1]
+              # Local maximum
+              #uval = np.nanmax(QA[fltDex[ii],0])
+              #wval = np.nanmax(QA[fltDex[ii],1])
               
               Q[ii,0,0] = min(DLD[2] * gval, 0.5 * DLD[0] * uval)
               Q[ii,1,0] = min(DLD[3] * gval, 0.5 * DLD[1] * wval)
@@ -61,6 +60,7 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
            CRES = computeRegionFilter(CRES, N_RES, Q_BND, DLD, LVAR)
        else:
            Q_RES = bn.nanmax(N_RES, axis=1) 
+           
            qr = DLD[2] * Q_RES
            qb = 0.5 * DLD[0] * Q_BND[:,0]
            CRES[:,0,0] = np.where(qr > qb, qb, qr)

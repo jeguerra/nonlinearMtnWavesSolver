@@ -46,7 +46,7 @@ def plotRHS(x, rhs, ebcDex, label):
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                               sol0, init0, rhs0, CRES, ebcDex, RSBops):
        
-       OPS = DIMS[-1]
+       OPS = DIMS[-2]
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
@@ -106,13 +106,17 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               if DynSGS_Update:
                      
                      DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, sol0, DLD, DT)
+                     
+                     # compute function average of abs(variables)
+                     sol_avg = np.expand_dims(DLD[-3] @ stateA, axis=0)
                             
-                     # Constant sponge layer diffusivity on max kinetic energy
-                     sol_norm = np.nanmax(solA, axis=0, keepdims=True)
+                     # State from local average state
+                     dsol = np.abs(stateA - sol_avg)
+                     #sol_norm = np.nanquantile(dsol, 0.95, axis=0, keepdims=True)
+                     sol_norm = DLD[-3] @ dsol
                      
                      # Define residual as the timestep change in the RHS
-                     bnd_vels = np.abs(solA)
-                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, bnd_vels, sol_norm, DLD, \
+                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, dsol, sol_norm, DLD, \
                                                             bdex, REFG[5], RLM, VWAV_max, CRES)
                      rhs1 = np.copy(rhsDyn)
                      res *= (1.0 / res_norm)

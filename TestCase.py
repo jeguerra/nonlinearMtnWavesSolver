@@ -125,13 +125,14 @@ class TestCase:
               L2 = 1.0E+3 * XF # In 10s of km
               L1 = -0.75 * L2
               ZH = 1.0E+3 * ZF # In km
+              AD = ZH * (L2 - L1) # domain total area
               OPS = (NX + 1) * (NZ + 1)
               iU = 0
               iW = 1
               iP = 2
               iT = 3
               self.varDex = [iU, iW, iP, iT]
-              self.DIMS = [L1, L2, ZH, NX, NZ, OPS]
+              self.DIMS = [L1, L2, ZH, NX, NZ, OPS, AD]
               
               # Background temperature profile
               self.Z_in = [0.0, 1.1E4, 2.5E4, ZH]
@@ -179,7 +180,7 @@ class TestCase:
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 10.0 # Time for diagnostic output
+              OTI = 5.0 # Time for diagnostic output
               ITI = 5.0 # Time for image output
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI]

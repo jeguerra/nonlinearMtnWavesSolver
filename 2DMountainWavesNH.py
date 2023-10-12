@@ -1152,7 +1152,7 @@ def runModel(TestName):
               regDms = nb_list(np.array(dms, dtype=np.float64) for dms in fltDms)
 
               # Create a container for DynSGS scaling and region parameters
-              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, regLen, regDex, regDms)
+              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, DA / DIMS[-1], regDex, regDms)
               
               #RLM_gpu = cp.asarray(REFG[4][0].data)
               RLM = REFG[4][0].data
