@@ -701,8 +701,8 @@ def runModel(TestName):
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
               
        #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZIL = (NZ+2, NZ+5, NZ+8)
-       DDZM_OP = DDZMS1
+       NZIL = (NZ+1, NZ+2, NZ+3, NZ+4, NZ+5)
+       DDZM_OP = 0.0 #DDZMS1
        for NZI in NZIL:
               if verticalChebGrid:
                      
@@ -742,7 +742,7 @@ def runModel(TestName):
                      
               DDZM_OP += DDZMI
        
-       DDZM_OP *= 1.0 / (len(NZIL) + 1)
+       DDZM_OP *= 1.0 / len(NZIL)
               
        if HermFunc:
               DDXM_OP = DDXMS1

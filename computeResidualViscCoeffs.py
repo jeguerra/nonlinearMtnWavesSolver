@@ -6,7 +6,7 @@ Created on Sun Aug  4 13:59:02 2019
 @author: TempestGuerra
 """
 
-byLocalFilter = True
+byLocalFilter = False
 import numpy as np
 import bottleneck as bn
 from numba import njit, prange, set_num_threads
@@ -42,7 +42,8 @@ def computeRegionFilterOne(Q, DLD, LVAR):
        
        for ii in prange(LVAR):
               # Compute the given filter over the region
-              fval[ii] = fltKrl[ii] @ Q[fltDex[ii],:]
+              fval[ii,0,0] = fltKrl[ii] @ Q[fltDex[ii],0,0]
+              fval[ii,1,0] = fltKrl[ii] @ Q[fltDex[ii],1,0]
               
        return fval
 
@@ -55,8 +56,8 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
        Q_NOR = np.where(NOR > 0.0, NOR, 1.0)
        N_RES = np.abs(RES) / Q_NOR
        
+       set_num_threads(8)
        if byLocalFilter:
-           set_num_threads(8)
            CRES = computeRegionFilter(CRES, N_RES, Q_BND, DLD, LVAR)
        else:
            Q_RES = bn.nanmax(N_RES, axis=1) 
@@ -67,7 +68,7 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
            qb = 0.5 * DLD[1] * Q_BND[:,1]
            CRES[:,1,0] = np.where(qr > qb, qb, qr)
            
-           CRES[:,:,0] = computeRegionFilterOne(CRES[:,:,0], DLD, LVAR)
+           CRES = computeRegionFilterOne(CRES, DLD, LVAR)
 
        # Augment damping to the sponge layers
        CRES[ldex,0,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
