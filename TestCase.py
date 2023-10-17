@@ -86,7 +86,7 @@ class TestCase:
                      # REGIONAL SCALE
                      self.setUserData(848, 92, 140.0, 36.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.25E+4, 'uwpt_static')
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # MICRO SCALE
                      #self.setUserData(823, 72, 20.0, 2.0, 300.0, \
@@ -104,7 +104,7 @@ class TestCase:
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      self.setUserData(848, 92, 140.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.25E+4, 'uwpt_static')
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -140,7 +140,7 @@ class TestCase:
               TH = TTP + GAMS * (self.Z_in[3] - self.Z_in[2])
               self.T_in = (T0, TTP, TTP, TH)
               
-              # Background wind profile
+              # Background wind profile (10 m/s max jet)
               self.JETOPS = (10.0, 16.822, 1.386, 15.0)
               
               # Set the Rayleigh options

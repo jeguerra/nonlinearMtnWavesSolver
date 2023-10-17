@@ -201,10 +201,11 @@ DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 6)
 DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 10)
 
 # Take boundary information from compact FD operators
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD1)
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, False, True, DDZ_CFD1)
 DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD2)
 
-DDZ_AV = 0.5 * (DDZ_CFD3 + DDZ_QS)
+# SUPER-RESOLUTION SPECTRAL DERIVATIVE
+DDZ_AV = 0.5 * (DDZ_QS + DDZ_CFD2) 
 
 # Compute eigenspectra
 W1 = scl.eigvals(DDZ_CFD1)
@@ -220,7 +221,7 @@ plt.plot(np.real(W1), np.imag(W1), 'o', label='Compact FD4')
 plt.plot(np.real(W2), np.imag(W2), 'o', label='Compact FD6')
 plt.plot(np.real(W3), np.imag(W3), 'o', label='Cubic Spline') 
 plt.plot(np.real(W4), np.imag(W4), 'o', label='Quintic Clamped')
-plt.plot(np.real(W5), np.imag(W5), 'o', label='Average Derivative')
+plt.plot(np.real(W5), np.imag(W5), 'o', label='Averaged Derivative')
 plt.plot(np.real(W6), np.imag(W6), 'o', label='Legendre') 
 plt.plot(np.real(W7), np.imag(W7), 'o', label='Chebyshev')
 plt.grid(visible=True, which='both', axis='both')
@@ -277,7 +278,7 @@ plt.semilogy(zv, np.abs(DYD4 - DY), 'md--', label='Cubic Spline Error')
 plt.semilogy(zv, np.abs(DYD5 - DY), 'c+--', label='Quintic Spline Error')
 plt.semilogy(zv, np.abs(DYD6 - DY), 'rs--', label='Chebyshev Spectral Error')
 plt.semilogy(zv, np.abs(DYD7 - DYL), 'ks--', label='Legendre Spectral Error')
-plt.semilogy(zv, np.abs(DYD8 - DY), 'yh--', label='Averaged Error')
+plt.semilogy(zv, np.abs(DYD8 - DY), 'yh--', label='Averaged Spectral Error')
 plt.xlabel('Domain')
 plt.ylabel('Error Magnitude')
 plt.title('Compact Finite Difference Derivative Test')

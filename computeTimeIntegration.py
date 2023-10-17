@@ -116,7 +116,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      sol_norm = DLD[-3] @ dsol
                      
                      # Define residual as the timestep change in the RHS
-                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, rhsDyn, dsol, sol_norm, DLD, \
+                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, 2*res, dsol, sol_norm, DLD, \
                                                             bdex, REFG[5], RLM, VWAV_max, CRES)
                      rhs1 = np.copy(rhsDyn)
                      res *= (1.0 / res_norm)

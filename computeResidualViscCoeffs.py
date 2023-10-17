@@ -6,7 +6,8 @@ Created on Sun Aug  4 13:59:02 2019
 @author: TempestGuerra
 """
 
-byLocalFilter = False
+byLocalFilter = True
+import math as mt
 import numpy as np
 import bottleneck as bn
 from numba import njit, prange, set_num_threads
@@ -16,19 +17,19 @@ def computeRegionFilter(Q, QR, QA, DLD, LVAR):
        
        fltDex = DLD[-2]
        fltKrl = DLD[-1]
+       
+       bval = mt.sqrt(QA[0]**2 + QA[1]**2)
         
        for ii in prange(LVAR):
               # Compute the given filter over the region
               gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
               # Local function average
-              uval = fltKrl[ii] @ QA[fltDex[ii],0]
-              wval = fltKrl[ii] @ QA[fltDex[ii],1]
+              #aval = fltKrl[ii] @ QA[fltDex[ii],:]
               # Local maximum
-              #uval = np.nanmax(QA[fltDex[ii],0])
-              #wval = np.nanmax(QA[fltDex[ii],1])
+              #aval = np.nanmax(QA[fltDex[ii],:])
               
-              Q[ii,0,0] = min(DLD[2] * gval, 0.5 * DLD[0] * uval)
-              Q[ii,1,0] = min(DLD[3] * gval, 0.5 * DLD[1] * wval)
+              Q[ii,0,0] = min(DLD[2] * gval, 0.5 * DLD[0] * bval)
+              Q[ii,1,0] = min(DLD[3] * gval, 0.5 * DLD[1] * bval)
               
        return Q
    
@@ -57,7 +58,7 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
        
        set_num_threads(8)
        if byLocalFilter:
-           CRES = computeRegionFilter(CRES, N_RES, Q_BND, DLD, LVAR)
+           CRES = computeRegionFilter(CRES, N_RES, NOR, DLD, LVAR)
        else:
            Q_RES = bn.nanmax(N_RES, axis=1) 
            

@@ -69,7 +69,7 @@ def plotPertb(tt):
        '''
        fig.gca().clear()
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 201, cmap='RdGy', vmin=-clim, vmax=+clim)
+       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 201, cmap='RdGy')#, vmin=-clim, vmax=+clim)
        
        #norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
        #plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e', cax=plt.gca())

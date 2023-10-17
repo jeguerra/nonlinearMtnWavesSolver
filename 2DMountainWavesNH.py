@@ -629,9 +629,9 @@ def runModel(TestName):
        '''      
        #'''
        # Compute the background (initial) fields
-       U = 5.0 * (np.expand_dims(uz, axis=1) - JETOPS[0])
+       U = np.expand_dims(uz, axis=1)
        UZ = computeColumnInterp(DIM0, REF0[1], U, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
-       dUdz = 5.0 * np.expand_dims(duz, axis=1)
+       dUdz = np.expand_dims(duz, axis=1)
        DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
        LPZ = np.expand_dims(lpz, axis=1)
        LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
@@ -683,11 +683,11 @@ def runModel(TestName):
        #%% DIFFERENTIATION OPERATORS
        DDX_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
        DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
-       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD4)
-       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD4)
-       #DDX = 0.5 * (DDX_CFD4 + DDX_CS)
-       #DDZ = 0.5 * (DDZ_CFD4 + DDZ_CS)
-       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
+       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD4)
+       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD4)
+       DDX = 0.5 * (DDX_CFD4 + DDX_CS)
+       DDZ = 0.5 * (DDZ_CFD4 + DDZ_CS)
+       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX, DDZ)
        
        DDX_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
        DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
@@ -700,58 +700,13 @@ def runModel(TestName):
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
               
-       #%% Staggered operator in the vertical Legendre/Chebyshev mix
-       NZIL = (NZ+1, NZ+2, NZ+3, NZ+4, NZ+5)
-       DDZM_OP = 0.0 #DDZMS1
-       for NZI in NZIL:
-              if verticalChebGrid:
-                     
-                     xiI, whf = derv.leglb(NZI) #[-1 1]
-                     xiO, whf = derv.cheblb(NZ) #[-1 1]
-                     
-                     TMO, dummy = derv.legpolym(NZI, xiO, True)
-                     TMI = derv.chebpolym(NZ+1, xiI)
-                     
-                     # Get the inner vertical derivative
-                     DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
-                     DDZ_I, I_TRANS = derv.computeLegendreDerivativeMatrix(DIMS_ST)
-                     
-                     O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
-                     I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid
-                     
-                     DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
-                     dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
-                     
-              if verticalLegdGrid:
-                     
-                     xiO, whf = derv.leglb(NZ) #[-1 1]
-                     xiI, whf = derv.cheblb(NZI) #[-1 1]
-                     
-                     TMO = derv.chebpolym(NZI+1, xiO)
-                     TMI, dummy = derv.legpolym(NZ, xiI, True)
-                     
-                     # Get the inner vertical derivative
-                     DIMS_ST = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], NZI, DIMS[5]]
-                     DDZ_I, I_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS_ST)
-                     
-                     O2I_INT = (TMI.T).dot(VTRANS) # Outer to Internal grid
-                     I2O_INT = (TMO.T).dot(I_TRANS) # Inner to Outer grid 1
-                     
-                     DDZ_I = I2O_INT.dot(DDZ_I).dot(O2I_INT)
-                     dummy, DDZMI = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_I)
-                     
-              DDZM_OP += DDZMI
-       
-       DDZM_OP *= 1.0 / len(NZIL)
+       #%% Set up the derivative operators
+       DDZM_OP = DDZMS1
               
        if HermFunc:
               DDXM_OP = DDXMS1
        else:
               DDXM_OP = DDXMS_QS
-              
-       #plt.plot(xiI, xiI, 'ko', xiO, xiO, 'ks')
-       #plt.show()
-       #input()
        
        #%% Prepare derivative operators for diffusion
        PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
@@ -1108,8 +1063,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 1.0 * DX_avg
-              DL2 = 1.0 * DZ_avg
+              DL1 = 1.0 * DX_max
+              DL2 = 1.0 * DZ_max
               
               import matplotlib.path as pth
               dx = 1.0 * mt.pi * DL1
@@ -1298,8 +1253,8 @@ def runModel(TestName):
               rdb['SOLT'] = SOLT
               rdb['LMS'] = LMS
               if NonLinSolve:
-                     rdb['DCF1'] = DCF[0]
-                     rdb['DCF2'] = DCF[1]
+                     rdb['DCF1'] = CRES[:,0,0]
+                     rdb['DCF2'] = CRES[:,1,0]
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]

@@ -24,8 +24,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
        RP = 4.0
        C2 = 5.0
-       W1 = 3.0 / 5.0
-       X1 = 4.0 / 3.0
+       W1 = 1.0 / 3.0
+       X1 = 2.0 / 1.0
        
        # Get REFS data
        X = REFS[4]
