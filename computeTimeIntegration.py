@@ -114,9 +114,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      dsol = np.abs(stateA - sol_avg)
                      #sol_norm = np.nanquantile(dsol, 0.95, axis=0, keepdims=True)
                      sol_norm = DLD[-3] @ dsol
+                     sol_norm[2] = 1.0
+                     sol_norm[3] = 1.0
                      
                      # Define residual as the timestep change in the RHS
-                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, 2*res, dsol, sol_norm, DLD, \
+                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, res, dsol, sol_norm, DLD, \
                                                             bdex, REFG[5], RLM, VWAV_max, CRES)
                      rhs1 = np.copy(rhsDyn)
                      res *= (1.0 / res_norm)
