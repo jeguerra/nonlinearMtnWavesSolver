@@ -73,9 +73,10 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               nonlocal DynSGS_Update, Residual_Update,rhs1,res,CRES,DT
               
-              # Compute total state
+              # Compute total state ()
               stateA = np.copy(solA)
               stateA[:,2:] += init0[:,2:]
+              stateA[:,2:] = np.exp(stateA[:,2:])
               
               # Compute pressure gradient force scaling (buoyancy)
               RdT, T_ratio = tendency.computeRdT(solA, REFS[9][0], PHYS[4])
@@ -100,6 +101,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               if Residual_Update:
                      res = rhs0 - 0.5 * (rhs0 + rhsDyn)
+                     res[:,2:] *= stateA[:,2:]
                      Residual_Update = False
               
               #%% Compute the DynSGS coefficients at the top update
@@ -112,10 +114,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                             
                      # State from local average state
                      dsol = np.abs(stateA - sol_avg)
-                     #sol_norm = np.nanquantile(dsol, 0.95, axis=0, keepdims=True)
+                     #sol_norm = np.nanquantile(dsol, 0.95, axis=0)
                      sol_norm = DLD[-3] @ dsol
-                     sol_norm[2] = 1.0
-                     sol_norm[3] = 1.0
                      
                      # Define residual as the timestep change in the RHS
                      CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, res, dsol, sol_norm, DLD, \
@@ -126,6 +126,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DynSGS_Update = False
               
               #%% Compute diffusive update
+              
+              PqPxA[:,2:] *= stateA[:,2:]
+              DqDzA[:,2:] *= stateA[:,2:]
 
               # Compute directional derivative along terrain
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
@@ -150,13 +153,14 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Second directional derivatives (of the diffusive fluxes)
               P2qPx2[bdex,:] += dhdx * P2qPzx[bdex,:]; P2qPx2[bdex,:] *= S
-              P2qPxz[bdex,:] += dhdx * P2qPz2[bdex,:]; P2qPxz[bdex,:] *= S
+              P2qPzx[bdex,:] += dhdx * P2qPz2[bdex,:]; P2qPzx[bdex,:] *= S
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                          ebcDex, DLD)
               rhsDif = tendency.enforceBC_RHS(rhsDif, ebcDex)
               # Compute total RHS and apply BC
+              rhsDif[:,2:] *= 1.0 / stateA[:,2:]
               rhs = (rhsDyn + rhsDif)
               
               # Apply stage update
