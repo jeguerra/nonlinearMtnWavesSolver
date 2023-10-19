@@ -702,11 +702,12 @@ def runModel(TestName):
               
        #%% Set up the derivative operators
        DDZM_OP = DDZMS1
+       #DDZM_OP = DDZMS_QS
               
        if HermFunc:
               DDXM_OP = DDXMS1
        else:
-              DDXM_OP = DDXMS_QS
+              DDXM_OP = DDXMS_QS# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
        
        #%% Prepare derivative operators for diffusion
        PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
@@ -857,7 +858,7 @@ def runModel(TestName):
               #'''
               # Compute the RHS for this iteration
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, True, False, False, RSBops)
+                                                  PHYS, REFS, REFG, True, False, RSBops)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               displayResiduals('Current function evaluation residual: ', RHS, \
                                      thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1007,7 +1008,7 @@ def runModel(TestName):
               message = 'Residual 2-norm BEFORE Newton step:'
               displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
               rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, True, False, False, RSBops)
+                                                  PHYS, REFS, REFG, True, False, RSBops)
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1148,10 +1149,10 @@ def runModel(TestName):
               else:
                      # Initialize fields
                      if withHydroState:
+                            hydroState[ubdex,0] = 0.0
+                            hydroState[ubdex,1] = 0.0
                             fields[:,0] = hydroState[:,0]
-                            fields[ubdex,0] = 0.0
-                            fields[ubdex,1] = 0.0
-                            #fields[ubdex,1] = -dWBC
+                            fields[:,3] = hydroState[:,3]
                      else:
                             fields[:,0] = hydroState[:,0]
                             fields[ubdex,1] = -dWBC
@@ -1163,7 +1164,8 @@ def runModel(TestName):
                      thisTime = IT
                      
               # Compute sound speed
-              RdT, T_ratio = eqs.computeRdT(fields, REFS[9][0], PHYS[4])
+              RdT, T_ratio = eqs.computeRdT(fields[:,2], fields[:,3] - hydroState[:,3], 
+                                            REFS[9][0], PHYS[4])
               
               TOPT[0], VWAV_fld, VWAV_max = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, TOPT[0])
                      

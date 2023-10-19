@@ -75,11 +75,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute total state ()
               stateA = np.copy(solA)
-              stateA[:,2:] += init0[:,2:]
-              stateA[:,2:] = np.exp(stateA[:,2:])
+              stateA[:,2] += init0[:,2]
+              stateA[:,2] = np.exp(stateA[:,2])
               
               # Compute pressure gradient force scaling (buoyancy)
-              RdT, T_ratio = tendency.computeRdT(solA, REFS[9][0], PHYS[4])
+              RdT, T_ratio = tendency.computeRdT(solA[:,2], solA[:,3] - init0[:,3],
+                                                 REFS[9][0], PHYS[4])
               
               #%% First dynamics update
               if RSBops:
@@ -100,7 +101,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
-                     res = rhs0 - 0.5 * (rhs0 + rhsDyn)
+                     res = rhs0 - rhsDyn #0.5 * (rhs0 + rhsDyn)
                      res[:,2:] *= stateA[:,2:]
                      Residual_Update = False
               
@@ -152,8 +153,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               P2qPz2 = DDq[OPS:,4:]
               
               # Second directional derivatives (of the diffusive fluxes)
-              P2qPx2[bdex,:] += dhdx * P2qPzx[bdex,:]; P2qPx2[bdex,:] *= S
-              P2qPzx[bdex,:] += dhdx * P2qPz2[bdex,:]; P2qPzx[bdex,:] *= S
+              P2qPx2[bdex,:] = S * (P2qPx2[bdex,:] + dhdx * P2qPxz[bdex,:])
+              P2qPzx[bdex,:] = S * (P2qPzx[bdex,:] + dhdx * P2qPz2[bdex,:])
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
@@ -351,6 +352,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        sol1[:,0] = RayD.T * sol1[:,0] + (1.0 - RayD.T) * init0[:,0]
        sol1[:,1] *= RayD.T
        sol1[:,2] *= RayD.T
-       sol1[:,3] *= RayD.T
+       sol1[:,3] = RayD.T * sol1[:,3] + (1.0 - RayD.T) * init0[:,3]
               
        return sol1, rhs1, res, CRES, DT
