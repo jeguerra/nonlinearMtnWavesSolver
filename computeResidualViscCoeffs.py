@@ -20,11 +20,11 @@ def computeRegionFilter(Q, QR, DLD, LVAR):
         
        for ii in prange(LVAR):
               # Compute the given filter over the region
-              gval = 0.1 * np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
+              gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
               #gval = np.nanmax(np.nanmax(QR[fltDex[ii],:]))
               
-              Q[ii,0,0] = DLD[2] * gval
-              Q[ii,1,0] = DLD[3] * gval
+              Q[ii,0,0] = 0.5 * DLD[2] * gval
+              Q[ii,1,0] = 0.5 * DLD[3] * gval
               
        return Q
    
@@ -42,7 +42,7 @@ def computeRegionFilterOne(Q, DLD, LVAR):
               
        return fval
 
-def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX, CRES):
+def computeResidualViscCoeffs(PHYS, RES, BND, NOR, DLD, bdex, ldex, RLM, SMAX, CRES):
        
        # Compute absolute value of residuals
        LVAR = RES.shape[0]
@@ -54,21 +54,21 @@ def computeResidualViscCoeffs(PHYS, RES, Q_BND, NOR, DLD, bdex, ldex, RLM, SMAX,
        set_num_threads(8)
        if byLocalFilter:
            CRES = computeRegionFilter(CRES, N_RES, DLD, LVAR)
-           '''
-           bval = mt.sqrt(NOR[0]**2 + NOR[1]**2)
-           qb = 0.5 * DLD[0] * bval
+           #'''
+           #bval = mt.sqrt(NOR[0]**2 + NOR[1]**2)
+           qb = 0.5 * DLD[0] * BND[0]
            CRES[:,0,0] = np.where(CRES[:,0,0] > qb, qb, CRES[:,0,0])
-           qb = 0.5 * DLD[1] * bval
+           qb = 0.5 * DLD[1] * BND[1]
            CRES[:,1,0] = np.where(CRES[:,1,0] > qb, qb, CRES[:,1,0])
-           '''
+           #'''
        else:
            Q_RES = bn.nanmax(N_RES, axis=1) 
            
            qr = DLD[2] * Q_RES
-           qb = 0.5 * DLD[0] * Q_BND[:,0]
+           qb = 0.5 * DLD[0] * BND[:,0]
            CRES[:,0,0] = np.where(qr > qb, qb, qr)
            qr = DLD[3] * Q_RES
-           qb = 0.5 * DLD[1] * Q_BND[:,1]
+           qb = 0.5 * DLD[1] * BND[:,1]
            CRES[:,1,0] = np.where(qr > qb, qb, qr)
            
            CRES = computeRegionFilterOne(CRES, DLD, LVAR)

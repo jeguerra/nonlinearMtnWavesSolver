@@ -111,15 +111,15 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, sol0, DLD, DT)
                      
                      # compute function average of abs(variables)
-                     sol_avg = np.expand_dims(DLD[-3] @ stateA, axis=0)
+                     sol_avrg = DLD[-3] @ stateA
+                     sol_norm = bn.nanmax(stateA, axis=0)
                             
                      # State from local average state
-                     dsol = np.abs(stateA - sol_avg)
-                     #sol_norm = np.nanquantile(dsol, 0.95, axis=0)
-                     sol_norm = DLD[-3] @ dsol
+                     dsol = np.abs(stateA - np.expand_dims(sol_avrg, axis=0))
+                     res_norm = DLD[-3] @ dsol
                      
                      # Define residual as the timestep change in the RHS
-                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, res, dsol, sol_norm, DLD, \
+                     CRES, res_norm = rescf.computeResidualViscCoeffs(DIMS, res, sol_norm, res_norm, DLD, \
                                                             bdex, REFG[5], RLM, VWAV_max, CRES)
                      rhs1 = np.copy(rhsDyn)
                      res *= (1.0 / res_norm)
