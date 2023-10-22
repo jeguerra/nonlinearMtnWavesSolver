@@ -48,7 +48,7 @@ def computeRdT(lp, lt, RdT_bar, kap):
        
        # Compute pressure gradient force scaling (buoyancy)              
        earg = kap * lp + lt
-       T_ratio = np.expm1(earg)#, dtype=np.float64)
+       T_ratio = np.expm1(earg, dtype=np.float64)
        #T_exp = np.exp(earg, dtype=np.longdouble)                 
               
        RdT = RdT_bar * (T_ratio + 1.0)
@@ -333,7 +333,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio,
        
        DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
        
-       return DqDt
+       return DqDt, PqPz
 
 def computeRayleighTendency(REFG, fields):
        

@@ -1153,21 +1153,47 @@ def runModel(TestName):
                             hydroState[ubdex,1] = 0.0
                             fields[:,0] = hydroState[:,0]
                             fields[:,3] = hydroState[:,3]
+                            fields[ubdex,0] = 0.0
+                            fields[ubdex,1] = 0.0
                      else:
                             fields[:,0] = hydroState[:,0]
                             fields[ubdex,1] = -dWBC
                             fields[:,2] = hydroState[:,2]
                             fields[:,3] = hydroState[:,3]
                      
+                     dfields = np.zeros(fields.shape)
                      rhsVec = np.zeros(fields.shape)
                      resVec = np.zeros(fields.shape)
                      thisTime = IT
-                     
+              
               # Compute sound speed
               RdT, T_ratio = eqs.computeRdT(fields[:,2], fields[:,3] - hydroState[:,3], 
                                             REFS[9][0], PHYS[4])
               
               TOPT[0], VWAV_fld, VWAV_max = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, TOPT[0])
+              VWAV_ref = bn.nanmax(VWAV_max - VWAV_fld)
+              print('Initial Sound Speed (m/s): ', VWAV_ref)
+              
+              # Normalization for vertical velocity
+              rw = np.abs(dWBC)
+              rw = rw[rw > 0.0]
+              wref = 0.5 * bn.nanmax(rw)
+              
+              sol_norm = bn.nanmax(np.abs(hydroState), axis=0)
+              sol_norm[1] = wref
+              print('Initial Solution Norms:')
+              print(sol_norm)
+                     
+              # compute function average of initial fields
+              sol_avrg = DLD[-3] @ hydroState
+              # compute state relative to average
+              res_norm = sol_norm - sol_avrg
+              res_norm[1] = wref
+              res_norm[2] = 1.0
+              res_norm[3] = 1.0
+              print('Residual Norms:')
+              print(res_norm)
+              res_norm = 1.0 / res_norm
                      
               # Initialize output to NetCDF
               newFname = initializeNetCDF(fname4Restart, thisTime, NX, NZ, XL, ZTL, hydroState)
@@ -1185,10 +1211,9 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
-                            fields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields, hydroState, rhsVec, \
-                                                                    CRES, ebcDex, RSBops)
-                            
+                            fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                                                                    DLD, TOPT, fields, hydroState, rhsVec, dfields, \
+                                                                    CRES, ebcDex, RSBops, VWAV_ref, sol_norm, res_norm)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)

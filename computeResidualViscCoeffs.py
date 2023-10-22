@@ -23,8 +23,8 @@ def computeRegionFilter(Q, QR, DLD, LVAR):
               gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
               #gval = np.nanmax(np.nanmax(QR[fltDex[ii],:]))
               
-              Q[ii,0,0] = 0.5 * DLD[2] * gval
-              Q[ii,1,0] = 0.5 * DLD[3] * gval
+              Q[ii,0,0] = DLD[2] * gval
+              Q[ii,1,0] = DLD[3] * gval
               
        return Q
    
@@ -42,18 +42,14 @@ def computeRegionFilterOne(Q, DLD, LVAR):
               
        return fval
 
-def computeResidualViscCoeffs(PHYS, RES, BND, NOR, DLD, bdex, ldex, RLM, SMAX, CRES):
+def computeResidualViscCoeffs(PHYS, RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
        
        # Compute absolute value of residuals
        LVAR = RES.shape[0]
        
-       # Diffusion proportional to the residual entropy
-       Q_NOR = np.where(NOR > 0.0, NOR, 1.0)
-       N_RES = np.abs(RES) / Q_NOR
-       
        set_num_threads(8)
        if byLocalFilter:
-           CRES = computeRegionFilter(CRES, N_RES, DLD, LVAR)
+           CRES = computeRegionFilter(CRES, RES, DLD, LVAR)
            #'''
            #bval = mt.sqrt(NOR[0]**2 + NOR[1]**2)
            qb = 0.5 * DLD[0] * BND[0]
@@ -62,7 +58,7 @@ def computeResidualViscCoeffs(PHYS, RES, BND, NOR, DLD, bdex, ldex, RLM, SMAX, C
            CRES[:,1,0] = np.where(CRES[:,1,0] > qb, qb, CRES[:,1,0])
            #'''
        else:
-           Q_RES = bn.nanmax(N_RES, axis=1) 
+           Q_RES = bn.nanmax(RES, axis=1) 
            
            qr = DLD[2] * Q_RES
            qb = 0.5 * DLD[0] * BND[:,0]
@@ -77,4 +73,4 @@ def computeResidualViscCoeffs(PHYS, RES, BND, NOR, DLD, bdex, ldex, RLM, SMAX, C
        CRES[ldex,0,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
        CRES[ldex,1,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
               
-       return CRES, Q_NOR
+       return CRES
