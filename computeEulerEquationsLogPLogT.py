@@ -360,8 +360,8 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD):
        
        #%% INTERIOR DIFFUSION
        # Diffusion of u-w vector
-       DqDt[:,0] = (2.0 * P2qPx2[:,0]) + (P2qPzx[:,1] + P2qPz2[:,0])
-       DqDt[:,1] = (P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1])
+       DqDt[:,0] = 0.5 * ((2.0 * P2qPx2[:,0]) + (P2qPzx[:,1] + P2qPz2[:,0]))
+       DqDt[:,1] = 0.5 * ((P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1]))
        # Diffusion of scalars (broken up into anisotropic components
        DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
        DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]

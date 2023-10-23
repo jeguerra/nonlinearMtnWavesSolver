@@ -730,21 +730,21 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        if isClamped:
               A[0,0] = 1.0
-              B[0,:] = np.copy(D4A)
+              B[0,:] = D4A
               A[-1,-1] = 1.0
-              B[-1,:] = np.copy(D4B)
+              B[-1,:] = D4B
        elif isEssential:
               A[0,0] = 1.0 * dom[1] / (dom[1] - dom[0]) 
               A[0,1] = -1.0 * dom[0] / (dom[1] - dom[0])
               B[0,:] = np.zeros(N)
-              A[N-1,N-2] = 1.0 * dom[-1] / (dom[-1] - dom[-2])
-              A[N-1,N-1] = -1.0 * dom[-2] / (dom[-1] - dom[-2])
+              A[N-1,N-2] = -1.0 * dom[-1] / (dom[-2] - dom[-1])
+              A[N-1,N-1] = 1.0 * dom[-2] / (dom[-2] - dom[-1])
               B[N-1,:] = np.zeros(N)
        else:
               A[0,0] = 1.0
-              B[0,:] = np.copy(D4A)
+              B[0,:] = D4A
               A[-1,-1] = 1.0
-              B[-1,:] = np.copy(D4B)
+              B[-1,:] = D4B
               
        # Compute the 4th derivative matrix
        Q, R = scl.qr(A)
@@ -753,12 +753,12 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        # Compute the 1st derivative matrix
        DDM = C.dot(AIB) + D
-       
+       #'''
        # Set boundary derivatives from specified
        if isClamped or not isEssential:
-              DDM[0,:] = np.copy(D1A)
-              DDM[-1,:] = np.copy(D1B)
-       
+              DDM[0,:] = D1A
+              DDM[-1,:] = D1B
+       #'''
        #DDM1 = removeLeastSingularValue(DDM)
        DDM = numericalCleanUp(DDM)
                      
@@ -883,13 +883,13 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        
        end3 = False
        if order == 4:
-              end4 = False
-              end6 = True
+              end4 = True
+              end6 = False
               end8 = False
        elif order == 6:
               end4 = False
-              end6 = False
-              end8 = True
+              end6 = True
+              end8 = False
        elif order > 6:
               end4 = False
               end6 = False
@@ -1018,7 +1018,8 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               hm1 = abs(dom[ii] - dom[ii-1])
               
               if (order == 10 and ii in [2,N-3]) or \
-                 (order == 6 and ii in range(2,N-2)):
+                 (order == 6 and ii in range(2,N-2)) or \
+                 (order == 8 and ii in range(3,N-3)):
                      hp2 = abs(dom[ii+2] - dom[ii+1])
                      hm2 = abs(dom[ii-1] - dom[ii-2])
               else:

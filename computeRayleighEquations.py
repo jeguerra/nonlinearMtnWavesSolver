@@ -49,21 +49,19 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      ZRL = Z[ii,jj]
                      if applyLateral:
                             # Left layer or right layer or not? [1 0]
-                            if XRL >= dLayerR:
+                            if XRL > dLayerR:
                                    dNormX = X1 * (L2 - XRL) / width - 0.5
                                    
                                    if dNormX > 0.0:
                                           RFX = 1.0 / (1.0 + (mt.tan(W1 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
-                                          #RFX = 1.0 - 16.0 * dNormX**4
                                           RFX = 1.0
-                            elif XRL <= dLayerL:
+                            elif XRL < dLayerL:
                                    dNormX = X1 * (XRL - L1) / width - 0.5
                                    
                                    if dNormX > 0.0:
                                           RFX = 1.0 / (1.0 + (mt.tan(W1 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
-                                          #RFX = 1.0 - (2.0 * dNormX)**8
                                           RFX = 1.0
                             else:
                                    dNormX = 1.0
@@ -72,16 +70,14 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             RFX = 0.0
                      if applyTop:
                             # In the top layer?
-                            if ZRL >= dLayerZ[jj]:
+                            if ZRL > dLayerZ[jj]:
                                    # This maps [depth ZH] to [1 0]
                                    dNormZ = X1 * (ZH - ZRL) / depth[jj] - 0.5
                                    
                                    if dNormZ > 0.0:
                                           RFZ = 1.0 / (1.0 + (mt.tan(W1 * mt.pi * dNormZ))**RP)
                                    elif dNormZ <= 0.0:
-                                          #RFZ = 2.0 - (1.0 - mt.exp(C2 * (2.0 * (dNormZ + 0.5) - 1.0)**2) / (1.0 - mt.exp(C2)))
-                                          RFZ = 1.0
-                                          
+                                          RFZ = 1.0                
                             else:
                                    dNormZ = 1.0
                                    RFZ = 0.0

@@ -77,7 +77,7 @@ class TestCase:
               
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': False, \
+                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': True, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
@@ -123,7 +123,7 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -0.75 * L2
+              L1 = -1.0 * L2
               ZH = 1.0E+3 * ZF # In km
               AD = ZH * (L2 - L1) # domain total area
               OPS = (NX + 1) * (NZ + 1)

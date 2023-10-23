@@ -16,7 +16,7 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-fname = 'Simulation2View1.nc'
+fname = 'Simulation2View.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -35,7 +35,7 @@ lnt = m_fid.variables['ln_t'][:,:,:,0]
 dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
 
 # Compute the total and perturbation potential temperature
-TH = np.exp(LNT + lnt)
+TH = np.exp(lnt)
 th = TH - np.exp(LNT)
 
 # Get the upper and lower bounds for TH

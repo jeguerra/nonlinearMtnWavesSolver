@@ -201,11 +201,11 @@ DDZ_CFD2 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 6)
 DDZ_CFD3 = derv.computeCompactFiniteDiffDerivativeMatrix1(zv, 10)
 
 # Take boundary information from compact FD operators
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, False, True, DDZ_CFD1)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD2)
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_CFD3)
+DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD3)
 
 # SUPER-RESOLUTION SPECTRAL DERIVATIVE
-DDZ_AV = 0.5 * (DDZ_QS + DDZ_CFD2) 
+DDZ_AV = 0.5 * (DDZ_CS + DDZ_CFD1) 
 
 # Compute eigenspectra
 W1 = scl.eigvals(DDZ_CFD1)

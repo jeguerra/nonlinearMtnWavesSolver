@@ -681,34 +681,33 @@ def runModel(TestName):
        del(DIM0)
        
        #%% DIFFERENTIATION OPERATORS
-       DDX_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-       DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
-       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD4)
-       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD4)
-       DDX = 0.5 * (DDX_CFD4 + DDX_CS)
-       DDZ = 0.5 * (DDZ_CFD4 + DDZ_CS)
-       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX, DDZ)
-       
-       DDX_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD6)
-       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD6)
-       #DDX = 0.5 * (DDX_CFD6 + DDX_QS)
-       #DDZ = 0.5 * (DDZ_CFD6 + DDZ_QS)
-       DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
+       
+       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
+       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
+       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
+       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
+       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
+       
+       #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 10)
+       #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 10)
+       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_1D)
+       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_1D)
+       DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
               
        #%% Set up the derivative operators
+       DDXM_OP = DDXMS_QS
        DDZM_OP = DDZMS1
-       #DDZM_OP = DDZMS_QS
+       '''
+       DDZM_OP = DDZMS1
               
        if HermFunc:
               DDXM_OP = DDXMS1
        else:
-              DDXM_OP = DDXMS_QS# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
-       
+              DDXM_OP = DDXMS_QS
+       '''
        #%% Prepare derivative operators for diffusion
        PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
        diffOps1 = (PPXMD, DDZMS_CS)

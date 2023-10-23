@@ -47,30 +47,29 @@ def computeResidualViscCoeffs(PHYS, RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
        # Compute absolute value of residuals
        LVAR = RES.shape[0]
        
+       # DynSGS bounds by advective speed
+       ubnd = 0.5 * DLD[0] * BND[0]
+       wbnd = 0.5 * DLD[1] * BND[1]
+       
        set_num_threads(8)
        if byLocalFilter:
            CRES = computeRegionFilter(CRES, RES, DLD, LVAR)
            #'''
-           #bval = mt.sqrt(NOR[0]**2 + NOR[1]**2)
-           qb = 0.5 * DLD[0] * BND[0]
-           CRES[:,0,0] = np.where(CRES[:,0,0] > qb, qb, CRES[:,0,0])
-           qb = 0.5 * DLD[1] * BND[1]
-           CRES[:,1,0] = np.where(CRES[:,1,0] > qb, qb, CRES[:,1,0])
+           CRES[:,0,0] = np.where(CRES[:,0,0] > ubnd, ubnd, CRES[:,0,0])
+           CRES[:,1,0] = np.where(CRES[:,1,0] > wbnd, wbnd, CRES[:,1,0])
            #'''
        else:
            Q_RES = bn.nanmax(RES, axis=1) 
            
            qr = DLD[2] * Q_RES
-           qb = 0.5 * DLD[0] * BND[:,0]
-           CRES[:,0,0] = np.where(qr > qb, qb, qr)
+           CRES[:,0,0] = np.where(qr > ubnd, ubnd, qr)
            qr = DLD[3] * Q_RES
-           qb = 0.5 * DLD[1] * BND[:,1]
-           CRES[:,1,0] = np.where(qr > qb, qb, qr)
+           CRES[:,1,0] = np.where(qr > wbnd, wbnd, qr)
            
            CRES = computeRegionFilterOne(CRES, DLD, LVAR)
 
        # Augment damping to the sponge layers
-       CRES[ldex,0,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
-       CRES[ldex,1,0] += 0.5 * DLD[4] * SMAX * RLM[0,ldex]
+       CRES[ldex,0,0] += ubnd * RLM[0,ldex]
+       CRES[ldex,1,0] += wbnd * RLM[0,ldex]
               
        return CRES
