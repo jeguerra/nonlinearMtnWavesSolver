@@ -36,7 +36,7 @@ def computeShearProfileOnGrid(REFS, JETOPS, P0, PZ, dlnPZdz, uniformWind, linear
               
               # Compute the decay portion of the jet profile
               jetDecay = np.exp(-(1.0 / b**2.0 * lpcoord2), dtype=np.longdouble)
-              UZ = U0 - uj * (lpcoord * jetDecay)
+              UZ = -uj * (lpcoord * jetDecay)
            
               # Compute the shear
               temp = jetDecay * (1.0 - 2.0 / b**2 * lpcoord2)

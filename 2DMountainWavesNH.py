@@ -691,10 +691,10 @@ def runModel(TestName):
        DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        
-       #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 10)
-       #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 10)
-       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_1D)
-       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_1D)
+       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 10)
+       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 10)
+       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
+       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
               
        #%% Set up the derivative operators
@@ -1148,8 +1148,6 @@ def runModel(TestName):
               else:
                      # Initialize fields
                      if withHydroState:
-                            hydroState[ubdex,0] = 0.0
-                            hydroState[ubdex,1] = 0.0
                             fields[:,0] = hydroState[:,0]
                             fields[:,3] = hydroState[:,3]
                             fields[ubdex,0] = 0.0
@@ -1165,31 +1163,31 @@ def runModel(TestName):
                      resVec = np.zeros(fields.shape)
                      thisTime = IT
               
-              # Compute sound speed
+              # Compute sound speed and initial time step
+              isInitialStep = True
               RdT, T_ratio = eqs.computeRdT(fields[:,2], fields[:,3] - hydroState[:,3], 
                                             REFS[9][0], PHYS[4])
-              
-              TOPT[0], VWAV_fld, VWAV_max = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, TOPT[0])
+              TOPT[0], VWAV_fld, VWAV_max = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=isInitialStep)
               VWAV_ref = bn.nanmax(VWAV_max - VWAV_fld)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
               # Normalization for vertical velocity
               rw = np.abs(dWBC)
               rw = rw[rw > 0.0]
-              wref = 0.5 * bn.nanmax(rw)
               
               sol_norm = bn.nanmax(np.abs(hydroState), axis=0)
-              sol_norm[1] = wref
+              sol_norm[1] = bn.nanmax(rw)
+              sol_norm *= 0.5
               print('Initial Solution Norms:')
               print(sol_norm)
                      
               # compute function average of initial fields
               sol_avrg = DLD[-3] @ hydroState
               # compute state relative to average
-              res_norm = sol_norm - sol_avrg
-              res_norm[1] = wref
-              res_norm[2] = 1.0
-              res_norm[3] = 1.0
+              res_norm = DLD[-3] @ np.abs(hydroState - sol_avrg)
+              res_norm[1] = bn.nanmean(rw)
+              #res_norm[2] = 1.0
+              #res_norm[3] = 1.0
               print('Residual Norms:')
               print(res_norm)
               res_norm = 1.0 / res_norm
@@ -1199,20 +1197,24 @@ def runModel(TestName):
        
               # Initialize parameters
               ti = 0; ff = 0
-              print('Time stepper order: ', str(TOPT[3]))
-              print('Time step factor: ', str(DTF))
+              print('Time stepper order: ', TOPT[3])
               print('Initial time step:', str(TOPT[0]))
               
               interTime1 = 0.0
               interTime2 = 0.0
               while thisTime <= TOPT[4]:
-                     
                             
                      # Compute the solution within a time step
                      try:   
                             fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields, hydroState, rhsVec, dfields, \
-                                                                    CRES, ebcDex, RSBops, VWAV_ref, sol_norm, res_norm)
+                                                                    CRES, ebcDex, RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep)
+                            isInitialStep = False
+                            
+                            # Update normalizations for vertical velocity
+                            #wa = np.abs(fields[:,1])
+                            #sol_norm[1] = bn.nanmax(wa)
+                            #res_norm[1] = bn.nanmean(wa)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
@@ -1225,6 +1227,9 @@ def runModel(TestName):
                             
                      # Print out diagnostics every TOPT[5] seconds
                      if interTime1 >= TOPT[5] or ti == 0:
+                            
+                            print('Solution norms: ', sol_norm)
+                            print('Residual norms: ', res_norm)
                             
                             message = ''
                             displayResiduals(message, np.reshape(resVec, (OPS*numVar,), order='F'), \

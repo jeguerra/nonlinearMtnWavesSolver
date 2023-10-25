@@ -43,15 +43,15 @@ def plotRHS(x, rhs, ebcDex, label):
        
 def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                              sol0, init0, rhs0, dsol0, CRES, ebcDex, \
-                             RSBops, VWAV_ref, sol_norm, res_norm):
+                             RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep):
        
        OPS = DIMS[-2]
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
        DQDZ = REFG[2]
-       RLMX = REFG[4][1].data
-       RLMZ = REFG[4][2].data
+       #RLMX = REFG[4][1].data
+       #RLMZ = REFG[4][2].data
        RLM = REFG[4][0].data
        
        S = DLD[5]
@@ -67,10 +67,12 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        res = 0.0
        DynSGS_Update = True
        Residual_Update = True
+       Timestep_Update = True
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              nonlocal DynSGS_Update, Residual_Update,rhs,res,CRES,DT
+              nonlocal DynSGS_Update,Residual_Update,Timestep_Update,\
+                       rhs,res,CRES,DT
               
               # Compute total state
               stateA = np.copy(solA)
@@ -93,24 +95,27 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               PqPxA = DqDxA - REFS[15] * DqDzA
                                    
               # Compute local RHS
-              rhsDyn, PqPzA = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, RdT, T_ratio, solA, stateA)
+              rhsDyn, PqPzA = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, 
+                                                                              RdT, T_ratio, solA, stateA)
 
               # Store the dynamic RHS
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
-                     res = dsol0 / DT - 0.5 * (rhs0 + rhs)
+                     res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
                      res *= res_norm
                      Residual_Update = False
+                     
+              if Timestep_Update:
+                     DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, solA,
+                                                                          DLD, isInitial=isInitialStep)
+                     Timestep_Update = False
               
               #%% Compute the DynSGS coefficients at the top update
               if DynSGS_Update:
-                     
-                     DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, sol0, DLD, DT)
-                     
                      # Define residual as the timestep change in the RHS
-                     CRES = rescf.computeResidualViscCoeffs(DIMS, np.abs(res), sol_norm, DLD, \
+                     CRES = rescf.computeResidualViscCoeffs(DIMS, np.abs(res), sol_norm, DLD,
                                                             bdex, REFG[5], RLM, VWAV_ref, CRES)
        
                      DynSGS_Update = False
@@ -134,9 +139,9 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      
               # Column 1
               P2qPx2 = DDq[:OPS,:4]
-              P2qPzx = DDq[OPS:,:4]
+              P2qPxz = DDq[OPS:,:4]
               # Column 2
-              P2qPxz = DDq[:OPS,4:]
+              P2qPzx = DDq[:OPS,4:]
               P2qPz2 = DDq[OPS:,4:]
               
               # Second directional derivatives (of the diffusive fluxes)

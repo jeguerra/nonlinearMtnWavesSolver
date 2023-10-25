@@ -1017,21 +1017,21 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               hp1 = abs(dom[ii+1] - dom[ii])
               hm1 = abs(dom[ii] - dom[ii-1])
               
-              if (order == 10 and ii in [2,N-3]) or \
-                 (order == 6 and ii in range(2,N-2)) or \
-                 (order == 8 and ii in range(3,N-3)):
-                     hp2 = abs(dom[ii+2] - dom[ii+1])
-                     hm2 = abs(dom[ii-1] - dom[ii-2])
-              else:
-                     hp2 = 0.0; hm2 = 0.0
-              
-              if (order == 10 and ii in range(3,N-3)):
+              if ii in range(3,N-3):
                      hp2 = abs(dom[ii+2] - dom[ii+1])
                      hm2 = abs(dom[ii-1] - dom[ii-2])
                      hp3 = abs(dom[ii+3] - dom[ii+2])
                      hm3 = abs(dom[ii-3] - dom[ii-2])
+              elif ii in range(2,N-2):
+                     hp2 = abs(dom[ii+2] - dom[ii+1])
+                     hm2 = abs(dom[ii-1] - dom[ii-2])
+                     hp3 = 0.0
+                     hm3 = 0.0
               else:
-                     hp3 = 0.0; hm3 = 0.0
+                     hp2 = 0.0
+                     hm2 = 0.0
+                     hp3 = 0.0
+                     hm3 = 0.0
               
               ND = 10
               CM10 = interiorMatrix10(hm3, hm2, hm1, hp1, hp2, hp3, ND)
@@ -1079,12 +1079,12 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                             hp2 = dom[3] - dom[2]
                             hp3 = dom[4] - dom[3]
                             hp4 = dom[5] - dom[4]
-                            hp5 = dom[6] - dom[5]
-                            hp6 = dom[7] - dom[6]
+                            #hp5 = dom[6] - dom[5]
+                            #hp6 = dom[7] - dom[6]
                             
-                            CME = p2Matrix8(hm1, hp1, hp2, hp3, hp4, hp5, hp6)
+                            CME = p2Matrix6(hm1, hp1, hp2, hp3, hp4)#, hp5, hp6)
                                             
-                            CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                            CME_V = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])#, 0.0, 0.0])
                             
                             Q, R = scl.qr(CME)
                             PLU = scl.lu_factor(R)
@@ -1099,8 +1099,8 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                                    RDM[ii,ii+2] = CF[2]
                                    RDM[ii,ii+3] = CF[3]
                                    RDM[ii,ii+4] = CF[4]
-                                   RDM[ii,ii+5] = CF[5]
-                                   RDM[ii,ii+6] = CF[6]
+                                   #RDM[ii,ii+5] = CF[5]
+                                   #RDM[ii,ii+6] = CF[6]
                             elif ii == N-3 or ii == N-2:
                                    RDM[ii,ii+1] = -CF[1]
                                    RDM[ii,ii] = -CFE
@@ -1108,8 +1108,8 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                                    RDM[ii,ii-2] = -CF[2]
                                    RDM[ii,ii-3] = -CF[3]
                                    RDM[ii,ii-4] = -CF[4]
-                                   RDM[ii,ii-5] = -CF[5]
-                                   RDM[ii,ii-6] = -CF[6]
+                                   #RDM[ii,ii-5] = -CF[5]
+                                   #RDM[ii,ii-6] = -CF[6]
                             
                             # Write the left equation
                             LDM[ii,ii-1] = CF[-1]
@@ -1229,15 +1229,15 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                              beta = 2.0 / 5.0
                              
                              # Delete columns
-                             ddex = [5, 9]
+                             ddex = [8, 9]
                              CM8 = np.delete(CM10, ddex, axis=1) 
                              
                              # Delete rows to 8th order
-                             ddex = [7, 9]
+                             ddex = [8, 9]
                              CM8 = np.delete(CM8, ddex, axis=0)
                              CM8_V = np.delete(CMV, ddex, axis=0)
                              
-                             # Constraint alpha = beta
+                             # Constraint alpha = beta = 2/5
                              CM8[:,-2] += CM8[:,-1]
                              CM8_V -= alpha * CM8[:,-2]
                              CMS = CM8[0:-2,0:-2]
@@ -1245,7 +1245,7 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
                              Q, R = scl.qr(CMS)
                              PLU = scl.lu_factor(R)
                              CF = scl.lu_solve(PLU, (Q.T).dot(CM8_V[0:-2]))
-                             CFE = -np.sum(CF[0:4])
+                             CFE = -np.sum(CF[0:6])
                              
                              # Write the right equation
                              RDM[ii,ii-3] = CF[5]

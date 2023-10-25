@@ -77,7 +77,7 @@ class TestCase:
               
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': True, \
+                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': False, \
                                 'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
@@ -123,7 +123,7 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -1.0 * L2
+              L1 = -0.75 * L2
               ZH = 1.0E+3 * ZF # In km
               AD = ZH * (L2 - L1) # domain total area
               OPS = (NX + 1) * (NZ + 1)
@@ -141,7 +141,7 @@ class TestCase:
               self.T_in = (T0, TTP, TTP, TH)
               
               # Background wind profile (10 m/s max jet)
-              self.JETOPS = (10.0, 16.822, 1.386, 15.0)
+              self.JETOPS = (10.0, 3 * 16.822, 1.386, 15.0)
               
               # Set the Rayleigh options
               applyTop = True

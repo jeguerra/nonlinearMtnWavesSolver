@@ -27,7 +27,7 @@ def enforceBC_RHS(rhs, ebcDex):
        
        return rhs
 
-def computeNewTimeStep(PHYS, RdT, fields, DLD, DT0):
+def computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=False):
        
        # Compute new time step based on median local sound speed
        VWAV_fld = np.sqrt(PHYS[6] * RdT)
@@ -36,11 +36,12 @@ def computeNewTimeStep(PHYS, RdT, fields, DLD, DT0):
        #VWAV_max = np.nanquantile(VWAV_fld + VFLW_adv, 0.95)
                             
        # Perform some checks before setting the new DT
-       if not np.isnan(VWAV_max) and VWAV_max > 0.0:
+       if np.isfinite(VWAV_max) and VWAV_max > 0.0:
               DT = DLD[4] / VWAV_max
-       else:
-              # Bisect time step to be safe...
-              DT *= 0.5
+      
+       if isInitial:
+              # Bisect time step on initialization
+              DT *= 0.1
               
        return DT, VWAV_fld, VWAV_max
 
@@ -360,8 +361,8 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD):
        
        #%% INTERIOR DIFFUSION
        # Diffusion of u-w vector
-       DqDt[:,0] = 0.5 * ((2.0 * P2qPx2[:,0]) + (P2qPzx[:,1] + P2qPz2[:,0]))
-       DqDt[:,1] = 0.5 * ((P2qPx2[:,1] + P2qPxz[:,0]) + (2.0 * P2qPz2[:,1]))
+       DqDt[:,0] = 0.5 * ((2.0 * P2qPx2[:,0]) + (P2qPxz[:,1] + P2qPz2[:,0]))
+       DqDt[:,1] = 0.5 * ((P2qPx2[:,1] + P2qPzx[:,0]) + (2.0 * P2qPz2[:,1]))
        # Diffusion of scalars (broken up into anisotropic components
        DqDt[:,2] = P2qPx2[:,2] + P2qPz2[:,2]
        DqDt[:,3] = P2qPx2[:,3] + P2qPz2[:,3]
