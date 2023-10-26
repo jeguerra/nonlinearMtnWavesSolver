@@ -685,14 +685,14 @@ def runModel(TestName):
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        
-       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
+       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        
-       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 10)
-       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 10)
+       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
+       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
        DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
        DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
@@ -1063,8 +1063,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 1.0 * DX_max
-              DL2 = 1.0 * DZ_max
+              DL1 = 2.0 * DX_max # 2X for uniform grid
+              DL2 = 1.0 * DZ_max # Maximum length for variable grid
               
               import matplotlib.path as pth
               dx = 1.0 * mt.pi * DL1
@@ -1209,7 +1209,9 @@ def runModel(TestName):
                             fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields, hydroState, rhsVec, dfields, \
                                                                     CRES, ebcDex, RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep)
-                            isInitialStep = False
+                            
+                            if isInitialStep:
+                                   isInitialStep = False
                             
                             # Update normalizations for vertical velocity
                             #wa = np.abs(fields[:,1])
