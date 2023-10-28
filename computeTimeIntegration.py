@@ -61,7 +61,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
-       DD2 = REFS[13] # First derivatives for diffusion gradient
+       DD2 = REFS[14] # First derivatives for diffusion gradient
        
        rhs = 0.0
        res = 0.0
@@ -103,7 +103,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
-                     res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
+                     #res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
+                     res = rhs - 0.5 * (rhs0 + rhs)
                      res *= res_norm
                      Residual_Update = False
                      
