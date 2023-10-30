@@ -41,7 +41,8 @@ th = TH - np.exp(LNT)
 # Get the upper and lower bounds for TH
 clim1 = th.min()
 clim2 = th.max()
-clim = max(abs(clim1),abs(clim2))
+clim = 0.5 * max(abs(clim1),abs(clim2))
+print('Plot bounds: ', clim)
 
 imgname = 'toanimate.png'
 THname = 'TotalPT.gif'
@@ -52,9 +53,6 @@ runPertb = True
 runSGS = False
 
 runPar = False
-runSer = True
-
-fig = plt.figure(figsize=(16.0, 8.0))
 
 def plotPertb(tt):
        
@@ -67,9 +65,9 @@ def plotPertb(tt):
        th2plot = U[:,0:mr].dot(S)
        th2plot = th2plot.dot(Vh[0:mr,:])
        '''
-       fig.gca().clear()
+       thisFigure = plt.figure(figsize=(16.0, 8.0))
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 201, cmap='RdGy')#, vmin=-clim, vmax=+clim)
+       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 101, cmap='nipy_spectral', vmin=-clim, vmax=+clim)
        
        #norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
        #plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e', cax=plt.gca())
@@ -78,13 +76,14 @@ def plotPertb(tt):
        
        plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-       plt.xlim(-50.0, 50.0)
-       plt.ylim(0.0, 25.0)
+       plt.xlim(-40.0, 80.0)
+       plt.ylim(0.0, 15.0)
        plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        plt.tight_layout()
        # Save out the image
        plt.savefig(imgname)
+       plt.close(fig=thisFigure)
        
        # Get the current image
        image = imageio.imread(imgname)
@@ -95,22 +94,18 @@ def plotPertb(tt):
        return image
 
 #%% Contour animation of perturbation potential temperatures
-if runPertb:
-       # Serial processing
-       if runSer:
-              print('Run serial processing...')
-              imglist = []
-              for tt in range(len(times)):
-                     image = plotPertb(tt)
-                     imglist.append(image)
-              
+if runPertb:    
               
        # Parallel processing
        if runPar:
               print('Attempt parallel processing...')
-              imglist = Parallel(n_jobs=4)(delayed(plotPertb)(tt) for tt in range(len(times)))
+              imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
+       else:
+              print('Run serial processing...')
+              imglist = [plotPertb(tt) for tt in range(len(times))]
+              #imglist = [plotPertb(tt) for tt in range(180)]
        
-       imageio.mimsave(thname, imglist, duration=33)
+       imageio.mimsave(thname, imglist, fps=20)
        
 #%% Contour animation of the normalized SGS
 if runSGS:
@@ -170,4 +165,4 @@ if runSGS:
               plt.close('all')
               del(fig)
        
-       imageio.mimsave(sgsname, imglist, fps=10)
+       imageio.mimsave(sgsname, imglist, fps=20)

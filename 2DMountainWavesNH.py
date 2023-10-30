@@ -689,39 +689,36 @@ def runModel(TestName):
        DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
-       DDXMS_CS, DDZMS_CS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
+       DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        
        DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
        DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
        DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
        DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
-       DDXMS_QS, DDZMS_QS = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
-              
-       #%% Set up the derivative operators
-       DDXM_OP = DDXMS_QS
-       DDZM_OP = DDZMS1
-       '''
-       DDZM_OP = DDZMS1
-              
-       if HermFunc:
-              DDXM_OP = DDXMS1
-       else:
-              DDXM_OP = DDXMS_QS
-       '''
-       #%% Prepare derivative operators for diffusion
-       PPXMD = DDXMS_CS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_CS)
-       diffOps1 = (PPXMD, DDZMS_CS)
-       PPXMD = DDXMS_QS - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_QS)
-       diffOps2 = (PPXMD, DDZMS_QS)
+       DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
-       REFS.append((DDXMS1, DDZMS1)) # index 10
+       #%% Prepare derivative operators for diffusion
+       PPXMD = DDXMS_LO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_LO)
+       diffOps1 = (PPXMD, DDZMS_LO)
+       PPXMD = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
+       diffOps2 = (PPXMD, DDZMS_HO)
+              
+       #%% Prepare derivative operators for advection              
+       if HermFunc:
+              PPXMD = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+       else:
+              PPXMD = DDXMS_LO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+              
+       advtOps = (PPXMD,DDZMS1)
+       
+       REFS.append((DDXMS1,DDZMS1)) # index 10
        REFS.append((sps.csr_matrix(diffOps1[0]), sps.csr_matrix(diffOps1[1]))) # index 11
        
        #%% Store operators for use
        if NonLinSolve:
               # Multithreaded enabled for transient solution
               if RSBops:
-                     DDOP = sps.vstack((DDXM_OP,DDZM_OP), format='csr')
+                     DDOP = sps.vstack(advtOps, format='csr')
                      DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
                      DDOP.autotune(nrhs=numVar)
                      REFS.append(DDOP) # index 12
@@ -737,7 +734,7 @@ def runModel(TestName):
                      REFS.append(DDOP) # index 14
               else:
                      import torch
-                     DDOP = sps.vstack((DDXM_OP,DDZM_OP), format='coo') 
+                     DDOP = sps.vstack(advtOps, format='coo') 
                      ind = np.vstack((DDOP.row, DDOP.col))
                      val = DDOP.data
                      DDOP = torch.sparse_coo_tensor(ind, val)
@@ -767,7 +764,7 @@ def runModel(TestName):
                      del(ind)
        else:
               # Native sparse
-              DDOP = sps.vstack((DDXM_OP,DDZM_OP))
+              DDOP = sps.vstack(advtOps)
               REFS.append(DDOP) # index 12
               DDOP = sps.vstack(diffOps1)
               REFS.append(DDOP) # index 13
@@ -780,17 +777,13 @@ def runModel(TestName):
        # Update REFG the terrain BC derivative
        REFG.append(DDX_CS)
        REFG.append(RLOPT[-1])
-       
-       print('Check number of non-zeros in derivative operator matrices: ')
-       print(DDXM_OP.nnz, DDZM_OP.nnz)
               
        # Get memory back
        del(DDOP)
        del(diffOps1); del(diffOps2)
        del(DDXMS1); del(DDZMS1)
-       del(DDXM_OP); del(DDZM_OP)
-       del(DDXMS_CS); del(DDZMS_CS)
-       del(DDXMS_QS); del(DDZMS_QS)
+       del(DDXMS_LO); del(DDZMS_LO)
+       del(DDXMS_HO); del(DDZMS_HO)
        del(dummy)
        
        #%% SOLUTION INITIALIZATION
@@ -1063,12 +1056,12 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 2.0 * DX_max # 2X for uniform grid
-              DL2 = 1.0 * DZ_max # Maximum length for variable grid
+              DL1 = 2.0 * DX_avg # 2X for uniform grid
+              DL2 = 2.0 * DZ_avg # Maximum length for variable grid
               
               import matplotlib.path as pth
-              dx = 1.0 * mt.pi * DL1
-              dz = 1.0 * mt.pi * DL2
+              dx = 0.5 * mt.pi * DL1
+              dz = 0.5 * mt.pi * DL2
               fltDex = []
               fltDms = []
               regLen = 0
@@ -1186,8 +1179,6 @@ def runModel(TestName):
               # compute state relative to average
               res_norm = DLD[-3] @ np.abs(hydroState - sol_avrg)
               res_norm[1] = bn.nanmean(rw)
-              #res_norm[2] = 1.0
-              #res_norm[3] = 1.0
               print('Residual Norms:')
               print(res_norm)
               res_norm = 1.0 / res_norm
@@ -1230,8 +1221,8 @@ def runModel(TestName):
                      # Print out diagnostics every TOPT[5] seconds
                      if interTime1 >= TOPT[5] or ti == 0:
                             
-                            print('Solution norms: ', sol_norm)
-                            print('Residual norms: ', res_norm)
+                            #print('Solution norms: ', sol_norm)
+                            #print('Residual norms: ', res_norm)
                             
                             message = ''
                             displayResiduals(message, np.reshape(resVec, (OPS*numVar,), order='F'), \

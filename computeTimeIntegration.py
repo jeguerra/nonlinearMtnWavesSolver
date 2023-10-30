@@ -88,11 +88,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               else:
                      Dq = torch.matmul(DD1, torch.from_numpy(solA)).numpy()
                      
-              DqDxA = Dq[:DIMS[5],:]
+              PqPxA = Dq[:DIMS[5],:]
               DqDzA = Dq[DIMS[5]:,:]
               
               # Complete advective partial derivatives
-              PqPxA = DqDxA - REFS[15] * DqDzA
+              #PqPxA = DqDxA - REFS[15] * DqDzA
                                    
               # Compute local RHS
               rhsDyn, PqPzA = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, 
@@ -122,10 +122,13 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DynSGS_Update = False
               
               #%% Compute diffusive update
-              PqPzA -= DQDZ
 
               # Compute directional derivative along terrain
-              PqPxA[bdex,:] = S * DqDxA[bdex,:]
+              #PqPxA[bdex,:] = S * (REFG[-2] @ solA[bdex,:]) #DqDxA[bdex,:]
+              PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * PqPzA[bdex,:])
+              
+              # Subtract hydrostatic background for diffusion
+              PqPzA -= DQDZ
               
               # Compute diffusive fluxes
               PqPxA *= CRES[:,0,:]
