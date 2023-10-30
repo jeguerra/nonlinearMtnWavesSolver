@@ -6,7 +6,7 @@ Created on Wed Mar 31 08:25:38 2021
 @author: jeg
 """
 import os
-import imageio.v2 as imageio
+import imageio.v3 as iio
 import numpy as np
 import scipy.linalg as scl
 import matplotlib as mpl
@@ -16,7 +16,7 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-fname = 'Simulation2View.nc'
+fname = 'Simulation2View1.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -44,7 +44,7 @@ clim2 = th.max()
 clim = 0.5 * max(abs(clim1),abs(clim2))
 print('Plot bounds: ', clim)
 
-imgname = 'toanimate.png'
+imgname = 'toanimate.jpg'
 THname = 'TotalPT.gif'
 thname = 'PerturbationPT.gif'
 sgsname = 'SGS-PT.gif'
@@ -86,7 +86,7 @@ def plotPertb(tt):
        plt.close(fig=thisFigure)
        
        # Get the current image
-       image = imageio.imread(imgname)
+       image = iio.imread(imgname)
                      
        # Delete stuff
        print('Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
@@ -102,10 +102,8 @@ if runPertb:
               imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
        else:
               print('Run serial processing...')
-              imglist = [plotPertb(tt) for tt in range(len(times))]
-              #imglist = [plotPertb(tt) for tt in range(180)]
-       
-       imageio.mimsave(thname, imglist, fps=20)
+              #imglist = [plotPertb(tt) for tt in range(len(times))]
+              imglist = np.stack([plotPertb(tt) for tt in range(180)], axis=0)
        
 #%% Contour animation of the normalized SGS
 if runSGS:
@@ -157,7 +155,7 @@ if runSGS:
               plt.savefig(imgname)
               
               # Get the current image and add to gif list
-              image = imageio.imread(imgname)
+              image = iio.imread(imgname)
               imglist.append(image)
                             
               # Delete stuff
@@ -165,4 +163,5 @@ if runSGS:
               plt.close('all')
               del(fig)
        
-       imageio.mimsave(sgsname, imglist, fps=20)
+
+iio.imwrite(thname, imglist, duration=100)
