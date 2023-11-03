@@ -31,11 +31,19 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        X = REFS[4]
        Z = REFS[5]
        
+       rd = (ZH - height[0])
+       pert_width = 0.1 * width
+       pert_depth = 0.1 * rd
+       
        # Set the layer bounds
-       dLayerZ = height
-       dLayerR = L2 - width
+       width += pert_width * np.sin(6.0 * mt.pi / width * Z[:,-1])
+       dLayerR = (L2 - width) 
+       
+       width += pert_width * np.sin(6.0 * mt.pi / width * Z[:,0])
        dLayerL = L1 + width
-       depth = ZH - height
+       
+       dLayerZ = height + pert_depth * np.sin(0.5 * mt.pi / rd * X[-1,:])
+       depth = ZH - dLayerZ       
        
        # Assemble the Rayleigh field
        RL = np.zeros((NZ, NX))
@@ -49,15 +57,15 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      ZRL = Z[ii,jj]
                      if applyLateral:
                             # Left layer or right layer or not? [1 0]
-                            if XRL > dLayerR:
-                                   dNormX = X1 * (L2 - XRL) / width - 0.5
+                            if XRL > dLayerR[ii]:
+                                   dNormX = X1 * (L2 - XRL) / width[ii] - 0.5
                                    
                                    if dNormX > 0.0:
                                           RFX = 1.0 / (1.0 + (mt.tan(W1 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
                                           RFX = 1.0
-                            elif XRL < dLayerL:
-                                   dNormX = X1 * (XRL - L1) / width - 0.5
+                            elif XRL < dLayerL[ii]:
+                                   dNormX = X1 * (XRL - L1) / width[ii] - 0.5
                                    
                                    if dNormX > 0.0:
                                           RFX = 1.0 / (1.0 + (mt.tan(W1 * mt.pi * dNormX))**RP)
@@ -108,6 +116,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        GML = np.ones((NZ, NX))
        GMLX = np.ones((NZ, NX))
        GMLZ = np.ones((NZ, NX))
+       '''
        C1 = 0.02
        C2 = 10.0
        isStretchGML = True # True: trig GML to RHS, False, direct GML to state
@@ -164,6 +173,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                             GMLZ[ii,jj] = RFZ
                             # Set the field to max(lateral, top) to handle corners
                             GML[ii,jj] = np.amin([RFX, RFZ])
+       '''
        '''
        plt.figure()
        plt.contourf(X, Z, GMLX, 101, cmap=cm.seismic)

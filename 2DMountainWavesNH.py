@@ -712,7 +712,7 @@ def runModel(TestName):
        advtOps = (PPXMD,DDZMS1)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
-       REFS.append((sps.csr_matrix(diffOps1[0]), sps.csr_matrix(diffOps1[1]))) # index 11
+       REFS.append((sps.csr_array(diffOps1[0]), sps.csr_array(diffOps1[1]))) # index 11
        
        #%% Store operators for use
        if NonLinSolve:

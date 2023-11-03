@@ -6,7 +6,7 @@ Created on Wed Mar 31 08:25:38 2021
 @author: jeg
 """
 import os
-import imageio.v3 as iio
+from PIL import Image
 import numpy as np
 import scipy.linalg as scl
 import matplotlib as mpl
@@ -16,20 +16,27 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-fname = 'Simulation2View1.nc'
+runPertb = True
+runSGS = False
+runPar = False
+imgname = 'toanimate.jpg'
+THname = 'TotalPT.gif'
+thname = 'PerturbationPT02.gif'
+sgsname = 'SGS-PT.gif'
+fname = 'Simulation2View.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
 X = m_fid.variables['Xlon'][:,:,0]
 Z = m_fid.variables['Zhgt'][:,:,0]
 
-U = m_fid.variables['U'][:,:,0]
-LNP = m_fid.variables['LNP'][:,:,0]
+#U = m_fid.variables['U'][:,:,0]
+#LNP = m_fid.variables['LNP'][:,:,0]
 LNT = m_fid.variables['LNT'][:,:,0]
 
-u = m_fid.variables['u'][:,:,:,0]
-w = m_fid.variables['w'][:,:,:,0]
-lnp = m_fid.variables['ln_p'][:,:,:,0]
+#u = m_fid.variables['u'][:,:,:,0]
+#w = m_fid.variables['w'][:,:,:,0]
+#lnp = m_fid.variables['ln_p'][:,:,:,0]
 lnt = m_fid.variables['ln_t'][:,:,:,0]
 
 dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
@@ -43,16 +50,6 @@ clim1 = th.min()
 clim2 = th.max()
 clim = 0.5 * max(abs(clim1),abs(clim2))
 print('Plot bounds: ', clim)
-
-imgname = 'toanimate.jpg'
-THname = 'TotalPT.gif'
-thname = 'PerturbationPT.gif'
-sgsname = 'SGS-PT.gif'
-
-runPertb = True
-runSGS = False
-
-runPar = False
 
 def plotPertb(tt):
        
@@ -81,12 +78,13 @@ def plotPertb(tt):
        plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        plt.tight_layout()
+       
        # Save out the image
-       plt.savefig(imgname)
+       thisFigure.savefig(imgname)
        plt.close(fig=thisFigure)
        
        # Get the current image
-       image = iio.imread(imgname)
+       image = Image.open(imgname)
                      
        # Delete stuff
        print('Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
@@ -103,7 +101,7 @@ if runPertb:
        else:
               print('Run serial processing...')
               #imglist = [plotPertb(tt) for tt in range(len(times))]
-              imglist = np.stack([plotPertb(tt) for tt in range(180)], axis=0)
+              imglist = [plotPertb(tt) for tt in range(180)]
        
 #%% Contour animation of the normalized SGS
 if runSGS:
@@ -155,7 +153,7 @@ if runSGS:
               plt.savefig(imgname)
               
               # Get the current image and add to gif list
-              image = iio.imread(imgname)
+              image = Image.open(imgname)
               imglist.append(image)
                             
               # Delete stuff
@@ -164,4 +162,4 @@ if runSGS:
               del(fig)
        
 
-iio.imwrite(thname, imglist, duration=100)
+imglist[0].save(thname, save_all=True, append_images=imglist[1:], optimize=False, duration=30, loop=0)
