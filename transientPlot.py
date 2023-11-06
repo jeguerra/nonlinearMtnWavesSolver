@@ -6,7 +6,9 @@ Created on Wed Mar 31 08:25:38 2021
 @author: jeg
 """
 import os
-from PIL import Image
+import time
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 import numpy as np
 import scipy.linalg as scl
 import matplotlib as mpl
@@ -19,10 +21,7 @@ m2k = 1.0E-3
 runPertb = True
 runSGS = False
 runPar = False
-imgname = 'toanimate.jpg'
-THname = 'TotalPT.gif'
-thname = 'PerturbationPT02.gif'
-sgsname = 'SGS-PT.gif'
+imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
 fname = 'Simulation2View.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
@@ -45,15 +44,25 @@ dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
 TH = np.exp(lnt)
 th = TH - np.exp(LNT)
 
+plotPert = True
+if plotPert:
+       var2plot = th
+       cmp2plot = 'RdBu_r'
+       out_name = 'PerturbationPT01.gif'
+else:
+       var2plot = TH
+       cmp2plot = 'nipy_spectral_r'
+       out_name = 'TotalPT01.gif'
+
 # Get the upper and lower bounds for TH
-clim1 = th.min()
-clim2 = th.max()
-clim = 0.5 * max(abs(clim1),abs(clim2))
-print('Plot bounds: ', clim)
+clim1 = var2plot.min()
+clim2 = 0.9 * var2plot.max()
+clim = 0.75 * max(abs(clim1),abs(clim2))
+print('Plot bounds: ', clim1, clim2)
 
 def plotPertb(tt):
        
-       th2plot = np.ma.getdata(th[tt,:,:])
+       th2plot = np.ma.getdata(var2plot[tt,:,:])
        '''
        mr = 20
        nm = th2plot.shape
@@ -64,7 +73,7 @@ def plotPertb(tt):
        '''
        thisFigure = plt.figure(figsize=(16.0, 8.0))
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 101, cmap='nipy_spectral', vmin=-clim, vmax=+clim)
+       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 256, cmap=cmp2plot, vmin=clim1, vmax=clim2)
        
        #norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
        #plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e', cax=plt.gca())
@@ -74,17 +83,20 @@ def plotPertb(tt):
        plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
        plt.xlim(-40.0, 80.0)
-       plt.ylim(0.0, 15.0)
+       plt.ylim(0.0, 16.0)
        plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        plt.tight_layout()
        
+       save_file = imgname + f'{tt:04}' + '.jpg'
+       
        # Save out the image
-       thisFigure.savefig(imgname)
+       thisFigure.savefig(save_file)
        plt.close(fig=thisFigure)
+       del(thisFigure)
        
        # Get the current image
-       image = Image.open(imgname)
+       image = Image.open(save_file)
                      
        # Delete stuff
        print('Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
@@ -100,8 +112,8 @@ if runPertb:
               imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
        else:
               print('Run serial processing...')
-              #imglist = [plotPertb(tt) for tt in range(len(times))]
-              imglist = [plotPertb(tt) for tt in range(180)]
+              imglist = [plotPertb(tt) for tt in range(len(times))]
+              #imglist = [plotPertb(tt) for tt in range(360)]
        
 #%% Contour animation of the normalized SGS
 if runSGS:
@@ -137,7 +149,7 @@ if runSGS:
               fig = plt.figure(figsize=(16.0, 8.0))
               plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
               
-              cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, qSGS[:,:], 101, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
+              cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, qSGS[:,:], 64, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
               
               norm = mpl.colors.Normalize(vmin=-1.0, vmax=1.0)
               plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e')
@@ -151,6 +163,7 @@ if runSGS:
               plt.tight_layout()
               # Save out the image
               plt.savefig(imgname)
+              time.sleep(0.01)
               
               # Get the current image and add to gif list
               image = Image.open(imgname)
@@ -161,5 +174,4 @@ if runSGS:
               plt.close('all')
               del(fig)
        
-
-imglist[0].save(thname, save_all=True, append_images=imglist[1:], optimize=False, duration=30, loop=0)
+imglist[0].save(out_name,append_images=imglist[1:], save_all=True, optimize=False, duration=30, loop=0)

@@ -707,7 +707,7 @@ def runModel(TestName):
        if HermFunc:
               PPXMD = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
        else:
-              PPXMD = DDXMS_LO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+              PPXMD = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
               
        advtOps = (PPXMD,DDZMS1)
        
