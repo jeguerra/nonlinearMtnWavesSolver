@@ -50,3 +50,7 @@ animations/
 *.gif
 
 *.jpg
+
+*.txt
+
+python results/
