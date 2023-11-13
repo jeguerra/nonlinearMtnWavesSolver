@@ -61,7 +61,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
-       DD2 = REFS[14] # First derivatives for diffusion gradient
+       DD2 = REFS[13] # First derivatives for diffusion gradient
        
        rhs = 0.0
        res = 0.0
@@ -88,11 +88,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               else:
                      Dq = torch.matmul(DD1, torch.from_numpy(solA)).numpy()
                      
-              PqPxA = Dq[:DIMS[5],:]
+              DqDxA = Dq[:DIMS[5],:]
               DqDzA = Dq[DIMS[5]:,:]
               
               # Complete advective partial derivatives
-              #PqPxA = DqDxA - REFS[15] * DqDzA
+              PqPxA = DqDxA - REFS[14] * DqDzA
                                    
               # Compute local RHS
               rhsDyn, PqPzA = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, 
@@ -124,8 +124,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #%% Compute diffusive update
 
               # Compute directional derivative along terrain
-              #PqPxA[bdex,:] = S * (REFG[-2] @ solA[bdex,:]) #DqDxA[bdex,:]
-              PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * PqPzA[bdex,:])
+              PqPxA[bdex,:] = S * DqDxA[bdex,:]
+              #PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * PqPzA[bdex,:])
               
               # Subtract hydrostatic background for diffusion
               PqPzA -= DQDZ
@@ -142,15 +142,18 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
                      DDq = torch.matmul(DD2, torch.from_numpy(Dq)).numpy()
                      
               # Column 1
-              P2qPx2 = DDq[:OPS,:4]
+              D2qDx2 = DDq[:OPS,:4]
               P2qPxz = DDq[OPS:,:4]
               # Column 2
-              P2qPzx = DDq[:OPS,4:]
+              D2qDzx = DDq[:OPS,4:]
               P2qPz2 = DDq[OPS:,4:]
               
+              P2qPx2 = D2qDx2 - REFS[14] * P2qPxz
+              P2qPzx = D2qDzx - REFS[14] * P2qPz2
+              
               # Second directional derivatives (of the diffusive fluxes)
-              P2qPx2[bdex,:] = S * (P2qPx2[bdex,:] + dhdx * P2qPxz[bdex,:])
-              P2qPzx[bdex,:] = S * (P2qPzx[bdex,:] + dhdx * P2qPz2[bdex,:])
+              P2qPx2[bdex,:] = S * D2qDx2[bdex,:]
+              P2qPzx[bdex,:] = S * D2qDzx[bdex,:]
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
@@ -161,6 +164,18 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               # Apply stage update
               solB = sol2Update + coeff * DT * rhs
+              
+              # Compute local Rayleigh factors
+              #RayDX = np.reciprocal(1.0 + DT * mu * RLMX)[0,:]
+              #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
+              RayD = (np.reciprocal(1.0 + coeff * DT * mu * RLM)[0,:]).T   
+
+              # Apply Rayleigh damping layer implicitly
+              oneMR = (1.0 - RayD)
+              solB[:,0] = RayD * solB[:,0] + oneMR * init0[:,0]
+              solB[:,1] *= RayD
+              solB[:,2] *= RayD
+              solB[:,3] = RayD * solB[:,3] + oneMR * init0[:,3]
               
               return solB
        
@@ -337,16 +352,5 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        else:
               print('Invalid time integration order. Going with 2.')
               sol = ketchesonM2(sol0)
-              
-       # Compute local Rayleigh factors
-       #RayDX = np.reciprocal(1.0 + DT * mu * RLMX)[0,:]
-       #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
-       RayD = np.reciprocal(1.0 + DT * mu * RLM)[0,:]              
-
-       # Apply Rayleigh damping layer implicitly
-       sol[:,0] = RayD.T * sol[:,0] + (1.0 - RayD.T) * init0[:,0]
-       sol[:,1] *= RayD.T
-       sol[:,2] *= RayD.T
-       sol[:,3] = RayD.T * sol[:,3] + (1.0 - RayD.T) * init0[:,3]
               
        return sol, sol-sol0, rhs, res, CRES, DT

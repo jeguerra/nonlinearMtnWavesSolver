@@ -22,7 +22,7 @@ runPertb = True
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Simulation2View.nc'
+fname = 'Simulation2View1.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -44,7 +44,7 @@ dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
 TH = np.exp(lnt)
 th = TH - np.exp(LNT)
 
-plotPert = True
+plotPert = False
 if plotPert:
        var2plot = th
        cmp2plot = 'RdBu_r'
@@ -56,8 +56,7 @@ else:
 
 # Get the upper and lower bounds for TH
 clim1 = var2plot.min()
-clim2 = 0.9 * var2plot.max()
-clim = 0.75 * max(abs(clim1),abs(clim2))
+clim2 = var2plot.max()
 print('Plot bounds: ', clim1, clim2)
 
 def plotPertb(tt):
@@ -87,8 +86,10 @@ def plotPertb(tt):
        plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        plt.tight_layout()
+       plt.show()
        
        save_file = imgname + f'{tt:04}' + '.jpg'
+       input('Image Check')
        
        # Save out the image
        thisFigure.savefig(save_file)
@@ -112,8 +113,8 @@ if runPertb:
               imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
        else:
               print('Run serial processing...')
-              imglist = [plotPertb(tt) for tt in range(len(times))]
-              #imglist = [plotPertb(tt) for tt in range(360)]
+              #imglist = [plotPertb(tt) for tt in range(len(times))]
+              imglist = [plotPertb(tt) for tt in range(420)]
        
 #%% Contour animation of the normalized SGS
 if runSGS:

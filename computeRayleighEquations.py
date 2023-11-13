@@ -42,7 +42,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        width += pert_width * np.sin(6.0 * mt.pi / width * Z[:,0])
        dLayerL = L1 + width
        
-       dLayerZ = height + pert_depth * np.sin(0.5 * mt.pi / rd * X[-1,:])
+       dLayerZ = height + pert_depth * np.sin(2.0 * mt.pi / rd * X[-1,:])
        depth = ZH - dLayerZ       
        
        # Assemble the Rayleigh field

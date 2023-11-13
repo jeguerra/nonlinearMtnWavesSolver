@@ -10,7 +10,7 @@ import numpy as np
 #import scipy.interpolate as spint
 import HerfunChebNodesWeights as hcnw
 
-def computeColumnInterp(DIMS, zdata, fdata, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid):
+def computeColumnInterp(DIMS, zdata, fdata, ZTL, ITRANS):
        NX = DIMS[3] + 1
        NZ = DIMS[4]
        
@@ -32,12 +32,7 @@ def computeColumnInterp(DIMS, zdata, fdata, ZTL, ITRANS, verticalChebGrid, verti
               xi = ((2.0 / np.amax(thisZ) * thisZ) - 1.0)
               
               # Apply the interpolation
-              if verticalChebGrid:
-                     ITM = hcnw.chebpolym(NZ+1, xi)
-                     
-              if verticalLegdGrid:
-                     ITM, dummy = hcnw.legpolym(NZ, xi, True)
-                     
+              ITM, dummy = hcnw.legpolym(NZ, xi, True)
               temp = (ITM.T).dot(fcoeffs)
               
               FLDI[:,cc] = np.ravel(temp)

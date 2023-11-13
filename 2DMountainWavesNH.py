@@ -439,7 +439,7 @@ def runModel(TestName):
               print('Diffusion coefficients by RHS evaluation.')
               
        verticalChebGrid = False
-       verticalLegdGrid = True
+       verticalLegdGrid = False
        if verticalChebGrid:
               print('Chebyshev spectral derivative in the vertical.')
        elif verticalLegdGrid:
@@ -500,19 +500,17 @@ def runModel(TestName):
        T_in = thisTest.T_in
               
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
-       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 2 * DIMS[4], DIMS[5]]
-       REF0 = computeGrid(DIM0, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
+       chebHydro = False
+       legrHydro = True
+       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 128, DIMS[5]]
+       REF0 = computeGrid(DIM0, HermFunc, FourierLin, chebHydro, legrHydro)
        
        DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REF0[0], 6)
        DDXP, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REF0[0], True, False, DDX_BC)
        
-       # Get the double resolution operator here
-       if verticalChebGrid:
-              DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
-       elif verticalLegdGrid:
-              DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
-       else:
-              DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
+       # Get the spectral resolution operator here
+       #DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
+       DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
                      
        REF0.append(DDXP)
        REF0.append(DDZP)
@@ -560,14 +558,16 @@ def runModel(TestName):
        elif FourierLin and not HermFunc:
               DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
-              DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+              DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
               DDX_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
                             
-       if verticalChebGrid:
+       if verticalChebGrid and not verticalLegdGrid:
               DDZ_1D, VTRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-       
-       if verticalLegdGrid:
+       elif verticalLegdGrid and not verticalChebGrid:
               DDZ_1D, VTRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+       else:
+              DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
+              DDZ_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_BC)
               
        #%% Update the REFS collection
        REFS.append(DDX_1D) # index 2
@@ -630,13 +630,13 @@ def runModel(TestName):
        #'''
        # Compute the background (initial) fields
        U = np.expand_dims(uz, axis=1)
-       UZ = computeColumnInterp(DIM0, REF0[1], U, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
+       UZ = computeColumnInterp(DIM0, REF0[1], U, ZTL, ITRANS)
        dUdz = np.expand_dims(duz, axis=1)
-       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
+       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, ZTL, ITRANS)
        LPZ = np.expand_dims(lpz, axis=1)
-       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)
+       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, ZTL, ITRANS)
        LPT = np.expand_dims(lpt, axis=1)
-       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, ZTL, ITRANS, verticalChebGrid, verticalLegdGrid)       
+       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, ZTL, ITRANS)       
        #'''
        # Compute thermodynamic gradients (no interpolation!)
        PORZ = PHYS[3] * TZ
@@ -653,9 +653,9 @@ def runModel(TestName):
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        '''
        fig, axs = plt.subplots(1,4)
-       axs[0].plot(XL[0,:], LOGT[0,:], XL[1,:], UZ[1,:])
+       axs[0].plot(XL[0,:], UZ[0,:], XL[1,:], UZ[1,:])
        axs[1].plot(XL[0,:], LOGT[0,:], XL[1,:], LOGT[1,:])
-       axs[2].plot(XL[0,:], LOGT[0,:], XL[1,:], LOGP[1,:])
+       axs[2].plot(XL[0,:], LOGP[0,:], XL[1,:], LOGP[1,:])
        axs[3].plot(XL[0,:], TZ[0,:], XL[1,:], TZ[1,:])
        plt.show()
        print('Check interpolated background fields...')
@@ -698,21 +698,23 @@ def runModel(TestName):
        DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        #%% Prepare derivative operators for diffusion
-       PPXMD = DDXMS_LO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_LO)
-       diffOps1 = (PPXMD, DDZMS_LO)
-       PPXMD = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
-       diffOps2 = (PPXMD, DDZMS_HO)
               
        #%% Prepare derivative operators for advection              
        if HermFunc:
-              PPXMD = DDXMS1 - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+              PPXMD = DDXMS1# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
        else:
-              PPXMD = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+              PPXMD = DDXMS_HO# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
               
-       advtOps = (PPXMD,DDZMS1)
+       if verticalChebGrid or verticalLegdGrid:
+              advtOps = (PPXMD,DDZMS1)
+       else:
+              advtOps = (PPXMD,DDZMS_HO)
+       
+       PPXMD = DDXMS_LO# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
+       diffOps = (PPXMD,DDZMS_LO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
-       REFS.append((sps.csr_array(diffOps1[0]), sps.csr_array(diffOps1[1]))) # index 11
+       REFS.append(diffOps) # index 11
        
        #%% Store operators for use
        if NonLinSolve:
@@ -723,15 +725,10 @@ def runModel(TestName):
                      DDOP.autotune(nrhs=numVar)
                      REFS.append(DDOP) # index 12
                      
-                     DDOP = sps.vstack(diffOps1, format='csr')
+                     DDOP = sps.vstack(diffOps, format='csr')
                      DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
                      DDOP.autotune(nrhs=2*numVar)
                      REFS.append(DDOP) # index 13
-                     
-                     DDOP = sps.vstack(diffOps2, format='csr')
-                     DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
-                     DDOP.autotune(nrhs=2*numVar)
-                     REFS.append(DDOP) # index 14
               else:
                      import torch
                      DDOP = sps.vstack(advtOps, format='coo') 
@@ -743,7 +740,7 @@ def runModel(TestName):
                      REFS.append(DDOP) # index 12
                      del(DDOP)
                      
-                     DDOP = sps.vstack(diffOps1, format='coo')
+                     DDOP = sps.vstack(diffOps, format='coo')
                      ind = np.vstack((DDOP.row, DDOP.col))
                      val = DDOP.data
                      DDOP = torch.sparse_coo_tensor(ind, val)
@@ -751,28 +748,17 @@ def runModel(TestName):
                      
                      REFS.append(DDOP) # index 13
                      del(DDOP)
-                     
-                     DDOP = sps.vstack(diffOps2, format='coo')
-                     ind = np.vstack((DDOP.row, DDOP.col))
-                     val = DDOP.data
-                     DDOP = torch.sparse_coo_tensor(ind, val)
-                     DDOP = DDOP.to_sparse_csr()
-                     
-                     REFS.append(DDOP) # index 14
-                     
                      del(val)
                      del(ind)
        else:
               # Native sparse
               DDOP = sps.vstack(advtOps)
               REFS.append(DDOP) # index 12
-              DDOP = sps.vstack(diffOps1)
+              DDOP = sps.vstack(diffOps)
               REFS.append(DDOP) # index 13
-              DDOP = sps.vstack(diffOps2)
-              REFS.append(DDOP) # index 14
               
        # Store the terrain profile and operators used on the terrain (diffusion)
-       REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 15
+       REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 14
        
        # Update REFG the terrain BC derivative
        REFG.append(DDX_CS)
@@ -780,7 +766,7 @@ def runModel(TestName):
               
        # Get memory back
        del(DDOP)
-       del(diffOps1); del(diffOps2)
+       del(diffOps)
        del(DDXMS1); del(DDZMS1)
        del(DDXMS_LO); del(DDZMS_LO)
        del(DDXMS_HO); del(DDZMS_HO)
@@ -1170,7 +1156,7 @@ def runModel(TestName):
               
               sol_norm = bn.nanmax(np.abs(hydroState), axis=0)
               sol_norm[1] = bn.nanmax(rw)
-              sol_norm *= 0.5
+              #sol_norm *= 0.5
               print('Initial Solution Norms:')
               print(sol_norm)
                      

@@ -208,7 +208,7 @@ DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, True, False, DDZ_C
 DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, True, False, DDZ_CFD3)
 
 # SUPER-RESOLUTION SPECTRAL DERIVATIVE
-DDZ_AV = 0.5 * (DDZ_CS + DDZ_CFD1) 
+DDZ_AV = 0.5 * (DDZ_CS + DDZ_QS) 
 
 # Compute eigenspectra
 W1 = scl.eigvals(DDZ_CFD1)

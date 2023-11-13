@@ -27,7 +27,7 @@ def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
               xi, wcp = qxw.leglb(NZ) #[-1 +1]
               z = 0.5 * ZH * (1.0 + xi)
        else:
-              z = np.linspace(0.0, ZH, num=NZ, endpoint=True)
+              z = np.linspace(0.0, ZH, num=NZ+1, endpoint=True)
        
        # Map reference 1D domains to physical 1D domains
        if Herm and not Four:

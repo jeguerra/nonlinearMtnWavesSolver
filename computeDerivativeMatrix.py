@@ -1591,7 +1591,7 @@ def computeLegendreDerivativeMatrix(DIMS):
        
        xi, wlf = leglb(NZ)
        LT, DLT = legpolym(NZ, xi, True)
-       LT = numericalCleanUp(LT)
+       #LT = numericalCleanUp(LT)
        
        b = 2.0 / ZH
        
@@ -1625,7 +1625,7 @@ def computeLegendreDerivativeMatrix(DIMS):
        DDM = b * temp @ STR_L
        
        #DDM1 = removeLeastSingularValue(DDM)
-       #DDMC = numericalCleanUp(DDM)
+       DDMC = numericalCleanUp(DDM)
        
        return DDM, STR_L
        

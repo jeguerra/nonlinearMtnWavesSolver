@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # REGIONAL SCALE
-                     self.setUserData(848, 92, 140.0, 36.0, 300.0, \
+                     self.setUserData(1024, 164, 140.0, 35.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
@@ -102,7 +102,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(848, 92, 140.0, 40.0, 300.0, \
+                     self.setUserData(1024, 128, 140.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
