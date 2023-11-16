@@ -58,6 +58,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        dhdx = np.expand_dims(REFS[6][0], axis=1)
        
        bdex = ebcDex[2]
+       boundary_index = np.concatenate(ebcDex[:4])
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
@@ -125,7 +126,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
 
               # Compute directional derivative along terrain
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
-              #PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * PqPzA[bdex,:])
               
               # Subtract hydrostatic background for diffusion
               PqPzA -= DQDZ
@@ -176,6 +176,11 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB[:,1] *= RayD
               solB[:,2] *= RayD
               solB[:,3] = RayD * solB[:,3] + oneMR * init0[:,3]
+              
+              # Test added filter to pressure field
+              filtP = rescf.computeRegionFilter2(solA[:,2], DLD, solA.shape[0])
+              filtP[boundary_index] = solA[boundary_index,2]
+              solA[:,2] = filtP
               
               return solB
        

@@ -701,16 +701,16 @@ def runModel(TestName):
               
        #%% Prepare derivative operators for advection              
        if HermFunc:
-              PPXMD = DDXMS1# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
+              PPXMD = DDXMS1
        else:
-              PPXMD = DDXMS_HO# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS1)
+              PPXMD = DDXMS_HO
               
        if verticalChebGrid or verticalLegdGrid:
               advtOps = (PPXMD,DDZMS1)
        else:
               advtOps = (PPXMD,DDZMS_HO)
        
-       PPXMD = DDXMS_LO# - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
+       PPXMD = DDXMS_LO
        diffOps = (PPXMD,DDZMS_LO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
@@ -1046,8 +1046,8 @@ def runModel(TestName):
               DL2 = 2.0 * DZ_avg # Maximum length for variable grid
               
               import matplotlib.path as pth
-              dx = 0.5 * mt.pi * DL1
-              dz = 0.5 * mt.pi * DL2
+              dx = 1.25 * DX_avg
+              dz = 1.25 * DZ_avg
               fltDex = []
               fltDms = []
               regLen = 0

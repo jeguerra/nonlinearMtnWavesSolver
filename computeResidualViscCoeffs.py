@@ -29,7 +29,7 @@ def computeRegionFilter(Q, QR, DLD, LVAR):
        return Q
    
 @njit(parallel=True)
-def computeRegionFilterOne(Q, DLD, LVAR):
+def computeRegionFilter1(Q, DLD, LVAR):
        
        fval = np.empty(Q.shape)
        fltDex = DLD[-2]
@@ -39,6 +39,19 @@ def computeRegionFilterOne(Q, DLD, LVAR):
               # Compute the given filter over the region
               fval[ii,0,0] = fltKrl[ii] @ Q[fltDex[ii],0,0]
               fval[ii,1,0] = fltKrl[ii] @ Q[fltDex[ii],1,0]
+              
+       return fval
+
+@njit(parallel=True)
+def computeRegionFilter2(Q, DLD, LVAR):
+       
+       fval = np.empty(Q.shape)
+       fltDex = DLD[-2]
+       fltKrl = DLD[-1]
+       
+       for ii in prange(LVAR):
+              # Compute the given filter over the region
+              fval[ii,:] = fltKrl[ii] @ Q[fltDex[ii],:]
               
        return fval
 
@@ -54,10 +67,9 @@ def computeResidualViscCoeffs(PHYS, RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
        set_num_threads(8)
        if byLocalFilter:
            CRES = computeRegionFilter(CRES, RES, DLD, LVAR)
-           #'''
+           
            CRES[:,0,0] = np.where(CRES[:,0,0] > ubnd, ubnd, CRES[:,0,0])
            CRES[:,1,0] = np.where(CRES[:,1,0] > wbnd, wbnd, CRES[:,1,0])
-           #'''
        else:
            Q_RES = bn.nanmax(RES, axis=1) 
            
@@ -66,7 +78,7 @@ def computeResidualViscCoeffs(PHYS, RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
            qr = DLD[3] * Q_RES
            CRES[:,1,0] = np.where(qr > wbnd, wbnd, qr)
            
-           CRES = computeRegionFilterOne(CRES, DLD, LVAR)
+           CRES = computeRegionFilter1(CRES, DLD, LVAR)
 
        # Augment damping to the sponge layers
        CRES[ldex,0,0] += ubnd * RLM[0,ldex]
