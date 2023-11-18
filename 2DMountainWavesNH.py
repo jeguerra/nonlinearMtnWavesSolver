@@ -1042,12 +1042,12 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 2.0 * DX_avg # 2X for uniform grid
-              DL2 = 2.0 * DZ_avg # Maximum length for variable grid
+              DL1 = 2.0 * DX_avg
+              DL2 = 2.0 * DZ_avg
               
               import matplotlib.path as pth
-              dx = 1.25 * DX_avg
-              dz = 1.25 * DZ_avg
+              dx = 2.01 * DX_avg
+              dz = 2.01 * DZ_avg
               fltDex = []
               fltDms = []
               regLen = 0
@@ -1189,12 +1189,17 @@ def runModel(TestName):
                             
                             if isInitialStep:
                                    isInitialStep = False
-                            
+                            '''
                             # Update normalizations for vertical velocity
-                            #wa = np.abs(fields[:,1])
-                            #sol_norm[1] = bn.nanmax(wa)
-                            #res_norm[1] = bn.nanmean(wa)
-                            
+                            state = np.copy(fields)
+                            state[:,2] += hydroState[:,2]
+                            sol_norm = bn.nanmax(np.abs(state), axis=0)
+                            # compute function average of initial fields
+                            sol_avrg = DLD[-3] @ state
+                            # compute state relative to average
+                            res_norm = DLD[-3] @ np.abs(state - sol_avrg)
+                            res_norm = 1.0 / res_norm
+                            '''
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             

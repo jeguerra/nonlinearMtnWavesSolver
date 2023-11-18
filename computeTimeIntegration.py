@@ -177,11 +177,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               solB[:,2] *= RayD
               solB[:,3] = RayD * solB[:,3] + oneMR * init0[:,3]
               
-              # Test added filter to pressure field
-              filtP = rescf.computeRegionFilter2(solA[:,2], DLD, solA.shape[0])
-              filtP[boundary_index] = solA[boundary_index,2]
-              solA[:,2] = filtP
-              
               return solB
        
        def ketchesonM2(sol):

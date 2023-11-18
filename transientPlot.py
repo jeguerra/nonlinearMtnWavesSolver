@@ -89,7 +89,7 @@ def plotPertb(tt):
        plt.show()
        
        save_file = imgname + f'{tt:04}' + '.jpg'
-       input('Image Check')
+       #input('Image Check')
        
        # Save out the image
        thisFigure.savefig(save_file)
