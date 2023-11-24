@@ -55,10 +55,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
        RLM = REFG[4][0].data
        
        S = DLD[5]
-       dhdx = np.expand_dims(REFS[6][0], axis=1)
-       
        bdex = ebcDex[2]
-       boundary_index = np.concatenate(ebcDex[:4])
 
        # Stacked derivative operators
        DD1 = REFS[12] # First derivatives for advection/dynamics
@@ -98,8 +95,6 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               # Compute local RHS
               rhsDyn, PqPzA = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, 
                                                                               RdT, T_ratio, solA, stateA)
-
-              # Store the dynamic RHS
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
@@ -159,6 +154,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                          ebcDex, DLD)
               rhsDif = tendency.enforceBC_RHS(rhsDif, ebcDex)
+              
               # Compute total RHS and apply BC
               rhs = (rhsDyn + rhsDif)
               
@@ -169,7 +165,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #RayDX = np.reciprocal(1.0 + DT * mu * RLMX)[0,:]
               #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
               RayD = (np.reciprocal(1.0 + coeff * DT * mu * RLM)[0,:]).T   
-
+ 
               # Apply Rayleigh damping layer implicitly
               oneMR = (1.0 - RayD)
               solB[:,0] = RayD * solB[:,0] + oneMR * init0[:,0]

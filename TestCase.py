@@ -84,7 +84,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # REGIONAL SCALE
-                     self.setUserData(1248, 192, 140.0, 35.0, 300.0, \
+                     self.setUserData(1684, 248, 140.0, 35.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
@@ -174,14 +174,14 @@ class TestCase:
               self.HOPT = [h0, aC, lC, kC, withWindow, Mountain]
               
               #% Transient solve parameters
-              DT = 0.025 # seconds
+              DT = 0.01 # seconds
               HR = 5.0 #/ 3600.0 # hours              
               DTF = 0.75 # scale time step              
               intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 5.0 # Time for diagnostic output
-              ITI = 5.0 # Time for image output
+              OTI = 10.0 # Time for diagnostic output
+              ITI = 10.0 # Time for image output
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI]
        

@@ -398,9 +398,6 @@ def runModel(TestName):
        NewtonLin = thisTest.solType['NewtonLin']
        ExactBC = thisTest.solType['ExactBC']
        
-       # Set the use of a persistent hydrostatic background:
-       withHydroState = True
-       
        useGuellrich = True
        useUniformSt = False
        
@@ -500,17 +497,17 @@ def runModel(TestName):
        T_in = thisTest.T_in
               
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
-       chebHydro = False
-       legrHydro = True
-       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 128, DIMS[5]]
+       chebHydro = True
+       legrHydro = False
+       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
        REF0 = computeGrid(DIM0, HermFunc, FourierLin, chebHydro, legrHydro)
        
        DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REF0[0], 6)
        DDXP, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REF0[0], True, False, DDX_BC)
        
        # Get the spectral resolution operator here
-       #DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
-       DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
+       DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
+       #DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
                      
        REF0.append(DDXP)
        REF0.append(DDZP)
@@ -612,6 +609,7 @@ def runModel(TestName):
        #makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ)
        # Compute the initial fields by interolation
        '''
+       import scipy.interpolate as spi
        Uz = spi.interp1d(REF0[1], uz, kind='cubic')
        dUdz = spi.interp1d(REF0[1], duz, kind='cubic')
        LPZ = spi.interp1d(REF0[1], lpz, kind='cubic')
@@ -703,7 +701,7 @@ def runModel(TestName):
        if HermFunc:
               PPXMD = DDXMS1
        else:
-              PPXMD = DDXMS_HO
+              PPXMD = DDXMS_LO
               
        if verticalChebGrid or verticalLegdGrid:
               advtOps = (PPXMD,DDZMS1)
@@ -711,7 +709,7 @@ def runModel(TestName):
               advtOps = (PPXMD,DDZMS_HO)
        
        PPXMD = DDXMS_LO
-       diffOps = (PPXMD,DDZMS_LO)
+       diffOps = (PPXMD,DDZMS_HO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
        REFS.append(diffOps) # index 11
@@ -1046,8 +1044,8 @@ def runModel(TestName):
               DL2 = 2.0 * DZ_avg
               
               import matplotlib.path as pth
-              dx = 2.01 * DX_avg
-              dz = 2.01 * DZ_avg
+              dx = 1.01 * DL1
+              dz = 1.01 * DL2
               fltDex = []
               fltDms = []
               regLen = 0
@@ -1126,17 +1124,11 @@ def runModel(TestName):
                             print('Could NOT read restart NC file!', fname2Restart)
               else:
                      # Initialize fields
-                     if withHydroState:
-                            fields[:,0] = hydroState[:,0]
-                            fields[:,3] = hydroState[:,3]
-                            fields[ubdex,0] = 0.0
-                            fields[ubdex,1] = 0.0
-                     else:
-                            fields[:,0] = hydroState[:,0]
-                            fields[ubdex,1] = -dWBC
-                            fields[:,2] = hydroState[:,2]
-                            fields[:,3] = hydroState[:,3]
-                     
+                     fields[:,0] = hydroState[:,0]
+                     fields[:,3] = hydroState[:,3]
+                     fields[ubdex,0] = 0.0
+                     fields[ubdex,1] = 0.0
+       
                      dfields = np.zeros(fields.shape)
                      rhsVec = np.zeros(fields.shape)
                      resVec = np.zeros(fields.shape)
@@ -1147,7 +1139,7 @@ def runModel(TestName):
               RdT, T_ratio = eqs.computeRdT(fields[:,2], fields[:,3] - hydroState[:,3], 
                                             REFS[9][0], PHYS[4])
               TOPT[0], VWAV_fld, VWAV_max = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=isInitialStep)
-              VWAV_ref = bn.nanmax(VWAV_max - VWAV_fld)
+              VWAV_ref = bn.nanmax(VWAV_fld)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
               # Normalization for vertical velocity
@@ -1186,9 +1178,6 @@ def runModel(TestName):
                             fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields, hydroState, rhsVec, dfields, \
                                                                     CRES, ebcDex, RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep)
-                            
-                            if isInitialStep:
-                                   isInitialStep = False
                             '''
                             # Update normalizations for vertical velocity
                             state = np.copy(fields)
@@ -1212,8 +1201,8 @@ def runModel(TestName):
                      # Print out diagnostics every TOPT[5] seconds
                      if interTime1 >= TOPT[5] or ti == 0:
                             
-                            #print('Solution norms: ', sol_norm)
-                            #print('Residual norms: ', res_norm)
+                            if isInitialStep:
+                                   isInitialStep = False
                             
                             message = ''
                             displayResiduals(message, np.reshape(resVec, (OPS*numVar,), order='F'), \

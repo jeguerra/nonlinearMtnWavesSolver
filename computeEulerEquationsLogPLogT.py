@@ -15,17 +15,28 @@ np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 def enforceBC_RHS(rhs, ebcDex):
        
        ldex = ebcDex[0]
-       rdex = ebcDex[1]
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        vdex = np.concatenate((bdex, tdex))
        
-       # Tendencies consistent with field conditions
+       # BC conditions on tendencies
        rhs[ldex,:] = 0.0
        rhs[bdex,0] = 0.0
        rhs[vdex,1] = 0.0
        
        return rhs
+
+def enforceBC_SOL(sol, ebcDex):
+       
+       bdex = ebcDex[2]
+       tdex = ebcDex[3]
+       vdex = np.concatenate((bdex, tdex))
+       
+       # Top and bottom conditions on velocity
+       sol[bdex,0] = 0.0
+       sol[vdex,1] = 0.0
+       
+       return sol
 
 def computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=False):
        
@@ -317,6 +328,7 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt):
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
        DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
+       #DqDt[:,1] -= (RdT * DqDz[:,2] + gc)
        # Pressure (mass) equation
        DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
        # Potential temperature equation (material derivative)
