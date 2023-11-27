@@ -60,15 +60,15 @@ def computeRdT(lp, lt, RdT_bar, kap):
        
        # Compute pressure gradient force scaling (buoyancy)              
        earg = kap * lp + lt
-       T_ratio = np.expm1(earg, dtype=np.float64)
+       T_ratio = np.expm1(earg, dtype=np.longdouble)
        #T_exp = np.exp(earg, dtype=np.longdouble)                 
               
        RdT = RdT_bar * (T_ratio + 1.0)
        #RdT = RdT_bar * T_exp
        #T_ratio = T_exp - 1.0
                      
-       #return RdT.astype(np.float64), T_ratio.astype(np.float64)
-       return RdT, T_ratio
+       return RdT.astype(np.float64), T_ratio.astype(np.float64)
+       #return RdT, T_ratio
 
 def computeFieldDerivatives(q, DDX, DDZ, RSBops):
                      

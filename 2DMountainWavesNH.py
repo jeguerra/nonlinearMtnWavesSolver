@@ -685,14 +685,14 @@ def runModel(TestName):
        
        DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
        DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
-       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
+       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD)
+       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD)
        DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        
        DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
        DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
-       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CFD)
-       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CFD)
+       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD)
+       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD)
        DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        #%% Prepare derivative operators for diffusion

@@ -18,11 +18,11 @@ from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 m2k = 1.0E-3
-runPertb = True
+runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Simulation2View2.nc'
+fname = 'Simulation2View_150m.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -44,14 +44,13 @@ dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
 TH = np.exp(lnt)
 th = TH - np.exp(LNT)
 
-plotPert = True
-if plotPert:
+if runPertb:
        var2plot = th
        cmp2plot = 'RdBu_r'
        out_name = 'PerturbationPT01.gif'
 else:
        var2plot = TH
-       cmp2plot = 'nipy_spectral_r'
+       cmp2plot = 'gist_ncar_r'
        out_name = 'TotalPT01.gif'
 
 # Get the upper and lower bounds for TH
@@ -62,26 +61,14 @@ print('Plot bounds: ', clim1, clim2)
 def plotPertb(tt):
        
        th2plot = np.ma.getdata(var2plot[tt,:,:])
-       '''
-       mr = 20
-       nm = th2plot.shape
-       U, s, Vh = scl.svd(th2plot)
-       S = scl.diagsvd(s[0:mr], mr, mr)
-       th2plot = U[:,0:mr].dot(S)
-       th2plot = th2plot.dot(Vh[0:mr,:])
-       '''
-       thisFigure = plt.figure(figsize=(16.0, 8.0))
+       
+       thisFigure = plt.figure(figsize=(24.0, 8.0))
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
        plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 256, cmap=cmp2plot, vmin=clim1, vmax=clim2)
        
-       #norm = mpl.colors.Normalize(vmin=-clim, vmax=clim)
-       #plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e', cax=plt.gca())
-       
-       #plt.contour(m2k * X, m2k * Z, TH[tt,:,:], 21, colors='black', linewidths=1.0)
-       
        plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-       plt.xlim(-40.0, 80.0)
+       plt.xlim(-30.0, 60.0)
        plt.ylim(0.0, 16.0)
        plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
@@ -103,18 +90,6 @@ def plotPertb(tt):
        print('Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        
        return image
-
-#%% Contour animation of perturbation potential temperatures
-if runPertb:    
-              
-       # Parallel processing
-       if runPar:
-              print('Attempt parallel processing...')
-              imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
-       else:
-              print('Run serial processing...')
-              imglist = [plotPertb(tt) for tt in range(len(times))]
-              #imglist = [plotPertb(tt) for tt in range(420)]
        
 #%% Contour animation of the normalized SGS
 if runSGS:
@@ -174,5 +149,15 @@ if runSGS:
               os.remove(imgname)
               plt.close('all')
               del(fig)
+#%% Contour animation of perturbation potential temperatures
+else:    
+       # Parallel processing
+       if runPar:
+              print('Attempt parallel processing...')
+              imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
+       else:
+              print('Run serial processing...')
+              #imglist = [plotPertb(tt) for tt in range(len(times))]
+              imglist = [plotPertb(tt) for tt in range(900)]
        
 imglist[0].save(out_name,append_images=imglist[1:], save_all=True, optimize=False, duration=30, loop=0)

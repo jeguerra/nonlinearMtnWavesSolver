@@ -728,38 +728,44 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        D1A = DDM_BC[0,:] # left end 1st derivative
        D1B = DDM_BC[-1,:] # right end 1st derivative
        
+       h0 = abs(dom[1] - dom[0])
+       hn = abs(dom[-1] - dom[-2])
+       
        if isClamped:
               A[0,0] = 1.0
               B[0,:] = D4A
               A[-1,-1] = 1.0
               B[-1,:] = D4B
-       elif isEssential:
-              A[0,0] = 1.0 * dom[1] / (dom[1] - dom[0]) 
-              A[0,1] = -1.0 * dom[0] / (dom[1] - dom[0])
-              B[0,:] = np.zeros(N)
-              A[N-1,N-2] = -1.0 * dom[-1] / (dom[-2] - dom[-1])
-              A[N-1,N-1] = 1.0 * dom[-2] / (dom[-2] - dom[-1])
-              B[N-1,:] = np.zeros(N)
-       else:
-              A[0,0] = 1.0
-              B[0,:] = D4A
-              A[-1,-1] = 1.0
-              B[-1,:] = D4B
               
-       # Compute the 4th derivative matrix
-       Q, R = scl.qr(A)
-       PLU = scl.lu_factor(R)
-       AIB = scl.lu_solve(PLU, (Q.T).dot(B))
+              Q, R = scl.qr(A)
+              PLU = scl.lu_factor(R)
+              AIB = scl.lu_solve(PLU, (Q.T).dot(B))
+       elif isEssential:
+              A[0,0] = +1.0 * dom[1] / h0
+              A[0,1] = -1.0 * dom[0] / h0
+              B[0,:] = np.zeros(N)
+              
+              A[N-1,N-2] = +1.0 * dom[-1] / hn
+              A[N-1,N-1] = -1.0 * dom[-2] / hn
+              B[N-1,:] = np.zeros(N)
+              
+              Q, R = scl.qr(A)
+              PLU = scl.lu_factor(R)
+              AIB = scl.lu_solve(PLU, (Q.T).dot(B))
+       else:
+              # NATURAL cubic spline.
+              AIB = np.diag(np.ones(N))
+              AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:-1,1:-1], B[1:-1,1:-1])
        
        # Compute the 1st derivative matrix
        DDM = C.dot(AIB) + D
-       #'''
+
        # Set boundary derivatives from specified
        if isClamped or not isEssential:
               DDM[0,:] = D1A
               DDM[-1,:] = D1B
-       #'''
-       #DDM1 = removeLeastSingularValue(DDM)
+       #else:
+              
        DDM = numericalCleanUp(DDM)
                      
        return DDM, AIB
@@ -779,6 +785,10 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               else:
                      print('Setting derivatives to single values (not 0) at ends NOT SUPPORTED!')
                      DDM_BC = np.zeros((2,N))
+              
+              DM2 = DDM_BC * DDM_BC
+       else:
+              DM2 = DDM_BC.dot(DDM_BC)
                      
        # Loop over each interior point in the irregular grid
        for ii in range(1,N-1):
@@ -794,7 +804,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               B[ii,ii] = (1.0 / hm + 1.0 / hp)
               B[ii,ii+1] = -1.0 / hp
               
-       for ii in range(1,N-1):
+       for ii in range(0,N-1):
               hp = abs(dom[ii+1] - dom[ii])
               C[ii,ii] = -1.0 / 3.0 * hp
               C[ii,ii+1] = -1.0 / 6.0 * hp
@@ -802,80 +812,51 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               D[ii,ii] = -1.0 / hp
               D[ii,ii+1] = 1.0 / hp
               
-       # Compute BC adjustments
        h0 = abs(dom[1] - dom[0])
        hn = abs(dom[-1] - dom[-2])
        
+       # Prescribed derivative conditions
+       D2A = DM2[0,:] # left end 4th derivative
+       D2B = DM2[-1,:] # right end 4th derivative
+       D1A = DDM_BC[0,:] # left end 1st derivative
+       D1B = DDM_BC[-1,:] # right end 1st derivative
+       
        if isClamped:
-              # Left end
-              A[0,0] = -2.0 * h0 / 3.0
-              A[0,1] = h0 / 6.0
+              A[0,0] = 1.0
+              B[0,:] = D2A
+              A[-1,-1] = 1.0
+              B[-1,:] = D2B
               
-              # Use derivative by CFD to set boundary condition
-              B[0,:] = DDM_BC[0,:]
-              B[0,0] += 1.0 / h0
-              B[0,1] -= 1.0 / h0
-              
-              # Right end
-              A[N-1,N-2] = -hn / 6.0
-              A[N-1,N-1] = 2.0 * hn / 3.0
-              
-              # Use derivative by CFD to set boundary condition
-              B[N-1,:] = DDM_BC[-1,:]
-              B[N-1,N-2] += 1.0 / hn
-              B[N-1,N-1] -= 1.0 / hn
-              #'''
-              
-              # Compute the first derivative matrix
-              AIB = np.linalg.solve(A, B)
-              DDM = C.dot(AIB) + D
-              
-              # Adjust ends
-              DDM[0,:] = DDM_BC[0,:]
-              DDM[-1,:] = DDM_BC[-1,:]
-              
+              Q, R = scl.qr(A)
+              PLU = scl.lu_factor(R)
+              AIB = scl.lu_solve(PLU, (Q.T).dot(B))
        elif isEssential:
-              # Left end
-              A[0,0] = -1.0 / h0
-              A[0,1] = 1.0 / h0
+              A[0,0] = +1.0 / h0
+              A[0,1] = -1.0 / h0
               B[0,:] = np.zeros(N)
               
-              # Right end
-              A[N-1,N-2] = 1.0 / hn
+              A[N-1,N-2] = +1.0 / hn
               A[N-1,N-1] = -1.0 / hn
               B[N-1,:] = np.zeros(N)
               
-              # Compute the first derivative matrix
-              AIB = np.linalg.solve(A, B)
-              DDM = C.dot(AIB) + D
-              
-              # Adjust the ends
-              DDM[0,:] = h0 / 6.0 * AIB[1,:] - 2.0 * h0 / 3.0 * AIB[0,:]
-              DDM[0,0] -= 1.0 / h0
-              DDM[0,1] += 1.0 / h0
-              
-              DDM[N-1,:] = -h0 / 6.0 * AIB[-2,:] + 2.0 * hn / 3.0 * AIB[-1,:]
-              DDM[N-1,N-2] -= 1.0 / hn
-              DDM[N-1,N-1] += 1.0 / hn
-       
+              Q, R = scl.qr(A)
+              PLU = scl.lu_factor(R)
+              AIB = scl.lu_solve(PLU, (Q.T).dot(B))
        else:
               # NATURAL cubic spline.
-              AIB = np.zeros((N,N))
+              AIB = np.diag(np.ones(N))
               AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:-1,1:-1], B[1:-1,1:-1])
-              DDM = C.dot(AIB) + D
-              
-              # Adjust the ends
-              DDM[0,:] = h0 / 6.0 * AIB[1,:]
-              DDM[0,0] -= 1.0 / h0
-              DDM[0,1] += 1.0 / h0
-              
-              DDM[N-1,:] = -h0 / 6.0 * AIB[-2,:]
-              DDM[N-1,N-2] -= 1.0 / hn
-              DDM[N-1,N-1] += 1.0 / hn      
        
-       #DDM1 = removeLeastSingularValue(DDM)
-       DDM = numericalCleanUp(DDM)
+       # Compute the 1st derivative matrix
+       DDM = C.dot(AIB) + D
 
+       # Set boundary derivatives from specified
+       if isClamped or not isEssential:
+              DDM[0,:] = D1A
+              DDM[-1,:] = D1B
+       #else:
+              
+       DDM = numericalCleanUp(DDM)
        return DDM, AIB
 
 # Computes standard 4th order compact finite difference 1st derivative matrix
