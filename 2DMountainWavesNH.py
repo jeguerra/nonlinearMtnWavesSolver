@@ -701,7 +701,7 @@ def runModel(TestName):
        if HermFunc:
               PPXMD = DDXMS1
        else:
-              PPXMD = DDXMS_LO
+              PPXMD = DDXMS_HO
               
        if verticalChebGrid or verticalLegdGrid:
               advtOps = (PPXMD,DDZMS1)
@@ -709,7 +709,7 @@ def runModel(TestName):
               advtOps = (PPXMD,DDZMS_HO)
        
        PPXMD = DDXMS_LO
-       diffOps = (PPXMD,DDZMS_HO)
+       diffOps = (PPXMD,DDZMS_LO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
        REFS.append(diffOps) # index 11
