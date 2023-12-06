@@ -1280,10 +1280,10 @@ def runModel(TestName):
               rdb.close()
        
        #%% Recover the solution (or check the residual)
-       uxz = np.reshape(SOLT[udex,0], (NZ+1,NX+1), order='F') 
-       wxz = np.reshape(SOLT[wdex,0], (NZ+1,NX+1), order='F')
-       pxz = np.reshape(SOLT[pdex,0], (NZ+1,NX+1), order='F') 
-       txz = np.reshape(SOLT[tdex,0], (NZ+1,NX+1), order='F')
+       uxz = np.reshape(SOLT[udex,0], (NZ,NX), order='F') 
+       wxz = np.reshape(SOLT[wdex,0], (NZ,NX), order='F')
+       pxz = np.reshape(SOLT[pdex,0], (NZ,NX), order='F') 
+       txz = np.reshape(SOLT[tdex,0], (NZ,NX), order='F')
        
        #%% Make some plots for static or transient solutions
        if makePlots and StaticSolve:
