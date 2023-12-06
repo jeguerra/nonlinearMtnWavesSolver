@@ -278,7 +278,11 @@ def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
        
        return np.array(SOLT), LMS, DCF, NX_in, NZ_in, IT
 
-def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
+def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState):
+       
+       NX = XL.shape[1]
+       NZ = ZTL.shape[0]
+       
        # Rename output file to the current time for subsequent storage
        if thisTime > 0.0:
               newFname = fname[0:-3] + str(int(thisTime)) + '.nc'
@@ -295,9 +299,9 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
               
        # Make dimensions
        m_fid.createDimension('time', None)
-       m_fid.createDimension('x', NX+1)
+       m_fid.createDimension('x', NX)
        m_fid.createDimension('y', 1)
-       m_fid.createDimension('z', NZ+1)
+       m_fid.createDimension('z', NZ)
        # Create variables (time and grid)
        tmvar = m_fid.createVariable('time', 'f8', ('time',))
        tmvar.units = 'seconds'
@@ -317,9 +321,9 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
        PVAR = m_fid.createVariable('LNP', 'f8', ('z', 'x', 'y'))
        TVAR = m_fid.createVariable('LNT', 'f8', ('z', 'x', 'y'))
        # Store variables
-       UVAR[:,:,0] = np.reshape(hydroState[:,0], (NZ+1,NX+1), order='F')
-       PVAR[:,:,0] = np.reshape(hydroState[:,2], (NZ+1,NX+1), order='F')
-       TVAR[:,:,0] = np.reshape(hydroState[:,3], (NZ+1,NX+1), order='F')
+       UVAR[:,:,0] = np.reshape(hydroState[:,0], (NZ,NX), order='F')
+       PVAR[:,:,0] = np.reshape(hydroState[:,2], (NZ,NX), order='F')
+       TVAR[:,:,0] = np.reshape(hydroState[:,3], (NZ,NX), order='F')
        # Create variables (transient fields)
        m_fid.createVariable('u', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('w', 'f8', ('time', 'z', 'x', 'y'))
@@ -346,18 +350,22 @@ def initializeNetCDF(fname, thisTime, NX, NZ, XL, ZTL, hydroState):
        
        return newFname
 
-def store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF):
+def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
+       
+       NX = ZTL.shape[1]
+       NZ = ZTL.shape[0]
+       
        # Store in the NC file
        try:
               m_fid = Dataset(newFname, 'a', format="NETCDF4")
               m_fid.variables['time'][ff] = thisTime
        
               for pp in range(numVar):
-                     q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
-                     dqdt = np.reshape(rhsVec[:,pp], (NZ+1, NX+1), order='F')
-                     rq = np.reshape(resVec[:,pp], (NZ+1, NX+1), order='F')
-                     dq1 = np.reshape(DCF[:,0,0], (NZ+1, NX+1), order='F')
-                     dq2 = np.reshape(DCF[:,1,0], (NZ+1, NX+1), order='F')
+                     q = np.reshape(fields[:,pp], (NZ, NX), order='F')
+                     dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
+                     rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
+                     dq1 = np.reshape(DCF[:,0,0], (NZ, NX), order='F')
+                     dq2 = np.reshape(DCF[:,1,0], (NZ, NX), order='F')
 
                      if pp == 0:
                             m_fid.variables['u'][ff,:,:,0] = q
@@ -419,8 +427,20 @@ def runModel(TestName):
               FourierLin = False
               print('Hermite Function grid in the horizontal.')
        else:
-              FourierLin = True
-              print('Uniform Fourier grid in the horizontal.')
+              FourierLin = False
+              if FourierLin == True:
+                     print('Uniform Fourier grid in the horizontal.')
+              else:
+                     print('Uniform INTERIOR grid in the horizontal')
+                     
+       verticalChebGrid = False
+       verticalLegdGrid = False
+       if verticalChebGrid:
+              print('Chebyshev spectral derivative in the vertical.')
+       elif verticalLegdGrid:
+              print('Legendre spectral derivative in the vertical.')
+       else:
+              print('Uniform INTERIOR grid in the vertical')
               
        # Set residual diffusion switch
        DynSGS = thisTest.solType['DynSGS']
@@ -434,15 +454,6 @@ def runModel(TestName):
               print('Diffusion coefficients by residual estimate.')
        else:
               print('Diffusion coefficients by RHS evaluation.')
-              
-       verticalChebGrid = False
-       verticalLegdGrid = False
-       if verticalChebGrid:
-              print('Chebyshev spectral derivative in the vertical.')
-       elif verticalLegdGrid:
-              print('Legendre spectral derivative in the vertical.')
-       else:
-              print('Regular uniform grid in the vertical...')
        
        # Set direct solution method (MUTUALLY EXCLUSIVE)
        SolveFull = thisTest.solType['SolveFull']
@@ -488,10 +499,6 @@ def runModel(TestName):
        NX = DIMS[3]
        NZ = DIMS[4]
        OPS = DIMS[5]
-       udex = np.arange(OPS)
-       wdex = np.add(udex, OPS)
-       pdex = np.add(wdex, OPS)
-       tdex = np.add(pdex, OPS)
        
        Z_in = thisTest.Z_in
        T_in = thisTest.T_in
@@ -500,7 +507,7 @@ def runModel(TestName):
        chebHydro = True
        legrHydro = False
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
-       REF0 = computeGrid(DIM0, HermFunc, FourierLin, chebHydro, legrHydro)
+       REF0 = computeGrid(DIM0, RLOPT, HermFunc, FourierLin, chebHydro, legrHydro)
        
        DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REF0[0], 6)
        DDXP, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REF0[0], True, False, DDX_BC)
@@ -547,7 +554,15 @@ def runModel(TestName):
        input('Check double resolution background profiles...')
        '''
        #%% SET UP THE GRID AND INDEX VECTORS
-       REFS = computeGrid(DIMS, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
+       zRay = DIMS[2] - RLOPT[0]
+       REFS = computeGrid(DIMS, RLOPT, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
+       
+       # Update OPS to the actual grid
+       OPS = REFS[0].shape[0] * REFS[1].shape[0]
+       udex = np.arange(OPS)
+       wdex = np.add(udex, OPS)
+       pdex = np.add(wdex, OPS)
+       tdex = np.add(pdex, OPS)
       
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
        if HermFunc and not FourierLin:
@@ -572,9 +587,6 @@ def runModel(TestName):
        
        #% Read in topography profile or compute from analytical function
        HofX, dHdX = computeTopographyOnGrid(REFS, HOPT)
-              
-       # Make the 2D physical domains from reference grids and topography
-       zRay = DIMS[2] - RLOPT[0]
        
        if useGuellrich:
               XL, ZTL, DZT, sigma, ZRL = \
@@ -594,12 +606,12 @@ def runModel(TestName):
        uldex, urdex, ubdex, utdex, wbdex, \
        ubcDex, wbcDex, pbcDex, tbcDex, \
        zeroDex, sysDex, ebcDex = \
-              computeAdjust4CBC(DIMS, numVar, varDex, bcType)
+              computeAdjust4CBC(ZTL.shape, numVar, varDex, bcType)
                             
        # Index to interior of terrain boundary
-       hdex = range(0,NX+1)
+       hdex = range(0,XL.shape[1])
        # Index to the entire bottom boundary on U
-       uBotDex = np.array(range(0, OPS, NZ+1))
+       uBotDex = np.array(range(0, OPS, ZTL.shape[0]))
        
        #%% MAKE THE INITIAL/BACKGROUND STATE ON COMPUTATIONAL GRID
        # Map the sounding to the computational vertical 2D grid [0 H]
@@ -701,7 +713,7 @@ def runModel(TestName):
        if HermFunc:
               PPXMD = DDXMS1
        else:
-              PPXMD = DDXMS_HO
+              PPXMD = DDXMS_LO
               
        if verticalChebGrid or verticalLegdGrid:
               advtOps = (PPXMD,DDZMS1)
@@ -709,7 +721,7 @@ def runModel(TestName):
               advtOps = (PPXMD,DDZMS_HO)
        
        PPXMD = DDXMS_LO
-       diffOps = (PPXMD,DDZMS_LO)
+       diffOps = (PPXMD,DDZMS_HO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
        REFS.append(diffOps) # index 11
@@ -806,9 +818,8 @@ def runModel(TestName):
               dWBC = -dHdX[hdex] * INIT[ubdex]
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       currentState = np.array(SOLT[:,0])
        fields, U, W = \
-              eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
+              eqs.computePrepareFields(OPS, np.array(SOLT[:,0]), udex, wdex, pdex, tdex)
               
        #% Compute the global LHS operator and RHS
        if StaticSolve:
@@ -1040,8 +1051,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 2.0 * DX_avg
-              DL2 = 2.0 * DZ_avg
+              DL1 = 2.0 * DX_min
+              DL2 = 2.0 * DZ_min
               
               import matplotlib.path as pth
               dx = 1.01 * DL1
@@ -1162,7 +1173,7 @@ def runModel(TestName):
               res_norm = 1.0 / res_norm
                      
               # Initialize output to NetCDF
-              newFname = initializeNetCDF(fname4Restart, thisTime, NX, NZ, XL, ZTL, hydroState)
+              newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState)
        
               # Initialize parameters
               ti = 0; ff = 0
@@ -1175,7 +1186,7 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
-                            fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, \
+                            fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields, hydroState, rhsVec, dfields, \
                                                                     CRES, ebcDex, RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep)
                             '''
@@ -1221,7 +1232,7 @@ def runModel(TestName):
                             fields_plot = fields_gpu.get()
                             '''
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, CRES)
+                            store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, CRES)
                                                         
                             ff += 1
                             interTime1 = 0.0

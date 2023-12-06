@@ -55,7 +55,7 @@ def computeRegionFilter2(Q, DLD, LVAR):
               
        return fval
 
-def computeResidualViscCoeffs(PHYS, RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
+def computeResidualViscCoeffs(RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
        
        # Compute absolute value of residuals
        LVAR = RES.shape[0]

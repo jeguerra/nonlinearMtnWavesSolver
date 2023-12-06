@@ -1513,9 +1513,9 @@ def computeFourierDerivativeMatrix(DIMS):
        L2 = DIMS[1]
        NX = DIMS[3]
        
-       kxf = (2*mt.pi/abs(L2 - L1)) * np.fft.fftfreq(NX+1) * (NX+1)
+       kxf = (2*mt.pi/abs(L2 - L1)) * np.fft.fftfreq(NX) * NX
        KDM = np.diag(kxf, k=0)
-       DFT = np.fft.fft(np.eye(NX+1), axis=0)
+       DFT = np.fft.fft(np.eye(NX), axis=0)
        DDM = np.fft.ifft(1j * KDM.dot(DFT), axis=0)
        
        #DDMC = numericalCleanUp(DDM)

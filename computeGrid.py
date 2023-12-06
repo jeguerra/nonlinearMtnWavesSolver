@@ -10,7 +10,7 @@ import math as mt
 import numpy as np
 import HerfunChebNodesWeights as qxw
 
-def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
+def computeGrid(DIMS, RLOPT, Herm, Four, ChebCol, LegCol):
        # Get the domain dimensions
        L1 = DIMS[0]
        L2 = DIMS[1]
@@ -27,21 +27,34 @@ def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
               xi, wcp = qxw.leglb(NZ) #[-1 +1]
               z = 0.5 * ZH * (1.0 + xi)
        else:
-              z = np.linspace(0.0, ZH, num=NZ+1, endpoint=True)
+              zu = np.linspace(0.0, ZH, num=NZ)
+              dz = abs(zu[1] - zu[0])
+              
+              zb = 0.5 * RLOPT[0]
+              NI = int(NZ * (ZH - zb) / ZH)
+              zi = np.linspace(0.0, ZH - zb, NI)
+              dz2 = 2.0 * dz
+              zt = np.linspace(ZH - zb + dz2, ZH, num=int(RLOPT[0] / dz2), endpoint=True)
+              z = np.concatenate((zi, zt))
        
        # Map reference 1D domains to physical 1D domains
        if Herm and not Four:
               alpha, whf = qxw.hefunclb(NX) #(-inf inf)
               x = 0.5 * abs(L2 - L1) / np.amax(alpha) * alpha
        elif Four and not Herm:
-              x = np.linspace(L1, L2, num=NX+1, endpoint=True)
+              x = np.linspace(L1, L2, num=NX, endpoint=True)
        else:
-              a = np.linspace(L1, L2, num=NX+1, endpoint=True)
+              xu = np.linspace(L1, L2, num=NX, endpoint=True)
+              dx = abs(xu[1] - xu[0])
               
-              b = a / L2
-              x = b - 1 / (4.0 * mt.pi) * np.sin(2.0 * mt.pi * b)
-              x *= L2
-              #input(x)
+              # Interior grid with 2X coarser in sponge layers
+              xb = 0.5 * RLOPT[1]
+              NI = int(NX * ((L2 - L1) - 2.0 * xb) / (L2 - L1))
+              xi = np.linspace(L1 + xb, L2 - xb, NI)
+              dx2 = 2.0 * dx
+              xl = np.linspace(L1, L1 + xb, num=int(xb / dx2), endpoint=False)
+              xr = np.linspace(L2 - xb + dx2, L2, num=int(xb / dx2), endpoint=True)
+              x = np.concatenate((xl, xi, xr))
        
        # Return the REFS structure
        REFS = [x, z]

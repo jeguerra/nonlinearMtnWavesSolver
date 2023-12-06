@@ -19,8 +19,6 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        L1 = DIMS[0]
        L2 = DIMS[1]
        ZH = DIMS[2]
-       NX = DIMS[3] + 1
-       NZ = DIMS[4] + 1
        
        RP = 4.0
        C2 = 5.0
@@ -30,6 +28,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        # Get REFS data
        X = REFS[4]
        Z = REFS[5]
+       NX = X.shape[1]
+       NZ = Z.shape[0]
        
        rd = (ZH - height[0])
        pert_width = 0.1 * width
@@ -184,20 +184,19 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        return (GML, GMLX, GMLZ), RL, RLX, RLZ
 
 def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
+       
        # Get options data
        width = RLOPT[1]
        applyTop = RLOPT[2]
        applyLateral = RLOPT[3]
        mu = RLOPT[4]
        
-       # Get DIMS data
-       OPS = DIMS[5]
-       
        # Set up the Rayleigh field
        GML, RL, RLX, RLZ = computeRayleighField(DIMS, REFS, depth, width, \
                                                      applyTop, applyLateral)
        
-       # Compute the diagonal for full Rayleigh field as matrices      
+       # Compute the diagonal for full Rayleigh field as matrices    
+       OPS = RL.shape[0] * RL.shape[1]
        RLM = sps.spdiags(np.reshape(RL, (OPS,), order='F'), 0, OPS, OPS)
        RLMX = sps.spdiags(np.reshape(RLX, (OPS,), order='F'), 0, OPS, OPS)
        RLMZ = sps.spdiags(np.reshape(RLZ, (OPS,), order='F'), 0, OPS, OPS)

@@ -11,10 +11,10 @@ import scipy.sparse as sps
 
 def computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D):
        # Get the dimensions
-       NX = DIMS[3] + 1
-       NZ = DIMS[4] + 1
-       OPS = DIMS[5]
-       
+       NX = sigma.shape[1]
+       NZ = sigma.shape[0]
+       OPS = NX * NZ
+              
        # Unwrap the 1D derivative matrices into 2D operators
        
        # Vertical derivative and diffusion operators

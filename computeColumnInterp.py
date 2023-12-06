@@ -11,8 +11,8 @@ import numpy as np
 import HerfunChebNodesWeights as hcnw
 
 def computeColumnInterp(DIMS, zdata, fdata, ZTL, ITRANS):
-       NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NX = ZTL.shape[1]
+       NZ = fdata.shape[0]
        
        # Check that data is good for self interpolation
        if (zdata.all() == None) or (fdata.all() == None):
@@ -32,7 +32,7 @@ def computeColumnInterp(DIMS, zdata, fdata, ZTL, ITRANS):
               xi = ((2.0 / np.amax(thisZ) * thisZ) - 1.0)
               
               # Apply the interpolation
-              ITM, dummy = hcnw.legpolym(NZ, xi, True)
+              ITM, dummy = hcnw.legpolym(NZ-1, xi, True)
               temp = (ITM.T).dot(fcoeffs)
               
               FLDI[:,cc] = np.ravel(temp)

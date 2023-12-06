@@ -8,11 +8,11 @@ Created on Tue Jul 23 10:49:24 2019
 
 import numpy as np
 
-def computeAdjust4CBC(DIMS, numVar, varDex, bcType):
+def computeAdjust4CBC(shape, numVar, varDex, bcType):
        # Get DIMS data
-       #NX = DIMS[3] + 1
-       NZ = DIMS[4] + 1
-       OPS = DIMS[5]
+       NX = shape[1]
+       NZ = shape[0]
+       OPS = NX * NZ
        
        # All DOF per variable
        rowsAll = set(np.array(range(0,OPS)))

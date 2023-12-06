@@ -41,11 +41,11 @@ def plotRHS(x, rhs, ebcDex, label):
        
        return
        
-def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                              sol0, init0, rhs0, dsol0, CRES, ebcDex, \
                              RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep):
        
-       OPS = DIMS[-2]
+       OPS = sol0.shape[0]
        DT = TOPT[0]
        order = TOPT[3]
        mu = REFG[3]
@@ -86,8 +86,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               else:
                      Dq = torch.matmul(DD1, torch.from_numpy(solA)).numpy()
                      
-              DqDxA = Dq[:DIMS[5],:]
-              DqDzA = Dq[DIMS[5]:,:]
+              DqDxA = Dq[:OPS,:]
+              DqDzA = Dq[OPS:,:]
               
               # Complete advective partial derivatives
               PqPxA = DqDxA - REFS[14] * DqDzA
@@ -99,8 +99,8 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
-                     #res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
-                     res = rhs - 0.5 * (rhs0 + rhs)
+                     res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
+                     #res = rhs - 0.5 * (rhs0 + rhs)
                      res *= res_norm
                      Residual_Update = False
                      
@@ -112,7 +112,7 @@ def computeTimeIntegrationNL(DIMS, PHYS, REFS, REFG, DLD, TOPT, \
               #%% Compute the DynSGS coefficients at the top update
               if DynSGS_Update:
                      # Define residual as the timestep change in the RHS
-                     CRES = rescf.computeResidualViscCoeffs(DIMS, np.abs(res), sol_norm, DLD,
+                     CRES = rescf.computeResidualViscCoeffs(np.abs(res), sol_norm, DLD,
                                                             bdex, REFG[5], RLM, VWAV_ref, CRES)
        
                      DynSGS_Update = False

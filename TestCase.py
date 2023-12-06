@@ -83,15 +83,15 @@ class TestCase:
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
-                     # REGIONAL SCALE
-                     self.setUserData(1684, 264, 120.0, 35.0, 300.0, \
+                     # HIGH RESOLUTION
+                     #self.setUserData(1684, 284, 125.0, 35.0, 300.0, \
+                     #                 10000.0, 20000.0, 1.0,
+                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     # LOW RESOLUTION
+                     self.setUserData(1484, 236, 125.0, 35.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
-                            
-                     # MICRO SCALE
-                     #self.setUserData(823, 72, 20.0, 2.0, 300.0, \
-                     #                 250.0, 1000.0, 1.0E+1,
-                     #                 20.0, 0.01, 0.0065, 0.002, 1, 2.0E+3, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -102,7 +102,7 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(1024, 128, 140.0, 40.0, 300.0, \
+                     self.setUserData(1684, 284, 120.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
@@ -146,7 +146,7 @@ class TestCase:
               # Set the Rayleigh options
               applyTop = True
               applyLateral = True
-              mu = rlf * 1.0#E-2
+              mu = rlf * 5.0
               rdex = [1]
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC, rdex)
               

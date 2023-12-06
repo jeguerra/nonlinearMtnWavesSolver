@@ -94,14 +94,13 @@ def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, RSBops):
        
        return P2qPx2, P2qPz2, P2qPzx, P2qPxz
 
-def computePrepareFields(REFS, SOLT, INIT, udex, wdex, pdex, tdex):
+def computePrepareFields(OPS, SOLT, udex, wdex, pdex, tdex):
        
-       #TQ = SOLT + INIT
        # Make the total quatities
        U = SOLT[udex]
        W = SOLT[wdex]
        
-       fields = np.reshape(SOLT, (len(udex), 4), order='F')
+       fields = np.reshape(SOLT, (OPS, 4), order='F')
 
        return fields, U, W
 
