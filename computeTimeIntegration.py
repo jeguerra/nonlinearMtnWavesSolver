@@ -50,9 +50,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        order = TOPT[3]
        mu = REFG[3]
        DQDZ = REFG[2]
-       #RLMX = REFG[4][1].data
-       #RLMZ = REFG[4][2].data
+       
        RLM = REFG[4][0].data
+       GMLZ = REFG[0][2]
        
        S = DLD[5]
        bdex = ebcDex[2]
@@ -91,16 +91,23 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Complete advective partial derivatives
               PqPxA = DqDxA - REFS[14] * DqDzA
+              # Compute complete vertical partial
+              PqPzA = np.copy(DqDzA)
+              PqPzA[:,2] += DQDZ[:,2]
+              
+              # Apply GML stretching Z
+              #DqDzA = GMLZ.dot(DqDzA)
+              PqPzA[:,[0,1]] = GMLZ.dot(PqPzA[:,[0,1]])
                                    
               # Compute local RHS
-              rhsDyn, PqPzA = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, DqDzA, DQDZ, 
+              rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
                                                                               RdT, T_ratio, solA, stateA)
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
-                     res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
-                     #res = rhs - 0.5 * (rhs0 + rhs)
+                     #res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
+                     res = rhs - 0.5 * (rhs0 + rhs)
                      res *= res_norm
                      Residual_Update = False
                      

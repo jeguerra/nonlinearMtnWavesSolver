@@ -16,6 +16,13 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 @author: Jorge E. Guerra
 """
 import os
+
+os.environ["OMP_NUM_THREADS"] = "12" # export OMP_NUM_THREADS=4
+os.environ["OPENBLAS_NUM_THREADS"] = "12" # export OPENBLAS_NUM_THREADS=4 
+os.environ["MKL_NUM_THREADS"] = "12" # export MKL_NUM_THREADS=6
+os.environ["VECLIB_MAXIMUM_THREADS"] = "8" # export VECLIB_MAXIMUM_THREADS=4
+os.environ["NUMEXPR_NUM_THREADS"] = "8" # export NUMEXPR_NUM_THREADS=6
+
 import sys
 import time
 import shelve
@@ -342,8 +349,6 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState):
        # Create variables for diffusion coefficients
        m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
-       #m_fid.createVariable('DCln_p', 'f8', ('time', 'z', 'x', 'y'))
-       #m_fid.createVariable('DCln_t', 'f8', ('time', 'z', 'x', 'y'))
        
        m_fid.close()
        del(m_fid)
@@ -546,8 +551,8 @@ def runModel(TestName):
        '''
        # Check background
        fig, ax = plt.subplots(nrows=2, ncols=2)
-       ax[0,0].plot(REF0[1], pz)
-       ax[0,1].plot(REF0[1], pt)
+       ax[0,0].plot(REF0[1], np.log(pz))
+       ax[0,1].plot(REF0[1], np.log(pt))
        ax[1,0].plot(REF0[1], uz)
        ax[1,1].plot(REF0[1], tz)
        plt.show()
@@ -1029,8 +1034,8 @@ def runModel(TestName):
               S = np.sqrt(S2)
                             
               # Smallest physical grid spacing in the 2D mesh
-              DX = DX_min
-              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_min
+              DX = DX_wav
+              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_wav
               DLS = min(DX, DZ)
               
               # Compute filtering regions by KDtree lookups
@@ -1051,8 +1056,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 2.0 * DX_min
-              DL2 = 2.0 * DZ_min
+              DL1 = 2.0 * DX_max
+              DL2 = 2.0 * DZ_max
               
               import matplotlib.path as pth
               dx = 1.01 * DL1
@@ -1105,6 +1110,7 @@ def runModel(TestName):
               
               # NetCDF restart for transient runs
               if isRestart:
+                     dfields = np.zeros(fields.shape)
                      rhsVec = np.empty(fields.shape)
                      resVec = np.empty(fields.shape)
                      print('Restarting from: ', fname2Restart)
@@ -1280,10 +1286,11 @@ def runModel(TestName):
               rdb.close()
        
        #%% Recover the solution (or check the residual)
-       uxz = np.reshape(SOLT[udex,0], (NZ,NX), order='F') 
-       wxz = np.reshape(SOLT[wdex,0], (NZ,NX), order='F')
-       pxz = np.reshape(SOLT[pdex,0], (NZ,NX), order='F') 
-       txz = np.reshape(SOLT[tdex,0], (NZ,NX), order='F')
+       GS = ZTL.shape
+       uxz = np.reshape(SOLT[udex,0], GS, order='F') 
+       wxz = np.reshape(SOLT[wdex,0], GS, order='F')
+       pxz = np.reshape(SOLT[pdex,0], GS, order='F') 
+       txz = np.reshape(SOLT[tdex,0], GS, order='F')
        
        #%% Make some plots for static or transient solutions
        if makePlots and StaticSolve:

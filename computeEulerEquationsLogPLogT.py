@@ -335,17 +335,13 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt):
        return DqDt
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, DQDZ, RdT, T_ratio, fields, state):
-
-       # Compute complete vertical partial
-       PqPz = np.copy(DqDz)
-       PqPz[:,2] += DQDZ[:,2]
+def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz, RdT, T_ratio, fields, state):
        
        DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state)
        
        DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
        
-       return DqDt, PqPz
+       return DqDt
 
 def computeRayleighTendency(REFG, fields):
        

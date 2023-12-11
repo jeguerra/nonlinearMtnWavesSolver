@@ -84,14 +84,14 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # HIGH RESOLUTION
-                     #self.setUserData(1684, 284, 125.0, 35.0, 300.0, \
-                     #                 10000.0, 20000.0, 1.0,
-                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
-                            
-                     # LOW RESOLUTION
-                     self.setUserData(1484, 236, 125.0, 35.0, 300.0, \
+                     self.setUserData(1324, 192, 125.0, 35.0, 300.0, \
                                       10000.0, 20000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     # HIGH RESOLUTION
+                     #self.setUserData(1484, 236, 125.0, 35.0, 300.0, \
+                     #                 10000.0, 20000.0, 5.0,
+                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -102,14 +102,14 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(1684, 284, 120.0, 40.0, 300.0, \
-                                      10000.0, 20000.0, 1.0,
+                     self.setUserData(1624, 256, 125.0, 40.0, 300.0, \
+                                      10000.0, 20000.0, 5.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
-       def setUserData(self, NX, NZ, XF, ZF, T0, depth, width, rlf, h0, NBVF, GAMT, GAMS, Mountain, kC, latBC):
+       def setUserData(self, NX, NZ, XF, ZF, T0, depth, width, mu, h0, NBVF, GAMT, GAMS, Mountain, kC, latBC):
               
               # Set physical constants (dry air)
               gc = 9.80601
@@ -123,7 +123,7 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -0.75 * L2
+              L1 = -1.0 * L2
               ZH = 1.0E+3 * ZF # In km
               AD = ZH * (L2 - L1) # domain total area
               OPS = (NX + 1) * (NZ + 1)
@@ -146,7 +146,6 @@ class TestCase:
               # Set the Rayleigh options
               applyTop = True
               applyLateral = True
-              mu = rlf * 5.0
               rdex = [1]
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC, rdex)
               
@@ -175,7 +174,7 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.01 # seconds
-              HR = 5.0 #/ 3600.0 # hours              
+              HR = 8.0 #/ 3600.0 # hours              
               DTF = 0.5 # scale time step              
               intMethodOrder = 3
               # 3rd or 4th order time integrator

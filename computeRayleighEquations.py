@@ -21,7 +21,6 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        ZH = DIMS[2]
        
        RP = 4.0
-       C2 = 5.0
        W1 = 1.0 / 3.0
        X1 = 2.0 / 1.0
        
@@ -116,10 +115,15 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        GML = np.ones((NZ, NX))
        GMLX = np.ones((NZ, NX))
        GMLZ = np.ones((NZ, NX))
-       '''
-       C1 = 0.02
-       C2 = 10.0
-       isStretchGML = True # True: trig GML to RHS, False, direct GML to state
+       
+       def sigma_func(x):
+              eps = 0.0
+              p = 2.0
+              q = 1.0
+              sf = (1.0 - eps) * np.power(1.0 - np.power(1.0 - x, p), q)
+              
+              return sf
+       
        for ii in range(0,NZ):
               for jj in range(0,NX):
                      # Get this X location
@@ -127,61 +131,45 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      ZRL = Z[ii,jj]
                      if applyLateral:
                             # Left layer or right layer or not? [0 1]
-                            if XRL >= dLayerR:
-                                   dNormX = (XRL - dLayerR) / width
-                            elif XRL <= dLayerL:
-                                   dNormX = (dLayerL - XRL) / width
+                            if XRL > dLayerR[ii]:
+                                   dNormX = (XRL - dLayerR[ii]) / width[ii]
+                            elif XRL < dLayerL[ii]:
+                                   dNormX = (dLayerL[ii] - XRL) / width[ii]
                             else:
                                    dNormX = 0.0
                             
-                            if isStretchGML:
-                                   # Evaluate the GML factor
-                                   #RFX = (mt.tan(0.5 * mt.pi * dNormX))**GP
-                                   RFX = 2.0 * dNormX**2
-                            else:
-                                   # Evaluate buffer layer factor
-                                   RFX = (1.0 - C1 * dNormX**2) * \
-                                          (1.0 - (1.0 - mt.exp(C2 * dNormX**2)) / (1.0 - mt.exp(C2)))
+                            # Evaluate the GML factor
+                            RFX = sigma_func(dNormX)
                      else:
                             RFX = 0.0
                      if applyTop:
                             # In the top layer?
-                            if ZRL >= dLayerZ[jj]:
-                                   dNormZ = (ZRL - dLayerZ[jj]) / (ZH - height[jj])
+                            if ZRL > dLayerZ[jj]:
+                                   dNormZ = (ZRL - dLayerZ[jj]) / depth[jj]
                             else:
                                    dNormZ = 0.0
                                    
-                            if isStretchGML:
-                                   # Evaluate the strength of the field
-                                   #RFZ = (mt.tan(0.5 * mt.pi * dNormZ))**GP
-                                   RFZ = 2.0 * dNormZ**2
-                            else:
-                                   # Evaluate buffer layer factor
-                                   RFZ = (1.0 - C1 * dNormZ**2) * \
-                                          (1.0 - (1.0 - mt.exp(C2 * dNormZ**2)) / (1.0 - mt.exp(C2)))
+                            # Evaluate the strength of the field
+                            RFZ = sigma_func(dNormZ)              
                      else:
                             RFZ = 0.0
                      
-                     if isStretchGML:
-                            GMLX[ii,jj] = 1.0 / (1.0 + RFX)
-                            GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
-                            # Set the field to max(lateral, top) to handle corners
-                            RFM = np.amax([RFX, RFZ])
-                            GML[ii,jj] = 1.0 / (1.0 + RFM)
-                     else:
-                            GMLX[ii,jj] = RFX
-                            GMLZ[ii,jj] = RFZ
-                            # Set the field to max(lateral, top) to handle corners
-                            GML[ii,jj] = np.amin([RFX, RFZ])
+                     GMLX[ii,jj] = 1.0 / (1.0 + RFX)
+                     GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
+                     # Set the field to max(lateral, top) to handle corners
+                     RFM = np.amax([RFX, RFZ])
+                     GML[ii,jj] = 1.0 / (1.0 + RFM)
+
        '''
-       '''
-       plt.figure()
-       plt.contourf(X, Z, GMLX, 101, cmap=cm.seismic)
-       plt.colorbar()
+       from matplotlib import cm
+       import matplotlib.pyplot as plt
+       fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+       ax.plot_surface(X, Z, GMLZ, cmap=cm.seismic,
+                       linewidth=0, antialiased=False)
        plt.show()
-       input()
+       input('CHECK GRID MATCHING LAYER...')
        '''                  
-       return (GML, GMLX, GMLZ), RL, RLX, RLZ
+       return (GML, GMLX, GMLZ), (RL, RLX, RLZ)
 
 def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        
@@ -192,22 +180,27 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        mu = RLOPT[4]
        
        # Set up the Rayleigh field
-       GML, RL, RLX, RLZ = computeRayleighField(DIMS, REFS, depth, width, \
+       GL, RL = computeRayleighField(DIMS, REFS, depth, width, \
                                                      applyTop, applyLateral)
        
        # Compute the diagonal for full Rayleigh field as matrices    
-       OPS = RL.shape[0] * RL.shape[1]
-       RLM = sps.spdiags(np.reshape(RL, (OPS,), order='F'), 0, OPS, OPS)
-       RLMX = sps.spdiags(np.reshape(RLX, (OPS,), order='F'), 0, OPS, OPS)
-       RLMZ = sps.spdiags(np.reshape(RLZ, (OPS,), order='F'), 0, OPS, OPS)
+       OPS = RL[0].shape[0] * RL[0].shape[1]
+       
+       RLM = sps.spdiags(np.reshape(RL[0], (OPS,), order='F'), 0, OPS, OPS)
+       RLMX = sps.spdiags(np.reshape(RL[1], (OPS,), order='F'), 0, OPS, OPS)
+       RLMZ = sps.spdiags(np.reshape(RL[2], (OPS,), order='F'), 0, OPS, OPS)
+       
+       GLM = sps.spdiags(np.reshape(GL[0], (OPS,), order='F'), 0, OPS, OPS)
+       GLMX = sps.spdiags(np.reshape(GL[1], (OPS,), order='F'), 0, OPS, OPS)
+       GLMZ = sps.spdiags(np.reshape(GL[2], (OPS,), order='F'), 0, OPS, OPS)
 
        # Store the diagonal blocks corresponding to Rayleigh damping terms
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        # Get the indices for the layer regions
-       tempDiagonal = np.reshape(RL, (OPS,), order='F')
+       tempDiagonal = np.reshape(RL[0], (OPS,), order='F')
        ldex = np.nonzero(tempDiagonal)
        
-       return ROPS, (RLM, RLMX, RLMZ), GML, ldex[0]
+       return ROPS, (RLM, RLMX, RLMZ), (GLM, GLMX, GLMZ), ldex[0]
        
                             

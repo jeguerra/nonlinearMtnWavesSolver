@@ -64,7 +64,7 @@ def computeResidualViscCoeffs(RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
        ubnd = 0.5 * DLD[0] * BND[0]
        wbnd = 0.5 * DLD[1] * BND[1]
        
-       set_num_threads(8)
+       set_num_threads(10)
        if byLocalFilter:
            CRES = computeRegionFilter(CRES, RES, DLD, LVAR)
            

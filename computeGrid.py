@@ -33,8 +33,8 @@ def computeGrid(DIMS, RLOPT, Herm, Four, ChebCol, LegCol):
               zb = 0.5 * RLOPT[0]
               NI = int(NZ * (ZH - zb) / ZH)
               zi = np.linspace(0.0, ZH - zb, NI)
-              dz2 = 2.0 * dz
-              zt = np.linspace(ZH - zb + dz2, ZH, num=int(RLOPT[0] / dz2), endpoint=True)
+              dz2 = 1.0 * dz
+              zt = np.linspace(ZH - zb + dz2, ZH, num=int(zb / dz2), endpoint=True)
               z = np.concatenate((zi, zt))
        
        # Map reference 1D domains to physical 1D domains
@@ -51,7 +51,7 @@ def computeGrid(DIMS, RLOPT, Herm, Four, ChebCol, LegCol):
               xb = 0.5 * RLOPT[1]
               NI = int(NX * ((L2 - L1) - 2.0 * xb) / (L2 - L1))
               xi = np.linspace(L1 + xb, L2 - xb, NI)
-              dx2 = 2.0 * dx
+              dx2 = 1.0 * dx
               xl = np.linspace(L1, L1 + xb, num=int(xb / dx2), endpoint=False)
               xr = np.linspace(L2 - xb + dx2, L2, num=int(xb / dx2), endpoint=True)
               x = np.concatenate((xl, xi, xr))
