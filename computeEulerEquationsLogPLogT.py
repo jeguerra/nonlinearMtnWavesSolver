@@ -16,13 +16,13 @@ def enforceBC_RHS(rhs, ebcDex):
        
        ldex = ebcDex[0]
        bdex = ebcDex[2]
-       tdex = ebcDex[3]
-       vdex = np.concatenate((bdex, tdex))
+       #tdex = ebcDex[3]
+       #vdex = np.concatenate((bdex, tdex))
        
        # BC conditions on tendencies
+       #print(rhs.shape)
        rhs[ldex,:] = 0.0
-       rhs[bdex,0] = 0.0
-       rhs[vdex,1] = 0.0
+       rhs[bdex,0:2] = 0.0
        
        return rhs
 

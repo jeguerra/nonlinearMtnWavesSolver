@@ -31,8 +31,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        NZ = Z.shape[0]
        
        rd = (ZH - height[0])
-       pert_width = 0.1 * width
-       pert_depth = 0.1 * rd
+       pert_width = 0.01 * width
+       pert_depth = 0.01 * rd
        
        # Set the layer bounds
        width += pert_width * np.sin(6.0 * mt.pi / width * Z[:,-1])

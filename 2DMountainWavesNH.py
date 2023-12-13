@@ -736,12 +736,12 @@ def runModel(TestName):
               # Multithreaded enabled for transient solution
               if RSBops:
                      DDOP = sps.vstack(advtOps, format='csr')
-                     DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+                     DDOP = rsb_matrix(sps.csr_array(DDOP), shape=DDOP.shape)
                      DDOP.autotune(nrhs=numVar)
                      REFS.append(DDOP) # index 12
                      
                      DDOP = sps.vstack(diffOps, format='csr')
-                     DDOP = rsb_matrix(DDOP, shape=DDOP.shape)
+                     DDOP = rsb_matrix(sps.csr_array(DDOP), shape=DDOP.shape)
                      DDOP.autotune(nrhs=2*numVar)
                      REFS.append(DDOP) # index 13
               else:
@@ -1217,6 +1217,9 @@ def runModel(TestName):
                             
                      # Print out diagnostics every TOPT[5] seconds
                      if interTime1 >= TOPT[5] or ti == 0:
+                            
+                            #print(rhsVec[ebcDex[3],2])
+                            #print(fields[ebcDex[3],2])
                             
                             if isInitialStep:
                                    isInitialStep = False
