@@ -97,8 +97,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               PqPzA[:,2] += DQDZ[:,2]
               
               # Apply GML stretching Z
-              PqPxA[:,[0,3]] = GMLX.dot(PqPxA[:,[0,3]])
-              PqPzA[:,[1,3]] = GMLZ.dot(PqPzA[:,[1,3]])
+              PqPxA[:,[0,1,3]] = GMLX.dot(PqPxA[:,[0,1,3]])
+              PqPzA[:,[0,1,3]] = GMLZ.dot(PqPzA[:,[0,1,3]])
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
@@ -107,8 +107,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
-                     res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
-                     #res = rhs - 0.5 * (rhs0 + rhs)
+                     #res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
+                     res = 2.0 * (rhs - 0.5 * (rhs0 + rhs))
                      res *= res_norm
                      Residual_Update = False
                      
