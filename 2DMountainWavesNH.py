@@ -1390,8 +1390,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       TestName = 'UniformTestTransient'
-       #TestName = '3LayerTestTransient'
+       #TestName = 'UniformTestTransient'
+       TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

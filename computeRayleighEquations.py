@@ -154,8 +154,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      else:
                             RFZ = 0.0
                      
-                     GMLX[ii,jj] = 1.0 / (1.0 + RFX)
-                     GMLZ[ii,jj] = 1.0 / (1.0 + RFZ)
+                     GMLX[ii,jj] = (1.0 - RFX) #1.0 / (1.0 + RFX)
+                     GMLZ[ii,jj] = (1.0 - RFZ) #1.0 / (1.0 + RFZ)
                      # Set the field to max(lateral, top) to handle corners
                      RFM = np.amax([RFX, RFZ])
                      GML[ii,jj] = 1.0 / (1.0 + RFM)

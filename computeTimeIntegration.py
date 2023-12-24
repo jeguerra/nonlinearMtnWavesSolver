@@ -96,9 +96,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               PqPzA = np.copy(DqDzA)
               PqPzA[:,2] += DQDZ[:,2]
               
-              # Apply GML stretching Z
-              PqPxA[:,[0,1,3]] = GMLX.dot(PqPxA[:,[0,1,3]])
-              PqPzA[:,[0,1,3]] = GMLZ.dot(PqPzA[:,[0,1,3]])
+              # Apply GML stretching to complete partials
+              PqPxA[:,[0,1,2,3]] = GMLX.dot(PqPxA[:,[0,1,2,3]])
+              PqPzA[:,[0,1,2,3]] = GMLZ.dot(PqPzA[:,[0,1,2,3]])
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
@@ -113,6 +113,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                      Residual_Update = False
                      
               if Timestep_Update:
+                     
                      DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, solA,
                                                                           DLD, isInitial=isInitialStep)
                      Timestep_Update = False
@@ -176,7 +177,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
  
               # Apply Rayleigh damping layer implicitly
               oneMR = (1.0 - RayD)
-              solB[:,0] = RayD * solB[:,0] + oneMR * init0[:,0]
+              #solB[:,0] = RayD * solB[:,0] + oneMR * init0[:,0]
               solB[:,1] *= RayD
               solB[:,2] *= RayD
               solB[:,3] = RayD * solB[:,3] + oneMR * init0[:,3]
