@@ -52,6 +52,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        DQDZ = REFG[2]
        
        RLM = REFG[4][0].data
+       RLMX = REFG[4][1].data
+       RLMG = REFG[4][2].data
        GMLX = REFG[0][1]
        GMLZ = REFG[0][2]
        
@@ -95,14 +97,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               # Compute complete vertical partial
               PqPzA = np.copy(DqDzA)
               PqPzA[:,2] += DQDZ[:,2]
-              
-              # Apply GML stretching to complete partials
-              PqPxA[:,[0,1,2,3]] = GMLX.dot(PqPxA[:,[0,1,2,3]])
-              PqPzA[:,[0,1,2,3]] = GMLZ.dot(PqPzA[:,[0,1,2,3]])
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
-                                                                              RdT, T_ratio, solA, stateA)
+                                                                       GMLX, GMLZ, RdT, T_ratio, solA, stateA)
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
@@ -116,6 +114,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                      
                      DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, solA,
                                                                           DLD, isInitial=isInitialStep)
+
                      Timestep_Update = False
               
               #%% Compute the DynSGS coefficients at the top update
@@ -170,14 +169,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               # Apply stage update
               solB = sol2Update + coeff * DT * rhs
               
-              # Compute local Rayleigh factors
-              #RayDX = np.reciprocal(1.0 + DT * mu * RLMX)[0,:]
-              #RayDZ = np.reciprocal(1.0 + DF * mu * RLMZ)[0,:]
-              RayD = (np.reciprocal(1.0 + coeff * DT * mu * RLM)[0,:]).T   
- 
+              # Rayleigh factor to inflow boundary
+              RayD = (np.reciprocal(1.0 + coeff * DT * mu * RLM)[0,:]).T
+              RayDX = (np.reciprocal(1.0 + coeff * DT * mu * RLMX)[0,:]).T
               # Apply Rayleigh damping layer implicitly
               oneMR = (1.0 - RayD)
-              #solB[:,0] = RayD * solB[:,0] + oneMR * init0[:,0]
+              #solB[:,0] = RayDX * solB[:,0] + oneMR * init0[:,0]
               solB[:,1] *= RayD
               solB[:,2] *= RayD
               solB[:,3] = RayD * solB[:,3] + oneMR * init0[:,3]

@@ -106,7 +106,7 @@ class TestCase:
                      #                 10000.0, 20000.0, 2.0,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
-                     self.setUserData(1284, 192, 125.0, 40.0, 300.0, \
+                     self.setUserData(1084, 208, 125.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 2.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
@@ -127,7 +127,7 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -1.0 * L2
+              L1 = -0.75 * L2
               ZH = 1.0E+3 * ZF # In km
               AD = ZH * (L2 - L1) # domain total area
               OPS = (NX + 1) * (NZ + 1)
