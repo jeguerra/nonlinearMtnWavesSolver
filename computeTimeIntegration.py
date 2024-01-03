@@ -51,13 +51,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        mu = REFG[3]
        DQDZ = REFG[2]
        
-       RLM = REFG[4][0].data
-       RLMX = REFG[4][1].data
-       RLMG = REFG[4][2].data
+       RLM = REFG[4][0]
+       RLMX = REFG[4][1]
+       RLMG = REFG[4][2]
        GMLX = REFG[0][1]
        GMLZ = REFG[0][2]
        
        S = DLD[5]
+       dhdx = np.expand_dims(REFS[6][0], axis=1)
        bdex = ebcDex[2]
 
        # Stacked derivative operators
@@ -77,10 +78,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute total state
               stateA = np.copy(solA)
-              stateA[:,2] += init0[:,2]
               
               # Compute pressure gradient force scaling (buoyancy)
-              RdT, T_ratio = tendency.computeRdT(solA[:,2], solA[:,3] - init0[:,3],
+              RdT, T_ratio = tendency.computeRdT(solA[:,2] - init0[:,2], 
+                                                 solA[:,3] - init0[:,3],
                                                  REFS[9][0], PHYS[4])
               
               #%% First dynamics update
@@ -89,18 +90,13 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               else:
                      Dq = torch.matmul(DD1, torch.from_numpy(solA)).numpy()
                      
-              DqDxA = Dq[:OPS,:]
-              DqDzA = Dq[OPS:,:]
-              
-              # Complete advective partial derivatives
-              PqPxA = DqDxA - REFS[14] * DqDzA
-              # Compute complete vertical partial
-              PqPzA = np.copy(DqDzA)
-              PqPzA[:,2] += DQDZ[:,2]
+              PqPxA = Dq[:OPS,:]
+              PqPzA = Dq[OPS:,:]
+              DqDzA = (PqPzA - DQDZ)
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
-                                                                       GMLX, GMLZ, RdT, T_ratio, solA, stateA)
+                                                                       RdT, T_ratio, solA, stateA)
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
@@ -112,7 +108,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                      
               if Timestep_Update:
                      
-                     DT, VWAV_fld, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, solA,
+                     DT, VWAV_fld, VFLW_adv = tendency.computeNewTimeStep(PHYS, RdT, solA,
                                                                           DLD, isInitial=isInitialStep)
 
                      Timestep_Update = False
@@ -128,10 +124,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               #%% Compute diffusive update
 
               # Compute directional derivative along terrain
-              PqPxA[bdex,:] = S * DqDxA[bdex,:]
-              
-              # Subtract hydrostatic background for diffusion
-              PqPzA -= DQDZ
+              PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * PqPzA[bdex,:])
               
               # Compute diffusive fluxes
               PqPxA *= CRES[:,0,:]
@@ -151,12 +144,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               D2qDzx = DDq[:OPS,4:]
               P2qPz2 = DDq[OPS:,4:]
               
-              P2qPx2 = D2qDx2 - REFS[14] * P2qPxz
-              P2qPzx = D2qDzx - REFS[14] * P2qPz2
+              P2qPx2 = D2qDx2 #- REFS[14] * P2qPxz
+              P2qPzx = D2qDzx #- REFS[14] * P2qPz2
               
               # Second directional derivatives (of the diffusive fluxes)
-              P2qPx2[bdex,:] = S * D2qDx2[bdex,:]
-              P2qPzx[bdex,:] = S * D2qDzx[bdex,:]
+              P2qPx2[bdex,:] = S * (D2qDx2[bdex,:] + dhdx * P2qPxz[bdex,:])
+              P2qPzx[bdex,:] = S * (D2qDzx[bdex,:] + dhdx * P2qPz2[bdex,:])
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
@@ -170,14 +163,13 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               solB = sol2Update + coeff * DT * rhs
               
               # Rayleigh factor to inflow boundary
-              RayD = (np.reciprocal(1.0 + coeff * DT * mu * RLM)[0,:]).T
-              RayDX = (np.reciprocal(1.0 + coeff * DT * mu * RLMX)[0,:]).T
+              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLM)
+              #RayDX = np.reciprocal(1.0 + coeff * DT * mu * RLMX)
               # Apply Rayleigh damping layer implicitly
-              oneMR = (1.0 - RayD)
-              #solB[:,0] = RayDX * solB[:,0] + oneMR * init0[:,0]
+              #solB[:,0] = RayD * solB[:,0] + (1.0 - RayD) * init0[:,0]
               solB[:,1] *= RayD
-              solB[:,2] *= RayD
-              solB[:,3] = RayD * solB[:,3] + oneMR * init0[:,3]
+              solB[:,2] = RayD * solB[:,2] + (1.0 - RayD) * init0[:,2]
+              solB[:,3] = RayD * solB[:,3] + (1.0 - RayD) * init0[:,3]
               
               return solB
        

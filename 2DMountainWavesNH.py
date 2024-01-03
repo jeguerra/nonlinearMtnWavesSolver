@@ -711,21 +711,23 @@ def runModel(TestName):
        DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD)
        DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD)
        DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
-       
-       #%% Prepare derivative operators for diffusion
-              
+                     
        #%% Prepare derivative operators for advection              
        if HermFunc:
-              PPXMD = DDXMS1
+              PPXMA = DDXMS1
        else:
-              PPXMD = DDXMS_LO
+              PPXMA = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
               
        if verticalChebGrid or verticalLegdGrid:
-              advtOps = (PPXMD,DDZMS1)
+              #advtOps = (REFG[0][1].dot(PPXMD),
+              #           REFG[0][2].dot(DDZMS1))
+              advtOps = (PPXMA,DDZMS1)
        else:
-              advtOps = (PPXMD,DDZMS_HO)
+              #advtOps = (REFG[0][1].dot(PPXMD),
+              #           REFG[0][2].dot(DDZMS_HO))
+              advtOps = (PPXMA,DDZMS_HO)
        
-       PPXMD = DDXMS_LO
+       PPXMD = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
        diffOps = (PPXMD,DDZMS_HO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
@@ -781,7 +783,7 @@ def runModel(TestName):
               
        # Get memory back
        del(DDOP)
-       del(diffOps)
+       del(advtOps); del(diffOps)
        del(DDXMS1); del(DDZMS1)
        del(DDXMS_LO); del(DDZMS_LO)
        del(DDXMS_HO); del(DDZMS_HO)
@@ -1141,8 +1143,9 @@ def runModel(TestName):
                             print('Could NOT read restart NC file!', fname2Restart)
               else:
                      # Initialize fields
-                     fields[:,0] = hydroState[:,0]
-                     fields[:,3] = hydroState[:,3]
+                     #fields[:,0] = hydroState[:,0]
+                     #fields[:,3] = hydroState[:,3]
+                     fields[:] = hydroState
                      fields[ubdex,0] = 0.0
                      fields[ubdex,1] = 0.0
        
@@ -1153,10 +1156,10 @@ def runModel(TestName):
               
               # Compute sound speed and initial time step
               isInitialStep = True
-              RdT, T_ratio = eqs.computeRdT(fields[:,2], fields[:,3] - hydroState[:,3], 
+              RdT, T_ratio = eqs.computeRdT(fields[:,2] - hydroState[:,2], 
+                                            fields[:,3] - hydroState[:,3], 
                                             REFS[9][0], PHYS[4])
-              TOPT[0], VWAV_fld, VWAV_max = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=isInitialStep)
-              VWAV_ref = bn.nanmax(VWAV_fld)
+              TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=isInitialStep)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
               # Normalization for vertical velocity

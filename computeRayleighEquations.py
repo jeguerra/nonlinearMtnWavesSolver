@@ -32,17 +32,17 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        NZ = Z.shape[0]
        
        rd = (ZH - height[0])
-       pert_width = 0.01 * width
-       pert_depth = 0.01 * rd
+       pert_width = 0.0 * width
+       pert_depth = 0.0 * rd
        
        # Set the layer bounds
-       width += pert_width * np.sin(6.0 * mt.pi / width * Z[:,-1])
+       width += pert_width * np.sin(1.0 * mt.pi / width * Z[:,-1])
        dLayerR = L2 - width
        
-       width += pert_width * np.sin(6.0 * mt.pi / width * Z[:,0])
+       width += pert_width * np.sin(1.0 * mt.pi / width * Z[:,0])
        dLayerL = L1 + width
        
-       dLayerZ = height + pert_depth * np.sin(2.0 * mt.pi / rd * X[-1,:])
+       dLayerZ = height + pert_depth * np.sin(1.0 * mt.pi / rd * X[-1,:])
        depth = ZH - dLayerZ       
        
        # Assemble the Rayleigh field
@@ -197,21 +197,22 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        # Compute the diagonal for full Rayleigh field as matrices    
        OPS = RL[0].shape[0] * RL[0].shape[1]
        
-       RLM = sps.spdiags(np.reshape(RL[0], (OPS,), order='F'), 0, OPS, OPS)
-       RLMX = sps.spdiags(np.reshape(RL[1], (OPS,), order='F'), 0, OPS, OPS)
-       RLMZ = sps.spdiags(np.reshape(RL[2], (OPS,), order='F'), 0, OPS, OPS)
+       RLMF = np.reshape(RL[0], (OPS,), order='F')
+       RLMX = np.reshape(RL[1], (OPS,), order='F')
+       RLMZ = np.reshape(RL[2], (OPS,), order='F')
        
        GLM = sps.spdiags(np.reshape(GL[0], (OPS,), order='F'), 0, OPS, OPS)
        GLMX = sps.spdiags(np.reshape(GL[1], (OPS,), order='F'), 0, OPS, OPS)
        GLMZ = sps.spdiags(np.reshape(GL[2], (OPS,), order='F'), 0, OPS, OPS)
 
        # Store the diagonal blocks corresponding to Rayleigh damping terms
+       RLM = sps.spdiags(np.reshape(RL[0], (OPS,), order='F'), 0, OPS, OPS)
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        # Get the indices for the layer regions
        tempDiagonal = np.reshape(RL[0], (OPS,), order='F')
        ldex = np.nonzero(tempDiagonal)
        
-       return ROPS, (RLM, RLMX, RLMZ), (GLM, GLMX, GLMZ), ldex[0]
+       return ROPS, (RLMF, RLMX, RLMZ), (GLM, GLMX, GLMZ), ldex[0]
        
                             

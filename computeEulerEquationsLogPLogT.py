@@ -15,11 +15,15 @@ np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 def enforceBC_RHS(rhs, ebcDex):
        
        ldex = ebcDex[0]
+       rdex = ebcDex[0]
        bdex = ebcDex[2]
+       tdex = ebcDex[3]
        
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
+       rhs[rdex,1] = 0.0
        rhs[bdex,0:2] = 0.0
+       rhs[tdex,1] = 0.0
        
        return rhs
 
@@ -305,6 +309,8 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
 # Fully explicit evaluation of the non linear advection
 def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
        
+       gam = PHYS[6]
+       
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(state[:,0], axis=1)
        WM = np.expand_dims(state[:,1], axis=1)
@@ -312,31 +318,31 @@ def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
        # Compute advection
        DqDt = -(UM * PqPx + WM * PqPz)
        
+       # Divergence
+       DqDt[:,2] -= gam * (PqPx[:,0] + PqPz[:,1])
+       
        return DqDt
 
 # Fully explicit evaluation of the non linear internal forcing
-def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt):
+def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt):
        # Get physical constants
        gc = PHYS[0]
-       gam = PHYS[6]
               
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
-       DqDt[:,1] -= (RdT * DqDz[:,2] - gc * T_ratio)
-       #DqDt[:,1] -= (RdT * DqDz[:,2] + gc)
-       # Pressure (mass) equation
-       DqDt[:,2] -= gam * (PqPx[:,0] + DqDz[:,1])
+       DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
+       #DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
        # Potential temperature equation (material derivative)
        
        return DqDt
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
-def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz, GMLX, GMLZ, 
+def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz, 
                                            RdT, T_ratio, fields, state):
        
-       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, GMLX.dot(PqPx), 
-                                                GMLZ.dot(PqPz), fields, state)
+       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, 
+                                                PqPz, fields, state)
        
        DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
        

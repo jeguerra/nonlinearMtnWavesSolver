@@ -55,7 +55,7 @@ def computeRegionFilter2(Q, DLD, LVAR):
               
        return fval
 
-def computeResidualViscCoeffs(RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
+def computeResidualViscCoeffs(RES, BND, DLD, bdex, ldex, RLM, VMAX, CRES):
        
        # Compute absolute value of residuals
        LVAR = RES.shape[0]
@@ -81,7 +81,8 @@ def computeResidualViscCoeffs(RES, BND, DLD, bdex, ldex, RLM, SMAX, CRES):
            CRES = computeRegionFilter1(CRES, DLD, LVAR)
 
        # Augment damping to the sponge layers
-       CRES[ldex,0,0] += ubnd * RLM[0,ldex]
-       CRES[ldex,1,0] += wbnd * RLM[0,ldex]
+       rlf = RLM[ldex]
+       CRES[ldex,0,0] += 0.5 * DLD[0] * VMAX * rlf
+       CRES[ldex,1,0] += 0.5 * DLD[1] * VMAX * rlf
               
        return CRES
