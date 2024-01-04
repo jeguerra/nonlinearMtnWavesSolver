@@ -6,16 +6,12 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
-import torch
 import matplotlib.pyplot as plt
 import computeResidualViscCoeffs as rescf
 import computeEulerEquationsLogPLogT as tendency
 
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
-
-torch.set_num_threads(12)
-torch.set_num_interop_threads(8)
 
 def plotRHS(x, rhs, ebcDex, label):
        plim = 2.0E4
@@ -78,21 +74,21 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute total state
               stateA = np.copy(solA)
+              pertbA = stateA - init0
               
               # Compute pressure gradient force scaling (buoyancy)
-              RdT, T_ratio = tendency.computeRdT(solA[:,2] - init0[:,2], 
-                                                 solA[:,3] - init0[:,3],
+              RdT, T_ratio = tendency.computeRdT(pertbA[:,2], pertbA[:,3],
                                                  REFS[9][0], PHYS[4])
               
               #%% First dynamics update
               if RSBops:
-                     Dq = DD1.dot(solA)
+                     Dq = DD1.dot(pertbA)
               else:
-                     Dq = torch.matmul(DD1, torch.from_numpy(solA)).numpy()
+                     Dq = DD1 @ pertbA
                      
               PqPxA = Dq[:OPS,:]
-              PqPzA = Dq[OPS:,:]
-              DqDzA = (PqPzA - DQDZ)
+              DqDzA = Dq[OPS:,:]
+              PqPzA = (DqDzA + DQDZ)
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
@@ -124,7 +120,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               #%% Compute diffusive update
 
               # Compute directional derivative along terrain
-              PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * PqPzA[bdex,:])
+              PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * DqDzA[bdex,:])
+              
+              PqPzA -= DQDZ
               
               # Compute diffusive fluxes
               PqPxA *= CRES[:,0,:]
@@ -135,21 +133,21 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               if RSBops:
                      DDq = DD2.dot(Dq)
               else:
-                     DDq = torch.matmul(DD2, torch.from_numpy(Dq)).numpy()
+                     DDq = DD2 @ Dq
                      
               # Column 1
-              D2qDx2 = DDq[:OPS,:4]
+              P2qPx2 = DDq[:OPS,:4]
               P2qPxz = DDq[OPS:,:4]
               # Column 2
-              D2qDzx = DDq[:OPS,4:]
+              P2qPzx = DDq[:OPS,4:]
               P2qPz2 = DDq[OPS:,4:]
               
-              P2qPx2 = D2qDx2 #- REFS[14] * P2qPxz
-              P2qPzx = D2qDzx #- REFS[14] * P2qPz2
+              #P2qPx2 = D2qDx2 #- REFS[14] * P2qPxz
+              #P2qPzx = D2qDzx #- REFS[14] * P2qPz2
               
               # Second directional derivatives (of the diffusive fluxes)
-              P2qPx2[bdex,:] = S * (D2qDx2[bdex,:] + dhdx * P2qPxz[bdex,:])
-              P2qPzx[bdex,:] = S * (D2qDzx[bdex,:] + dhdx * P2qPz2[bdex,:])
+              P2qPx2[bdex,:] = S * (P2qPx2[bdex,:] + dhdx * P2qPxz[bdex,:])
+              P2qPzx[bdex,:] = S * (P2qPzx[bdex,:] + dhdx * P2qPz2[bdex,:])
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
