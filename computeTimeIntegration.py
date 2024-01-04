@@ -86,13 +86,15 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               else:
                      Dq = DD1 @ pertbA
                      
-              PqPxA = Dq[:OPS,:]
+              DqDxA = Dq[:OPS,:]
               DqDzA = Dq[OPS:,:]
+              
+              PqPxA = DqDxA - REFS[14] * DqDzA
               PqPzA = (DqDzA + DQDZ)
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
-                                                                       RdT, T_ratio, solA, stateA)
+                                                                       RdT, T_ratio, stateA)
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
@@ -120,9 +122,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               #%% Compute diffusive update
 
               # Compute directional derivative along terrain
-              PqPxA[bdex,:] = S * (PqPxA[bdex,:] + dhdx * DqDzA[bdex,:])
-              
-              PqPzA -= DQDZ
+              PqPxA[bdex,:] = S * DqDxA[bdex,:]
+              PqPzA = np.copy(DqDzA)
               
               # Compute diffusive fluxes
               PqPxA *= CRES[:,0,:]
@@ -136,22 +137,22 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                      DDq = DD2 @ Dq
                      
               # Column 1
-              P2qPx2 = DDq[:OPS,:4]
+              D2qDx2 = DDq[:OPS,:4]
               P2qPxz = DDq[OPS:,:4]
               # Column 2
-              P2qPzx = DDq[:OPS,4:]
+              D2qDzx = DDq[:OPS,4:]
               P2qPz2 = DDq[OPS:,4:]
               
-              #P2qPx2 = D2qDx2 #- REFS[14] * P2qPxz
-              #P2qPzx = D2qDzx #- REFS[14] * P2qPz2
+              P2qPx2 = D2qDx2 - REFS[14] * P2qPxz
+              P2qPzx = D2qDzx - REFS[14] * P2qPz2
               
               # Second directional derivatives (of the diffusive fluxes)
-              P2qPx2[bdex,:] = S * (P2qPx2[bdex,:] + dhdx * P2qPxz[bdex,:])
-              P2qPzx[bdex,:] = S * (P2qPzx[bdex,:] + dhdx * P2qPz2[bdex,:])
+              P2qPx2[bdex,:] = S * D2qDx2[bdex,:]
+              P2qPzx[bdex,:] = S * D2qDzx[bdex,:]
               
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
-                                                         ebcDex, DLD)
+                                                         ebcDex)
               rhsDif = tendency.enforceBC_RHS(rhsDif, ebcDex)
               
               # Compute total RHS and apply BC

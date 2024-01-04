@@ -21,9 +21,9 @@ def enforceBC_RHS(rhs, ebcDex):
        
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
-       rhs[rdex,1] = 0.0
+       #rhs[rdex,1] = 0.0
        rhs[bdex,0:2] = 0.0
-       rhs[tdex,1] = 0.0
+       #rhs[tdex,0] = 0.0
        
        return rhs
 
@@ -109,17 +109,16 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, is
        
        # Compute flow speed
        Q = np.copy(fields)
-       Q[:,2] += hydroState[:,2]
+       pertb = Q - hydroState
        
        # Compute pressure gradient force scaling (buoyancy)
-       RdT, T_ratio = computeRdT(fields[:,2], fields[:,3] - hydroState[:,3], 
-                                 REFS[9][0], PHYS[4])
+       RdT, T_ratio = computeRdT(pertb[:,2], pertb[:,3], REFS[9][0], PHYS[4])
        
        # Compute the updated RHS
        PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ, RSBops)
               
        if not isTFOpX:
-              PqPx -= REFS[15] * DqDz
+              PqPx -= REFS[14] * DqDz
                             
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFG[2], 
                                                        RdT, T_ratio, fields, Q)
@@ -307,9 +306,7 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        return DOPS
 
 # Fully explicit evaluation of the non linear advection
-def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
-       
-       gam = PHYS[6]
+def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, state):
        
        # Compute advective (multiplicative) operators
        UM = np.expand_dims(state[:,0], axis=1)
@@ -318,31 +315,30 @@ def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, fields, state):
        # Compute advection
        DqDt = -(UM * PqPx + WM * PqPz)
        
-       # Divergence
-       DqDt[:,2] -= gam * (PqPx[:,0] + PqPz[:,1])
-       
        return DqDt
 
 # Fully explicit evaluation of the non linear internal forcing
 def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt):
        # Get physical constants
        gc = PHYS[0]
+       gam = PHYS[6]
               
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
        DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
        #DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
+       # Divergence
+       DqDt[:,2] -= gam * (PqPx[:,0] + PqPz[:,1])
        # Potential temperature equation (material derivative)
        
        return DqDt
 
 # Fully explicit evaluation of the non linear equations (dynamic components)
 def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz, 
-                                           RdT, T_ratio, fields, state):
+                                           RdT, T_ratio, state):
        
-       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, 
-                                                PqPz, fields, state)
+       DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, state)
        
        DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
        
@@ -364,7 +360,7 @@ def computeRayleighTendency(REFG, fields):
        return DqDt
 
 #@njit(parallel=True)
-def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex, DLD):
+def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex):
        
        bdex = ebcDex[2]
        tdex = ebcDex[3]

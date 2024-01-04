@@ -711,12 +711,14 @@ def runModel(TestName):
        DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD)
        DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD)
        DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
+       
+       DZTM = sps.diags(np.reshape(DZT, (OPS,), order='F'))
                      
        #%% Prepare derivative operators for advection              
        if HermFunc:
               PPXMA = DDXMS1
        else:
-              PPXMA = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
+              PPXMA = DDXMS_HO# - DZTM @ DDZMS_HO
               
        if verticalChebGrid or verticalLegdGrid:
               #advtOps = (REFG[0][1].dot(PPXMD),
@@ -727,8 +729,8 @@ def runModel(TestName):
               #           REFG[0][2].dot(DDZMS_HO))
               advtOps = (PPXMA,DDZMS_HO)
        
-       PPXMD = DDXMS_HO - sps.diags(np.reshape(DZT, (OPS,), order='F')).dot(DDZMS_HO)
-       diffOps = (PPXMD,DDZMS_HO)
+       PPXMD = DDXMS_LO #- DZTM @ DDZMS_HO
+       diffOps = (PPXMD,DDZMS_LO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
        REFS.append(diffOps) # index 11
@@ -1173,9 +1175,9 @@ def runModel(TestName):
               print(sol_norm)
                      
               # compute function average of initial fields
-              sol_avrg = DLD[-3] @ hydroState
+              sol_avrg = DLD[-3] @ fields
               # compute state relative to average
-              res_norm = DLD[-3] @ np.abs(hydroState - sol_avrg)
+              res_norm = DLD[-3] @ np.abs(fields - sol_avrg)
               res_norm[1] = bn.nanmean(rw)
               print('Residual Norms:')
               print(res_norm)
