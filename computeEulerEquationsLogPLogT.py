@@ -5,6 +5,7 @@ Created on Mon Jul 22 13:11:11 2019
 
 @author: -
 """
+import math as mt
 import numpy as np
 import bottleneck as bn
 import scipy.sparse as sps
@@ -57,14 +58,20 @@ def computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=False):
               
        return DT, VWAV_fld, VWAV_max
 
-def computeRdT(lp, lt, RdT_bar, kap):
+def computeRdT(PHYS, sol, pert, RdT_bar):
+       
+       Rd = PHYS[3]
+       lp0 = mt.log(PHYS[1])
+       kap = PHYS[4]
        
        # Compute pressure gradient force scaling (buoyancy)              
-       earg = kap * lp + lt
+       earg = kap * pert[:,2] + pert[:,3]
        T_ratio = np.expm1(earg, dtype=np.longdouble)
        #T_exp = np.exp(earg, dtype=np.longdouble)                 
               
-       RdT = RdT_bar * (T_ratio + 1.0)
+       earg = kap * sol[:,2] + sol[:,3] - kap * lp0
+       RdT = Rd * np.exp(earg, dtype=np.longdouble)
+       #RdT = RdT_bar * (T_ratio + 1.0)
        #RdT = RdT_bar * T_exp
        #T_ratio = T_exp - 1.0
                      
@@ -112,7 +119,7 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, is
        pertb = Q - hydroState
        
        # Compute pressure gradient force scaling (buoyancy)
-       RdT, T_ratio = computeRdT(pertb[:,2], pertb[:,3], REFS[9][0], PHYS[4])
+       RdT, T_ratio = computeRdT(Q, pertb, REFS[9][0], PHYS)
        
        # Compute the updated RHS
        PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ, RSBops)
@@ -327,7 +334,7 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt):
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
        #DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
-       DqDt[:,1] -= (RdT * PqPz[:,2] + 0.0*gc)
+       DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
        # Divergence
        DqDt[:,2] -= gam * (PqPx[:,0] + PqPz[:,1])
        # Potential temperature equation (material derivative)

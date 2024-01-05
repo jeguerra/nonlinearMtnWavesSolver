@@ -76,8 +76,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               pertbA = solA - init0
               
               # Compute pressure gradient force scaling (buoyancy)
-              RdT, T_ratio = tendency.computeRdT(pertbA[:,2], pertbA[:,3],
-                                                 REFS[9][0], PHYS[4])
+              RdT, T_ratio = tendency.computeRdT(PHYS, solA, pertbA, REFS[9][0])
               
               #%% First dynamics update
               if RSBops:

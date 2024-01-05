@@ -1158,9 +1158,9 @@ def runModel(TestName):
               
               # Compute sound speed and initial time step
               isInitialStep = True
-              RdT, T_ratio = eqs.computeRdT(fields[:,2] - hydroState[:,2], 
-                                            fields[:,3] - hydroState[:,3], 
-                                            REFS[9][0], PHYS[4])
+              RdT, T_ratio = eqs.computeRdT(PHYS, fields, 
+                                            fields - hydroState, 
+                                            REFS[9][0])
               TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=isInitialStep)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
