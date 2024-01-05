@@ -326,8 +326,8 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt):
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
-       DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
-       #DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
+       #DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
+       DqDt[:,1] -= (RdT * PqPz[:,2] + 0.0*gc)
        # Divergence
        DqDt[:,2] -= gam * (PqPx[:,0] + PqPz[:,1])
        # Potential temperature equation (material derivative)

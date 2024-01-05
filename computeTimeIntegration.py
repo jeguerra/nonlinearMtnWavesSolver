@@ -72,9 +72,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               nonlocal DynSGS_Update,Residual_Update,Timestep_Update,\
                        rhs,res,CRES,DT
               
-              # Compute total state
-              stateA = np.copy(solA)
-              pertbA = stateA - init0
+              # Compute time dependent state about initial conditions
+              pertbA = solA - init0
               
               # Compute pressure gradient force scaling (buoyancy)
               RdT, T_ratio = tendency.computeRdT(pertbA[:,2], pertbA[:,3],
@@ -82,19 +81,19 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% First dynamics update
               if RSBops:
-                     Dq = DD1.dot(pertbA)
+                     Dq = DD1.dot(solA)
               else:
-                     Dq = DD1 @ pertbA
+                     Dq = DD1 @ solA
                      
               DqDxA = Dq[:OPS,:]
-              DqDzA = Dq[OPS:,:]
+              PqPzA = Dq[OPS:,:]
               
-              PqPxA = DqDxA - REFS[14] * DqDzA
-              PqPzA = (DqDzA + DQDZ)
+              PqPxA = DqDxA - REFS[14] * PqPzA
+              DqDzA = (PqPzA - DQDZ)
                                    
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
-                                                                       RdT, T_ratio, stateA)
+                                                                       RdT, T_ratio, solA)
               rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
@@ -165,7 +164,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLM)
               #RayDX = np.reciprocal(1.0 + coeff * DT * mu * RLMX)
               # Apply Rayleigh damping layer implicitly
-              #solB[:,0] = RayD * solB[:,0] + (1.0 - RayD) * init0[:,0]
+              solB[:,0] = RayD * solB[:,0] + (1.0 - RayD) * init0[:,0]
               solB[:,1] *= RayD
               solB[:,2] = RayD * solB[:,2] + (1.0 - RayD) * init0[:,2]
               solB[:,3] = RayD * solB[:,3] + (1.0 - RayD) * init0[:,3]
