@@ -89,11 +89,23 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               PqPxA = DqDxA - REFS[14] * PqPzA
               DqDzA = (PqPzA - DQDZ)
-                                   
+              '''
+              NX = REFS[4].shape[1]
+              NZ = REFS[5].shape[0]
+              #HDP = np.reshape(RdT * PqPzA[:,2] + PHYS[0], (NZ,NX), order='F')
+              HDP = np.reshape(PqPzA[:,2], (NZ,NX), order='F')
+              from matplotlib import cm
+              import matplotlib.pyplot as plt
+              fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+              ax.plot_surface(REFS[4], REFS[5], HDP, cmap=cm.jet,
+                              linewidth=0, antialiased=False)
+              plt.show()
+              input('CHECK GRADIENTS...')
+              '''                     
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
                                                                        RdT, T_ratio, solA)
-              rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
+              #rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
@@ -151,10 +163,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               # Compute diffusive tendencies
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                          ebcDex)
-              rhsDif = tendency.enforceBC_RHS(rhsDif, ebcDex)
               
               # Compute total RHS and apply BC
               rhs = (rhsDyn + rhsDif)
+              rhsDif = tendency.enforceBC_RHS(PHYS, rhs, ebcDex)
               
               # Apply stage update
               solB = sol2Update + coeff * DT * rhs
@@ -163,10 +175,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLM)
               #RayDX = np.reciprocal(1.0 + coeff * DT * mu * RLMX)
               # Apply Rayleigh damping layer implicitly
-              solB[:,0] = RayD * solB[:,0] + (1.0 - RayD) * init0[:,0]
+              #solB[:,0] = RayD * solB[:,0] + (1.0 - RayD) * init0[:,0]
               solB[:,1] *= RayD
               solB[:,2] = RayD * solB[:,2] + (1.0 - RayD) * init0[:,2]
-              solB[:,3] = RayD * solB[:,3] + (1.0 - RayD) * init0[:,3]
+              #solB[:,3] = RayD * solB[:,3] + (1.0 - RayD) * init0[:,3]
               
               return solB
        

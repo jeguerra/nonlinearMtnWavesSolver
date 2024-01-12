@@ -27,15 +27,7 @@ def computeGrid(DIMS, RLOPT, Herm, Four, ChebCol, LegCol):
               xi, wcp = qxw.leglb(NZ) #[-1 +1]
               z = 0.5 * ZH * (1.0 + xi)
        else:
-              zu = np.linspace(0.0, ZH, num=NZ)
-              dz = abs(zu[1] - zu[0])
-              
-              zb = 0.5 * RLOPT[0]
-              NI = int(NZ * (ZH - zb) / ZH)
-              zi = np.linspace(0.0, ZH - zb, NI)
-              dz2 = 1.0 * dz
-              zt = np.linspace(ZH - zb + dz2, ZH, num=int(zb / dz2), endpoint=True)
-              z = np.concatenate((zi, zt))
+              z = np.linspace(0.0, ZH, num=NZ)
        
        # Map reference 1D domains to physical 1D domains
        if Herm and not Four:
@@ -44,17 +36,7 @@ def computeGrid(DIMS, RLOPT, Herm, Four, ChebCol, LegCol):
        elif Four and not Herm:
               x = np.linspace(L1, L2, num=NX, endpoint=True)
        else:
-              xu = np.linspace(L1, L2, num=NX, endpoint=True)
-              dx = abs(xu[1] - xu[0])
-              
-              # Interior grid with 2X coarser in sponge layers
-              xb = 0.5 * RLOPT[1]
-              NI = int(NX * ((L2 - L1) - 2.0 * xb) / (L2 - L1))
-              xi = np.linspace(L1 + xb, L2 - xb, NI)
-              dx2 = 1.0 * dx
-              xl = np.linspace(L1, L1 + xb, num=int(xb / dx2), endpoint=False)
-              xr = np.linspace(L2 - xb + dx2, L2, num=int(xb / dx2), endpoint=True)
-              x = np.concatenate((xl, xi, xr))
+              x = np.linspace(L1, L2, num=NX, endpoint=True)
        
        # Return the REFS structure
        REFS = [x, z]

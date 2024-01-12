@@ -656,10 +656,14 @@ def runModel(TestName):
        # Compute thermodynamic gradients (no interpolation!)
        PORZ = PHYS[3] * TZ
        PBAR = np.exp(LOGP) # Hydrostatic pressure
-       DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
+       DLPDZ = -PHYS[0] / (PHYS[3] * TZ)
        DLTDZ = np.reciprocal(TZ) * DTDZ
        DLPTDZ = DLTDZ - PHYS[4] * DLPDZ
        
+       #fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+       #ax.plot_surface(REFS[4], REFS[5], DLPDZ, cmap=cm.jet,
+       #                linewidth=0, antialiased=False)
+
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
        DLTDZ = np.reshape(DLTDZ, (OPS,1), order='F')
@@ -675,6 +679,45 @@ def runModel(TestName):
        plt.show()
        print('Check interpolated background fields...')
        '''
+       
+       physDOF = numVar * OPS
+       lmsDOF = len(ubdex)
+       
+       # Initialize solution storage
+       SOLT = np.zeros((physDOF, 2))
+       
+       # Initialize Lagrange Multiplier storage
+       LMS = np.zeros(lmsDOF)
+       
+       # Initialize hydrostatic background
+       INIT = np.zeros((physDOF,))
+       RHS = np.zeros((physDOF,))
+       
+       # Initialize the Background fields
+       INIT[udex] = np.reshape(UZ, (OPS,), order='F')
+       INIT[wdex] = np.zeros((OPS,))
+       INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
+       INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
+       hydroState = np.reshape(INIT, (OPS, numVar), order='F')
+       
+       if isRestart and StaticSolve:
+              print('Restarting from previous solution...')
+              SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
+              
+              # Updates nolinear boundary condition to next Newton iteration
+              dWBC = SOLT[wbdex,0] - dHdX[hdex] * (INIT[ubdex] + SOLT[ubdex,0])  
+       else:
+              # Set the initial time
+              IT = 0.0
+              thisTime = IT
+              
+              # Initial change in vertical velocity at boundary
+              dWBC = -dHdX[hdex] * INIT[ubdex]
+            
+       # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
+       fields, U, W = \
+              eqs.computePrepareFields(OPS, np.array(SOLT[:,0]), udex, wdex, pdex, tdex)
+       
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT)
        
@@ -689,7 +732,7 @@ def runModel(TestName):
        del(PORZ)
        del(DUDZ)
        del(DLTDZ)
-       del(DLPDZ)
+       #del(DLPDZ)
        del(DLPTDZ)
        del(GML)
        del(REF0)
@@ -700,25 +743,43 @@ def runModel(TestName):
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        
-       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD)
-       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD)
+       #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+       #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
+       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
        DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
        
-       DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
-       DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
-       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CFD)
-       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CFD)
+       #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
+       #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
+       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CS)
+       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CS)
        DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
        
        DZTM = sps.diags(np.reshape(DZT, (OPS,), order='F'))
+       
+       '''
+       
+       print(DDZ_CS[-1,:])
+       print(DDZ_QS[-1,:])
+       
+       fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+       ax.plot_surface(REFS[4], REFS[5], 
+                       np.reshape(DDZMS_LO @ hydroState[:,2], REFS[4].shape, order='F'), 
+                       cmap=cm.jet, linewidth=0, antialiased=False)
+       
+       fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+       ax.plot_surface(REFS[4], REFS[5], 
+                       np.reshape(DDZMS_HO @ hydroState[:,2], REFS[4].shape, order='F'), 
+                       cmap=cm.jet, linewidth=0, antialiased=False)
+       plt.show()
+       input('CHECK GRADIENTS...')
+       '''
                      
        #%% Prepare derivative operators for advection              
        if HermFunc:
               PPXMA = DDXMS1
        else:
-              PPXMA = DDXMS_HO# - DZTM @ DDZMS_HO
+              PPXMA = DDXMS_LO# - DZTM @ DDZMS_HO
               
        if verticalChebGrid or verticalLegdGrid:
               #advtOps = (REFG[0][1].dot(PPXMD),
@@ -727,7 +788,7 @@ def runModel(TestName):
        else:
               #advtOps = (REFG[0][1].dot(PPXMD),
               #           REFG[0][2].dot(DDZMS_HO))
-              advtOps = (PPXMA,DDZMS_HO)
+              advtOps = (PPXMA,DDZMS_LO)
        
        PPXMD = DDXMS_LO #- DZTM @ DDZMS_HO
        diffOps = (PPXMD,DDZMS_LO)
@@ -792,43 +853,6 @@ def runModel(TestName):
        del(dummy)
        
        #%% SOLUTION INITIALIZATION
-       physDOF = numVar * OPS
-       lmsDOF = len(ubdex)
-       
-       # Initialize solution storage
-       SOLT = np.zeros((physDOF, 2))
-       
-       # Initialize Lagrange Multiplier storage
-       LMS = np.zeros(lmsDOF)
-       
-       # Initialize hydrostatic background
-       INIT = np.zeros((physDOF,))
-       RHS = np.zeros((physDOF,))
-       
-       # Initialize the Background fields
-       INIT[udex] = np.reshape(UZ, (OPS,), order='F')
-       INIT[wdex] = np.zeros((OPS,))
-       INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
-       INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-       hydroState = np.reshape(INIT, (OPS, numVar), order='F')
-       
-       if isRestart and StaticSolve:
-              print('Restarting from previous solution...')
-              SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
-              
-              # Updates nolinear boundary condition to next Newton iteration
-              dWBC = SOLT[wbdex,0] - dHdX[hdex] * (INIT[ubdex] + SOLT[ubdex,0])  
-       else:
-              # Set the initial time
-              IT = 0.0
-              thisTime = IT
-              
-              # Initial change in vertical velocity at boundary
-              dWBC = -dHdX[hdex] * INIT[ubdex]
-            
-       # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       fields, U, W = \
-              eqs.computePrepareFields(OPS, np.array(SOLT[:,0]), udex, wdex, pdex, tdex)
               
        #% Compute the global LHS operator and RHS
        if StaticSolve:
@@ -1105,10 +1129,7 @@ def runModel(TestName):
 
               # Create a container for DynSGS scaling and region parameters
               DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, DA / DIMS[-1], regDex, regDms)
-              
-              #RLM_gpu = cp.asarray(REFG[4][0].data)
-              RLM = REFG[4][0].data
-              
+                            
               # Initialize residual coefficient storage
               CRES = np.zeros((fields.shape[0],2,1))
               
@@ -1395,8 +1416,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       #TestName = 'UniformTestTransient'
-       TestName = '3LayerTestTransient'
+       TestName = 'UniformTestTransient'
+       #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

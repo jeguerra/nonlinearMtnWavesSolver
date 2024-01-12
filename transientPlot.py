@@ -22,7 +22,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Simulation2View_150m.nc'
+fname = 'Simulation2View_Discrete.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -50,12 +50,12 @@ if runPertb:
        out_name = 'PerturbationPT01.gif'
 else:
        var2plot = TH
-       cmp2plot = 'gist_ncar_r'
+       cmp2plot = 'plasma'
        out_name = 'TotalPT01.gif'
 
 # Get the upper and lower bounds for TH
 clim1 = var2plot.min()
-clim2 = var2plot.max()
+clim2 = 0.25*var2plot.max()
 print('Plot bounds: ', clim1, clim2)
 
 def plotPertb(tt):

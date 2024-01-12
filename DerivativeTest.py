@@ -39,8 +39,8 @@ def function1(x):
        
        for ii in range(len(x)):
               if x[ii] >= 0.5:
-                     Y[ii] = 1.0
-                     DY[ii] = 0.0
+                     Y[ii] = 1.0 - 2.0*x[ii]
+                     DY[ii] = -2.0
 
        return Y, DY
 
@@ -49,7 +49,9 @@ def function2(x, L):
        A = 4.0
        B = 2.0
        C = 4.0
+       
        Y = C * np.exp(-A / L * x) * np.sin(B * mt.pi / L * x)
+       
        DY = -(A * C) / L * np.exp(-A / L * x) * np.sin(B * mt.pi / L * x)
        DY += (B * C) * mt.pi / L * np.exp(-A / L * x) * np.cos(B * mt.pi / L * x)
        
@@ -70,8 +72,8 @@ NX = NNX * NEX
 DIMS = [L1, L2, ZH, NX, NZ]
 DIMS_EL = [L1, L2, ZH, NNZ, NZ]
 # Define the computational and physical grids+
-REFS = computeGrid(DIMS, True, False, False, True)
-REFS_EL = computeGrid(DIMS_EL, True, False, False, True)
+REFS = computeGrid(DIMS, None, True, False, False, True)
+REFS_EL = computeGrid(DIMS_EL, None, True, False, False, True)
 
 #%% SCSE VS SPECTRAL TEST Z DIRECTION
 '''
@@ -181,8 +183,8 @@ NZ = 95
 DIMS = [L1, L2, ZH, NX, NZ]
 
 # Define the computational and physical grids+
-REFS_CH = computeGrid(DIMS, True, False, True, False)
-REFS_LG = computeGrid(DIMS, True, False, False, True)
+REFS_CH = computeGrid(DIMS, None, True, False, True, False)
+REFS_LG = computeGrid(DIMS, None, True, False, False, True)
 
 #% Compute the raw derivative matrix operators in alpha-xi computational space
 DDZ_LG, LG_TRANS = derv.computeLegendreDerivativeMatrix(DIMS)
@@ -204,8 +206,8 @@ print('Compact FD6: ', np.count_nonzero(DDZ_CFD2))
 print('Compact FD8: ', np.count_nonzero(DDZ_CFD3))
 
 # Take boundary information from compact FD operators
-DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, False, True, DDZ_CFD2)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CFD3)
+DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, False, True, None)
+DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CS)
 
 # SUPER-RESOLUTION SPECTRAL DERIVATIVE
 DDZ_AV = 0.5 * (DDZ_CFD2 + DDZ_QS) 

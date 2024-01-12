@@ -13,18 +13,19 @@ import sparse_dot_mkl as spk
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
-def enforceBC_RHS(rhs, ebcDex):
+def enforceBC_RHS(PHYS, rhs, ebcDex):
        
        ldex = ebcDex[0]
-       rdex = ebcDex[0]
+       rdex = ebcDex[1]
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
-       #rhs[rdex,1] = 0.0
+       rhs[rdex,2] = 0.0
        rhs[bdex,0:2] = 0.0
-       #rhs[tdex,0] = 0.0
+       rhs[bdex,3] = 0.0
+       rhs[tdex,2] = 0.0
        
        return rhs
 
@@ -70,12 +71,14 @@ def computeRdT(PHYS, sol, pert, RdT_bar):
        #T_exp = np.exp(earg, dtype=np.longdouble)                 
               
        earg = kap * sol[:,2] + sol[:,3] - kap * lp0
-       RdT = Rd * np.exp(earg, dtype=np.longdouble)
-       #RdT = RdT_bar * (T_ratio + 1.0)
+       RdT1 = Rd * np.exp(earg, dtype=np.longdouble)
+       RdT2 = RdT_bar * (T_ratio + 1.0)
        #RdT = RdT_bar * T_exp
        #T_ratio = T_exp - 1.0
+       
+       #print(RdT1.max(), RdT2.max())
                      
-       return RdT.astype(np.float64), T_ratio.astype(np.float64)
+       return RdT1.astype(np.float64), T_ratio.astype(np.float64)
        #return RdT, T_ratio
 
 def computeFieldDerivatives(q, DDX, DDZ, RSBops):
@@ -119,7 +122,7 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, is
        pertb = Q - hydroState
        
        # Compute pressure gradient force scaling (buoyancy)
-       RdT, T_ratio = computeRdT(Q, pertb, REFS[9][0], PHYS)
+       RdT, T_ratio = computeRdT(PHYS, Q, pertb, REFS[9][0])
        
        # Compute the updated RHS
        PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ, RSBops)
@@ -347,7 +350,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz,
        
        DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, state)
        
-       DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
+       DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt)
        
        return DqDt
 
