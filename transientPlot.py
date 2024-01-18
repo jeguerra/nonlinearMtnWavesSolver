@@ -46,16 +46,16 @@ th = TH - np.exp(LNT)
 
 if runPertb:
        var2plot = th
-       cmp2plot = 'RdBu_r'
+       cmp2plot = 'nipy_spectral'
        out_name = 'PerturbationPT01.gif'
 else:
        var2plot = TH
-       cmp2plot = 'plasma'
+       cmp2plot = 'gist_ncar_r'
        out_name = 'TotalPT01.gif'
 
 # Get the upper and lower bounds for TH
 clim1 = var2plot.min()
-clim2 = 0.25*var2plot.max()
+clim2 = 0.5*var2plot.max()
 print('Plot bounds: ', clim1, clim2)
 
 def plotPertb(tt):

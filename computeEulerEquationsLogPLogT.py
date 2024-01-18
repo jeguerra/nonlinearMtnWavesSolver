@@ -22,10 +22,15 @@ def enforceBC_RHS(PHYS, rhs, ebcDex):
        
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
-       rhs[rdex,2] = 0.0
+       
+       rhs[rdex,1:3] = 0.0
+       #rhs[rdex,3] = 0.0
+       
        rhs[bdex,0:2] = 0.0
        rhs[bdex,3] = 0.0
-       rhs[tdex,2] = 0.0
+       
+       rhs[tdex,1:3] = 0.0
+       #rhs[tdex,3] = 0.0
        
        return rhs
 
@@ -68,17 +73,17 @@ def computeRdT(PHYS, sol, pert, RdT_bar):
        # Compute pressure gradient force scaling (buoyancy)              
        earg = kap * pert[:,2] + pert[:,3]
        T_ratio = np.expm1(earg, dtype=np.longdouble)
-       #T_exp = np.exp(earg, dtype=np.longdouble)                 
+       #T_exp = np.exp(earg, dtype=np.longdouble)
+       RdT = RdT_bar * (T_ratio + 1.0)                 
               
-       earg = kap * sol[:,2] + sol[:,3] - kap * lp0
-       RdT1 = Rd * np.exp(earg, dtype=np.longdouble)
-       RdT2 = RdT_bar * (T_ratio + 1.0)
+       #earg = kap * sol[:,2] + sol[:,3] - kap * lp0
+       #RdT = Rd * np.exp(earg, dtype=np.longdouble)
        #RdT = RdT_bar * T_exp
        #T_ratio = T_exp - 1.0
        
        #print(RdT1.max(), RdT2.max())
                      
-       return RdT1.astype(np.float64), T_ratio.astype(np.float64)
+       return RdT.astype(np.float64), T_ratio.astype(np.float64)
        #return RdT, T_ratio
 
 def computeFieldDerivatives(q, DDX, DDZ, RSBops):
@@ -87,8 +92,8 @@ def computeFieldDerivatives(q, DDX, DDZ, RSBops):
               DqDx = DDX.dot(q)
               DqDz = DDZ.dot(q)
        else:
-              DqDx = spk.dot_product_mkl(DDX, q)
-              DqDz = spk.dot_product_mkl(DDZ, q)
+              DqDx = DDX @ q
+              DqDz = DDZ @ q
               
        return DqDx, DqDz
 
