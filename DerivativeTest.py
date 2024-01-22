@@ -207,7 +207,7 @@ print('Compact FD8: ', np.count_nonzero(DDZ_CFD3))
 
 # Take boundary information from compact FD operators
 DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, False, True, None)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CS)
+DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CFD2)
 
 # SUPER-RESOLUTION SPECTRAL DERIVATIVE
 DDZ_AV = 0.5 * (DDZ_CFD2 + DDZ_QS) 
