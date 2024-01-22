@@ -22,7 +22,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Simulation2View_Discrete.nc'
+fname = 'Simulation2View2.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -50,12 +50,13 @@ if runPertb:
        out_name = 'PerturbationPT01.gif'
 else:
        var2plot = TH
-       cmp2plot = 'gist_ncar_r'
+       cmp2plot = 'nipy_spectral_r'
        out_name = 'TotalPT01.gif'
 
 # Get the upper and lower bounds for TH
-clim1 = var2plot.min()
-clim2 = 0.5*var2plot.max()
+NF = 900
+clim1 = var2plot[0,:,:].min()
+clim2 = 0.75 * var2plot[0,:,:].max()
 print('Plot bounds: ', clim1, clim2)
 
 def plotPertb(tt):
@@ -68,8 +69,8 @@ def plotPertb(tt):
        
        plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-       plt.xlim(-30.0, 60.0)
-       plt.ylim(0.0, 16.0)
+       plt.xlim(-25.0, 50.0)
+       plt.ylim(0.0, 20.0)
        plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        plt.tight_layout()
@@ -158,6 +159,6 @@ else:
        else:
               print('Run serial processing...')
               #imglist = [plotPertb(tt) for tt in range(len(times))]
-              imglist = [plotPertb(tt) for tt in range(900)]
+              imglist = [plotPertb(tt) for tt in range(NF)]
        
 imglist[0].save(out_name,append_images=imglist[1:], save_all=True, optimize=False, duration=30, loop=0)

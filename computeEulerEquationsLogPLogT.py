@@ -23,7 +23,7 @@ def enforceBC_RHS(PHYS, rhs, ebcDex):
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
        
-       rhs[rdex,1:3] = 0.0
+       rhs[rdex,:] = 0.0
        #rhs[rdex,3] = 0.0
        
        rhs[bdex,0:2] = 0.0

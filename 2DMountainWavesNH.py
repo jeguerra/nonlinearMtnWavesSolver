@@ -1093,7 +1093,7 @@ def runModel(TestName):
               fltDex = []
               fltDms = []
               regLen = 0
-              sigma2 = DL1*DL2
+              sigma2 = dx*dz
               gaussf = 0.5 / (mt.pi * sigma2)
               for nn in np.arange(XZV.shape[0]):
                      node = XZV[nn,:]
@@ -1111,7 +1111,7 @@ def runModel(TestName):
                      xc2 = np.power(XZV[regDex,0] - node[0], 2.0)
                      zc2 = np.power(XZV[regDex,1] - node[1], 2.0)
                      gkernel = DA[regDex] * gaussf * \
-                               np.exp(-0.5 * (xc2 / DL1**2 + zc2 / DL2**2))
+                               np.exp(-0.5 * (xc2 + zc2) / sigma2)
                                
                      # Function mean kernel
                      mkernel = DA[regDex] / (4.0 * dx * dz)
