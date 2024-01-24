@@ -825,7 +825,8 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      DDM[-1,:] = DDM_BC[-1,:]
        #else:
               
-       DDM = numericalCleanUp(DDM)
+       #DDM = numericalCleanUp(DDM)
+       DDM = removeLeastSingularValue(DDM)
        return DDM, AIB
 
 # Computes standard 4th order compact finite difference 1st derivative matrix
