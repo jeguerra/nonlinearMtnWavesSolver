@@ -751,31 +751,12 @@ def runModel(TestName):
        
        #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
        #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
-       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_CS)
-       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_CS)
+       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
+       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CS)
        DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
-       
-       DZTM = sps.diags(np.reshape(DZT, (OPS,), order='F'))
-       
-       '''
-       
-       print(DDZ_CS[-1,:])
-       print(DDZ_QS[-1,:])
-       
-       fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-       ax.plot_surface(REFS[4], REFS[5], 
-                       np.reshape(DDZMS_LO @ hydroState[:,2], REFS[4].shape, order='F'), 
-                       cmap=cm.jet, linewidth=0, antialiased=False)
-       
-       fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-       ax.plot_surface(REFS[4], REFS[5], 
-                       np.reshape(DDZMS_HO @ hydroState[:,2], REFS[4].shape, order='F'), 
-                       cmap=cm.jet, linewidth=0, antialiased=False)
-       plt.show()
-       input('CHECK GRADIENTS...')
-       '''
                      
        #%% Prepare derivative operators for advection              
+       DZTM = sps.diags(np.reshape(DZT, (OPS,), order='F'))
        if HermFunc:
               PPXMA = DDXMS1
        else:
