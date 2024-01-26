@@ -771,8 +771,8 @@ def runModel(TestName):
               #           REFG[0][2].dot(DDZMS_HO))
               advtOps = (PPXMA,DDZMS_LO)
        
-       PPXMD = DDXMS_LO #- DZTM @ DDZMS_HO
-       diffOps = (PPXMD,DDZMS_LO)
+       PPXMD = DDXMS_HO #- DZTM @ DDZMS_HO
+       diffOps = (PPXMD,DDZMS_HO)
        
        REFS.append((DDXMS1,DDZMS1)) # index 10
        REFS.append(diffOps) # index 11
