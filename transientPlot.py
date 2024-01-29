@@ -22,7 +22,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Simulation2View2.nc'
+fname = 'Simulation2View1.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:]
@@ -50,13 +50,13 @@ if runPertb:
        out_name = 'PerturbationPT01.gif'
 else:
        var2plot = TH
-       cmp2plot = 'nipy_spectral_r'
+       cmp2plot = 'prism'
        out_name = 'TotalPT01.gif'
 
 # Get the upper and lower bounds for TH
 NF = 900
 clim1 = var2plot[0,:,:].min()
-clim2 = 0.75 * var2plot[0,:,:].max()
+clim2 = 1.0 * var2plot[0,:,:].max()
 print('Plot bounds: ', clim1, clim2)
 
 def plotPertb(tt):
@@ -65,7 +65,9 @@ def plotPertb(tt):
        
        thisFigure = plt.figure(figsize=(24.0, 8.0))
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 256, cmap=cmp2plot, vmin=clim1, vmax=clim2)
+       
+       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 512, cmap=cmp2plot, vmin=clim1, vmax=clim2)
+       plt.contour(1.0E-3*X, 1.0E-3*Z, th2plot, 128, colors='k')
        
        plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)

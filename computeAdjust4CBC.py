@@ -36,7 +36,7 @@ def computeAdjust4CBC(shape, numVar, varDex, bcType):
        urdex2 = np.array(range(ubdex[-1]+1, OPS))
        
        # Index all boundary DOF that can be diffused on
-       diffDex = (uldex2, urdex2, ubdex, utdex)
+       diffDex = (uldex1, urdex1, ubdex, utdex)
        
        isInflow = False
        # BC indices for static solution (per variable)
