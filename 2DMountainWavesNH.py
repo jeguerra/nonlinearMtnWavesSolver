@@ -337,6 +337,7 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState):
        m_fid.createVariable('ln_p', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('ln_t', 'f8', ('time', 'z', 'x', 'y'))
        # Create variables (field tendencies)
+       '''
        m_fid.createVariable('DuDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('DwDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Dln_pDt', 'f8', ('time', 'z', 'x', 'y'))
@@ -346,6 +347,7 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState):
        m_fid.createVariable('Rw', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Rln_p', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Rln_t', 'f8', ('time', 'z', 'x', 'y'))
+       '''
        # Create variables for diffusion coefficients
        m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
@@ -374,22 +376,22 @@ def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
 
                      if pp == 0:
                             m_fid.variables['u'][ff,:,:,0] = q
-                            m_fid.variables['DuDt'][ff,:,:,0] = dqdt
-                            m_fid.variables['Ru'][ff,:,:,0] = rq
+                            #m_fid.variables['DuDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Ru'][ff,:,:,0] = rq
                             m_fid.variables['DC1'][ff,:,:,0] = dq1
                      elif pp == 1:
                             m_fid.variables['w'][ff,:,:,0] = q
-                            m_fid.variables['DwDt'][ff,:,:,0] = dqdt
-                            m_fid.variables['Rw'][ff,:,:,0] = rq
+                            #m_fid.variables['DwDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Rw'][ff,:,:,0] = rq
                             m_fid.variables['DC2'][ff,:,:,0] = dq2
                      elif pp == 2:
                             m_fid.variables['ln_p'][ff,:,:,0] = q
-                            m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
-                            m_fid.variables['Rln_p'][ff,:,:,0] = rq
+                            #m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Rln_p'][ff,:,:,0] = rq
                      else:
                             m_fid.variables['ln_t'][ff,:,:,0] = q
-                            m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
-                            m_fid.variables['Rln_t'][ff,:,:,0] = rq
+                            #m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Rln_t'][ff,:,:,0] = rq
                             
               m_fid.close()
               del(m_fid)
@@ -1074,8 +1076,7 @@ def runModel(TestName):
               fltDex = []
               fltDms = []
               regLen = 0
-              sigma2 = dx*dz
-              gaussf = 0.5 / (mt.pi * sigma2)
+              gaussf = 0.5 / (mt.pi * dx * dz)
               for nn in np.arange(XZV.shape[0]):
                      node = XZV[nn,:]
                      #'''
@@ -1092,7 +1093,7 @@ def runModel(TestName):
                      xc2 = np.power(XZV[regDex,0] - node[0], 2.0)
                      zc2 = np.power(XZV[regDex,1] - node[1], 2.0)
                      gkernel = DA[regDex] * gaussf * \
-                               np.exp(-0.5 * (xc2 + zc2) / sigma2)
+                               np.exp(-0.5 * (xc2 / dx**2 + zc2 / dz**2))
                                
                      # Function mean kernel
                      mkernel = DA[regDex] / (4.0 * dx * dz)

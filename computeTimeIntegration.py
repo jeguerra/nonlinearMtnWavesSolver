@@ -110,7 +110,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
                      #res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
-                     res = 2.0 * (rhs - 0.5 * (rhs0 + rhs))
+                     #res = np.copy(rhs)
+                     res = 1.0 * (rhs - 0.5 * (rhs0 + rhs))
                      res *= res_norm
                      Residual_Update = False
                      
@@ -124,8 +125,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               #%% Compute the DynSGS coefficients at the top update
               if DynSGS_Update:
                      # Define residual as the timestep change in the RHS
-                     CRES = rescf.computeResidualViscCoeffs(np.abs(res), sol_norm, DLD,
-                                                            bdex, REFG[5], RLM, VWAV_ref, CRES)
+                     CRES = rescf.computeResidualViscCoeffs(np.abs(res), sol_norm, DLD, DT, 
+                                                            bdex, RLM, VWAV_ref, CRES)
        
                      DynSGS_Update = False
               
@@ -165,8 +166,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                                                          ebcDex)
               
               # Compute total RHS and apply BC
-              rhs = (rhsDyn + rhsDif)
-              rhsDif = tendency.enforceBC_RHS(PHYS, rhs, ebcDex)
+              rhs = tendency.enforceBC_RHS(PHYS, (rhsDyn + rhsDif), ebcDex)
               
               # Apply stage update
               solB = sol2Update + coeff * DT * rhs

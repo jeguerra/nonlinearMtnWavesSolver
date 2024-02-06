@@ -733,10 +733,9 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        if isClamped:
               DDM[0,:] = D1A
               DDM[-1,:] = D1B
-       #else:
               
        DDM = numericalCleanUp(DDM)
-                     
+       #DDM = removeLeastSingularValue(DDM)
        return DDM, AIB
 
 # Computes Cubic Spline 1st derivative matrix
@@ -823,7 +822,6 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               else:
                      DDM[0,:] = DDM_BC[0,:]
                      DDM[-1,:] = DDM_BC[-1,:]
-       #else:
               
        DDM = numericalCleanUp(DDM)
        #DDM = removeLeastSingularValue(DDM)
