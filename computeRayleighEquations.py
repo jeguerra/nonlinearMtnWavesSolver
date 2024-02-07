@@ -22,9 +22,10 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        ZH = DIMS[2]
        
        RP = 4.0
-       T1 = 1.0 / 2.0
+       T1 = 1.0 / 4.0
        W1 = 1.0 / 3.0
        X1 = 2.0 / 1.0
+       C1 = 20.0
        
        # Get REFS data
        X = REFS[4]
@@ -66,6 +67,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                           RFX2 = 1.0 / (1.0 + T1 * (mt.tan(W1 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
                                           RFX2 = 1.0
+                                          
+                                   RFX2 *= 1.0 - (2.0 * (L2 - XRL) / width[ii] - 1.0)**C1
                             elif XRL < dLayerL[ii]:
                                    dNormX = X1 * (XRL - L1) / width[ii] - 0.5
                                    RFX2 = 0.0
@@ -73,6 +76,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                           RFX1 = 1.0 / (1.0 + T1 * (mt.tan(W1 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
                                           RFX1 = 1.0
+                                          
+                                   RFX1 *= 1.0 - (2.0 * (L2 - XRL) / width[ii] - 1.0)**C1
                             else:
                                    dNormX = 1.0
                                    RFX1 = 0.0

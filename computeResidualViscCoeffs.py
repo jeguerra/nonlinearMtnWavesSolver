@@ -20,8 +20,8 @@ def computeRegionFilter(Q, QR, DLD, LVAR):
         
        for ii in prange(LVAR):
               # Compute the given filter over the region
-              gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
-              #gval = np.nanmax(np.nanmax(QR[fltDex[ii],:]))
+              #gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
+              gval = np.nanmax(np.nanmax(QR[fltDex[ii],:]))
               
               Q[ii,0,0] = DLD[2] * gval
               Q[ii,1,0] = DLD[3] * gval
