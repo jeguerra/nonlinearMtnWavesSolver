@@ -556,7 +556,10 @@ def runModel(TestName):
        ax[0,0].plot(REF0[1], np.log(pz))
        ax[0,1].plot(REF0[1], np.log(pt))
        ax[1,0].plot(REF0[1], uz)
-       ax[1,1].plot(REF0[1], tz)
+       ax[1,1].plot(tz[:,0],1.0E-3 * REF0[1],linewidth=3.0,color='black')
+       ax[1,1].grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
+       ax[1,1].set_xlabel('Temperature (K)')
+       ax[1,1].set_ylabel('Elevation (km)')
        plt.show()
        input('Check double resolution background profiles...')
        '''
@@ -1236,18 +1239,6 @@ def runModel(TestName):
                             displayResiduals(message, np.reshape(resVec, (OPS*numVar,), order='F'), \
                                                    thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
                                    
-                            # Compute and apply SVD based filtering
-                            '''
-                            fields_gpu = cp.asarray(fields)
-                            for vv in range(numVar):
-                                   q = cp.reshape(fields_gpu[:,vv], (NZ+1, NX+1), order='F')
-                                   svdq = cp.linalg.svd(q, full_matrices=False)
-                                   sdex = cp.nonzero(svdq[1] >= np.nanmedian(svdq[1]))
-                                   qf = svdq[0][:,sdex].dot(cp.diag(svdq[1][sdex]))
-                                   fields_gpu[:,vv] = cp.reshape(qf.dot(svdq[2][sdex,:]),(OPS,),order='F')
-                            
-                            fields_plot = fields_gpu.get()
-                            '''
                             # Store in the NC file
                             store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, CRES)
                                                         

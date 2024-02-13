@@ -54,3 +54,5 @@ animations/
 *.txt
 
 python results/
+
+*.mp4

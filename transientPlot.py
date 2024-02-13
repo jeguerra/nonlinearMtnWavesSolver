@@ -10,24 +10,33 @@ import time
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import numpy as np
+import bottleneck as bn
 import scipy.linalg as scl
+import scipy.ndimage as scm
 import matplotlib as mpl
 from matplotlib import cm
+import seaborn as sns
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
+plt.rcParams.update({'font.size': 16})
+
+NF = 900
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Simulation2View_discrete.nc'
+fname = 'Simulation2View_mkernel.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
-times = m_fid.variables['time'][:]
-X = m_fid.variables['Xlon'][:,:,0]
-Z = m_fid.variables['Zhgt'][:,:,0]
+times = m_fid.variables['time'][:NF]
+X = m2k * m_fid.variables['Xlon'][:,:,0]
+Z = m2k * m_fid.variables['Zhgt'][:,:,0]
+
+zdex = np.nonzero(Z <= 21.0)
+xdex = np.nonzero((-30.0 <= X) & (X <= +50.0))
 
 #U = m_fid.variables['U'][:,:,0]
 #LNP = m_fid.variables['LNP'][:,:,0]
@@ -36,9 +45,7 @@ LNT = m_fid.variables['LNT'][:,:,0]
 #u = m_fid.variables['u'][:,:,:,0]
 #w = m_fid.variables['w'][:,:,:,0]
 #lnp = m_fid.variables['ln_p'][:,:,:,0]
-lnt = m_fid.variables['ln_t'][:,:,:,0]
-
-dlnt = m_fid.variables['Dln_tDt'][:,:,:,0]
+lnt = m_fid.variables['ln_t'][:NF,:,:,0]
 
 # Compute the total and perturbation potential temperature
 TH = np.exp(lnt)
@@ -50,31 +57,61 @@ if runPertb:
        out_name = 'PerturbationPT01.gif'
 else:
        var2plot = TH
-       cmp2plot = 'prism'
+       cmp2plot = sns.color_palette('Spectral_r', as_cmap=True)
        out_name = 'TotalPT01.gif'
 
 # Get the upper and lower bounds for TH
-NF = 900
-clim1 = var2plot[0,:,:].min()
-clim2 = 1.0 * var2plot[0,:,:].max()
+clim1 = 300.0
+clim2 = 450.0
 print('Plot bounds: ', clim1, clim2)
+
+# Initialize figure
+thisFigure = plt.figure(figsize=(18.0, 10.0))
+plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
 
 def plotPertb(tt):
        
-       th2plot = np.ma.getdata(var2plot[tt,:,:])
+       thisFigure.gca().clear()
+       th2plot = np.ma.getdata(var2plot[tt,:zdex[0].max(),:])
+       '''
+       # Time filtering (Useless for stationary modes)
+       if tt > 1 and tt < times.shape[0] - 1:
+              th2plot = np.ma.getdata(var2plot[tt-1,:,:]) + \
+                        np.ma.getdata(var2plot[tt,:,:]) + \
+                        np.ma.getdata(var2plot[tt+1,:,:])
+              th2plot *= 1.0 / 3.0
+       '''
+       # SVD spatial filter
+       '''
+       svdq = scl.svd(th2plot, full_matrices=False)
+       quantile_filter = np.nanquantile(svdq[1], 0.75)
+       print(svdq[1].max(), svdq[1].min(), quantile_filter)
+       sdex = np.nonzero(svdq[1] >= quantile_filter)
+       qf = svdq[0][:,sdex].dot(np.diag(svdq[1][sdex]))
+       th2plot = qf.dot(svdq[2][sdex,:])[:,0,0,:]
+       '''
+       # Median spatial filter
+       th2plot = scm.median_filter(th2plot, size=(8,4))
        
-       thisFigure = plt.figure(figsize=(24.0, 8.0))
-       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
+       cflow = plt.contourf(X[:zdex[0].max(),:], 
+                            Z[:zdex[0].max(),:], 
+                            th2plot, 512, cmap=cmp2plot, vmin=clim1, vmax=clim2)
+       plt.contour(X[:zdex[0].max(),:], 
+                   Z[:zdex[0].max(),:], 
+                   th2plot, 36, colors='k', vmin=clim1, vmax=clim2)
        
-       plt.contourf(1.0E-3*X, 1.0E-3*Z, th2plot, 768, cmap=cmp2plot, vmin=clim1, vmax=clim2)
-       plt.contour(1.0E-3*X, 1.0E-3*Z, th2plot, 64, colors='k')
-       
-       plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
+       plt.fill_between(X[0,:], Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
        plt.xlim(-25.0, 50.0)
        plt.ylim(0.0, 20.0)
-       plt.title('Total ' + r'$\theta$ and $\Delta \theta$ (K)' + \
+       plt.xlabel('Distance (km)')
+       plt.ylabel('Elevation (km)')
+       plt.title('Total ' + r'$\theta$ (K)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
+       
+       if tt == 0:
+              thisFigure.colorbar(cflow, location='bottom')
+       
        plt.tight_layout()
        #plt.show()
        
@@ -83,16 +120,15 @@ def plotPertb(tt):
        
        # Save out the image
        thisFigure.savefig(save_file)
-       plt.close(fig=thisFigure)
-       del(thisFigure)
+       #plt.close(fig=thisFigure)
        
        # Get the current image
-       image = Image.open(save_file)
+       #image = Image.open(save_file)
                      
        # Delete stuff
        print('Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        
-       return image
+       return save_file
        
 #%% Contour animation of the normalized SGS
 if runSGS:
@@ -163,4 +199,4 @@ else:
               #imglist = [plotPertb(tt) for tt in range(len(times))]
               imglist = [plotPertb(tt) for tt in range(NF)]
        
-imglist[0].save(out_name,append_images=imglist[1:], save_all=True, optimize=False, duration=30, loop=0)
+#imglist[0].save(out_name,append_images=imglist[1:], save_all=True, optimize=True, duration=30, loop=0)

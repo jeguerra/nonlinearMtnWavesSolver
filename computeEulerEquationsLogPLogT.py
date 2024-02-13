@@ -23,7 +23,7 @@ def enforceBC_RHS(PHYS, rhs, ebcDex):
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
        
-       rhs[rdex,:] = 0.0
+       rhs[rdex,2:] = 0.0
        #rhs[rdex,3] = 0.0
        
        rhs[bdex,0:2] = 0.0
@@ -73,12 +73,10 @@ def computeRdT(PHYS, sol, pert, RdT_bar):
        # Compute pressure gradient force scaling (buoyancy)              
        earg = kap * pert[:,2] + pert[:,3]
        T_ratio = np.expm1(earg, dtype=np.longdouble)
-       #T_exp = np.exp(earg, dtype=np.longdouble)
        RdT = RdT_bar * (T_ratio + 1.0)                 
               
-       #earg = kap * sol[:,2] + sol[:,3] - kap * lp0
+       #earg = sol[:,3] - kap * (sol[:,2] - lp0)
        #RdT = Rd * np.exp(earg, dtype=np.longdouble)
-       #RdT = RdT_bar * T_exp
        #T_ratio = T_exp - 1.0
        
        #print(RdT1.max(), RdT2.max())

@@ -111,7 +111,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                      rhs = np.copy(rhsDyn)
                      #res = dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)
                      #res = np.copy(rhs)
-                     res = 1.0 * (rhs - 0.5 * (rhs0 + rhs))
+                     res = 2.0 * (rhs - 0.5 * (rhs0 + rhs))
                      res *= res_norm
                      Residual_Update = False
                      
