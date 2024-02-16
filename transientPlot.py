@@ -22,7 +22,7 @@ from joblib import Parallel, delayed
 
 plt.rcParams.update({'font.size': 16})
 
-NF = 900
+NF = 1080
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
