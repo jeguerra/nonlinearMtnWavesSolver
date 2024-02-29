@@ -17,18 +17,19 @@ import matplotlib as mpl
 from matplotlib import cm
 import seaborn as sns
 import matplotlib.pyplot as plt
+import proplot as pplt
 from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 plt.rcParams.update({'font.size': 16})
 
-NF = 1080
+NF = 1540
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Simulation2View_mkernel.nc'
+fname = '3Layer_150mXZ.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
@@ -57,12 +58,16 @@ if runPertb:
        out_name = 'PerturbationPT01.gif'
 else:
        var2plot = TH
-       cmp2plot = sns.color_palette('Spectral_r', as_cmap=True)
+       #cmp2plot = sns.color_palette('Spectral_r', as_cmap=True)
+       #cmp2plot = pplt.Colormap('vikO')
+       cmp2plot = pplt.Colormap(
+              'YlGnBu_r', 'YlOrRd', 'RdYlGn', 'PRGn_r',
+              ratios=(1,1,3,3), name='SciVisColorEven', save=True)
        out_name = 'TotalPT01.gif'
 
 # Get the upper and lower bounds for TH
 clim1 = 300.0
-clim2 = 450.0
+clim2 = 550.0
 print('Plot bounds: ', clim1, clim2)
 
 # Initialize figure
@@ -91,7 +96,7 @@ def plotPertb(tt):
        th2plot = qf.dot(svdq[2][sdex,:])[:,0,0,:]
        '''
        # Median spatial filter
-       th2plot = scm.median_filter(th2plot, size=(8,4))
+       #th2plot = scm.median_filter(th2plot, size=(8,4))
        
        cflow = plt.contourf(X[:zdex[0].max(),:], 
                             Z[:zdex[0].max(),:], 
@@ -119,7 +124,7 @@ def plotPertb(tt):
        #input('Image Check')
        
        # Save out the image
-       thisFigure.savefig(save_file)
+       thisFigure.savefig(save_file, dpi=200)
        #plt.close(fig=thisFigure)
        
        # Get the current image

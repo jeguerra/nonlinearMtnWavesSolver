@@ -47,14 +47,13 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        mu = REFG[3]
        DQDZ = REFG[2]
        
-       RLM = REFG[4][0]
-       RLMX = REFG[4][1]
-       RLMG = REFG[4][2]
+       RLMI = REFG[4][0]
+       RLMO = REFG[4][1]
+       RLMA = REFG[4][2]
        GMLX = REFG[0][1]
        GMLZ = REFG[0][2]
        
        S = DLD[5]
-       dhdx = np.expand_dims(REFS[6][0], axis=1)
        bdex = ebcDex[2]
 
        # Stacked derivative operators
@@ -105,11 +104,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
                                                                        RdT, T_ratio, solA)
-              #rhsDyn = tendency.enforceBC_RHS(rhsDyn, ebcDex)
               
               if Residual_Update:
                      rhs = np.copy(rhsDyn)
-                     #res = np.copy(rhs)
                      res = 0.5 * ((rhs - rhs0) + (dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)))
                      res *= res_norm
                      Residual_Update = False
@@ -125,7 +122,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               if DynSGS_Update:
                      # Define residual as the timestep change in the RHS
                      CRES = rescf.computeResidualViscCoeffs(np.abs(res), sol_norm, DLD, DT, 
-                                                            bdex, RLM, VWAV_ref, CRES)
+                                                            bdex, RLMA, VWAV_ref, CRES)
        
                      DynSGS_Update = False
               
@@ -170,10 +167,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               # Apply stage update
               solB = sol2Update + coeff * DT * rhs
               
-              # Rayleigh factor to inflow boundary
-              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLM)
-              #RayDX = np.reciprocal(1.0 + coeff * DT * mu * RLMX)
-              # Apply Rayleigh damping layer implicitly
+              # Rayleigh factor to inflow boundary implicitly
+              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMI)
+              solB = RayD * solB + (1.0 - RayD) * init0
+              
+              # Rayleigh factor to outflow boundary implicitly
+              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMO)
               #solB[:,0] = RayD * solB[:,0] + (1.0 - RayD) * init0[:,0]
               solB[:,1] *= RayD
               solB[:,2] = RayD * solB[:,2] + (1.0 - RayD) * init0[:,2]

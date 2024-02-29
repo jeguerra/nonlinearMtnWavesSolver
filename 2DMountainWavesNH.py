@@ -1070,23 +1070,21 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 2.0 * DX_max
-              DL2 = 2.0 * DZ_max
+              DL1 = mt.pi * DX_max
+              DL2 = mt.pi * DZ_max
               
               import matplotlib.path as pth
-              dx = 1.01 * DL1
-              dz = 1.01 * DL2
               fltDex = []
               fltDms = []
               regLen = 0
-              gaussf = 0.5 / (mt.pi * dx * dz)
+              gaussf = 0.5 / (mt.pi * DL1 * DL2)
               for nn in np.arange(XZV.shape[0]):
                      node = XZV[nn,:]
                      #'''
-                     verts = np.array([(node[0] + dx, node[1] - dz), \
-                              (node[0] + dx, node[1] + dz), \
-                              (node[0] - dx, node[1] + dz), \
-                              (node[0] - dx, node[1] - dz)])
+                     verts = np.array([(node[0] + DL1, node[1] - DL2), \
+                              (node[0] + DL1, node[1] + DL2), \
+                              (node[0] - DL1, node[1] + DL2), \
+                              (node[0] - DL1, node[1] - DL2)])
                      rectangle = pth.Path(verts)
                      region = rectangle.contains_points(XZV)
                      regDex = np.nonzero(region == True)[0].tolist()
@@ -1096,10 +1094,10 @@ def runModel(TestName):
                      xc2 = np.power(XZV[regDex,0] - node[0], 2.0)
                      zc2 = np.power(XZV[regDex,1] - node[1], 2.0)
                      gkernel = DA[regDex] * gaussf * \
-                               np.exp(-0.5 * (xc2 / dx**2 + zc2 / dz**2))
+                               np.exp(-0.5 * (xc2 / DL1**2 + zc2 / DL2**2))
                                
                      # Function mean kernel
-                     mkernel = DA[regDex] / (4.0 * dx * dz)
+                     mkernel = DA[regDex] / bn.nansum(DA[regDex])
                      
                      fltDms += [mkernel]
                      regLen = max(len(regDex), regLen)

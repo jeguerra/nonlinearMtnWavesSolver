@@ -34,24 +34,25 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        NZ = Z.shape[0]
        
        rd = (ZH - height[0])
-       pert_width = 0.0 * width
-       pert_depth = 0.0 * rd
+       pert_width = 0.01 * width
+       pert_depth = 0.01 * rd
        
        # Set the layer bounds
-       width += pert_width * np.sin(2.0 * mt.pi / width * Z[:,-1])
+       width += pert_width * np.sin(4.0 * mt.pi / width * Z[:,-1])
        dLayerR = L2 - width
        
-       width += pert_width * np.sin(2.0 * mt.pi / width * Z[:,0])
-       dLayerL = L1 + 0.0 * width
+       width += pert_width * np.sin(4.0 * mt.pi / width * Z[:,0])
+       dLayerL = L1 + width
        
        dLayerZ = height + pert_depth * np.sin(2.0 * mt.pi / rd * X[-1,:])
        depth = ZH - dLayerZ       
        
        # Assemble the Rayleigh field
-       RL = np.zeros((NZ, NX))
+       RL_in = np.zeros((NZ, NX))
+       RL_out = np.zeros((NZ, NX))
+       RL_all = np.zeros((NZ, NX))
        RLX1 = np.zeros((NZ, NX))
        RLX2 = np.zeros((NZ, NX))
-       RLZ = np.zeros((NZ, NX))
        
        for ii in range(0,NZ):
               for jj in range(0,NX):
@@ -116,10 +117,12 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      # Set the field to max(lateral, top) to handle corners
                      RLX1[ii,jj] = RFX1
                      RLX2[ii,jj] = RFX2
-                     # Absorption compatible with GML
-                     RLZ[ii,jj] = np.amax([RFX2, RFZ]) #RFZ
-                     # Full absorption layer
-                     RL[ii,jj] = np.amax([RFX1, RFX2, RFZ])
+                     # Absorption to the inflow boundary
+                     RL_in[ii,jj] = RLX1[ii,jj]
+                     # Absorption to the outflow boundaries
+                     RL_out[ii,jj] = np.amax([RFX2, RFZ])
+                     # Complete absorption frame
+                     RL_all[ii,jj] = np.amax([RFX1, RFX2, RFZ])
                             
        # Assemble the Grid Matching Layer field X and Z directions
        GML = np.ones((NZ, NX))
@@ -188,7 +191,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
               plt.show()
               input('CHECK BOUNDARY LAYERS...')
        
-       return (GML, GMLX2, GMLZ), (RL, RLX1, RLZ)
+       return (GML, GMLX2, GMLZ), (RL_in, RL_out, RL_all)
 
 def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        
@@ -205,9 +208,9 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        # Compute the diagonal for full Rayleigh field as matrices    
        OPS = RL[0].shape[0] * RL[0].shape[1]
        
-       RLMF = np.reshape(RL[0], (OPS,), order='F')
-       RLMX = np.reshape(RL[1], (OPS,), order='F')
-       RLMZ = np.reshape(RL[2], (OPS,), order='F')
+       RLMI = np.reshape(RL[0], (OPS,1), order='F')
+       RLMO = np.reshape(RL[1], (OPS,), order='F')
+       RLMA = np.reshape(RL[2], (OPS,), order='F')
        
        GLM = sps.spdiags(np.reshape(GL[0], (OPS,), order='F'), 0, OPS, OPS)
        GLMX = sps.spdiags(np.reshape(GL[1], (OPS,), order='F'), 0, OPS, OPS)
@@ -221,6 +224,6 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        tempDiagonal = np.reshape(RL[0], (OPS,), order='F')
        ldex = np.nonzero(tempDiagonal)
        
-       return ROPS, (RLMF, RLMX, RLMZ), (GLM, GLMX, GLMZ), ldex[0]
+       return ROPS, (RLMI, RLMO, RLMA), (GLM, GLMX, GLMZ), ldex[0]
        
                             
