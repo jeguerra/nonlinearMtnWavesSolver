@@ -23,7 +23,7 @@ from joblib import Parallel, delayed
 
 plt.rcParams.update({'font.size': 16})
 
-NF = 1540
+NF = 1800
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
@@ -96,7 +96,7 @@ def plotPertb(tt):
        th2plot = qf.dot(svdq[2][sdex,:])[:,0,0,:]
        '''
        # Median spatial filter
-       #th2plot = scm.median_filter(th2plot, size=(8,4))
+       th2plot = scm.median_filter(th2plot, size=(4,3))
        
        cflow = plt.contourf(X[:zdex[0].max(),:], 
                             Z[:zdex[0].max(),:], 

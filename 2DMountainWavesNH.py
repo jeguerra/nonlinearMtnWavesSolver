@@ -1149,8 +1149,6 @@ def runModel(TestName):
                             print('Could NOT read restart NC file!', fname2Restart)
               else:
                      # Initialize fields
-                     #fields[:,0] = hydroState[:,0]
-                     #fields[:,3] = hydroState[:,3]
                      fields[:] = hydroState
                      fields[ubdex,0] = 0.0
                      fields[ubdex,1] = 0.0

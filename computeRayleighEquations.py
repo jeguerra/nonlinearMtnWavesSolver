@@ -13,7 +13,6 @@ import math as mt
 import numpy as np
 import scipy.sparse as sps
 checkPlots = False
-
 def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
        # Get DIMS data
@@ -67,18 +66,14 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    if dNormX > 0.0:
                                           RFX2 = 1.0 / (1.0 + T1 * (mt.tan(W1 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
-                                          RFX2 = 1.0
-                                          
-                                   RFX2 *= 1.0 - (2.0 * (L2 - XRL) / width[ii] - 1.0)**C1
+                                          RFX2 = 1.0                                          
                             elif XRL < dLayerL[ii]:
                                    dNormX = X1 * (XRL - L1) / width[ii] - 0.5
                                    RFX2 = 0.0
                                    if dNormX > 0.0:
                                           RFX1 = 1.0 / (1.0 + T1 * (mt.tan(W1 * mt.pi * dNormX))**RP)
                                    elif dNormX <= 0.0:
-                                          RFX1 = 1.0
-                                          
-                                   RFX1 *= 1.0 - (2.0 * (XRL - L1) / width[ii] - 1.0)**C1
+                                          RFX1 = 1.0                                          
                             else:
                                    dNormX = 1.0
                                    RFX1 = 0.0
@@ -96,9 +91,7 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                                    if dNormZ > 0.0:
                                           RFZ = 1.0 / (1.0 + T1 * (mt.tan(W1 * mt.pi * dNormZ))**RP)
                                    elif dNormZ <= 0.0:
-                                          RFZ = 1.0
-                                          
-                                   RFZ *= 1.0 - (2.0 * (ZH - ZRL) / depth[jj] - 1.0)**C1
+                                          RFZ = 1.0                                          
                             else:
                                    dNormZ = 1.0
                                    RFZ = 0.0
@@ -182,11 +175,11 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
               from matplotlib import cm
               import matplotlib.pyplot as plt
               fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-              ax.plot_surface(X, Z, RLX1, cmap=cm.jet,
+              ax.plot_surface(X, Z, RL_out, cmap=cm.jet,
                               linewidth=0, antialiased=False)
        
               fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-              ax.plot_surface(X, Z, GMLZ, cmap=cm.jet,
+              ax.plot_surface(X, Z, RL_all, cmap=cm.jet,
                               linewidth=0, antialiased=False)
               plt.show()
               input('CHECK BOUNDARY LAYERS...')
