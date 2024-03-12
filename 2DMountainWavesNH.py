@@ -746,22 +746,24 @@ def runModel(TestName):
        #%% DIFFERENTIATION OPERATORS
        
        # Derivative operators from global spectral methods
+       DZTM = sps.diags(np.reshape(DZT, (OPS,), order='F'))
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        
-       #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       # Derivative operators from 3 and 5 spline expansions
        DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
        DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
-       DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_CS, DDZ_CS)
-       
-       #DDX_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
-       #DDZ_CFD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
        DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
        DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CS)
-       DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_QS, DDZ_QS)
+       
+       DDX_FD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+       DDZ_FD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       
+       DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, REFS[7], 
+                                                              DDX_CS, DDZ_CS)
+       DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], 
+                                                              DDX_QS, DDZ_QS)
                      
        #%% Prepare derivative operators for advection              
-       DZTM = sps.diags(np.reshape(DZT, (OPS,), order='F'))
        if HermFunc:
               PPXMA = DDXMS1
        else:
@@ -1073,12 +1075,12 @@ def runModel(TestName):
               DL1 = mt.pi * DX_max
               DL2 = mt.pi * DZ_max
               
+              print('Diffusion regions dimensions (m): ', DL1, DL2)
+              
+              import numba as nb
               import matplotlib.path as pth
-              fltDex = []
-              fltDms = []
-              regLen = 0
-              gaussf = 0.5 / (mt.pi * DL1 * DL2)
-              for nn in np.arange(XZV.shape[0]):
+              
+              def searchRegions(nn):
                      node = XZV[nn,:]
                      #'''
                      verts = np.array([(node[0] + DL1, node[1] - DL2), \
@@ -1088,24 +1090,20 @@ def runModel(TestName):
                      rectangle = pth.Path(verts)
                      region = rectangle.contains_points(XZV)
                      regDex = np.nonzero(region == True)[0].tolist()
-                     fltDex += [regDex]
                      
-                     # Gaussian filter kernel
-                     xc2 = np.power(XZV[regDex,0] - node[0], 2.0)
-                     zc2 = np.power(XZV[regDex,1] - node[1], 2.0)
-                     gkernel = DA[regDex] * gaussf * \
-                               np.exp(-0.5 * (xc2 / DL1**2 + zc2 / DL2**2))
-                               
-                     # Function mean kernel
-                     mkernel = DA[regDex] / bn.nansum(DA[regDex])
-                     
-                     fltDms += [mkernel]
-                     regLen = max(len(regDex), regLen)
+                     return regDex
               
-              print('Diffusion regions dimensions (m): ', DL1, DL2)
+              fltDex = [searchRegions(ii) for ii in np.arange(XZV.shape[0])]
+              
+              def meanRegions(regDex):
+                     # Function mean kernel
+                     mkernel = DA[regDex] / bn.nansum(DA[regDex])                     
+                     
+                     return mkernel
+              
+              fltDms = [meanRegions(regDex) for regDex in fltDex]
 
               # Manipulate arrays to enable numba acceleration for DynSGS
-              import numba as nb
               nb_list = nb.typed.List
               regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
               regDms = nb_list(np.array(dms, dtype=np.float64) for dms in fltDms)
