@@ -22,6 +22,7 @@ def enforceBC_RHS(PHYS, rhs, ebcDex):
        
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
+       #rhs[ldex,3] = 0.0
        
        rhs[rdex,1:] = 0.0
        #rhs[rdex,3] = 0.0
@@ -339,8 +340,8 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt):
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
-       #DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
-       DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
+       DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
+       #DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
        # Divergence
        DqDt[:,2] -= gam * (PqPx[:,0] + PqPz[:,1])
        # Potential temperature equation (material derivative)
@@ -353,7 +354,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz,
        
        DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, state)
        
-       DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt)
+       DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
        
        return DqDt
 

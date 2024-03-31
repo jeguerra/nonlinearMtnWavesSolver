@@ -1167,12 +1167,6 @@ def runModel(TestName):
               # Normalization for vertical velocity
               rw = np.abs(dWBC)
               rw = rw[rw > 0.0]
-              
-              sol_norm = bn.nanmax(np.abs(hydroState), axis=0)
-              sol_norm[1] = bn.nanmax(rw)
-              #sol_norm *= 0.5
-              print('Initial Solution Norms:')
-              print(sol_norm)
                      
               # compute function average of initial fields
               sol_avrg = DLD[-3] @ fields
@@ -1199,7 +1193,7 @@ def runModel(TestName):
                      try:   
                             fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
                                                                     DLD, TOPT, fields, hydroState, rhsVec, dfields, \
-                                                                    CRES, ebcDex, RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep)
+                                                                    CRES, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             '''
                             # Update normalizations for vertical velocity
                             state = np.copy(fields)

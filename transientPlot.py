@@ -23,13 +23,13 @@ from joblib import Parallel, delayed
 
 plt.rcParams.update({'font.size': 16})
 
-NF = 1800
+NF = 1540
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = '3Layer_150mXZ.nc'
+fname = '3Layer_175mXZ.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
@@ -78,25 +78,9 @@ def plotPertb(tt):
        
        thisFigure.gca().clear()
        th2plot = np.ma.getdata(var2plot[tt,:zdex[0].max(),:])
-       '''
-       # Time filtering (Useless for stationary modes)
-       if tt > 1 and tt < times.shape[0] - 1:
-              th2plot = np.ma.getdata(var2plot[tt-1,:,:]) + \
-                        np.ma.getdata(var2plot[tt,:,:]) + \
-                        np.ma.getdata(var2plot[tt+1,:,:])
-              th2plot *= 1.0 / 3.0
-       '''
-       # SVD spatial filter
-       '''
-       svdq = scl.svd(th2plot, full_matrices=False)
-       quantile_filter = np.nanquantile(svdq[1], 0.75)
-       print(svdq[1].max(), svdq[1].min(), quantile_filter)
-       sdex = np.nonzero(svdq[1] >= quantile_filter)
-       qf = svdq[0][:,sdex].dot(np.diag(svdq[1][sdex]))
-       th2plot = qf.dot(svdq[2][sdex,:])[:,0,0,:]
-       '''
+       
        # Median spatial filter
-       th2plot = scm.median_filter(th2plot, size=(4,3))
+       #th2plot = scm.median_filter(th2plot, size=(4,3))
        
        cflow = plt.contourf(X[:zdex[0].max(),:], 
                             Z[:zdex[0].max(),:], 

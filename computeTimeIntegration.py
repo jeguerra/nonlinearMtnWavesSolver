@@ -39,7 +39,7 @@ def plotRHS(x, rhs, ebcDex, label):
        
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                              sol0, init0, rhs0, dsol0, CRES, ebcDex, \
-                             RSBops, VWAV_ref, sol_norm, res_norm, isInitialStep):
+                             RSBops, VWAV_ref, res_norm, isInitialStep):
        
        OPS = sol0.shape[0]
        DT = TOPT[0]
@@ -50,8 +50,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        RLMI = REFG[4][0]
        RLMO = REFG[4][1]
        RLMA = REFG[4][2]
-       GMLX = REFG[0][1]
-       GMLZ = REFG[0][2]
+       #GMLX = REFG[0][1]
+       #GMLZ = REFG[0][2]
        
        S = DLD[5]
        bdex = ebcDex[2]
@@ -88,19 +88,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               PqPxA = DqDxA - REFS[14] * PqPzA
               DqDzA = (PqPzA - DQDZ)
-              '''
-              NX = REFS[4].shape[1]
-              NZ = REFS[5].shape[0]
-              #HDP = np.reshape(RdT * PqPzA[:,2] + PHYS[0], (NZ,NX), order='F')
-              HDP = np.reshape(PqPzA[:,2], (NZ,NX), order='F')
-              from matplotlib import cm
-              import matplotlib.pyplot as plt
-              fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-              ax.plot_surface(REFS[4], REFS[5], HDP, cmap=cm.jet,
-                              linewidth=0, antialiased=False)
-              plt.show()
-              input('CHECK GRADIENTS...')
-              '''                     
+              
+              # Apply Neumman BC here...
+               
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
                                                                        RdT, T_ratio, solA)
@@ -120,9 +110,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% Compute the DynSGS coefficients at the top update
               if DynSGS_Update:
+                     # Initialize diffusion coefficient field
+                     sbnd = 0.5 * DT * VWAV_ref**2
+                     CRES[:,:,0] = sbnd * RLMA
+                     #CRES[:,0,0] = sbnd * RLMA
+                     
                      # Define residual as the timestep change in the RHS
-                     CRES = rescf.computeResidualViscCoeffs(np.abs(res), sol_norm, DLD, DT, 
-                                                            bdex, RLMA, VWAV_ref, CRES)
+                     CRES = rescf.computeResidualViscCoeffs(np.abs(res), DLD, DT, 
+                                                            bdex, sbnd, CRES)
        
                      DynSGS_Update = False
               
@@ -167,9 +162,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               # Apply stage update
               solB = sol2Update + coeff * DT * rhs
               
-              # Rayleigh factor to inflow boundary implicitly
-              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMI)
-              solB = RayD * solB + (1.0 - RayD) * init0
+              # Rayleigh factor to outflow boundary implicitly
+              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMI)[:,0]
+              #solB[:,0] = RayD * solB[:,0] + (1.0 - RayD) * init0[:,0]
+              solB[:,1] *= RayD
+              solB[:,2] = RayD * solB[:,2] + (1.0 - RayD) * init0[:,2]
+              #solB[:,3] = RayD * solB[:,3] + (1.0 - RayD) * init0[:,3]
               
               # Rayleigh factor to outflow boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMO)
