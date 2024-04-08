@@ -50,6 +50,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        RLMI = REFG[4][0]
        RLMO = REFG[4][1]
        RLMA = REFG[4][2]
+       RDEX = REFG[5]
        #GMLX = REFG[0][1]
        #GMLZ = REFG[0][2]
        
@@ -110,14 +111,17 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               #%% Compute the DynSGS coefficients at the top update
               if DynSGS_Update:
-                     # Initialize diffusion coefficient field
                      sbnd = 0.5 * DT * VWAV_ref**2
-                     CRES[:,:,0] = sbnd * RLMA
-                     #CRES[:,0,0] = sbnd * RLMA
+                     CRES *= 0.0
                      
                      # Define residual as the timestep change in the RHS
                      CRES = rescf.computeResidualViscCoeffs(np.abs(res), DLD, DT, 
                                                             bdex, sbnd, CRES)
+                                                            
+                     # Residual contribution vanishes in the sponge layers
+                     CRES[:,:,0] *= (1.0 - RLMA)
+                     # Add in smooth diffusion field in the sponge layers
+                     CRES[:,:,0] += sbnd * RLMA
        
                      DynSGS_Update = False
               

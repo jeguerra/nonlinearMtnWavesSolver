@@ -56,3 +56,5 @@ animations/
 python results/
 
 *.mp4
+
+*.py~

@@ -20,8 +20,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        L2 = DIMS[1]
        ZH = DIMS[2]
        
-       RP = 3.0
-       T1 = 0.25
+       RP = 2.0
+       T1 = 0.5
        S1 = 0.25 / (1.0 - T1)
        C1 = 20.0
        
@@ -60,28 +60,29 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      ZRL = Z[ii,jj]
                      
                      if applyLateral:
+                            RFX1 = 0.0
+                            RFX2 = 0.0
                             # Left layer or right layer or not? [1 0]
                             if XRL > dLayerR[ii]:
                                    dNormX = 2.0 * S1 * mt.pi * ((L2 - XRL) / width2[ii] - T1)
                                    RFX1 = 0.0
+                                   #RFX2 = 1.0 / (1.0 + (mt.tan(dNormX))**RP)
+                                   #'''
                                    if dNormX > 0.0:
                                           RFX2 = 1.0 / (1.0 + (mt.tan(dNormX))**RP)
                                    elif dNormX <= 0.0:
                                           RFX2 = 1.0
-                                          
-                                   #if ii == NZ/2:
-                                   #       print((L2 - XRL)/width2[ii] - T1, RFX2, L2 - dLayerR[ii])
-                                          
+                                   #'''
                             elif XRL < dLayerL[ii]:
                                    dNormX = 2.0 * S1 * mt.pi * ((XRL - L1) / width1[ii] - T1)
+                                   #RFX1 = 1.0 / (1.0 + (mt.tan(dNormX))**RP)
                                    RFX2 = 0.0
+                                   #'''
                                    if dNormX > 0.0:
                                           RFX1 = 1.0 / (1.0 + (mt.tan(dNormX))**RP)
                                    elif dNormX <= 0.0:
                                           RFX1 = 1.0
-
-                                   #if ii == NZ/2:
-                                   #       print((XRL - L1)/width[ii] - T1, RFX1)                                          
+                                   #'''
                             else:
                                    dNormX = 1.0
                                    RFX1 = 0.0
@@ -222,7 +223,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        # Get the indices for the layer regions
-       tempDiagonal = np.reshape(RL[0], (OPS,), order='F')
+       tempDiagonal = np.reshape(RL[2], (OPS,), order='F')
        ldex = np.nonzero(tempDiagonal)
        
        return ROPS, (RLMI, RLMO, RLMA), (GLM, GLMX, GLMZ), ldex[0]
