@@ -10,12 +10,11 @@ import time
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import numpy as np
-import bottleneck as bn
-import scipy.linalg as scl
-import scipy.ndimage as scm
+#import bottleneck as bn
+#import scipy.linalg as scl
+#import scipy.ndimage as scm
 import matplotlib as mpl
 from matplotlib import cm
-import seaborn as sns
 import matplotlib.pyplot as plt
 import proplot as pplt
 from netCDF4 import Dataset
@@ -29,7 +28,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = '3Layer_175mXZ_Test.nc'
+fname = '3Layer_150mXZ.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]

@@ -9,7 +9,6 @@ import math as mt
 import numpy as np
 import bottleneck as bn
 import scipy.sparse as sps
-import sparse_dot_mkl as spk
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
