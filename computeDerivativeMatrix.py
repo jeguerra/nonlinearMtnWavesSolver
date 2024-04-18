@@ -627,67 +627,67 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               #'''
               if ii == 1:                     
                      # Compute the right EIC
-                     OM2, ET2 = computeIntegratalConstantMatrices(ii, dom)
+                     OM, ET = computeIntegratalConstantMatrices(ii, dom)
                      
                      # Assemble to the equation for Z
-                     A[ii,ii] = -a0 * hc
-                     A[ii,ii-1:ii+3] += +(OM2[3,:])
-                     A[ii,ii-1:ii+2] += -(OM2[0,1:])
+                     A[ii,ii] = a0 * hc
+                     A[ii,ii-1:ii+3] += OM[3,:]
+                     #A[ii,ii-1:ii+2] -= OM[0,1:]
                      
-                     B[ii,ii-1:ii+3] += -(ET2[3,:])
-                     #B[ii,ii-1:ii+2] += +(ET2[0,1:])
+                     B[ii,ii-1:ii+3] += ET[3,:]
+                     #B[ii,ii-1:ii+2] -= ET[0,1:]
                      
                      # Compute the C matrix (coefficients to Z)
                      # Compute the D matrix (coefficients to Q)
                      
                      C[ii,ii] = -a2 * hp**3
-                     C[ii,ii-1:ii+3] += a0 * dom[ii]**2 * OM2[3,:] + dom[ii] * OM2[4,:] + OM2[5,:]
-                     D[ii,ii-1:ii+3] += a0 * dom[ii]**2 * ET2[3,:] + dom[ii] * ET2[4,:] + ET2[5,:]
+                     C[ii,ii-1:ii+3] += a0 * dom[ii]**2 * OM[3,:] + dom[ii] * OM[4,:] + OM[5,:]
+                     D[ii,ii-1:ii+3] += a0 * dom[ii]**2 * ET[3,:] + dom[ii] * ET[4,:] + ET[5,:]
                      
                      C[ii-1,ii-1] = -a2 * hm**3
-                     C[ii-1,ii-1:ii+3] += a0 * dom[ii-1]**2 * OM2[0,:] + dom[ii-1] * OM2[1,:] + OM2[2,:]
-                     D[ii-1,ii-1:ii+3] += a0 * dom[ii-1]**2 * ET2[0,:] + dom[ii-1] * ET2[1,:] + ET2[2,:]
+                     C[ii-1,ii-1:ii+3] += a0 * dom[ii-1]**2 * OM[0,:] + dom[ii-1] * OM[1,:] + OM[2,:]
+                     D[ii-1,ii-1:ii+3] += a0 * dom[ii-1]**2 * ET[0,:] + dom[ii-1] * ET[1,:] + ET[2,:]
                      
               elif ii == N-2:
                      # Compute the left EIC
-                     OM1, ET1 = computeIntegratalConstantMatrices(ii-1, dom)
+                     OM, ET = computeIntegratalConstantMatrices(ii-1, dom)
                      
                      # Assemble to the equation for Z
-                     A[ii,ii] = -a0 * hc
-                     A[ii,ii-1:ii+2] += +(OM1[6,:-1])
-                     A[ii,ii-2:ii+2] += -(OM1[3,:])
+                     A[ii,ii] = a0 * hc
+                     #A[ii,ii-1:ii+2] += OM[6,:-1]
+                     A[ii,ii-2:ii+2] -= OM[3,:]
                      
-                     #B[ii,ii-1:ii+2] += -ET1[6,:-1]
-                     B[ii,ii-2:ii+2] += +(ET1[3,:])
+                     #B[ii,ii-1:ii+2] += ET[6,:-1]
+                     B[ii,ii-2:ii+2] -= ET[3,:]
                      
                      # Compute the C matrix (coefficients to Z)
                      # Compute the D matrix (coefficients to Q)
                      
                      C[ii,ii] = +a2 * hm**3
-                     C[ii,ii-2:ii+2] += a0 * dom[ii]**2 * OM1[3,:] + dom[ii] * OM1[4,:] + OM1[5,:]
-                     D[ii,ii-2:ii+2] += a0 * dom[ii]**2 * ET1[3,:] + dom[ii] * ET1[4,:] + ET1[5,:]
+                     C[ii,ii-2:ii+2] += a0 * dom[ii]**2 * OM[3,:] + dom[ii] * OM[4,:] + OM[5,:]
+                     D[ii,ii-2:ii+2] += a0 * dom[ii]**2 * ET[3,:] + dom[ii] * ET[4,:] + ET[5,:]
                      
                      C[ii+1,ii+1] = +a2 * hp**3
-                     C[ii+1,ii-2:ii+2] += a0 * dom[ii+1]**2 * OM2[6,:] + dom[ii+1] * OM2[7,:] + OM2[8,:]
-                     D[ii+1,ii-2:ii+2] += a0 * dom[ii+1]**2 * ET2[6,:] + dom[ii+1] * ET2[7,:] + ET2[8,:]
+                     C[ii+1,ii-2:ii+2] += a0 * dom[ii+1]**2 * OM[6,:] + dom[ii+1] * OM[7,:] + OM[8,:]
+                     D[ii+1,ii-2:ii+2] += a0 * dom[ii+1]**2 * ET[6,:] + dom[ii+1] * ET[7,:] + ET[8,:]
               else:
                      # Compute adjacent EIC and assemble to internal equations for Z
                      OM1, ET1 = computeIntegratalConstantMatrices(ii-1, dom)
-                     OM2, ET2 = computeIntegratalConstantMatrices(ii, dom)
+                     OM, ET = computeIntegratalConstantMatrices(ii, dom)
                      
-                     A[ii,ii] = -a0 * hc
-                     A[ii, ii-1:ii+3] += +(OM2[3,:])
-                     A[ii, ii-2:ii+2] += -(OM1[3,:])
+                     A[ii,ii] = a0 * hc
+                     A[ii,ii-1:ii+3] += OM[3,:]
+                     A[ii,ii-2:ii+2] -= OM1[3,:]
                      
-                     B[ii, ii-1:ii+3] += -(ET2[3,:])
-                     B[ii, ii-2:ii+2] += +(ET1[3,:])
+                     B[ii, ii-1:ii+3] += ET[3,:]
+                     B[ii, ii-2:ii+2] -= ET1[3,:]
                      
                      # Compute the C matrix (coefficients to Z)
                      C[ii,ii] = -a2 * hp**3
-                     C[ii,ii-1:ii+3] += a0 * dom[ii]**2 * OM2[3,:] + dom[ii] * OM2[4,:] + OM2[5,:]
+                     C[ii,ii-1:ii+3] += a0 * dom[ii]**2 * OM[3,:] + dom[ii] * OM[4,:] + OM[5,:]
                      
                      # Compute the D matrix (coefficients to Q)
-                     D[ii,ii-1:ii+3] += a0 * dom[ii]**2 * ET2[3,:] + dom[ii] * ET2[4,:] + ET2[5,:]
+                     D[ii,ii-1:ii+3] += a0 * dom[ii]**2 * ET[3,:] + dom[ii] * ET[4,:] + ET[5,:]
               #'''
               
        # Prescribed derivative conditions
@@ -706,8 +706,8 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               PLU = scl.lu_factor(R)
               AIB = scl.lu_solve(PLU, (Q.T).dot(B))
        elif isEssential:
-              A[0,0] = +1.0
-              A[0,1] = -1.0
+              A[0,0] = -1.0
+              A[0,1] = +1.0
               B[0,:] = np.zeros(N)
               
               A[N-1,N-2] = -1.0
@@ -726,9 +726,9 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        DDM = C.dot(AIB) + D
 
        # Set boundary derivatives from specified
-       if isClamped:
-              DDM[0,:] = D1A
-              DDM[-1,:] = D1B
+       #if isClamped:
+       #       DDM[0,:] = D1A
+       #       DDM[-1,:] = D1B
               
        DDM = numericalCleanUp(DDM)
        #DDM = removeLeastSingularValue(DDM)
@@ -794,51 +794,74 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
           
        # Loop over each interior point in the irregular grid
        for ii in range(1,N-1):
-                               
-              # Compute adjacent EIC and assemble to internal equations for Z              
-              if ii == 1:
+              hp = abs(dom[ii+1] - dom[ii])
+              hm = abs(dom[ii] - dom[ii-1])
+              
+              #%% LHS matrix
+              a0 = 0.5
+              a1 = 1.0 / 6.0
+              hc = hp + hm
+              
+              #'''
+              if ii == 1:                     
+                     # Compute the right EIC
                      OM, ET = computeIntegratalConstantMatrices(ii, dom)
-                     hii = (dom[ii+1] - dom[ii])
-                     A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
+                     
+                     # Assemble to the equation for Z
+                     A[ii,ii] = a0 * hc
                      A[ii,ii-1:ii+2] += OM[2,:]
-                     A[ii,ii-1:ii+1] -= OM[0,1:]
+                     #A[ii,ii-1:ii+1] -= OM[0,1:]
+                     
                      B[ii,ii-1:ii+2] += ET[2,:]
-                     B[ii,ii-1:ii+1] -= ET[0,1:]
-                     
-                     C[ii,ii] = a1 * hii**2
-                     C[ii,ii-1:ii+2] += OM[3,:]
-                     D[ii,ii-1:ii+2] += ET[3,:]
-                     
-                     C[ii-1,ii-1] = a1 * hii**2
-                     C[ii-1,ii-1:ii+2] += OM[1,:]
-                     D[ii-1,ii-1:ii+2] += ET[1,:]
-              elif ii == N-2:
-                     OM, ET = computeIntegratalConstantMatrices(ii-1, dom)
-                     hii = (dom[ii+1] - dom[ii])
-                     A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
-                     A[ii,ii-1:ii+2] += OM[4,:]
-                     A[ii,ii-1:ii+1] -= OM[2,1:]
-                     B[ii,ii-1:ii+2] += ET[4,:]
-                     B[ii,ii-1:ii+1] -= ET[2,1:]
-                     
-                     C[ii,ii] = a1 * hii**2
-                     C[ii,ii-1:ii+2] += OM[3,:]
-                     D[ii,ii-1:ii+2] += ET[3,:]
-                     
-                     C[ii+1,ii+1] = a1 * hii**2
-                     C[ii+1,ii-2:ii+1] += OM[5,:]
-                     D[ii+1,ii-2:ii+1] += ET[5,:]
-              else:
-                     OM, ET = computeIntegratalConstantMatrices(ii, dom)
-                     hii = (dom[ii+1] - dom[ii])
-                     A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
-                     A[ii,ii-1:ii+2] += OM[2,:]
-                     A[ii,ii-2:ii+1] -= OM[0,:]
-                     B[ii,ii-1:ii+2] += ET[2,:]
-                     B[ii,ii-2:ii+1] -= ET[0,:]
+                     #B[ii,ii-1:ii+2] += +(ET2[0,1:])
                      
                      # Compute the C matrix (coefficients to Z)
-                     C[ii,ii] = a1 * hii**2
+                     # Compute the D matrix (coefficients to Q)
+                     
+                     C[ii,ii] = a1 * hp**2
+                     C[ii,ii-1:ii+2] += OM[3,:]
+                     D[ii,ii-1:ii+2] += ET[3,:]
+                     
+                     C[ii-1,ii-1] = a1 * hm**2
+                     C[ii-1,ii-1:ii+2] += OM[1,:]
+                     D[ii-1,ii-1:ii+2] += ET[1,:]
+                     
+              elif ii == N-2:
+                     # Compute the left EIC
+                     OM, ET = computeIntegratalConstantMatrices(ii-1, dom)
+                     
+                     # Assemble to the equation for Z
+                     A[ii,ii] = a0 * hc
+                     #A[ii,ii:ii+2] += OM[4,:-1]
+                     A[ii,ii-1:ii+2] -= OM[4,:]
+                     
+                     #B[ii,ii-1:ii+2] += -ET1[6,:-1]
+                     B[ii,ii-1:ii+2] -= ET[4,:]
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     # Compute the D matrix (coefficients to Q)
+                     
+                     C[ii,ii] = a1 * hm**2
+                     C[ii,ii-1:ii+2] += hm * OM[2,:] + OM[3,:]
+                     D[ii,ii-1:ii+2] += hm * ET[2,:] + ET[3,:]
+                     
+                     C[ii+1,ii+1] = a1 * hp**2
+                     C[ii+1,ii-1:ii+2] += hp * OM[4,:] + OM[5,:]
+                     D[ii+1,ii-1:ii+2] += hp * ET[4,:] + ET[5,:]
+              else:
+                     # Compute adjacent EIC and assemble to internal equations for Z
+                     OM1, ET1 = computeIntegratalConstantMatrices(ii-1, dom)
+                     OM, ET = computeIntegratalConstantMatrices(ii, dom)
+                     
+                     A[ii,ii] = a0 * hc
+                     A[ii, ii-1:ii+2] += OM[2,:]
+                     A[ii, ii-2:ii+1] -= OM[0,:]
+                     
+                     B[ii, ii-1:ii+2] += ET[2,:]
+                     B[ii, ii-2:ii+1] -= ET[0,:]
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     C[ii,ii] = a1 * hp**2
                      C[ii,ii-1:ii+2] += OM[3,:]
                      
                      # Compute the D matrix (coefficients to Q)

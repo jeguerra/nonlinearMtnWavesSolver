@@ -210,8 +210,8 @@ print('Compact FD8: ', np.count_nonzero(DDZ_CFD3))
 
 # Take boundary information from compact FD operators
 DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, False, True, None)
-DDZ_RS, DDZ3_RS = derv.computeQuarticSplineDerivativeMatrix(zv, True, False, DDZ_CS)
-DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CS)
+DDZ_RS, DDZ3_RS = derv.computeQuarticSplineDerivativeMatrix(zv, False, True, DDZ_CS)
+DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CFD1)
 
 # Compute eigenspectra
 W1 = scl.eigvals(DDZ_CFD2)
