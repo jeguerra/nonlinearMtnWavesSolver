@@ -632,7 +632,7 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      # Assemble to the equation for Z
                      A[ii,ii] = a0 * hc
                      A[ii,ii-1:ii+3] += OM[3,:]
-                     #A[ii,ii-1:ii+2] -= OM[0,1:]
+                     A[ii,ii-1:ii+2] -= OM[0,1:]
                      
                      B[ii,ii-1:ii+3] += ET[3,:]
                      #B[ii,ii-1:ii+2] -= ET[0,1:]
@@ -654,7 +654,7 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      
                      # Assemble to the equation for Z
                      A[ii,ii] = a0 * hc
-                     #A[ii,ii-1:ii+2] += OM[6,:-1]
+                     A[ii,ii-1:ii+2] += OM[6,:-1]
                      A[ii,ii-2:ii+2] -= OM[3,:]
                      
                      #B[ii,ii-1:ii+2] += ET[6,:-1]
@@ -679,8 +679,8 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      A[ii,ii-1:ii+3] += OM[3,:]
                      A[ii,ii-2:ii+2] -= OM1[3,:]
                      
-                     B[ii, ii-1:ii+3] += ET[3,:]
-                     B[ii, ii-2:ii+2] -= ET1[3,:]
+                     B[ii,ii-1:ii+3] += ET[3,:]
+                     B[ii,ii-2:ii+2] -= ET1[3,:]
                      
                      # Compute the C matrix (coefficients to Z)
                      C[ii,ii] = -a2 * hp**3
