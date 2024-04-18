@@ -550,13 +550,13 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        def computeIntegratalConstantMatrices(ii, x):
               
-              x = np.array(x, dtype=np.longdouble)
+              #x = np.array(x, dtype=np.longdouble)
               
               hp = abs(x[ii+1] - x[ii])
               hp1 = abs(x[ii+2] - x[ii+1])
               hm = abs(x[ii] - x[ii-1])
               
-              V = np.zeros((9,9), dtype=np.longdouble)
+              V = np.zeros((9,9))
               
               a0 = 0.5
               a1 = 1.0 / 6.0
@@ -585,7 +585,7 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               V[7,:] = np.array([0.0, 0.0, 0.0, xip, 1.0, 0.0, -xip, -1.0, 0.0])
               V[8,:] = np.array([0.0, 0.0, 0.0, xip2, xip, 1.0, -xip2, -xip, -1.0])
               
-              rho = np.zeros((9,4), dtype=np.longdouble)
+              rho = np.zeros((9,4))
               rho[0,1] = a0 * (hp + hm)
               rho[1,1] = a1 * (hm**2 - hp**2)
               rho[2,1] = a2 * (hm**3 + hp**3)
@@ -599,7 +599,7 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               rho[7,2] = a1 * (hp1**2 - hp**2)
               rho[8,2] = -a2 * (hp**3 + hp1**3)
               
-              eta = np.zeros((9,4), dtype=np.longdouble)
+              eta = np.zeros((9,4))
               eta[3,:] = 1.0 / hm * np.array([-1.0, 1.0, 0.0, 0.0])
               eta[4,:] = 1.0 / hp * np.array([0.0, -1.0, 1.0, 0.0])
               eta[5,:] = 1.0 / hp1 *np.array([0.0, 0.0, -1.0, 1.0])
@@ -753,9 +753,9 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        def computeIntegratalConstantMatrices(ii, x):
                             
-              hj = abs(x[ii+1] - x[ii])
-              hm = abs(x[ii] - x[ii-1])
-              hp = abs(x[ii+2] - x[ii+1])
+              hj = (x[ii+1] - x[ii])
+              hm = (x[ii] - x[ii-1])
+              hp = (x[ii+2] - x[ii+1])
               
               V = np.zeros((6,6))
               
@@ -793,44 +793,56 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               return OM, ET
           
        # Loop over each interior point in the irregular grid
-       for ii in range(1,N-2):
+       for ii in range(1,N-1):
                                
-              # Compute adjacent EIC and assemble to internal equations for Z
-              OM, ET = computeIntegratalConstantMatrices(ii, dom)
-              
+              # Compute adjacent EIC and assemble to internal equations for Z              
               if ii == 1:
-                     C[0,0] = a1 * (dom[1] - dom[0])**2
-                     C[0,0:3] += OM[1,:]
-                     D[0,0:3] += ET[1,:]
-              
-              A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
-              A[ii, ii-1:ii+2] += OM[2,:] - OM[0,:]
-              B[ii, ii-1:ii+2] += ET[2,:] - ET[0,:]
-              
-              # Compute the C matrix (coefficients to Z)
-              C[ii,ii] = a1 * (dom[ii+1] - dom[ii])**2
-              C[ii,ii-1:ii+2] += OM[3,:]
-              
-              # Compute the D matrix (coefficients to Q)
-              D[ii,ii-1:ii+2] += ET[3,:]
-       
-       # Handle the right end from the loop above
-       hN1 = (dom[N-1] - dom[N-2])
-       A[N-2,N-2] = a0 * (dom[N-1] + dom[N-3])
-       A[N-2,N-3:N] += OM[4,:] - OM[2,:]
-       B[N-2,N-3:N] += ET[4,:] - ET[2,:]
-       
-       # Compute the C matrix (coefficients to Z)
-       C[N-2,N-2] = a1 * (dom[N-1] - dom[N-2])**2
-       C[N-2,N-3:N] += OM[5,:]
-       
-       # Compute the D matrix (coefficients to Q)
-       D[N-2,N-3:N] += ET[5,:]
-       
-       # Compute boundary terms in the first derivative matrices
-       C[N-1,N-1] = a1 * hN1**2
-       C[N-1,N-3:N] += hN1 * OM[4,:] + OM[5,:]
-       D[N-1,N-3:N] += hN1 * ET[4,:] + ET[5,:]
+                     OM, ET = computeIntegratalConstantMatrices(ii, dom)
+                     hii = (dom[ii+1] - dom[ii])
+                     A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
+                     A[ii,ii-1:ii+2] += OM[2,:]
+                     A[ii,ii-1:ii+1] -= OM[0,1:]
+                     B[ii,ii-1:ii+2] += ET[2,:]
+                     B[ii,ii-1:ii+1] -= ET[0,1:]
+                     
+                     C[ii,ii] = a1 * hii**2
+                     C[ii,ii-1:ii+2] += OM[3,:]
+                     D[ii,ii-1:ii+2] += ET[3,:]
+                     
+                     C[ii-1,ii-1] = a1 * hii**2
+                     C[ii-1,ii-1:ii+2] += OM[1,:]
+                     D[ii-1,ii-1:ii+2] += ET[1,:]
+              elif ii == N-2:
+                     OM, ET = computeIntegratalConstantMatrices(ii-1, dom)
+                     hii = (dom[ii+1] - dom[ii])
+                     A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
+                     A[ii,ii-1:ii+2] += OM[4,:]
+                     A[ii,ii-1:ii+1] -= OM[2,1:]
+                     B[ii,ii-1:ii+2] += ET[4,:]
+                     B[ii,ii-1:ii+1] -= ET[2,1:]
+                     
+                     C[ii,ii] = a1 * hii**2
+                     C[ii,ii-1:ii+2] += OM[3,:]
+                     D[ii,ii-1:ii+2] += ET[3,:]
+                     
+                     C[ii+1,ii+1] = a1 * hii**2
+                     C[ii+1,ii-2:ii+1] += OM[5,:]
+                     D[ii+1,ii-2:ii+1] += ET[5,:]
+              else:
+                     OM, ET = computeIntegratalConstantMatrices(ii, dom)
+                     hii = (dom[ii+1] - dom[ii])
+                     A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
+                     A[ii,ii-1:ii+2] += OM[2,:]
+                     A[ii,ii-2:ii+1] -= OM[0,:]
+                     B[ii,ii-1:ii+2] += ET[2,:]
+                     B[ii,ii-2:ii+1] -= ET[0,:]
+                     
+                     # Compute the C matrix (coefficients to Z)
+                     C[ii,ii] = a1 * hii**2
+                     C[ii,ii-1:ii+2] += OM[3,:]
+                     
+                     # Compute the D matrix (coefficients to Q)
+                     D[ii,ii-1:ii+2] += ET[3,:]
               
        # Prescribed derivative conditions
        D3A = DM3[0,:] # left end 3th derivative

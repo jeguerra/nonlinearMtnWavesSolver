@@ -130,12 +130,12 @@ DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
 HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT)
 DYD_SPT = DDX_1D.dot(HofX)    
 
-#DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
 DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, 0.0)
-#DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+DDX_RS, DDX3A_RS = derv.computeQuarticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
 DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
 
 DYD_CS = DDX_CS.dot(HofX)
+DYD_RS = DDX_RS.dot(HofX)
 DYD_QS = DDX_QS.dot(HofX)
 
 '''
@@ -153,6 +153,7 @@ plt.figure(figsize=(8, 6), tight_layout=True)
 plt.plot(xv, dHdX, 'r-', label='Analytical Derivative')
 plt.plot(xv, DYD_SPT, 'r--', label='Spectral Derivative')
 plt.plot(xv, DYD_CS, 'bs-', label='Cubic Spline Derivative')
+plt.plot(xv, DYD_RS, 's-', label='Quartic Spline Derivative', color='orange')
 plt.plot(xv, DYD_QS, 'gs-', label='Quintic Derivative')
 #plt.xlim(-12500.0, 12500.0)
 plt.xlabel('Domain')
@@ -165,6 +166,7 @@ plt.legend()
 plt.figure(figsize=(8, 6), tight_layout=True)
 plt.semilogy(xv, np.abs(DYD_SPT - dHdX), 'r--', label='Spectral Derivative')
 plt.semilogy(xv, np.abs(DYD_CS - dHdX), 'bs-', label='CS Derivative Error')
+plt.semilogy(xv, np.abs(DYD_RS - dHdX), 's-', label='RS Derivative Error', color='orange')
 plt.semilogy(xv, np.abs(DYD_QS - dHdX), 'gs-', label='QS Derivative Error')
 plt.grid(visible=True, which='both', axis='both')
 plt.legend()
@@ -173,6 +175,7 @@ plt.legend()
 plt.show()
 print('Spectral Derivative: ', np.count_nonzero(DDX_1D))
 print('Cubic Spline Derivative: ', np.count_nonzero(DDX_CS))
+print('Quartic Spline Derivative: ', np.count_nonzero(DDX_RS))
 print('Quintic Spline Derivative: ', np.count_nonzero(DDX_QS))
 
 #%% SPECTRAL TRANSFORM TESTS
@@ -207,7 +210,7 @@ print('Compact FD8: ', np.count_nonzero(DDZ_CFD3))
 
 # Take boundary information from compact FD operators
 DDZ_CS, DDZ2_CS = derv.computeCubicSplineDerivativeMatrix(zv, False, True, None)
-DDZ_RS, DDZ3_RS = derv.computeQuarticSplineDerivativeMatrix(zv, False, True, DDZ_CS)
+DDZ_RS, DDZ3_RS = derv.computeQuarticSplineDerivativeMatrix(zv, True, False, DDZ_CS)
 DDZ_QS, DDZ4_QS = derv.computeQuinticSplineDerivativeMatrix(zv, False, True, DDZ_CS)
 
 # Compute eigenspectra
