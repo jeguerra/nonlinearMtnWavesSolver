@@ -534,7 +534,7 @@ def computeSpectralElementDerivativeMatrix(dom, NE, nonCoincident, endsLaguerre,
        
        return GDMS, domain
 
-# Computes Clamped Quintic Spline 1st derivative matrix
+# Compute Quintic Spline 1st derivative matrix
 def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        DM2 = DDM_BC.dot(DDM_BC)
@@ -604,13 +604,9 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               eta[4,:] = 1.0 / hp * np.array([0.0, -1.0, 1.0, 0.0])
               eta[5,:] = 1.0 / hp1 *np.array([0.0, 0.0, -1.0, 1.0])
               
-              #PLU = scl.lu_factor(V)
-              #VI = scl.lu_solve(PLU, np.eye(9))
-              
               Q, R = scl.qr(V)
               PLU = scl.lu_factor(R)
               VI = scl.lu_solve(PLU, Q.T)
-              #VI = scl.solve(R, (Q.T).dot(np.eye(9)))
               
               OM = VI.dot(rho)
               ET = VI.dot(eta)
@@ -736,6 +732,149 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               
        DDM = numericalCleanUp(DDM)
        #DDM = removeLeastSingularValue(DDM)
+       return DDM, AIB
+   
+# Compute Quartic Spline 1st derivative matrix
+def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
+       
+       a0 = 0.5
+       a1 = 1.0 / 6.0
+       a2 = 1.0 / 24.0
+       
+       DM2 = DDM_BC.dot(DDM_BC)
+       DM3 = DDM_BC.dot(DM2)
+       
+       # Initialize matrix blocks
+       N = len(dom)
+       A = np.zeros((N,N)) # coefficients to 4th derivatives
+       B = np.zeros((N,N)) # coefficients to RHS of 4th derivatives
+       C = np.zeros((N,N)) # coefficients to 1st derivatives
+       D = np.zeros((N,N)) # coefficients to additive part of 1st derivatives
+       
+       def computeIntegratalConstantMatrices(ii, x):
+                            
+              hj = abs(x[ii+1] - x[ii])
+              hm = abs(x[ii] - x[ii-1])
+              hp = abs(x[ii+2] - x[ii+1])
+              
+              V = np.zeros((6,6))
+              
+              # A_j-1, B_j-1, A_j, B_j, A_j+1, B_j+1 
+              V[0,:] = np.array([-1.0, 0.0, +1.0, 0.0, 0.0, 0.0])
+              V[1,:] = np.array([0.0, 0.0, +1.0, 0.0, -1.0, 0.0])
+              V[2,:] = np.array([-hm, -1.0, 0.0, +1.0, 0.0, 0.0])
+              V[3,:] = np.array([0.0, 0.0, +hj, +1.0, 0.0, -1.0])
+              V[4,:] = np.array([a0 * hm**2, +hm, 0.0, 0.0, 0.0, 0.0])
+              V[5,:] = np.array([0.0, 0.0, a0 * hj**2, +hj, 0.0, 0.0])
+              
+              # Z_i-1, Z_i, Z_i+1
+              rho = np.zeros((6,3))
+              rho[0,1] = a0 * (hm + hj)
+              rho[1,2] = -a0 * (hp + hj)
+              rho[2,1] = a1 * (hm - hj) * (hm + hj)
+              rho[3,2] = a1 * (hp - hj) * (hp + hj)
+              rho[4,0] = -a2 * hm**3
+              rho[4,1] = -a2 * hj**3
+              rho[5,1] = -a2 * hj**3
+              rho[5,2] = -a2 * hp**3
+              
+              # q_i-1, q_i, q_i+1
+              eta = np.zeros((6,3))
+              eta[4,:] = np.array([-1.0, +1.0, 0.0])
+              eta[5,:] = np.array([0.0, -1.0, +1.0])
+              
+              Q, R = scl.qr(V)
+              PLU = scl.lu_factor(R)
+              VI = scl.lu_solve(PLU, Q.T)
+              
+              OM = VI.dot(rho)
+              ET = VI.dot(eta)
+                            
+              return OM, ET
+          
+       # Loop over each interior point in the irregular grid
+       for ii in range(1,N-2):
+                               
+              # Compute adjacent EIC and assemble to internal equations for Z
+              OM, ET = computeIntegratalConstantMatrices(ii, dom)
+              
+              if ii == 1:
+                     C[0,0] = a1 * (dom[1] - dom[0])**2
+                     C[0,0:3] += OM[1,:]
+                     D[0,0:3] += ET[1,:]
+              
+              A[ii,ii] = a0 * (dom[ii+1] + dom[ii-1])
+              A[ii, ii-1:ii+2] += OM[2,:] - OM[0,:]
+              B[ii, ii-1:ii+2] += ET[2,:] - ET[0,:]
+              
+              # Compute the C matrix (coefficients to Z)
+              C[ii,ii] = a1 * (dom[ii+1] - dom[ii])**2
+              C[ii,ii-1:ii+2] += OM[3,:]
+              
+              # Compute the D matrix (coefficients to Q)
+              D[ii,ii-1:ii+2] += ET[3,:]
+       
+       # Handle the right end from the loop above
+       hN1 = (dom[N-1] - dom[N-2])
+       A[N-2,N-2] = a0 * (dom[N-1] + dom[N-3])
+       A[N-2,N-3:N] += OM[4,:] - OM[2,:]
+       B[N-2,N-3:N] += ET[4,:] - ET[2,:]
+       
+       # Compute the C matrix (coefficients to Z)
+       C[N-2,N-2] = a1 * (dom[N-1] - dom[N-2])**2
+       C[N-2,N-3:N] += OM[5,:]
+       
+       # Compute the D matrix (coefficients to Q)
+       D[N-2,N-3:N] += ET[5,:]
+       
+       # Compute boundary terms in the first derivative matrices
+       C[N-1,N-1] = a1 * hN1**2
+       C[N-1,N-3:N] += hN1 * OM[4,:] + OM[5,:]
+       D[N-1,N-3:N] += hN1 * ET[4,:] + ET[5,:]
+              
+       # Prescribed derivative conditions
+       D3A = DM3[0,:] # left end 3th derivative
+       D3B = DM3[-1,:] # right end 3th derivative
+       D1A = DDM_BC[0,:] # left end 1st derivative
+       D1B = DDM_BC[-1,:] # right end 1st derivative
+              
+       if isClamped:
+              A[0,0] = 1.0
+              B[0,:] = D3A
+              A[-1,-1] = 1.0
+              B[-1,:] = D3B
+              
+              Q, R = scl.qr(A)
+              PLU = scl.lu_factor(R)
+              AIB = scl.lu_solve(PLU, (Q.T).dot(B))
+       elif isEssential:
+              A[0,0] = -1.0
+              A[0,1] = +1.0
+              B[0,:] = 0.0
+              
+              A[N-1,N-2] = -1.0
+              A[N-1,N-1] = +1.0
+              B[N-1,:] = 0.0
+                            
+              Q, R = scl.qr(A)
+              PLU = scl.lu_factor(R)
+              AIB = scl.lu_solve(PLU, (Q.T).dot(B))
+       else:
+              # NATURAL cubic spline.
+              AIB = np.diag(np.ones(N))
+              AIB[1:N-1,1:N-1] = np.linalg.solve(A[1:-1,1:-1], B[1:-1,1:-1])
+       
+       # Compute the 1st derivative matrix
+       DDM = C.dot(AIB) + D
+
+       # Set boundary derivatives from specified
+       if isClamped:
+              DDM[0,:] = D1A
+              DDM[-1,:] = D1B
+              
+       DDM = numericalCleanUp(DDM)
+       #DDM = removeLeastSingularValue(DDM)
+       
        return DDM, AIB
 
 # Computes Cubic Spline 1st derivative matrix

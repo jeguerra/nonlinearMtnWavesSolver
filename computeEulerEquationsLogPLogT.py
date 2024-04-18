@@ -6,6 +6,7 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import math as mt
+import torch 
 import numpy as np
 import bottleneck as bn
 import scipy.sparse as sps
@@ -84,29 +85,15 @@ def computeRdT(PHYS, sol, pert, RdT_bar):
        return RdT.astype(np.float64), T_ratio.astype(np.float64)
        #return RdT, T_ratio
 
-def computeFieldDerivatives(q, DDX, DDZ, RSBops):
+def computeFieldDerivative(q, DD, RSBops):
                      
        if RSBops:
-              DqDx = DDX.dot(q)
-              DqDz = DDZ.dot(q)
+              Dq = DD.dot(q)
        else:
-              DqDx = DDX @ q
-              DqDz = DDZ @ q
+              Dq = torch.matmul(DD,
+                                torch.from_numpy(q)).numpy()
               
-       return DqDx, DqDz
-
-def computeFieldDerivatives2(PqPx, PqPz, DDX, DDZ, REFS, RSBops):
-       
-       vd = np.hstack((PqPx, PqPz))
-       pvpx, dvdz = computeFieldDerivatives(vd, DDX, DDZ, False, RSBops)
-       
-       P2qPx2 = pvpx[:,0:4]
-       P2qPz2 = dvdz[:,4:] 
-       
-       P2qPzx = dvdz[:,0:4]
-       P2qPxz = pvpx[:,4:]
-       
-       return P2qPx2, P2qPz2, P2qPzx, P2qPxz
+       return Dq
 
 def computePrepareFields(OPS, SOLT, udex, wdex, pdex, tdex):
        
@@ -128,10 +115,15 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, is
        RdT, T_ratio = computeRdT(PHYS, Q, pertb, REFS[9][0])
        
        # Compute the updated RHS
-       PqPx, DqDz = computeFieldDerivatives(fields, DDX, DDZ, RSBops)
+       if RSBops:
+              DqDx = DDX.dot(fields)
+              DqDz = DDZ.dot(fields)
+       else:
+              DqDx = DDX @ fields
+              DqDz = DDZ @ fields
               
        if not isTFOpX:
-              PqPx -= REFS[14] * DqDz
+              PqPx = DqDx - REFS[14] * DqDz
                             
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFG[2], 
                                                        RdT, T_ratio, fields, Q)

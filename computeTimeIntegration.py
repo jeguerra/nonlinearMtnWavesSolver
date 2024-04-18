@@ -6,6 +6,7 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 import computeResidualViscCoeffs as rescf
 import computeEulerEquationsLogPLogT as tendency
@@ -79,11 +80,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               RdT, T_ratio = tendency.computeRdT(PHYS, solA, pertbA, REFS[9][0])
               
               #%% First dynamics update
-              if RSBops:
-                     Dq = DD1.dot(solA)
-              else:
-                     Dq = DD1 @ solA
-                     
+              Dq = tendency.computeFieldDerivative(solA, DD1, RSBops)
               DqDxA = Dq[:OPS,:]
               PqPzA = Dq[OPS:,:]
               
@@ -137,10 +134,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute derivatives of diffusive flux
               Dq = np.column_stack((PqPxA,PqPzA))
-              if RSBops:
-                     DDq = DD2.dot(Dq)
-              else:
-                     DDq = DD2 @ Dq
+              DDq = tendency.computeFieldDerivative(Dq, DD1, RSBops)
                      
               # Column 1
               D2qDx2 = DDq[:OPS,:4]

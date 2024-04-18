@@ -420,7 +420,7 @@ def runModel(TestName):
        if StaticSolve and not NonLinSolve:
               RSBops = False
        else:
-              RSBops = True # Turn off PyRSB SpMV
+              RSBops = False # Turn off PyRSB SpMV
               
        if RSBops:
               from rsb import rsb_matrix
@@ -815,7 +815,6 @@ def runModel(TestName):
                      DDOP = DDOP.to_sparse_csr()
                      
                      REFS.append(DDOP) # index 13
-                     del(DDOP)
                      del(val)
                      del(ind)
        else:
