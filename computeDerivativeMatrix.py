@@ -746,8 +746,8 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        # Initialize matrix blocks
        N = len(dom)
-       A = np.zeros((N,N)) # coefficients to 4th derivatives
-       B = np.zeros((N,N)) # coefficients to RHS of 4th derivatives
+       A = np.zeros((N,N)) # coefficients to 2nd derivatives
+       B = np.zeros((N,N)) # coefficients to RHS of 2nd derivatives
        C = np.zeros((N,N)) # coefficients to 1st derivatives
        D = np.zeros((N,N)) # coefficients to additive part of 1st derivatives
        
@@ -833,10 +833,10 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      # Assemble to the equation for Z
                      A[ii,ii] = a0 * hc
                      #A[ii,ii:ii+2] += OM[4,:-1]
-                     A[ii,ii-1:ii+2] -= OM[4,:]
+                     A[ii,ii-1:ii+2] += OM[4,:]
                      
                      #B[ii,ii-1:ii+2] += -ET1[6,:-1]
-                     B[ii,ii-1:ii+2] -= ET[4,:]
+                     B[ii,ii-1:ii+2] += ET[4,:]
                      
                      # Compute the C matrix (coefficients to Z)
                      # Compute the D matrix (coefficients to Q)
@@ -855,10 +855,10 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      
                      A[ii,ii] = a0 * hc
                      A[ii, ii-1:ii+2] += OM[2,:]
-                     A[ii, ii-2:ii+1] -= OM[0,:]
+                     A[ii, ii-2:ii+1] -= OM1[2,:]
                      
                      B[ii, ii-1:ii+2] += ET[2,:]
-                     B[ii, ii-2:ii+1] -= ET[0,:]
+                     B[ii, ii-2:ii+1] -= ET1[2,:]
                      
                      # Compute the C matrix (coefficients to Z)
                      C[ii,ii] = a1 * hp**2
@@ -901,11 +901,6 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        # Compute the 1st derivative matrix
        DDM = C.dot(AIB) + D
-
-       # Set boundary derivatives from specified
-       if isClamped:
-              DDM[0,:] = D1A
-              DDM[-1,:] = D1B
               
        DDM = numericalCleanUp(DDM)
        #DDM = removeLeastSingularValue(DDM)
@@ -954,7 +949,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        if isClamped:
               
               if np.isscalar(DDM_BC):
-                     DM2 = DDM_BC * DDM_BC
+                     DM2 = 0.0
                      B[0,:] = DM2
                      B[-1,:] = DM2
               else:
@@ -987,15 +982,6 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        
        # Compute the 1st derivative matrix
        DDM = C.dot(AIB) + D
-
-       # Set boundary derivatives from specified
-       if isClamped:
-              if np.isscalar(DDM_BC):
-                     DDM[0,:] = DDM_BC
-                     DDM[-1,:] = DDM_BC
-              else:
-                     DDM[0,:] = DDM_BC[0,:]
-                     DDM[-1,:] = DDM_BC[-1,:]
               
        DDM = numericalCleanUp(DDM)
        #DDM = removeLeastSingularValue(DDM)

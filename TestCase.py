@@ -89,7 +89,7 @@ class TestCase:
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     self.setUserData(1564, 192, 200.0, 35.0, 300.0, \
+                     self.setUserData(1384, 192, 125.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
