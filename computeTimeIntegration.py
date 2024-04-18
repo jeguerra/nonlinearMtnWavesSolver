@@ -134,7 +134,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Compute derivatives of diffusive flux
               Dq = np.column_stack((PqPxA,PqPzA))
-              DDq = tendency.computeFieldDerivative(Dq, DD1, RSBops)
+              DDq = tendency.computeFieldDerivative(Dq, DD2, RSBops)
                      
               # Column 1
               D2qDx2 = DDq[:OPS,:4]
