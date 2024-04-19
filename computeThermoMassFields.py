@@ -129,7 +129,6 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform, RLO
               PT = T0 * np.exp(NBVP**2 / gc * z)
               LPT = np.log(PT)
               
-              
               # Analytical pressure field
               ExP = 1.0 + gc**2 / (cp * NBVP**2 * T0) * (np.exp(-NBVP**2 / gc * z) - 1.0)
               PZ = P0 * np.power(ExP, 1.0 / Kp)

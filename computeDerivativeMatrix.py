@@ -575,13 +575,13 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               xqr = a1 * (xip**2 + xir * xip + xir**2)
               
               # A_j-1, B_j-1, C_j-1, A_j, B_j, C_j, A_j+1, B_j+1, C_j+1 
-              V[0,:] = np.array([-1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+              V[0,:] = np.array([-1.0, 0.0, 0.0, +1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
               V[1,:] = np.array([-xi, -1.0, 0.0, xi, 1.0, 0.0, 0.0, 0.0, 0.0])
               V[2,:] = np.array([-xi2, -xi, -1.0, xi2, xi, 1.0, 0.0, 0.0, 0.0])
               V[3,:] = np.array([xqm, a0 * (xi + xim), 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
               V[4,:] = np.array([0.0, 0.0, 0.0, xqp, a0 * (xip + xi), 1.0, 0.0, 0.0, 0.0])
               V[5,:] = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, xqr, a0 * (xir + xip), 1.0])
-              V[6,:] = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0])
+              V[6,:] = np.array([0.0, 0.0, 0.0, +1.0, 0.0, 0.0, -1.0, 0.0, 0.0])
               V[7,:] = np.array([0.0, 0.0, 0.0, xip, 1.0, 0.0, -xip, -1.0, 0.0])
               V[8,:] = np.array([0.0, 0.0, 0.0, xip2, xip, 1.0, -xip2, -xip, -1.0])
               
@@ -752,12 +752,14 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        D = np.zeros((N,N)) # coefficients to additive part of 1st derivatives
        
        def computeIntegratalConstantMatrices(ii, x):
+              
+              x = np.array(x, dtype=np.longdouble)
                             
               hj = (x[ii+1] - x[ii])
               hm = (x[ii] - x[ii-1])
               hp = (x[ii+2] - x[ii+1])
               
-              V = np.zeros((6,6))
+              V = np.zeros((6,6), dtype=np.longdouble)
               
               # A_j-1, B_j-1, A_j, B_j, A_j+1, B_j+1 
               V[0,:] = np.array([-1.0, 0.0, +1.0, 0.0, 0.0, 0.0])
@@ -769,7 +771,7 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               
               # Z_i-1, Z_i, Z_i+1
               rho = np.zeros((6,3))
-              rho[0,1] = a0 * (hm + hj)
+              rho[0,1] = +a0 * (hm + hj)
               rho[1,2] = -a0 * (hp + hj)
               rho[2,1] = a1 * (hm - hj) * (hm + hj)
               rho[3,2] = a1 * (hp - hj) * (hp + hj)
@@ -779,7 +781,7 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               rho[5,2] = -a2 * hp**3
               
               # q_i-1, q_i, q_i+1
-              eta = np.zeros((6,3))
+              eta = np.zeros((6,3), dtype=np.longdouble)
               eta[4,:] = np.array([-1.0, +1.0, 0.0])
               eta[5,:] = np.array([0.0, -1.0, +1.0])
               
@@ -808,21 +810,21 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      OM, ET = computeIntegratalConstantMatrices(ii, dom)
                      
                      # Assemble to the equation for Z
-                     A[ii,ii] = a0 * hc
+                     A[ii,ii] = -a0 * hc
                      A[ii,ii-1:ii+2] += OM[2,:]
                      A[ii,ii-1:ii+1] -= OM[0,1:]
                      
-                     B[ii,ii-1:ii+2] -= ET[2,:]
-                     #B[ii,ii-1:ii+1] -= ET[0,1:]
+                     #B[ii,ii-1:ii+2] += ET[2,:]
+                     #B[ii,ii-1:ii+1] += ET[0,1:]
                      
                      # Compute the C matrix (coefficients to Z)
                      # Compute the D matrix (coefficients to Q)
                      
-                     C[ii,ii] = a1 * hp**2
+                     C[ii,ii] += a1 * hp**2
                      C[ii,ii-1:ii+2] += OM[3,:]
                      D[ii,ii-1:ii+2] += ET[3,:]
                      
-                     C[ii-1,ii-1] = a1 * hm**2
+                     C[ii-1,ii-1] += a1 * hm**2
                      C[ii-1,ii-1:ii+2] += OM[1,:]
                      D[ii-1,ii-1:ii+2] += ET[1,:]
                      
@@ -831,21 +833,22 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      OM, ET = computeIntegratalConstantMatrices(ii-1, dom)
                      
                      # Assemble to the equation for Z
-                     A[ii,ii] = a0 * hc
-                     A[ii,ii-2:ii+1] += OM[4,:]
-                     A[ii,ii-1:ii+1] -= OM[2,:-1]
+                     A[ii,ii] = -a0 * hc
+                     A[ii,ii-1:ii+2] += OM[4,:]
+                     A[ii,ii-2:ii+1] -= OM[2,:]
                      
-                     B[ii,ii-2:ii+1] -= ET[4,:]
+                     #B[ii,ii-2:ii+1] += ET[4,:]
                      #B[ii,ii-1:ii+2] += -ET1[6,:-1]
                      
                      # Compute the C matrix (coefficients to Z)
                      # Compute the D matrix (coefficients to Q)
+                     C[ii,ii] += a1 * hm**2
+                     #C[ii,ii-1:ii+2] += hm * OM[2,:] + OM[3,:]
+                     #D[ii,ii-1:ii+2] += hm * ET[2,:] + ET[3,:]
+                     C[ii,ii-1:ii+2] += OM[5,:]
+                     D[ii,ii-1:ii+2] += ET[5,:]
                      
-                     C[ii,ii] = a1 * hm**2
-                     C[ii,ii-2:ii+1] += hm * OM[2,:] + OM[3,:]
-                     D[ii,ii-2:ii+1] += hm * ET[2,:] + ET[3,:]
-                     
-                     C[ii+1,ii+1] = a1 * hp**2
+                     C[ii+1,ii+1] += a1 * hp**2
                      C[ii+1,ii-2:ii+1] += hp * OM[4,:] + OM[5,:]
                      D[ii+1,ii-2:ii+1] += hp * ET[4,:] + ET[5,:]
               else:
@@ -853,7 +856,7 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      OM1, ET1 = computeIntegratalConstantMatrices(ii-1, dom)
                      OM, ET = computeIntegratalConstantMatrices(ii, dom)
                      
-                     A[ii,ii] = a0 * hc
+                     A[ii,ii] = -a0 * hc
                      A[ii,ii-1:ii+2] += OM[2,:]
                      A[ii,ii-2:ii+1] -= OM1[2,:]
                      
@@ -861,7 +864,7 @@ def computeQuarticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
                      B[ii,ii-2:ii+1] += ET1[2,:]
                      
                      # Compute the C matrix (coefficients to Z)
-                     C[ii,ii] = a1 * hp**2
+                     C[ii,ii] += a1 * hp**2
                      C[ii,ii-1:ii+2] += OM[3,:]
                      
                      # Compute the D matrix (coefficients to Q)
