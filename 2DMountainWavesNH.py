@@ -753,7 +753,7 @@ def runModel(TestName):
        del(PORZ)
        del(DUDZ)
        del(DLTDZ)
-       #del(DLPDZ)
+       del(DLPDZ)
        del(DLPTDZ)
        del(GML)
        del(REF0)
