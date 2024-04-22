@@ -30,7 +30,7 @@ class TestCase:
               if TestName == 'ClassicalSchar01':
                      # Reproduction of the Classical Schar case (one solve)
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveSchur': True, \
+                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
@@ -42,7 +42,7 @@ class TestCase:
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveSchur': True, \
+                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
@@ -54,7 +54,7 @@ class TestCase:
               elif TestName == 'UniformStratStatic':
                      # Newton iteration with smooth stratification
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveSchur': True, \
+                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
@@ -66,7 +66,7 @@ class TestCase:
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveSchur': True, \
+                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
@@ -78,7 +78,7 @@ class TestCase:
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
                      self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
-                                'DynSGS': True, 'SolveSchur': True, \
+                                'VerticalSpectral': False, 'DynSGS': True, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
@@ -89,14 +89,14 @@ class TestCase:
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     self.setUserData(1464, 192, 150.0, 35.0, 300.0, \
-                                      10000.0, 25000.0, 1.0,
+                     self.setUserData(1348, 160, 150.0, 32.0, 300.0, \
+                                      7000.0, 25000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
                      self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
-                                'DynSGS': True, 'SolveSchur': True, \
+                                'VerticalSpectral': True,'DynSGS': True, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}

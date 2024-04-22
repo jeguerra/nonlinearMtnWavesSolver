@@ -100,7 +100,7 @@ def computePfromPotentialT(DDZ, TZ, AC, P0, Kp, N):
        
        return pBar, ln_pBar
 
-def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform, RLOPT, isStatic):
+def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, RLOPT):
        
        # Get DIMS data
        NZ = DIMS[4]+1
@@ -111,72 +111,35 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, isUniform, RLO
        cp = PHYS[2]
        Rd = PHYS[3]
        Kp = PHYS[4]
-       NBVP = PHYS[7]
-       
-       # Get the reference temperature (uniform profile)
-       T0 = TZ[0]
        
        # Get REFS data
        DDZ = REFS[3]
-       z = REFS[1]
-       #ZTL = REFS[5]
        
-       # Solve for background pressure by hydrostatic balance
-       if isUniform:
-              
-              # Analytical potential temperature field
-              dlnPTdz = NBVP**2 / gc * np.ones(NZ)
-              PT = T0 * np.exp(NBVP**2 / gc * z)
-              LPT = np.log(PT)
-              
-              # Analytical pressure field
-              ExP = 1.0 + gc**2 / (cp * NBVP**2 * T0) * (np.exp(-NBVP**2 / gc * z) - 1.0)
-              PZ = P0 * np.power(ExP, 1.0 / Kp)
-              LPZ = np.log(PZ)
-              '''
-              # Make profile dry adiabatic near the top boundary (unsupportive of waves)
-              if not isStatic:
-                     for cc in range(NC):
-                            zcol = ZTL[:,cc]
-                            zrl = np.argwhere(zcol > (zcol[-1] - 0.5 * RLOPT[0]))
-                            
-                            dlnPTdz[zrl] = 0.0
-                            PT[zrl] = PT[zrl[0]]
-                            LPT[zrl] = np.log(PT[zrl])
-                            
-                            PZ[zrl] = PZ[zrl[0]]
-                            LPZ[zrl] = np.log(PZ[zrl])
-              '''
-              # Log gradient of pressure
-              dlnPdz = -(gc / Rd) * np.reciprocal(TZ)
+       if TempType == 'sensible':
+              AC = - gc / Rd
+              PZ, LPZ = computePfromSensibleT(DDZ, TZ, AC, P0)
+              # Recover vertical gradient in log pressure
+              dlnPdz = AC * np.reciprocal(TZ)
+              # Recover potential temperature background
+              LPT = np.log(TZ) + Rd / cp * (mt.log(P0) - LPZ)
+              dlnPTdz = np.reciprocal(TZ) * DTDZ - Rd / cp * dlnPdz
+              PT = np.exp(LPT)
               # Recover density
               RHO = 1.0 / Rd * (PZ * np.reciprocal(TZ))
+       elif TempType == 'potential':
+              AC = - gc * P0**Kp / Rd
+              PZ, LPZ = computePfromPotentialT(DDZ, TZ, AC, P0, Kp, NZ)
+              # Recover vertical gradient in log pressure
+              dlnPdz = AC * np.reciprocal(PZ * TZ)
+              # Recover potential temperature background
+              LPT = np.log(TZ)
+              dlnPTdz = np.reciprocal(PT) * DTDZ
+              PT = np.exp(PT)
+              # Recover density
+              RHO = P0**Kp / Rd * np.power(PZ, 1.0 - Kp) * np.reciprocal(TZ)
        else:
-              if TempType == 'sensible':
-                     AC = - gc / Rd
-                     PZ, LPZ = computePfromSensibleT(DDZ, TZ, AC, P0)
-                     # Recover vertical gradient in log pressure
-                     dlnPdz = AC * np.reciprocal(TZ)
-                     # Recover potential temperature background
-                     LPT = np.log(TZ) + Rd / cp * (mt.log(P0) - LPZ)
-                     dlnPTdz = np.reciprocal(TZ) * DTDZ - Rd / cp * dlnPdz
-                     PT = np.exp(LPT)
-                     # Recover density
-                     RHO = 1.0 / Rd * (PZ * np.reciprocal(TZ))
-              elif TempType == 'potential':
-                     AC = - gc * P0**Kp / Rd
-                     PZ, LPZ = computePfromPotentialT(DDZ, TZ, AC, P0, Kp, NZ)
-                     # Recover vertical gradient in log pressure
-                     dlnPdz = AC * np.reciprocal(PZ * TZ)
-                     # Recover potential temperature background
-                     LPT = np.log(TZ)
-                     dlnPTdz = np.reciprocal(PT) * DTDZ
-                     PT = np.exp(PT)
-                     # Recover density
-                     RHO = P0**Kp / Rd * np.power(PZ, 1.0 - Kp) * np.reciprocal(TZ)
-              else:
-                     print('Error: invalid background temperature type chosen.')
-                     sys.exit(2)
+              print('Error: invalid background temperature type chosen.')
+              sys.exit(2)
        
        return dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO
        

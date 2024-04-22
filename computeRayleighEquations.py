@@ -20,8 +20,8 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        L2 = DIMS[1]
        ZH = DIMS[2]
        
-       RP = 2.0
-       T1 = 0.5
+       RP = 3.0
+       T1 = 0.25
        S1 = 0.25 / (1.0 - T1)
        C1 = 20.0
        
@@ -183,10 +183,6 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        
               from matplotlib import cm
               import matplotlib.pyplot as plt
-              fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-              ax.plot_surface(X, Z, RL_out, cmap=cm.jet,
-                              linewidth=0, antialiased=False)
-       
               fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
               ax.plot_surface(X, Z, RL_all, cmap=cm.jet,
                               linewidth=0, antialiased=False)

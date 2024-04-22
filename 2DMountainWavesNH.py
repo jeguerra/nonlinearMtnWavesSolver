@@ -63,30 +63,39 @@ schurName = localDir + 'SchurOps'
 fname2Restart = 'Simulation2Restart.nc'
 fname4Restart = 'SimulationTemp.nc'
 
-def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
+def makeBackgroundPlots(ztl, tz, dtz, pz, ptz):
        
        # Make a figure of the temperature background
        plt.figure(figsize=(18.0, 6.0))
-       plt.subplot(1,3,1)
-       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
-       plt.title('Discrete Temperature Profile (K)')
+       plt.subplot(2,2,1)
+       plt.plot(tz, 1.0E-3*ztl, 'ko-')
+       plt.title('Sensible Temperature')
        plt.xlabel('Temperature (K)')
        plt.ylabel('Height (km)')
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(1,3,2)
-       plt.plot(TZ, 1.0E-3*ZTL, 'k-')
-       plt.title('Smooth Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
+       plt.subplot(2,2,2)
+       plt.plot(dtz, 1.0E-3*ztl, 'k-')
+       plt.title('Temperature Lapse Rate')
+       plt.xlabel('Lapse Rate (K/m)')
+       plt.ylabel('Height (km)')
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(1,3,3)
-       plt.plot(DTDZ, 1.0E-3*ZTL, 'k-')
-       plt.title('Smooth Temperature Derivative (K/z)')
+       plt.subplot(2,2,3)
+       plt.plot(pz, 1.0E-3*ztl, 'k-')
+       plt.title('Atmospheric Pressure (Pa)')
+       plt.xlabel('Pressure (Pa)')
+       plt.ylabel('Height (km)')
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(2,2,4)
+       plt.plot(ptz, 1.0E-3*ztl, 'k-')
+       plt.title('Potential Temperature')
        plt.xlabel('Temperature (K)')
+       plt.ylabel('Height (km)')
        plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
        
        plt.tight_layout()
-       plt.savefig('python results/Temperature_Background.png')
+       plt.savefig('Temperature_Background.png')
        plt.show()
+       plt.close()
 
        return       
 
@@ -407,10 +416,14 @@ def runModel(TestName):
        import TestCase
        thisTest = TestCase.TestCase(TestName)
        
-       # Set the solution type (MUTUALLY EXCLUSIVE)
+       # Set the solution type
        StaticSolve = thisTest.solType['StaticSolve']
        NewtonLin = thisTest.solType['NewtonLin']
        ExactBC = thisTest.solType['ExactBC']
+       
+       # Set the grid type
+       HermFunc = thisTest.solType['HermFuncGrid']
+       VertSpec = thisTest.solType['VerticalSpectral']
        
        useGuellrich = True
        useUniformSt = False
@@ -418,18 +431,11 @@ def runModel(TestName):
        # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
        if StaticSolve:
               RSBops = False
-              verticalChebGrid = False
-              verticalLegdGrid = True
        else:
-              RSBops = True # Turn off PyRSB SpMV
-              verticalChebGrid = False
-              verticalLegdGrid = False
-              
-       if RSBops:
-              from rsb import rsb_matrix
-                     
-       # Set the grid type
-       HermFunc = thisTest.solType['HermFuncGrid']
+              RSBops = False # Turn off PyRSB SpMV
+              if RSBops:
+                     from rsb import rsb_matrix
+       
        # Use the uniform grid fourier solution if not Hermite Functions
        if HermFunc:
               FourierLin = False
@@ -441,6 +447,13 @@ def runModel(TestName):
               else:
                      print('Uniform INTERIOR grid in the horizontal')
                      
+       if VertSpec:
+              verticalChebGrid = False
+              verticalLegdGrid = True
+       else:
+              verticalChebGrid = False
+              verticalLegdGrid = False
+       
        if verticalChebGrid:
               print('Chebyshev spectral derivative in the vertical.')
        elif verticalLegdGrid:
@@ -541,12 +554,15 @@ def runModel(TestName):
        REF0.append(sig)
        
        tz, dtz = \
-              computeTemperatureProfileOnGrid(PHYS, REF0, Z_in, T_in, smooth3Layer, uniformStrat, RLOPT, StaticSolve)
+              computeTemperatureProfileOnGrid(PHYS, REF0, Z_in, T_in, smooth3Layer, uniformStrat, RLOPT)
               
        dlpz, lpz, pz, dlptz, lpt, pt, rho = \
-              computeThermoMassFields(PHYS, DIM0, REF0, tz[:,0], dtz[:,0], 'sensible', uniformStrat, RLOPT, StaticSolve)
+              computeThermoMassFields(PHYS, DIM0, REF0, tz, dtz, 'sensible', RLOPT)
               
        uz, duz = computeShearProfileOnGrid(REF0, JETOPS, PHYS[1], pz, dlpz, uniformWind, linearShear)
+       
+       # CHECK THE BACKGROUND PROFILES
+       #makeBackgroundPlots(REF0[1], tz, dtz, pz, pt)
        
        '''
        # Check background
@@ -622,11 +638,7 @@ def runModel(TestName):
        uBotDex = np.array(range(0, OPS, ZTL.shape[0]))
        
        #%% MAKE THE INITIAL/BACKGROUND STATE ON COMPUTATIONAL GRID
-       # Map the sounding to the computational vertical 2D grid [0 H]
-       TZ, DTDZ = \
-              computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat, RLOPT, StaticSolve)
        
-       #makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ)
        # Compute the initial fields by interolation
        '''
        import scipy.interpolate as spi
@@ -647,6 +659,10 @@ def runModel(TestName):
        '''      
        #'''
        # Compute the background (initial) fields
+       TZ = np.expand_dims(tz, axis=1)
+       TZ = computeColumnInterp(DIM0, REF0[1], TZ, ZTL, ITRANS)
+       DTDZ = np.expand_dims(dtz, axis=1)
+       DTDZ = computeColumnInterp(DIM0, REF0[1], DTDZ, ZTL, ITRANS)
        U = np.expand_dims(uz, axis=1)
        UZ = computeColumnInterp(DIM0, REF0[1], U, ZTL, ITRANS)
        dUdz = np.expand_dims(duz, axis=1)
@@ -1367,10 +1383,10 @@ def runModel(TestName):
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       TestName = 'ClassicalScharIter'
+       #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       #TestName = 'UniformTestTransient'
+       TestName = 'UniformTestTransient'
        #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
