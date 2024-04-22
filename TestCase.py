@@ -29,86 +29,86 @@ class TestCase:
        def __init__(self, TestName):
               if TestName == 'ClassicalSchar01':
                      # Reproduction of the Classical Schar case (one solve)
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'DynSGS': False, 'SolveSchur': True, \
+                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 86, 70.0, 22.0, 280.0, 
-                                      7000.0, 10000.0, 1.0, \
+                     self.setUserData(192, 86, 70.0, 22.0, 280.0, 
+                                      7000.0, 10000.0, 1.0E-2, \
                                       250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'DynSGS': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 86, 70.0, 22.0, 280.0, \
-                                      7000.0, 10000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
+                     self.setUserData(164, 86, 70.0, 22.0, 280.0, \
+                                      7000.0, 10000.0, 1.0E-2, \
+                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'UniformStratStatic':
                      # Newton iteration with smooth stratification
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'DynSGS': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 96, 75.0, 32.0, 300.0, \
-                                      7000.0, 10000.0, 1.0, \
+                     self.setUserData(192, 96, 75.0, 32.0, 300.0, \
+                                      7000.0, 10000.0, 1.0E-2, \
                                       25.0, 0.01, 0.0065, 0.003, 3, 1.2E+4, 'uwpt_static') 
                             
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermFuncGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'DynSGS': False, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 96, 75.0, 32.0, 300.0, \
-                                      7000.0, 10000.0, 1.0, \
+                     self.setUserData(192, 96, 75.0, 32.0, 300.0, \
+                                      7000.0, 10000.0, 1.0E-2, \
                                       25.0, 0.01, 0.0065, 0.003, 3, 1.2E+4, 'uwpt_static')
               
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': False, \
-                                'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
+                     self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
+                                'DynSGS': True, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # HIGH RESOLUTION
-                     #self.setUserData(1624, 236, 125.0, 35.0, 300.0, \
+                     #self.setUserData(1624, 236, 150.0, 35.0, 300.0, \
                      #                 10000.0, 20000.0, 1.0,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     self.setUserData(1384, 192, 125.0, 35.0, 300.0, \
+                     self.setUserData(1464, 192, 150.0, 35.0, 300.0, \
                                       10000.0, 25000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermFuncGrid': False, \
-                                'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
+                     self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
+                                'DynSGS': True, 'SolveSchur': True, \
                                 'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     #self.setUserData(1932, 216, 200.0, 40.0, 300.0, \
-                     #                 10000.0, 25000.0, 1.0,
-                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
-                            
-                     self.setUserData(1548, 232, 150.0, 40.0, 300.0, \
+                     self.setUserData(2084, 256, 175.0, 40.0, 300.0, \
                                       10000.0, 25000.0, 1.0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     #self.setUserData(1548, 232, 150.0, 40.0, 300.0, \
+                     #                 10000.0, 25000.0, 1.0,
+                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')

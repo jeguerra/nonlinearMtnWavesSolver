@@ -219,7 +219,7 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        GLMZ = sps.spdiags(np.reshape(GL[2], (OPS,), order='F'), 0, OPS, OPS)
 
        # Store the diagonal blocks corresponding to Rayleigh damping terms
-       RLM = sps.spdiags(np.reshape(RL[0], (OPS,), order='F'), 0, OPS, OPS)
+       RLM = sps.spdiags(np.reshape(RL[2], (OPS,), order='F'), 0, OPS, OPS)
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        # Get the indices for the layer regions

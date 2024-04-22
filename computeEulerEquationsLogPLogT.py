@@ -108,11 +108,10 @@ def computePrepareFields(OPS, SOLT, udex, wdex, pdex, tdex):
 def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, isTFOpX, RSBops):
        
        # Compute flow speed
-       Q = np.copy(fields)
-       pertb = Q - hydroState
+       state = fields + hydroState
        
        # Compute pressure gradient force scaling (buoyancy)
-       RdT, T_ratio = computeRdT(PHYS, Q, pertb, REFS[9][0])
+       RdT, T_ratio = computeRdT(PHYS, state, fields, REFS[9][0])
        
        # Compute the updated RHS
        if RSBops:
@@ -126,7 +125,7 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, is
               PqPx = DqDx - REFS[14] * DqDz
                             
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFG[2], 
-                                                       RdT, T_ratio, fields, Q)
+                                                       RdT, T_ratio, fields)
        if withRay:
               rhsVec += computeRayleighTendency(REFG, fields)
        
@@ -143,7 +142,7 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        # Get the derivative operators (enhanced cubig spline derivative)
        DDXM = REFS[10][0]
        DDZM = REFS[10][1]
-       DZDX = REFS[15].flatten()
+       DZDX = REFS[14].flatten()
        
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        PPXM = DDXM - DZDXM.dot(DDZM)
@@ -161,29 +160,29 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DqDz = DDZM.dot(fields)
        
        # Compute terrain following x derivatives of perturbations
-       DZDXM = sps.diags(DZDX, offsets=0, format='csr')
+       DZDXM = sps.diags_array(DZDX, offsets=0, format='csr')
        PqPx = DqDx - DZDXM.dot(DqDz)
        
        # Compute partial in X terrain following block
        PPXM = DDXM - DZDXM.dot(DDZM)
        
        # Compute vertical gradient diagonal operators
-       DuDzM = sps.diags(DqDz[:,0], offsets=0, format='csr')
-       DwDzM = sps.diags(DqDz[:,1], offsets=0, format='csr')
-       DlpDzM = sps.diags(DqDz[:,2], offsets=0, format='csr')
-       DltDzM = sps.diags(DqDz[:,3], offsets=0, format='csr')
+       DuDzM = sps.diags_array(DqDz[:,0], offsets=0, format='csr')
+       DwDzM = sps.diags_array(DqDz[:,1], offsets=0, format='csr')
+       DlpDzM = sps.diags_array(DqDz[:,2], offsets=0, format='csr')
+       DltDzM = sps.diags_array(DqDz[:,3], offsets=0, format='csr')
        
        # Compute horizontal gradient diagonal operators
-       PuPxM = sps.diags(PqPx[:,0], offsets=0, format='csr')
-       PwPxM = sps.diags(PqPx[:,1], offsets=0, format='csr')
-       PlpPxM = sps.diags(PqPx[:,2], offsets=0, format='csr')
-       PltPxM = sps.diags(PqPx[:,3], offsets=0, format='csr')
+       PuPxM = sps.diags_array(PqPx[:,0], offsets=0, format='csr')
+       PwPxM = sps.diags_array(PqPx[:,1], offsets=0, format='csr')
+       PlpPxM = sps.diags_array(PqPx[:,2], offsets=0, format='csr')
+       PltPxM = sps.diags_array(PqPx[:,3], offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
-       DLTDZM = sps.diags(DLTDZ[:,0], offsets=0, format='csr')
-       DUDZM = sps.diags(DQDZ[:,0], offsets=0, format='csr')
-       DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
-       DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
+       DLTDZM = sps.diags_array(DLTDZ[:,0], offsets=0, format='csr')
+       DUDZM = sps.diags_array(DQDZ[:,0], offsets=0, format='csr')
+       DLPDZM = sps.diags_array(DQDZ[:,2], offsets=0, format='csr')
+       DLPTDZM = sps.diags_array(DQDZ[:,3], offsets=0, format='csr')
        
        # Compute diagonal blocks related to sensible temperature
        RdT_bar = REFS[9][0]
@@ -205,15 +204,15 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        PtPx = PPXM.dot(T_prime)
        DtDz = DDZM.dot(T_prime)
        
-       PtPxM = sps.diags(PtPx, offsets=0, format='csr')
-       DtDzM = sps.diags(DtDz, offsets=0, format='csr')
+       PtPxM = sps.diags_array(PtPx, offsets=0, format='csr')
+       DtDzM = sps.diags_array(DtDz, offsets=0, format='csr')
        
        # Compute advective (multiplicative) diagonal operators
-       UM = sps.diags(U, offsets=0, format='csr')
-       WXZM = sps.diags(WXZ, offsets=0, format='csr')
+       UM = sps.diags_array(U, offsets=0, format='csr')
+       WXZM = sps.diags_array(WXZ, offsets=0, format='csr')
        
        # Compute common horizontal transport block
-       UPXM = UM.dot(DDXM) + WXZM.dot(DDZM)
+       UPXM = UM @ DDXM + WXZM @ DDZM
        
        # Compute the blocks of the Jacobian operator
        LD11 = UPXM + PuPxM
@@ -262,20 +261,23 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        DDZM = REFS[10][1]
               
        #%% Compute the various blocks needed
-       UM = sps.diags(UZ, offsets=0, format='csr')
-       PORZM = sps.diags(PORZ, offsets=0, format='csr')
+       UM = sps.diags_array(UZ, offsets=0, format='csr')
+       PORZM = sps.diags_array(PORZ, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
        DLTDZ = REFG[1]
        DQDZ = REFG[2]
-       DLTDZM = sps.diags(DLTDZ[:,0], offsets=0, format='csr')
-       DUDZM = sps.diags(DQDZ[:,0], offsets=0, format='csr')
-       DLPDZM = sps.diags(DQDZ[:,2], offsets=0, format='csr')
-       DLPTDZM = sps.diags(DQDZ[:,3], offsets=0, format='csr')
+       DLTDZM = sps.diags_array(DLTDZ[:,0], offsets=0, format='csr')
+       DUDZM = sps.diags_array(DQDZ[:,0], offsets=0, format='csr')
+       DLPDZM = sps.diags_array(DQDZ[:,2], offsets=0, format='csr')
+       DLPTDZM = sps.diags_array(DQDZ[:,3], offsets=0, format='csr')
        unit = sps.identity(OPS)
               
        #%% Compute the terms in the equations
-       U0DDX = UM.dot(DDXM)
+       U0DDX = UM @ DDXM
+       print(U0DDX.diagonal(-1))
+       print(U0DDX.diagonal(0))
+       print(U0DDX.diagonal(+1))
        
        # Horizontal momentum
        LD11 = U0DDX
@@ -352,13 +354,13 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz,
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
-       mu = np.expand_dims(REFG[3],0)
-       ROP = REFG[4][0]
+       #mu = np.expand_dims(REFG[3],0)
+       ROP = REFG[4][2]
        rdex = REFG[-1]
        
        DqDt = np.zeros(fields.shape)
        try:
-              DqDt[:,rdex] = -mu * ROP.dot(fields[:,rdex])
+              DqDt[:,rdex] = -ROP * fields[:,rdex]
        except FloatingPointError:
               DqDt[:,rdex] = 0.0
               

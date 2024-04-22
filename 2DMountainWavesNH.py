@@ -409,7 +409,6 @@ def runModel(TestName):
        
        # Set the solution type (MUTUALLY EXCLUSIVE)
        StaticSolve = thisTest.solType['StaticSolve']
-       NonLinSolve = thisTest.solType['NLTranSolve']
        NewtonLin = thisTest.solType['NewtonLin']
        ExactBC = thisTest.solType['ExactBC']
        
@@ -417,16 +416,18 @@ def runModel(TestName):
        useUniformSt = False
        
        # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
-       if StaticSolve and not NonLinSolve:
+       if StaticSolve:
               RSBops = False
+              verticalChebGrid = False
+              verticalLegdGrid = True
        else:
-              RSBops = False # Turn off PyRSB SpMV
+              RSBops = True # Turn off PyRSB SpMV
+              verticalChebGrid = False
+              verticalLegdGrid = False
               
        if RSBops:
               from rsb import rsb_matrix
-              
-       print('Colocated spectral method in the vertical.')
-       
+                     
        # Set the grid type
        HermFunc = thisTest.solType['HermFuncGrid']
        # Use the uniform grid fourier solution if not Hermite Functions
@@ -440,8 +441,6 @@ def runModel(TestName):
               else:
                      print('Uniform INTERIOR grid in the horizontal')
                      
-       verticalChebGrid = False
-       verticalLegdGrid = False
        if verticalChebGrid:
               print('Chebyshev spectral derivative in the vertical.')
        elif verticalLegdGrid:
@@ -462,8 +461,7 @@ def runModel(TestName):
        else:
               print('Diffusion coefficients by RHS evaluation.')
        
-       # Set direct solution method (MUTUALLY EXCLUSIVE)
-       SolveFull = thisTest.solType['SolveFull']
+       # Set direct solution method
        SolveSchur = thisTest.solType['SolveSchur']
        
        # Set Newton solve initial and restarting parameters
@@ -720,8 +718,9 @@ def runModel(TestName):
               dWBC = -dHdX[hdex] * INIT[ubdex]
             
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       fields, U, W = \
-              eqs.computePrepareFields(OPS, np.array(SOLT[:,0]), udex, wdex, pdex, tdex)
+       U = SOLT[udex,0] + INIT[udex]
+       W = SOLT[wdex,0] + INIT[wdex]
+       fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT)
@@ -731,7 +730,8 @@ def runModel(TestName):
               
        # Update the REFS collection
        REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
-       REFS.append((np.reshape(PORZ, (OPS,), order='F'), np.reshape(PBAR, (OPS,), order='F'))) #index 9
+       REFS.append((np.reshape(PORZ, (OPS,), order='F'), 
+                    np.reshape(PBAR, (OPS,), order='F'))) #index 9
        
        # Get some memory back here
        del(PORZ)
@@ -746,7 +746,6 @@ def runModel(TestName):
        #%% DIFFERENTIATION OPERATORS
        
        # Derivative operators from global spectral methods
-       DZTM = sps.diags(np.reshape(DZT, (OPS,), order='F'))
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
        
        # Derivative operators from 3 and 5 spline expansions
@@ -781,11 +780,17 @@ def runModel(TestName):
        PPXMD = DDXMS_HO #- DZTM @ DDZMS_HO
        diffOps = (PPXMD,DDZMS_HO)
        
-       REFS.append((DDXMS1,DDZMS1)) # index 10
+       REFS.append(advtOps) # index 10
        REFS.append(diffOps) # index 11
        
        #%% Store operators for use
-       if NonLinSolve:
+       if StaticSolve:
+              # Native sparse
+              DDOP = sps.vstack(advtOps)
+              REFS.append(DDOP) # index 12
+              DDOP = sps.vstack(diffOps)
+              REFS.append(DDOP) # index 13
+       else:
               # Multithreaded enabled for transient solution
               if RSBops:
                      DDOP = sps.vstack(advtOps, format='csr')
@@ -817,12 +822,6 @@ def runModel(TestName):
                      REFS.append(DDOP) # index 13
                      del(val)
                      del(ind)
-       else:
-              # Native sparse
-              DDOP = sps.vstack(advtOps)
-              REFS.append(DDOP) # index 12
-              DDOP = sps.vstack(diffOps)
-              REFS.append(DDOP) # index 13
               
        # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 14
@@ -846,10 +845,11 @@ def runModel(TestName):
               if NewtonLin:
                      # Full Newton linearization with TF terms
                      DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                                   np.array(fields), U, ubdex, utdex)
+                                   fields, U, ubdex, utdex)
               else:
                      # Classic linearization without TF terms
-                     DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG)
+                     DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, 
+                                                                           REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -876,13 +876,13 @@ def runModel(TestName):
               C2 = +1.0 * sps.eye(len(ubdex), format='csr')
        
               colShape = (OPS,len(ubdex))
-              LD = sps.lil_matrix(colShape)
+              LD = sps.lil_array(colShape)
               if ExactBC:
                      LD[ubdex,:] = C1
-              LH = sps.lil_matrix(colShape)
+              LH = sps.lil_array(colShape)
               LH[ubdex,:] = C2
-              LM = sps.lil_matrix(colShape)
-              LQ = sps.lil_matrix(colShape)
+              LM = sps.lil_array(colShape)
+              LQ = sps.lil_array(colShape)
               
               #%% Apply BC adjustments and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
@@ -895,7 +895,7 @@ def runModel(TestName):
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((lmsDOF,lmsDOF))
+              LDIA = sps.lil_array((lmsDOF,lmsDOF))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -919,21 +919,15 @@ def runModel(TestName):
               Q = DOPS[15][np.ix_(tbcDex,tbcDex)]
               
               # The Rayleigh operators are block diagonal
-              R1 = (ROPS[0].tolil())[np.ix_(ubcDex,ubcDex)]
-              R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
-              R3 = (ROPS[2].tolil())[np.ix_(pbcDex,pbcDex)]
-              R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
-               
+              A += (ROPS[0].tolil())[np.ix_(ubcDex,ubcDex)]
+              F += (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
+              K += (ROPS[2].tolil())[np.ix_(pbcDex,pbcDex)]
+              Q += (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
+              
               del(DOPS)
               
               # Set up Schur blocks or full operator...
-              if (StaticSolve and SolveSchur):
-                     # Add Rayleigh damping terms
-                     A += R1
-                     F += R2
-                     K += R3
-                     Q += R4
-                     
+              if SolveSchur:
                      # Store the operators...
                      opdb = shelve.open(schurName, flag='n')
                      opdb['A'] = A; opdb['B'] = B; opdb['C'] = C; opdb['D'] = D
@@ -951,21 +945,15 @@ def runModel(TestName):
                      f1 = np.concatenate((-dWBC, fu[ubcDex], fw[wbcDex]))
                      fp = RHS[pdex]
                      ft = RHS[tdex]
-                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))
-                     
-              if (StaticSolve and SolveFull):
-                     # Add Rayleigh damping terms
-                     A += R1
-                     F += R2
-                     K += R3
-                     Q += R4
-                     
+                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))   
+              else:
                      # Compute the global linear operator
-                     AN = sps.bmat([[A, B, C, D, LDA], \
-                              [E, F, G, H, LHA], \
-                              [I, J, K, M, LMA], \
-                              [N, O, P, Q, LQAC], \
-                              [LNA, LOA, LPA, LQAR, LDIA]], format='csc')
+                     
+                     AN = sps.bmat([[LDIA, LNA, LOA, LPA, LQAR], \
+                              [LDA, A, B, C, D], \
+                              [LHA, E, F, G, H], \
+                              [LMA, I, J, K, M], \
+                              [LQAC, N, O, P, Q]], format='csc')
               
                      # Compute the global linear force vector
                      bN = np.concatenate((RHS[sysDex], -dWBC))
@@ -982,7 +970,10 @@ def runModel(TestName):
        if StaticSolve:
               print('Starting Linear to Nonlinear Static Solver...')
               
-              if SolveFull and not SolveSchur:
+              if SolveSchur:
+                     # Call the 4 way partitioned Schur block solver
+                     dsol = dsolver.solveDiskPartSchur(localDir, schurName, f1, f2)
+              else:
                      print('Solving linear system by full operator SuperLU...')
                      # Direct solution over the entire operator (better for testing BC's)
                      opts = dict(Equil=True, IterRefine='DOUBLE')
@@ -991,9 +982,6 @@ def runModel(TestName):
                      dsol = factor.solve(bN)
                      del(bN)
                      del(factor)
-              if SolveSchur and not SolveFull:
-                     # Call the 4 way partitioned Schur block solver
-                     dsol = dsolver.solveDiskPartSchur(localDir, schurName, f1, f2)
                      
               #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
@@ -1008,14 +996,19 @@ def runModel(TestName):
               print('Recover full linear solution vector... DONE!')
               
               # Prepare the fields
-              fields, U, W = \
-                     eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+              U = SOLT[udex,0] + INIT[udex]
+              W = SOLT[wdex,0] + INIT[wdex]
+              fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
               
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
-              rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
+              try:
+                     rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
                                                   PHYS, REFS, REFG, True, False, RSBops)
+              except:
+                     rhs = np.zeros(fields.shape)
+                     
               RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
               displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
@@ -1025,7 +1018,7 @@ def runModel(TestName):
               DSOL = np.array(SOLT[:,1])
               print('Norm of change in solution: ', np.linalg.norm(DSOL))
        #%% Transient solutions       
-       elif NonLinSolve:
+       else:
               print('Starting Nonlinear Transient Solver...')
               
               # Compute DX and DZ grid length scales
@@ -1262,16 +1255,17 @@ def runModel(TestName):
               rdb['DSOL'] = DSOL
               rdb['SOLT'] = SOLT
               rdb['LMS'] = LMS
-              if NonLinSolve:
-                     rdb['DCF1'] = CRES[:,0,0]
-                     rdb['DCF2'] = CRES[:,1,0]
               rdb['NX'] = NX
               rdb['NZ'] = NZ
               rdb['ET'] = TOPT[4]
               rdb['PHYS'] = PHYS
               rdb['DIMS'] = DIMS
+              
               if StaticSolve:
                      rdb['REFS'] = REFS
+              else:
+                     rdb['DCF1'] = CRES[:,0,0]
+                     rdb['DCF2'] = CRES[:,1,0]
               rdb.close()
        
        #%% Recover the solution (or check the residual)
@@ -1373,11 +1367,11 @@ def runModel(TestName):
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       #TestName = 'ClassicalScharIter'
+       TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
        #TestName = 'UniformTestTransient'
-       TestName = '3LayerTestTransient'
+       #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

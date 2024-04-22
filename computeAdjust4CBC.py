@@ -48,7 +48,10 @@ def computeAdjust4CBC(shape, numVar, varDex, bcType):
                      rowsOutP = set(uldex2)
                      rowsOutT = set(uldex2)
                      # Indexing for static solver
-                     left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
+                     left = np.concatenate((uldex2, 
+                                            uldex2 + iW*OPS, 
+                                            uldex2 + iP*OPS, 
+                                            uldex2 + iT*OPS))
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, top)))
               else:
@@ -59,8 +62,14 @@ def computeAdjust4CBC(shape, numVar, varDex, bcType):
                      rowsOutT = set(np.concatenate((uldex2,urdex2)))
               
                      # Indexing for static solver
-                     left = np.concatenate((uldex2, uldex2 + iW*OPS, uldex2 + iP*OPS, uldex2 + iT*OPS))
-                     right = np.concatenate((urdex2, urdex2 + iW*OPS, urdex2 + iP*OPS, urdex2 + iT*OPS))
+                     left = np.concatenate((uldex2, 
+                                            uldex2 + iW*OPS, 
+                                            uldex2 + iP*OPS, 
+                                            uldex2 + iT*OPS))
+                     right = np.concatenate((urdex2, 
+                                             urdex2 + iW*OPS, 
+                                             urdex2 + iP*OPS, 
+                                             urdex2 + iT*OPS))
                      top = utdex + iW*OPS
                      rowsOutBC = set(np.concatenate((left, right, top)))
        elif bcType == 2:
@@ -70,7 +79,10 @@ def computeAdjust4CBC(shape, numVar, varDex, bcType):
               rowsOutP = set(uldex1)
               rowsOutT = set(np.concatenate((uldex1,ubdex,utdex)))
               # Indexing for static solver
-              left = np.concatenate((uldex1, uldex1 + iW*OPS, uldex1 + iP*OPS, uldex1 + iT*OPS))
+              left = np.concatenate((uldex1, 
+                                     uldex1 + iW*OPS, 
+                                     uldex1 + iP*OPS,
+                                     uldex1 + iT*OPS))
               right = urdex1 + iW*OPS
               top = np.concatenate((utdex, utdex + iW*OPS, utdex + iT*OPS))
               botm = np.concatenate((ubdex, ubdex + iW*OPS, ubdex + iT*OPS))
