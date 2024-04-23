@@ -61,43 +61,7 @@ localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
 fname2Restart = 'Simulation2Restart.nc'
-fname4Restart = 'SimulationTemp.nc'
-
-def makeBackgroundPlots(ztl, tz, dtz, pz, ptz):
-       
-       # Make a figure of the temperature background
-       plt.figure(figsize=(18.0, 6.0))
-       plt.subplot(2,2,1)
-       plt.plot(tz, 1.0E-3*ztl, 'ko-')
-       plt.title('Sensible Temperature')
-       plt.xlabel('Temperature (K)')
-       plt.ylabel('Height (km)')
-       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(2,2,2)
-       plt.plot(dtz, 1.0E-3*ztl, 'k-')
-       plt.title('Temperature Lapse Rate')
-       plt.xlabel('Lapse Rate (K/m)')
-       plt.ylabel('Height (km)')
-       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(2,2,3)
-       plt.plot(pz, 1.0E-3*ztl, 'k-')
-       plt.title('Atmospheric Pressure (Pa)')
-       plt.xlabel('Pressure (Pa)')
-       plt.ylabel('Height (km)')
-       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(2,2,4)
-       plt.plot(ptz, 1.0E-3*ztl, 'k-')
-       plt.title('Potential Temperature')
-       plt.xlabel('Temperature (K)')
-       plt.ylabel('Height (km)')
-       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       
-       plt.tight_layout()
-       plt.savefig('Temperature_Background.png')
-       plt.show()
-       plt.close()
-
-       return       
+fname4Restart = 'SimulationTemp.nc'       
 
 def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, dca, dcb, NX, NZ, numVar):
        
@@ -561,9 +525,6 @@ def runModel(TestName):
               
        uz, duz = computeShearProfileOnGrid(REF0, JETOPS, PHYS[1], pz, dlpz, uniformWind, linearShear)
        
-       # CHECK THE BACKGROUND PROFILES
-       #makeBackgroundPlots(REF0[1], tz, dtz, pz, pt)
-       
        '''
        # Check background
        fig, ax = plt.subplots(nrows=2, ncols=2)
@@ -587,6 +548,31 @@ def runModel(TestName):
        wdex = np.add(udex, OPS)
        pdex = np.add(wdex, OPS)
        tdex = np.add(pdex, OPS)
+       
+       #%% Read in topography profile or compute from analytical function
+       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT)
+       
+       if useGuellrich:
+              XL, ZTL, DZT, sigma, ZRL = \
+                     coords.computeGuellrichDomain2D(DIMS, REFS[0], REFS[1], zRay, HofX, dHdX, StaticSolve)
+       
+       if useUniformSt:
+              XL, ZTL, DZT, sigma, ZRL = \
+                     coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       
+       #% Compute the BC index vector
+       uldex, urdex, ubdex, utdex, wbdex, \
+       ubcDex, wbcDex, pbcDex, tbcDex, \
+       zeroDex, sysDex, ebcDex = \
+              computeAdjust4CBC(ZTL.shape, numVar, varDex, bcType)
+                            
+       # Index to interior of terrain boundary
+       hdex = range(0,XL.shape[1])
+       # Index to the entire bottom boundary on U
+       uBotDex = np.array(range(0, OPS, ZTL.shape[0]))
+       
+       physDOF = numVar * OPS
+       lmsDOF = len(ubdex)
       
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
        if HermFunc and not FourierLin:
@@ -604,38 +590,19 @@ def runModel(TestName):
        else:
               DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
               DDZ_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_BC)
-              
-       #%% Update the REFS collection
-       REFS.append(DDX_1D) # index 2
-       REFS.append(DDZ_1D) # index 3
        
-       #% Read in topography profile or compute from analytical function
-       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT)
+       # Derivative operators from 3 and 5 spline expansions
+       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
+       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
+       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
+       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CS)
        
-       if useGuellrich:
-              XL, ZTL, DZT, sigma, ZRL = \
-                     coords.computeGuellrichDomain2D(DIMS, REFS[0], REFS[1], zRay, HofX, dHdX, StaticSolve)
-       
-       if useUniformSt:
-              XL, ZTL, DZT, sigma, ZRL = \
-                     coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
-       
-       # Update the REFS collection
-       REFS.append(XL) # index 4
-       REFS.append(ZTL) # index 5
-       REFS.append((dHdX, HofX)) # index 6
-       REFS.append(sigma) # index 7
-       
-       #% Compute the BC index vector
-       uldex, urdex, ubdex, utdex, wbdex, \
-       ubcDex, wbcDex, pbcDex, tbcDex, \
-       zeroDex, sysDex, ebcDex = \
-              computeAdjust4CBC(ZTL.shape, numVar, varDex, bcType)
-                            
-       # Index to interior of terrain boundary
-       hdex = range(0,XL.shape[1])
-       # Index to the entire bottom boundary on U
-       uBotDex = np.array(range(0, OPS, ZTL.shape[0]))
+       # Derivative operators from global spectral methods
+       DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D)
+       DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, sigma, 
+                                                              DDX_CS, DDZ_CS)
+       DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, sigma, 
+                                                              DDX_QS, DDZ_QS)
        
        #%% MAKE THE INITIAL/BACKGROUND STATE ON COMPUTATIONAL GRID
        
@@ -678,10 +645,6 @@ def runModel(TestName):
        DLPDZ = -PHYS[0] / (PHYS[3] * TZ)
        DLTDZ = np.reciprocal(TZ) * DTDZ
        DLPTDZ = DLTDZ - PHYS[4] * DLPDZ
-       
-       #fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-       #ax.plot_surface(REFS[4], REFS[5], DLPDZ, cmap=cm.jet,
-       #                linewidth=0, antialiased=False)
 
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
@@ -689,18 +652,6 @@ def runModel(TestName):
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
-       '''
-       fig, axs = plt.subplots(1,4)
-       axs[0].plot(XL[0,:], UZ[0,:], XL[1,:], UZ[1,:])
-       axs[1].plot(XL[0,:], LOGT[0,:], XL[1,:], LOGT[1,:])
-       axs[2].plot(XL[0,:], LOGP[0,:], XL[1,:], LOGP[1,:])
-       axs[3].plot(XL[0,:], TZ[0,:], XL[1,:], TZ[1,:])
-       plt.show()
-       print('Check interpolated background fields...')
-       '''
-       
-       physDOF = numVar * OPS
-       lmsDOF = len(ubdex)
        
        # Initialize solution storage
        SOLT = np.zeros((physDOF, 2))
@@ -719,64 +670,11 @@ def runModel(TestName):
        INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
        hydroState = np.reshape(INIT, (OPS, numVar), order='F')
        
-       if isRestart and StaticSolve:
-              print('Restarting from previous solution...')
-              SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
-              
-              # Updates nolinear boundary condition to next Newton iteration
-              dWBC = SOLT[wbdex,0] - dHdX[hdex] * (INIT[ubdex] + SOLT[ubdex,0])  
-       else:
-              # Set the initial time
-              IT = 0.0
-              thisTime = IT
-              
-              # Initial change in vertical velocity at boundary
-              dWBC = -dHdX[hdex] * INIT[ubdex]
-            
-       # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       U = SOLT[udex,0] + INIT[udex]
-       W = SOLT[wdex,0] + INIT[wdex]
-       fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
-       
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT)
+       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
        
        # Make a collection for background field derivatives
        REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX]
-              
-       # Update the REFS collection
-       REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
-       REFS.append((np.reshape(PORZ, (OPS,), order='F'), 
-                    np.reshape(PBAR, (OPS,), order='F'))) #index 9
-       
-       # Get some memory back here
-       del(PORZ)
-       del(DUDZ)
-       del(DLTDZ)
-       del(DLPDZ)
-       del(DLPTDZ)
-       del(GML)
-       del(REF0)
-       del(DIM0)
-       
-       #%% DIFFERENTIATION OPERATORS
-       
-       # Derivative operators from global spectral methods
-       DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, REFS[7], DDX_1D, DDZ_1D)
-       
-       # Derivative operators from 3 and 5 spline expansions
-       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
-       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
-       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
-       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CS)
-       
-       DDX_FD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-       DDZ_FD = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
-       
-       DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, REFS[7], 
-                                                              DDX_CS, DDZ_CS)
-       DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, REFS[7], 
-                                                              DDX_QS, DDZ_QS)
                      
        #%% Prepare derivative operators for advection              
        if HermFunc:
@@ -796,6 +694,16 @@ def runModel(TestName):
        PPXMD = DDXMS_HO #- DZTM @ DDZMS_HO
        diffOps = (PPXMD,DDZMS_HO)
        
+       # Update the REFS collection
+       REFS.append(DDX_1D) # index 2
+       REFS.append(DDZ_1D) # index 3
+       REFS.append(XL) # index 4
+       REFS.append(ZTL) # index 5
+       REFS.append((dHdX, HofX)) # index 6
+       REFS.append(sigma) # index 7
+       REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
+       REFS.append((np.reshape(PORZ, (OPS,), order='F'), 
+                    np.reshape(PBAR, (OPS,), order='F'))) #index 9
        REFS.append(advtOps) # index 10
        REFS.append(diffOps) # index 11
        
@@ -841,12 +749,16 @@ def runModel(TestName):
               
        # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 14
-       
-       # Update REFG the terrain BC derivative
-       REFG.append(DDX_CS)
-       REFG.append(RLOPT[-1])
               
-       # Get memory back
+       #%% Get some memory back here
+       del(PORZ)
+       del(DUDZ)
+       del(DLTDZ)
+       del(DLPDZ)
+       del(DLPTDZ)
+       del(GML)
+       del(REF0)
+       del(DIM0)
        del(DDOP)
        del(advtOps); del(diffOps)
        del(DDXMS1); del(DDZMS1)
@@ -855,6 +767,25 @@ def runModel(TestName):
        del(dummy)
        
        #%% SOLUTION INITIALIZATION
+       
+       if isRestart and StaticSolve:
+              print('Restarting from previous solution...')
+              SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
+              
+              # Updates nolinear boundary condition to next Newton iteration
+              dWBC = SOLT[wbdex,0] - dHdX[hdex] * (INIT[ubdex] + SOLT[ubdex,0])  
+       else:
+              # Set the initial time
+              IT = 0.0
+              thisTime = IT
+              
+              # Initial change in vertical velocity at boundary
+              dWBC = -dHdX[hdex] * INIT[ubdex]
+            
+       # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
+       U = SOLT[udex,0] + INIT[udex]
+       W = SOLT[wdex,0] + INIT[wdex]
+       fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
               
        #% Compute the global LHS operator and RHS
        if StaticSolve:

@@ -9,11 +9,15 @@ Created on Mon Jul 22 07:39:25 2019
 import sys
 import math as mt
 import numpy as np
+import matplotlib.pyplot as plt
 from numpy import linalg as lan
 import computeDerivativeMatrix as derv
 
+checkPlots = False
+
 def computePfromSensibleT(DDZ, TZ, AC, P0):
        N = len(TZ)
+       NE = N-1
        
        # Solves for lnP_bar so set the constant of integration
        lnP0 = mt.log(P0)
@@ -26,28 +30,18 @@ def computePfromSensibleT(DDZ, TZ, AC, P0):
        
        #%% Impose BC lnp = 0 @ z = 0 and d(lnp)dz = B @ z = H matched to lnp = -Inf at Inf
        # Specify the derivative at the model top
-       dpdZ_H = AC * tempBarI[N-1]
+       dpdZ_H = AC * tempBarI[NE]
        # Compute adjustment to the derivative matrix operator
        DOP = derv.computeAdjustedOperatorNBC(DDZ, DDZ, -1)
-
-       # Impose resulting Neumann/Dirichlet conditions lnP top and bottom
-       NE = N-1
-       DOPS = DOP[1:NE,1:NE]
-       
-       # Index of interior nodes
-       idex = range(1,NE)
-       # Index of left and interior nodes
-       bdex = range(0,NE)
        
        # Compute the forcing due to matching at the model top
-       f1 = lnP0 * DOP[:,0]
        f2 = dpdZ_H / DDZ[NE,NE] * DDZ[:,NE]
-       F = tempBarI #- f1 - f2
+       F = tempBarI - f2
        # Solve the system for lnP
-       ln_pBar[idex] = AC * lan.solve(DOPS, (F[1:NE]).astype(dtype=np.float64))
+       ln_pBar[1:NE] = AC * lan.solve(DOP[1:NE,1:NE], (F[1:NE]).astype(dtype=np.float64))
        
        # Compute and set the value at the top that satisfies the BC
-       dPdZ_partial = np.dot(DDZ[NE,bdex], ln_pBar[bdex])
+       dPdZ_partial = np.dot(DDZ[NE,1:NE], ln_pBar[1:NE])
        ln_pBar[NE] = (dpdZ_H - dPdZ_partial) / DDZ[NE,NE]
                               
        #%% Reconstruct hydrostatic pressure p from p^K
@@ -140,8 +134,47 @@ def computeThermoMassFields(PHYS, DIMS, REFS, TZ, DTDZ, TempType, RLOPT):
        else:
               print('Error: invalid background temperature type chosen.')
               sys.exit(2)
+              
+       # CHECK THE BACKGROUND PROFILES
+       if checkPlots:
+              makeBackgroundPlots(REFS[1], TZ, DTDZ, PZ, PT)
        
        return dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO
+
+def makeBackgroundPlots(ztl, tz, dtz, pz, ptz):
+       
+       # Make a figure of the temperature background
+       plt.figure(figsize=(18.0, 6.0))
+       plt.subplot(2,2,1)
+       plt.plot(tz, 1.0E-3*ztl, 'ko-')
+       plt.title('Sensible Temperature')
+       plt.xlabel('Temperature (K)')
+       plt.ylabel('Height (km)')
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(2,2,2)
+       plt.plot(dtz, 1.0E-3*ztl, 'k-')
+       plt.title('Temperature Lapse Rate')
+       plt.xlabel('Lapse Rate (K/m)')
+       plt.ylabel('Height (km)')
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(2,2,3)
+       plt.plot(pz, 1.0E-3*ztl, 'k-')
+       plt.title('Atmospheric Pressure (Pa)')
+       plt.xlabel('Pressure (Pa)')
+       plt.ylabel('Height (km)')
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.subplot(2,2,4)
+       plt.plot(ptz, 1.0E-3*ztl, 'k-')
+       plt.title('Potential Temperature')
+       plt.xlabel('Temperature (K)')
+       plt.ylabel('Height (km)')
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       
+       plt.tight_layout()
+       plt.show()
+       input('CHECK BACKGROUND PROFILES...')
+
+       return
        
        
               

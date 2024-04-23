@@ -13,21 +13,19 @@ import math as mt
 import numpy as np
 import scipy.sparse as sps
 checkPlots = False
-def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
+def computeRayleighField(DIMS, X, Z, height, width, applyTop, applyLateral):
        
        # Get DIMS data
        L1 = DIMS[0]
        L2 = DIMS[1]
        ZH = DIMS[2]
        
-       RP = 3.0
-       T1 = 0.25
+       RP = 2.0
+       T1 = 0.1
        S1 = 0.25 / (1.0 - T1)
        C1 = 20.0
        
-       # Get REFS data
-       X = REFS[4]
-       Z = REFS[5]
+       # Get domain data
        NX = X.shape[1]
        NZ = Z.shape[0]
        
@@ -47,11 +45,10 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
        dLayerZ = ZH - depth       
        
        # Assemble the Rayleigh field
-       RL_in = np.zeros((NZ, NX))
-       RL_out = np.zeros((NZ, NX))
+       RL_inl = np.zeros((NZ, NX))
+       RL_inr = np.zeros((NZ, NX))
+       RL_top = np.zeros((NZ, NX))
        RL_all = np.zeros((NZ, NX))
-       RLX1 = np.zeros((NZ, NX))
-       RLX2 = np.zeros((NZ, NX))
        
        for ii in range(0,NZ):
               for jj in range(0,NX):
@@ -116,13 +113,12 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
                      if RFZ < 0.0:
                             RFZ = 0.0
                             
-                     # Set the field to max(lateral, top) to handle corners
-                     RLX1[ii,jj] = RFX1
-                     RLX2[ii,jj] = RFX2
-                     # Absorption to the inflow boundary
-                     RL_in[ii,jj] = RLX1[ii,jj]
-                     # Absorption to the outflow boundaries
-                     RL_out[ii,jj] = np.amax([RFX2, RFZ])
+                     # Absorption to the inflow lateral boundary
+                     RL_inl[ii,jj] = RFX1
+                     # Absorption to the outflow lateral boundary
+                     RL_inr[ii,jj] = RFX2
+                     # Absorption to the model top boundary
+                     RL_top[ii,jj] = RFZ
                      # Complete absorption frame
                      RL_all[ii,jj] = np.amax([RFX1, RFX2, RFZ])
                             
@@ -189,9 +185,9 @@ def computeRayleighField(DIMS, REFS, height, width, applyTop, applyLateral):
               plt.show()
               input('CHECK BOUNDARY LAYERS...')
        
-       return (GML, GMLX2, GMLZ), (RL_in, RL_out, RL_all)
+       return (GML, GMLX2, GMLZ), (RL_inl, RL_inr, RL_top, RL_all)
 
-def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
+def computeRayleighEquations(DIMS, X, Z, depth, RLOPT):
        
        # Get options data
        width = RLOPT[1]
@@ -200,28 +196,29 @@ def computeRayleighEquations(DIMS, REFS, depth, RLOPT):
        mu = RLOPT[4]
        
        # Set up the Rayleigh field
-       GL, RL = computeRayleighField(DIMS, REFS, depth, width, \
+       GL, RL = computeRayleighField(DIMS, X, Z, depth, width, \
                                                      applyTop, applyLateral)
        
        # Compute the diagonal for full Rayleigh field as matrices    
        OPS = RL[0].shape[0] * RL[0].shape[1]
        
-       RLMI = np.reshape(RL[0], (OPS,1), order='F')
-       RLMO = np.reshape(RL[1], (OPS,), order='F')
-       RLMA = np.reshape(RL[2], (OPS,1), order='F')
+       RLML = np.reshape(RL[0], (OPS,), order='F')
+       RLMR = np.reshape(RL[1], (OPS,), order='F')
+       RLMT = np.reshape(RL[2], (OPS,), order='F')
+       RLMA = np.reshape(RL[3], (OPS,1), order='F')
        
        GLM = sps.spdiags(np.reshape(GL[0], (OPS,), order='F'), 0, OPS, OPS)
        GLMX = sps.spdiags(np.reshape(GL[1], (OPS,), order='F'), 0, OPS, OPS)
        GLMZ = sps.spdiags(np.reshape(GL[2], (OPS,), order='F'), 0, OPS, OPS)
 
        # Store the diagonal blocks corresponding to Rayleigh damping terms
-       RLM = sps.spdiags(np.reshape(RL[2], (OPS,), order='F'), 0, OPS, OPS)
+       RLM = sps.spdiags(np.reshape(RL[-1], (OPS,), order='F'), 0, OPS, OPS)
        ROPS = mu * np.array([RLM, RLM, RLM, RLM])
        
        # Get the indices for the layer regions
        tempDiagonal = np.reshape(RL[2], (OPS,), order='F')
        ldex = np.nonzero(tempDiagonal)
        
-       return ROPS, (RLMI, RLMO, RLMA), (GLM, GLMX, GLMZ), ldex[0]
+       return ROPS, (RLML, RLMR, RLMT, RLMA), (GLM, GLMX, GLMZ), ldex[0]
        
                             

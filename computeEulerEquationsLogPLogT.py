@@ -22,16 +22,17 @@ def enforceBC_RHS(PHYS, rhs, ebcDex):
        
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
-       #rhs[ldex,3] = 0.0
+       #rhs[ldex,0] = 0.0
+       #rhs[ldex,1] = 0.0
        
-       rhs[rdex,1:] = 0.0
-       #rhs[rdex,3] = 0.0
+       #rhs[rdex,1:] = 0.0
+       #rhs[rdex,1] = 0.0
        
        rhs[bdex,0:2] = 0.0
        rhs[bdex,3] = 0.0
        
        rhs[tdex,1:3] = 0.0
-       #rhs[tdex,3] = 0.0
+       #rhs[tdex,2] = 0.0
        
        return rhs
 
@@ -275,9 +276,6 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
               
        #%% Compute the terms in the equations
        U0DDX = UM @ DDXM
-       print(U0DDX.diagonal(-1))
-       print(U0DDX.diagonal(0))
-       print(U0DDX.diagonal(+1))
        
        # Horizontal momentum
        LD11 = U0DDX
@@ -354,15 +352,13 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz,
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
-       #mu = np.expand_dims(REFG[3],0)
        ROP = REFG[4][2]
-       rdex = REFG[-1]
        
        DqDt = np.zeros(fields.shape)
        try:
-              DqDt[:,rdex] = -ROP * fields[:,rdex]
+              DqDt = -ROP * fields
        except FloatingPointError:
-              DqDt[:,rdex] = 0.0
+              DqDt = 0.0
               
        return DqDt
 

@@ -150,8 +150,7 @@ class TestCase:
               # Set the Rayleigh options
               applyTop = True
               applyLateral = True
-              rdex = [1]
-              self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC, rdex)
+              self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC)
               
               # Set the terrain options
               withWindow = False
