@@ -486,17 +486,20 @@ def runModel(TestName):
        T_in = thisTest.T_in
               
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
-       chebHydro = True
-       legrHydro = False
+       chebHydro = False
+       legrHydro = True
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
        REF0 = computeGrid(DIM0, RLOPT, HermFunc, FourierLin, chebHydro, legrHydro)
        
-       DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REF0[0], 6)
-       DDXP, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REF0[0], True, False, DDX_BC)
+       DDXP, dummy = derv.computeCubicSplineDerivativeMatrix(REF0[0], False, True, None)
        
        # Get the spectral resolution operator here
-       DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
-       #DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
+       if chebHydro:
+              DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
+       elif legrHydro:
+              DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
+       else:
+              DDZP = derv.computeCompactFiniteDiffDerivativeMatrix1(REF0[1], 6)
                      
        REF0.append(DDXP)
        REF0.append(DDZP)
@@ -671,10 +674,10 @@ def runModel(TestName):
        hydroState = np.reshape(INIT, (OPS, numVar), order='F')
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML, LDEX = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
+       RLM, GML = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
        
        # Make a collection for background field derivatives
-       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM, LDEX]
+       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM]
                      
        #%% Prepare derivative operators for advection              
        if HermFunc:
@@ -866,10 +869,11 @@ def runModel(TestName):
               Q = DOPS[15][np.ix_(tbcDex,tbcDex)]
               
               # The Rayleigh operators are block diagonal
-              A += (ROPS[0].tolil())[np.ix_(ubcDex,ubcDex)]
-              F += (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
-              K += (ROPS[2].tolil())[np.ix_(pbcDex,pbcDex)]
-              Q += (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
+              ROPS = -RLOPT[4] * RLM[-1]
+              A += (ROPS.tolil())[np.ix_(ubcDex,ubcDex)]
+              F += (ROPS.tolil())[np.ix_(wbcDex,wbcDex)]
+              K += (ROPS.tolil())[np.ix_(pbcDex,pbcDex)]
+              Q += (ROPS.tolil())[np.ix_(tbcDex,tbcDex)]
               
               del(DOPS)
               
