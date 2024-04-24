@@ -352,13 +352,8 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz,
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
-       ROP = REFG[4][2]
-       
-       DqDt = np.zeros(fields.shape)
-       try:
-              DqDt = -ROP * fields
-       except FloatingPointError:
-              DqDt = 0.0
+       ROP = REFG[4][-1]
+       DqDt = -ROP * fields
               
        return DqDt
 
