@@ -778,8 +778,8 @@ def runModel(TestName):
               thisTime = IT
               
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       state = fields + hydroState
        fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
+       state = fields + hydroState
               
        # Updates nolinear boundary condition to next Newton iteration
        dWBC = fields[ubdex,1] - dHdX[hdex] * state[ubdex,0]
@@ -946,7 +946,7 @@ def runModel(TestName):
               message = 'Residual 2-norm BEFORE Newton step:'
               displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
               try:
-                     rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], \
+                     rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], \
                                                   PHYS, REFS, REFG, True, False)
               except:
                      rhsVec = np.zeros(fields.shape)
@@ -1152,8 +1152,7 @@ def runModel(TestName):
                                    isInitialStep = False
                             
                             message = ''
-                            displayResiduals(message, np.reshape(resVec, (OPS*numVar,), order='F'), \
-                                                   thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
+                            displayResiduals(message, resVec, thisTime, TOPT[0], OPS)
                                    
                             # Store in the NC file
                             store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, CRES)
@@ -1273,7 +1272,7 @@ def runModel(TestName):
               fig = plt.figure(figsize=(12.0, 6.0))
               for pp in range(4):
                      plt.subplot(2,2,pp+1)
-                     dqdt = np.reshape(rhs[:,pp], (NZ, NX), order='F')
+                     dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
                      ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
                      plt.colorbar(ccheck, format='%+.3E')
                      plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
