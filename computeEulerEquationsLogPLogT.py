@@ -106,7 +106,7 @@ def computePrepareFields(OPS, SOLT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, isTFOpX, RSBops):
+def computeRHS(fields, hydroState, DDX, DDZ, PHYS, REFS, REFG, withRay, isTFOpX):
        
        # Compute flow speed
        state = fields + hydroState
@@ -115,18 +115,17 @@ def computeRHS(fields, hydroState, DDX, DDZ, dhdx, PHYS, REFS, REFG, withRay, is
        RdT, T_ratio = computeRdT(PHYS, state, fields, REFS[9][0])
        
        # Compute the updated RHS
-       if RSBops:
-              DqDx = DDX.dot(fields)
-              DqDz = DDZ.dot(fields)
-       else:
-              DqDx = DDX @ fields
-              DqDz = DDZ @ fields
+       DqDx = DDX @ fields
+       DqDz = DDZ @ fields
               
-       if not isTFOpX:
-              PqPx = DqDx - REFS[14] * DqDz
+       PqPz = DqDz + REFG[2]
+       if isTFOpX:
+              PqPx = np.copy(DqDx)
+       else:
+              PqPx = DqDx - REFS[14] * PqPz
                             
-       rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, DqDz, REFG[2], 
-                                                       RdT, T_ratio, fields)
+       rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz, 
+                                                       RdT, T_ratio, state)
        if withRay:
               rhsVec += computeRayleighTendency(REFG, fields)
        
@@ -157,8 +156,8 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        WXZ = wxz - UZX
 
        # Compute raw derivatives of perturbations
-       DqDx = DDXM.dot(fields)
-       DqDz = DDZM.dot(fields)
+       DqDx = DDXM @ fields
+       DqDz = DDZM @ fields
        
        # Compute terrain following x derivatives of perturbations
        DZDXM = sps.diags_array(DZDX, offsets=0, format='csr')

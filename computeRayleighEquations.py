@@ -21,7 +21,7 @@ def computeRayleighField(DIMS, X, Z, height, width, applyTop, applyLateral):
        ZH = DIMS[2]
        
        RP = 2.0
-       T1 = 0.1
+       T1 = 0.25
        S1 = 0.25 / (1.0 - T1)
        C1 = 20.0
        

@@ -221,17 +221,13 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, dca, dcb, NX, NZ, 
        
        return
 
-def displayResiduals(message, RHS, thisTime, DT, OPS, udex, wdex, pdex, tdex):
-       RHSA = np.abs(RHS)
-       err = bn.nanmax(RHSA)# / mt.sqrt(OPS)
-       err1 = bn.nanmax(RHSA[udex])# / mt.sqrt(OPS)
-       err2 = bn.nanmax(RHSA[wdex])# / mt.sqrt(OPS)
-       err3 = bn.nanmax(RHSA[pdex])# / mt.sqrt(OPS)
-       err4 = bn.nanmax(RHSA[tdex])# / mt.sqrt(OPS)
+def displayResiduals(message, rhs, thisTime, DT, OPS):
+       RHSA = np.abs(rhs)
+       err = bn.nanmax(RHSA, axis=0)# / mt.sqrt(OPS)
        if message != '':
               print(message)
-       print('Time (min): %4.2f, DT (sec): %4.3E, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
-             % (thisTime / 60.0, DT, err1, err2, err3, err4, err))
+       print('Time (min): %4.2f, DT (sec): %4.3E, Residuals: %10.4E, %10.4E, %10.4E, %10.4E' \
+             % (thisTime / 60.0, DT, err[0], err[1], err[2], err[3]))
        
        return err
 
@@ -664,14 +660,16 @@ def runModel(TestName):
        
        # Initialize hydrostatic background
        INIT = np.zeros((physDOF,))
-       RHS = np.zeros((physDOF,))
-       
-       # Initialize the Background fields
        INIT[udex] = np.reshape(UZ, (OPS,), order='F')
        INIT[wdex] = np.zeros((OPS,))
        INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
        INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
+       
+       # Initialize state/tendency storage
        hydroState = np.reshape(INIT, (OPS, numVar), order='F')
+       fields = np.reshape(SOLT[:,0], (OPS, numVar), order='F')
+       dfields = np.empty(fields.shape)
+       rhsVec = np.empty(fields.shape)
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        RLM, GML = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
@@ -774,28 +772,24 @@ def runModel(TestName):
        if isRestart and StaticSolve:
               print('Restarting from previous solution...')
               SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
-              
-              # Updates nolinear boundary condition to next Newton iteration
-              dWBC = SOLT[wbdex,0] - dHdX[hdex] * (INIT[ubdex] + SOLT[ubdex,0])  
        else:
               # Set the initial time
               IT = 0.0
               thisTime = IT
               
-              # Initial change in vertical velocity at boundary
-              dWBC = -dHdX[hdex] * INIT[ubdex]
-            
        # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       U = SOLT[udex,0] + INIT[udex]
-       W = SOLT[wdex,0] + INIT[wdex]
+       state = fields + hydroState
        fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
+              
+       # Updates nolinear boundary condition to next Newton iteration
+       dWBC = fields[ubdex,1] - dHdX[hdex] * state[ubdex,0]
               
        #% Compute the global LHS operator and RHS
        if StaticSolve:
               if NewtonLin:
                      # Full Newton linearization with TF terms
                      DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                                   fields, U, ubdex, utdex)
+                                   fields, state[:,0], ubdex, utdex)
               else:
                      # Classic linearization without TF terms
                      DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, 
@@ -814,12 +808,9 @@ def runModel(TestName):
               
               #'''
               # Compute the RHS for this iteration
-              rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, True, False, RSBops)
-              RHS = np.reshape(rhs, (physDOF,), order='F')
-              displayResiduals('Current function evaluation residual: ', RHS, \
-                                     thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
-              del(U); del(fields); del(rhs)
+              rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], \
+                                                  PHYS, REFS, REFG, True, False)
+              displayResiduals('Current function evaluation residual: ', rhsVec, thisTime, TOPT[0], OPS)
               
               #%% Compute Lagrange Multiplier column augmentation matrices (terrain equation)
               C1 = -1.0 * sps.diags(dHdX[hdex], offsets=0, format='csr')
@@ -869,11 +860,11 @@ def runModel(TestName):
               Q = DOPS[15][np.ix_(tbcDex,tbcDex)]
               
               # The Rayleigh operators are block diagonal
-              ROPS = -RLOPT[4] * RLM[-1]
-              A += (ROPS.tolil())[np.ix_(ubcDex,ubcDex)]
-              F += (ROPS.tolil())[np.ix_(wbcDex,wbcDex)]
-              K += (ROPS.tolil())[np.ix_(pbcDex,pbcDex)]
-              Q += (ROPS.tolil())[np.ix_(tbcDex,tbcDex)]
+              ROPS = sps.spdiags(RLOPT[4] * RLM[-1][:,0], 0, OPS, OPS).tolil()
+              A += ROPS[np.ix_(ubcDex,ubcDex)]
+              F += ROPS[np.ix_(wbcDex,wbcDex)]
+              K += ROPS[np.ix_(pbcDex,pbcDex)]
+              Q += ROPS[np.ix_(tbcDex,tbcDex)]
               
               del(DOPS)
               
@@ -891,11 +882,11 @@ def runModel(TestName):
                      opdb.close()
                       
                      # Compute the partitions for Schur Complement solution
-                     fu = RHS[udex]
-                     fw = RHS[wdex]
+                     fu = rhsVec[:,0]
+                     fw = rhsVec[:,1]
                      f1 = np.concatenate((-dWBC, fu[ubcDex], fw[wbcDex]))
-                     fp = RHS[pdex]
-                     ft = RHS[tdex]
+                     fp = rhsVec[:,2]
+                     ft = rhsVec[:,3]
                      f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))   
               else:
                      # Compute the global linear operator
@@ -907,6 +898,7 @@ def runModel(TestName):
                               [LQAC, N, O, P, Q]], format='csc')
               
                      # Compute the global linear force vector
+                     RHS = np.reshape(rhsVec, (physDOF,), order='F')
                      bN = np.concatenate((RHS[sysDex], -dWBC))
               
               # Get memory back
@@ -947,27 +939,20 @@ def runModel(TestName):
               print('Recover full linear solution vector... DONE!')
               
               # Prepare the fields
-              U = SOLT[udex,0] + INIT[udex]
-              W = SOLT[wdex,0] + INIT[wdex]
               fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
+              U = fields[:,0] + hydroState[:,0]
               
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
-              displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
+              displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
               try:
-                     rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], REFS[6][0], \
-                                                  PHYS, REFS, REFG, True, False, RSBops)
+                     rhs, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], \
+                                                  PHYS, REFS, REFG, True, False)
               except:
-                     rhs = np.zeros(fields.shape)
+                     rhsVec = np.zeros(fields.shape)
                      
-              RHS = np.reshape(rhs, (physDOF,), order='F')
               message = 'Residual 2-norm AFTER Newton step:'
-              displayResiduals(message, RHS, thisTime, TOPT[0], OPS, udex, wdex, pdex, tdex)
-              del(rhs)
-              
-              # Check the change in the solution
-              DSOL = np.array(SOLT[:,1])
-              print('Norm of change in solution: ', np.linalg.norm(DSOL))
+              displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
        #%% Transient solutions       
        else:
               print('Starting Nonlinear Transient Solver...')
@@ -1185,14 +1170,7 @@ def runModel(TestName):
                      thisTime += TOPT[0]
                      interTime1 += TOPT[0]
                      interTime2 += TOPT[0]
-                     
-              # Reshape back to a column vector after time loop
-              SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')
-              RHS = np.reshape(rhsVec, (OPS*numVar, ), order='F')
               
-              # Copy state instance 0 to 1
-              SOLT[:,1] = np.array(SOLT[:,0])
-              DSOL = SOLT[:,1] - SOLT[:,0]
        #%%       
        endt = time.time()
        print('Solve the system: DONE!')
@@ -1203,8 +1181,8 @@ def runModel(TestName):
               rdb = shelve.open(restart_file, flag='n')
               rdb['qdex'] = (udex, wdex, pdex, tdex)
               rdb['INIT'] = INIT
-              rdb['DSOL'] = DSOL
-              rdb['SOLT'] = SOLT
+              rdb['DSOL'] = SOLT[:,1]
+              rdb['SOLT'] = SOLT[:,0]
               rdb['LMS'] = LMS
               rdb['NX'] = NX
               rdb['NZ'] = NZ
@@ -1295,15 +1273,7 @@ def runModel(TestName):
               fig = plt.figure(figsize=(12.0, 6.0))
               for pp in range(4):
                      plt.subplot(2,2,pp+1)
-                     if pp == 0:
-                            qdex = udex
-                     elif pp == 1:
-                            qdex = wdex
-                     elif pp == 2:
-                            qdex = pdex
-                     else:
-                            qdex = tdex
-                     dqdt = np.reshape(RHS[qdex], (NZ+1, NX+1), order='F')
+                     dqdt = np.reshape(rhs[:,pp], (NZ, NX), order='F')
                      ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
                      plt.colorbar(ccheck, format='%+.3E')
                      plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
@@ -1312,16 +1282,15 @@ def runModel(TestName):
               plt.show()
               
               # Check W at the boundaries...
-              dwdt = np.reshape(RHS[wdex], (NZ+1, NX+1), order='F')
-              return (XL, ZTL, dwdt)
+              return (XL, ZTL, rhs)
        
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       #TestName = 'ClassicalScharIter'
+       TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       TestName = 'UniformTestTransient'
+       #TestName = 'UniformTestTransient'
        #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
