@@ -753,6 +753,9 @@ def runModel(TestName):
               IT = 0.0
               thisTime = IT
               
+       # Compute the terrain boundary condition
+       dWBC = fields[ebcDex[2],1] - dHdX * state[ebcDex[2],0]
+              
        # Initialize output to NetCDF
        newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState)
               
@@ -792,9 +795,6 @@ def runModel(TestName):
                      else:
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
-              
-              # Compute the terrain boundary condition
-              dWBC = fields[ebcDex[2],1] - dHdX * state[ebcDex[2],0]
               
               # Compute Lagrange Multiplier column augmentation matrices (terrain equation)
               C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
