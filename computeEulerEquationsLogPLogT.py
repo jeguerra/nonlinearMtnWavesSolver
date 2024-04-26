@@ -106,10 +106,7 @@ def computePrepareFields(OPS, SOLT, udex, wdex, pdex, tdex):
 
        return fields, U, W
 
-def computeRHS(fields, hydroState, DDX, DDZ, PHYS, REFS, REFG, withRay, isTFOpX):
-       
-       # Compute flow speed
-       state = fields + hydroState
+def computeRHS(state, fields, DDX, DDZ, PHYS, REFS, REFG, withRay, isTFOpX):
        
        # Compute pressure gradient force scaling (buoyancy)
        RdT, T_ratio = computeRdT(PHYS, state, fields, REFS[9][0])
@@ -118,12 +115,12 @@ def computeRHS(fields, hydroState, DDX, DDZ, PHYS, REFS, REFG, withRay, isTFOpX)
        DqDx = DDX @ fields
        DqDz = DDZ @ fields
               
-       PqPz = DqDz + REFG[2]
        if isTFOpX:
               PqPx = np.copy(DqDx)
        else:
-              PqPx = DqDx - REFS[14] * PqPz
-                            
+              PqPx = DqDx - REFS[14] * DqDz
+       
+       PqPz = DqDz + REFG[2]
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz, 
                                                        RdT, T_ratio, state)
        if withRay:

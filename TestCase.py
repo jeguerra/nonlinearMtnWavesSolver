@@ -30,32 +30,32 @@ class TestCase:
               if TestName == 'ClassicalSchar01':
                      # Reproduction of the Classical Schar case (one solve)
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': False, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': False, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(192, 86, 70.0, 22.0, 280.0, 
+                     self.setUserData(184, 86, 70.0, 22.0, 280.0, 
                                       7000.0, 10000.0, 1.0E-2, \
                                       250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(164, 86, 70.0, 22.0, 280.0, \
+                     self.setUserData(184, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0E-2, \
-                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
+                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'UniformStratStatic':
                      # Newton iteration with smooth stratification
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
@@ -66,8 +66,8 @@ class TestCase:
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'VerticalSpectral': True, 'DynSGS': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
@@ -78,8 +78,8 @@ class TestCase:
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
                      self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
-                                'VerticalSpectral': False, 'DynSGS': True, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'VerticalSpectral': False, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
@@ -96,8 +96,8 @@ class TestCase:
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
                      self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
-                                'VerticalSpectral': True,'DynSGS': True, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
@@ -127,16 +127,15 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -0.8 * L2
+              L1 = -1.0 * L2
               ZH = 1.0E+3 * ZF # In km
               AD = ZH * (L2 - L1) # domain total area
-              OPS = (NX + 1) * (NZ + 1)
               iU = 0
               iW = 1
               iP = 2
               iT = 3
               self.varDex = [iU, iW, iP, iT]
-              self.DIMS = [L1, L2, ZH, NX, NZ, OPS, AD]
+              self.DIMS = [L1, L2, ZH, NX, NZ, AD]
               
               # Background temperature profile
               self.Z_in = [0.0, 1.1E4, 2.5E4, ZH]

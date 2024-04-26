@@ -29,11 +29,14 @@ import shelve
 import shutil
 import math as mt
 import numpy as np
+import numba as nb
 import bottleneck as bn
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
+import matplotlib.path as pth
 from matplotlib import cm
 import matplotlib.pyplot as plt
+
 # Import from the local library of routines
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
@@ -231,29 +234,6 @@ def displayResiduals(message, rhs, thisTime, DT, OPS):
        
        return err
 
-def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
-       rdb = shelve.open(restart_file, flag='r')
-       
-       NX_in = rdb['NX']
-       NZ_in = rdb['NZ']
-       if NX_in != NX or NZ_in != NZ:
-              print('ERROR: RESTART DATA IS INVALID')
-              print(NX, NX_in)
-              print(NZ, NZ_in)
-              sys.exit(2)
-       
-       SOLT = rdb['SOLT']
-       DCF = rdb['DCF']
-       IT = rdb['ET']
-       LMS = rdb['LMS']
-       if TOPT[4] <= IT and not StaticSolve:
-              print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
-              sys.exit(2)
-              
-       rdb.close()
-       
-       return np.array(SOLT), LMS, DCF, NX_in, NZ_in, IT
-
 def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState):
        
        NX = XL.shape[1]
@@ -338,8 +318,8 @@ def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
        
               for pp in range(numVar):
                      q = np.reshape(fields[:,pp], (NZ, NX), order='F')
-                     dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
-                     rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
+                     #dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
+                     #rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
                      dq1 = np.reshape(DCF[:,0,0], (NZ, NX), order='F')
                      dq2 = np.reshape(DCF[:,1,0], (NZ, NX), order='F')
 
@@ -422,12 +402,6 @@ def runModel(TestName):
               print('Uniform INTERIOR grid in the vertical')
               
        # Set residual diffusion switch
-       DynSGS = thisTest.solType['DynSGS']
-       if DynSGS:
-              print('DynSGS Diffusion Model.')
-       else:
-              print('Flow-Dependent Diffusion Model.')
-              
        DynSGS_RES = True
        if DynSGS_RES:
               print('Diffusion coefficients by residual estimate.')
@@ -438,7 +412,6 @@ def runModel(TestName):
        SolveSchur = thisTest.solType['SolveSchur']
        
        # Set Newton solve initial and restarting parameters
-       toRestart = thisTest.solType['ToRestart'] # Saves resulting state to restart database
        isRestart = thisTest.solType['IsRestart'] # Initializes from a restart database
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
        
@@ -473,10 +446,7 @@ def runModel(TestName):
               print('DEFAULT BC profile: ' + RLOPT[5])
        
        # Make the equation index vectors for all DOF
-       numVar = 4
-       NX = DIMS[3]
-       NZ = DIMS[4]
-       OPS = DIMS[5]
+       numVar = len(varDex)
        
        Z_in = thisTest.Z_in
        T_in = thisTest.T_in
@@ -524,29 +494,15 @@ def runModel(TestName):
               
        uz, duz = computeShearProfileOnGrid(REF0, JETOPS, PHYS[1], pz, dlpz, uniformWind, linearShear)
        
-       '''
-       # Check background
-       fig, ax = plt.subplots(nrows=2, ncols=2)
-       ax[0,0].plot(REF0[1], np.log(pz))
-       ax[0,1].plot(REF0[1], np.log(pt))
-       ax[1,0].plot(REF0[1], uz)
-       ax[1,1].plot(tz[:,0],1.0E-3 * REF0[1],linewidth=3.0,color='black')
-       ax[1,1].grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-       ax[1,1].set_xlabel('Temperature (K)')
-       ax[1,1].set_ylabel('Elevation (km)')
-       plt.show()
-       input('Check double resolution background profiles...')
-       '''
        #%% SET UP THE GRID AND INDEX VECTORS
        zRay = DIMS[2] - RLOPT[0]
        REFS = computeGrid(DIMS, RLOPT, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
        
        # Update OPS to the actual grid
-       OPS = REFS[0].shape[0] * REFS[1].shape[0]
-       udex = np.arange(OPS)
-       wdex = np.add(udex, OPS)
-       pdex = np.add(wdex, OPS)
-       tdex = np.add(pdex, OPS)
+       NX = REFS[0].shape[0]
+       NZ = REFS[1].shape[0]
+       OPS = NX * NZ
+       physDOF = numVar * OPS
        
        #%% Read in topography profile or compute from analytical function
        HofX, dHdX = computeTopographyOnGrid(REFS, HOPT)
@@ -560,18 +516,8 @@ def runModel(TestName):
                      coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        
        #% Compute the BC index vector
-       uldex, urdex, ubdex, utdex, wbdex, \
-       ubcDex, wbcDex, pbcDex, tbcDex, \
-       zeroDex, sysDex, ebcDex = \
+       ubcDex, wbcDex, pbcDex, tbcDex, sysDex, ebcDex = \
               computeAdjust4CBC(ZTL.shape, numVar, varDex, bcType)
-                            
-       # Index to interior of terrain boundary
-       hdex = range(0,XL.shape[1])
-       # Index to the entire bottom boundary on U
-       uBotDex = np.array(range(0, OPS, ZTL.shape[0]))
-       
-       physDOF = numVar * OPS
-       lmsDOF = len(ubdex)
       
        #%% Compute the raw derivative matrix operators in alpha-xi computational space
        if HermFunc and not FourierLin:
@@ -652,32 +598,13 @@ def runModel(TestName):
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
-       # Initialize solution storage
-       SOLT = np.zeros((physDOF, 2))
-       
-       # Initialize Lagrange Multiplier storage
-       LMS = np.zeros(lmsDOF)
-       
-       # Initialize hydrostatic background
-       INIT = np.zeros((physDOF,))
-       INIT[udex] = np.reshape(UZ, (OPS,), order='F')
-       INIT[wdex] = np.zeros((OPS,))
-       INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
-       INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-       
-       # Initialize state/tendency storage
-       hydroState = np.reshape(INIT, (OPS, numVar), order='F')
-       fields = np.reshape(SOLT[:,0], (OPS, numVar), order='F')
-       dfields = np.empty(fields.shape)
-       rhsVec = np.empty(fields.shape)
-       
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        RLM, GML = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
        
        # Make a collection for background field derivatives
        REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM]
                      
-       #%% Prepare derivative operators for advection              
+       #%% PREPARE DERIVATIVE OPERATORS              
        if HermFunc:
               PPXMA = DDXMS1
        else:
@@ -768,28 +695,88 @@ def runModel(TestName):
        del(dummy)
        
        #%% SOLUTION INITIALIZATION
+
+       hydroState = np.empty((OPS,numVar))
+       fields = np.zeros((OPS,numVar))
+       state = np.empty((OPS,numVar))
+       dfields = np.empty((OPS,numVar))
+       rhsVec = np.empty((OPS,numVar))
+       resVec = np.empty((OPS,numVar))
        
-       if isRestart and StaticSolve:
-              print('Restarting from previous solution...')
-              SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
+       # Initialize residual coefficient storage
+       DCF = np.zeros((fields.shape[0],2,1))
+       
+       if isRestart:
+              print('Restarting from: ', fname2Restart)
+              try:
+                     m_fid = Dataset(fname2Restart, 'r', format="NETCDF4")
+                     thisTime = m_fid.variables['time'][rdex]
+                     
+                     hydroState[:,0] = np.reshape(m_fid.variables['U'][rdex,:,:,0], (OPS,), order='F')
+                     hydroState[:,1] = 0.0
+                     hydroState[:,2] = np.reshape(m_fid.variables['LNP'][rdex,:,:,0], (OPS,), order='F')
+                     hydroState[:,3] = np.reshape(m_fid.variables['LNT'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     state[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:,0], (OPS,), order='F')
+                     state[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:,0], (OPS,), order='F')
+                     state[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:,0], (OPS,), order='F')
+                     state[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     fields = state - hydroState
+                     
+                     rhsVec[:,0] = np.reshape(m_fid.variables['DuDt'][rdex,:,:,0], (OPS,), order='F')
+                     rhsVec[:,1] = np.reshape(m_fid.variables['DwDt'][rdex,:,:,0], (OPS,), order='F')
+                     rhsVec[:,2] = np.reshape(m_fid.variables['Dln_pDt'][rdex,:,:,0], (OPS,), order='F')
+                     rhsVec[:,3] = np.reshape(m_fid.variables['Dln_tDt'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     resVec[:,0] = np.reshape(m_fid.variables['Ru'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,1] = np.reshape(m_fid.variables['Rw'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,2] = np.reshape(m_fid.variables['Rln_p'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,3] = np.reshape(m_fid.variables['Rln_t'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     DCF[:,0,0] = np.reshape(m_fid.variables['DC1'][rdex,:,:,0], (OPS,), order='F')
+                     DCF[:,1,0] = np.reshape(m_fid.variables['DC2'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     m_fid.close()
+                     del(m_fid)
+              except:
+                     print('Could NOT read restart NC file!', fname2Restart)
        else:
+              hydroState[:,0] = np.reshape(UZ, (OPS,), order='F')
+              hydroState[:,1] = 0.0
+              hydroState[:,2] = np.reshape(LOGP, (OPS,), order='F')
+              hydroState[:,3] = np.reshape(LOGT, (OPS,), order='F')
+              
+              state[:] = fields + hydroState
+              
               # Set the initial time
               IT = 0.0
               thisTime = IT
               
-       # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
-       state = fields + hydroState
+       # Initialize output to NetCDF
+       newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState)
               
-       # Updates nolinear boundary condition to next Newton iteration
-       dWBC = fields[ubdex,1] - dHdX[hdex] * state[ubdex,0]
-              
-       #% Compute the global LHS operator and RHS
+       start = time.time()
+       
+       #%% STATIC OR TRANSIENT SOLVERS
        if StaticSolve:
+              
+              # Initialize solution storage
+              SOLT = np.zeros((physDOF, 2))
+              SOLT[:,0] = np.reshape(fields, (physDOF,), order='F')
+              
+              # Initialize Lagrange Multiplier storage (bottom boundary)
+              LMS = np.zeros(NX)
+                     
+              # Compute the RHS for this iteration
+              rhsVec, DqDx, DqDz = eqs.computeRHS(state, fields, REFS[10][0], REFS[10][1], \
+                                                  PHYS, REFS, REFG, True, False)
+              displayResiduals('Current function evaluation residual: ', rhsVec, thisTime, TOPT[0], OPS)
+              
               if NewtonLin:
                      # Full Newton linearization with TF terms
                      DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                                   fields, state[:,0], ubdex, utdex)
+                                   fields, state[:,0], ebcDex[2], ebcDex[3])
               else:
                      # Classic linearization without TF terms
                      DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, 
@@ -806,22 +793,19 @@ def runModel(TestName):
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
-              #'''
-              # Compute the RHS for this iteration
-              rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], \
-                                                  PHYS, REFS, REFG, True, False)
-              displayResiduals('Current function evaluation residual: ', rhsVec, thisTime, TOPT[0], OPS)
+              # Compute the terrain boundary condition
+              dWBC = fields[ebcDex[2],1] - dHdX * state[ebcDex[2],0]
               
-              #%% Compute Lagrange Multiplier column augmentation matrices (terrain equation)
-              C1 = -1.0 * sps.diags(dHdX[hdex], offsets=0, format='csr')
-              C2 = +1.0 * sps.eye(len(ubdex), format='csr')
+              # Compute Lagrange Multiplier column augmentation matrices (terrain equation)
+              C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
+              C2 = +1.0 * sps.eye(NX, format='csr')
        
-              colShape = (OPS,len(ubdex))
+              colShape = (OPS,NX)
               LD = sps.lil_array(colShape)
               if ExactBC:
-                     LD[ubdex,:] = C1
+                     LD[ebcDex[2],:] = C1
               LH = sps.lil_array(colShape)
-              LH[ubdex,:] = C2
+              LH[ebcDex[2],:] = C2
               LM = sps.lil_array(colShape)
               LQ = sps.lil_array(colShape)
               
@@ -836,7 +820,7 @@ def runModel(TestName):
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_array((lmsDOF,lmsDOF))
+              LDIA = sps.lil_array((NX,NX))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -899,7 +883,7 @@ def runModel(TestName):
               
                      # Compute the global linear force vector
                      RHS = np.reshape(rhsVec, (physDOF,), order='F')
-                     bN = np.concatenate((RHS[sysDex], -dWBC))
+                     bN = np.concatenate((-dWBC, RHS[sysDex]))
               
               # Get memory back
               del(A); del(B); del(C); del(D)
@@ -908,9 +892,6 @@ def runModel(TestName):
               del(N); del(O); del(P); del(Q)
               print('Set up global linear operators: DONE!')
        
-       #%% Solve the system - Static or Transient Solution
-       start = time.time()
-       if StaticSolve:
               print('Starting Linear to Nonlinear Static Solver...')
               
               if SolveSchur:
@@ -926,10 +907,9 @@ def runModel(TestName):
                      del(bN)
                      del(factor)
                      
-              #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
-              LMS += dsol[0:lmsDOF]
-              dsolQ = dsol[lmsDOF:]
+              LMS += dsol[0:NX]
+              dsolQ = dsol[NX:]
               
               SOLT[sysDex,0] += dsolQ
 
@@ -939,21 +919,24 @@ def runModel(TestName):
               print('Recover full linear solution vector... DONE!')
               
               # Prepare the fields
-              fields = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
-              U = fields[:,0] + hydroState[:,0]
+              fields[:] = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
+              state[:] = fields + hydroState
               
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
               displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
               try:
-                     rhsVec, DqDx, DqDz = eqs.computeRHS(fields, hydroState, REFS[10][0], REFS[10][1], \
+                     rhsVec, DqDx, DqDz = eqs.computeRHS(state, fields, REFS[10][0], REFS[10][1], \
                                                   PHYS, REFS, REFG, True, False)
               except:
                      rhsVec = np.zeros(fields.shape)
                      
               message = 'Residual 2-norm AFTER Newton step:'
               displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
-       #%% Transient solutions       
+              
+              store2NC(newFname, thisTime, 0, numVar, ZTL, fields, rhsVec, resVec, DCF)
+       
+       # Transient solution
        else:
               print('Starting Nonlinear Transient Solver...')
               
@@ -1005,9 +988,6 @@ def runModel(TestName):
               
               print('Diffusion regions dimensions (m): ', DL1, DL2)
               
-              import numba as nb
-              import matplotlib.path as pth
-              
               def searchRegions(nn):
                      node = XZV[nn,:]
                      #'''
@@ -1038,58 +1018,11 @@ def runModel(TestName):
 
               # Create a container for DynSGS scaling and region parameters
               DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, DA / DIMS[-1], regDex, regDms)
-                            
-              # Initialize residual coefficient storage
-              CRES = np.zeros((fields.shape[0],2,1))
-              
-              # NetCDF restart for transient runs
-              if isRestart:
-                     dfields = np.zeros(fields.shape)
-                     rhsVec = np.empty(fields.shape)
-                     resVec = np.empty(fields.shape)
-                     print('Restarting from: ', fname2Restart)
-                     try:
-                            m_fid = Dataset(fname2Restart, 'r', format="NETCDF4")
-                            thisTime = m_fid.variables['time'][rdex]
-                            fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:,0], (OPS,), order='F')
-                            fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:,0], (OPS,), order='F')
-                            fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:,0], (OPS,), order='F')
-                            fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:,0], (OPS,), order='F')
-                            
-                            rhsVec[:,0] = np.reshape(m_fid.variables['DuDt'][rdex,:,:,0], (OPS,), order='F')
-                            rhsVec[:,1] = np.reshape(m_fid.variables['DwDt'][rdex,:,:,0], (OPS,), order='F')
-                            rhsVec[:,2] = np.reshape(m_fid.variables['Dln_pDt'][rdex,:,:,0], (OPS,), order='F')
-                            rhsVec[:,3] = np.reshape(m_fid.variables['Dln_tDt'][rdex,:,:,0], (OPS,), order='F')
-                            
-                            resVec[:,0] = np.reshape(m_fid.variables['Ru'][rdex,:,:,0], (OPS,), order='F')
-                            resVec[:,1] = np.reshape(m_fid.variables['Rw'][rdex,:,:,0], (OPS,), order='F')
-                            resVec[:,2] = np.reshape(m_fid.variables['Rln_p'][rdex,:,:,0], (OPS,), order='F')
-                            resVec[:,3] = np.reshape(m_fid.variables['Rln_t'][rdex,:,:,0], (OPS,), order='F')
-                            
-                            CRES[:,0,0] = np.reshape(m_fid.variables['DC1'][rdex,:,:,0], (OPS,), order='F')
-                            CRES[:,1,0] = np.reshape(m_fid.variables['DC2'][rdex,:,:,0], (OPS,), order='F')
-                            
-                            m_fid.close()
-                            del(m_fid)
-                     except:
-                            print('Could NOT read restart NC file!', fname2Restart)
-              else:
-                     # Initialize fields
-                     fields[:] = hydroState
-                     fields[ubdex,0] = 0.0
-                     fields[ubdex,1] = 0.0
-       
-                     dfields = np.zeros(fields.shape)
-                     rhsVec = np.zeros(fields.shape)
-                     resVec = np.zeros(fields.shape)
-                     thisTime = IT
               
               # Compute sound speed and initial time step
               isInitialStep = True
-              RdT, T_ratio = eqs.computeRdT(PHYS, fields, 
-                                            fields - hydroState, 
-                                            REFS[9][0])
-              TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=isInitialStep)
+              RdT, T_ratio = eqs.computeRdT(PHYS, state, fields, REFS[9][0])
+              TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, state, DLD, isInitial=isInitialStep)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
               # Normalization for vertical velocity
@@ -1097,16 +1030,13 @@ def runModel(TestName):
               rw = rw[rw > 0.0]
                      
               # compute function average of initial fields
-              sol_avrg = DLD[-3] @ fields
+              sol_avrg = DLD[-3] @ state
               # compute state relative to average
-              res_norm = DLD[-3] @ np.abs(fields - sol_avrg)
+              res_norm = DLD[-3] @ np.abs(state - sol_avrg)
               res_norm[1] = bn.nanmean(rw)
               print('Residual Norms:')
               print(res_norm)
               res_norm = 1.0 / res_norm
-                     
-              # Initialize output to NetCDF
-              newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState)
        
               # Initialize parameters
               ti = 0; ff = 0
@@ -1119,9 +1049,9 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
-                            fields, dfields, rhsVec, resVec, CRES, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, fields, hydroState, rhsVec, dfields, \
-                                                                    CRES, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
+                            state, dfields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
+                                                                    DLD, TOPT, state, hydroState, rhsVec, dfields, \
+                                                                    DCF, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             '''
                             # Update normalizations for vertical velocity
                             state = np.copy(fields)
@@ -1136,8 +1066,8 @@ def runModel(TestName):
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, fields, rhsVec, resVec, DCF)
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF[0], DCF[1], NX, NZ, numVar)
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, state, rhsVec, resVec, DCF)
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, state, rhsVec, resVec, DCF[0], DCF[1], NX, NZ, numVar)
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
@@ -1155,7 +1085,7 @@ def runModel(TestName):
                             displayResiduals(message, resVec, thisTime, TOPT[0], OPS)
                                    
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, CRES)
+                            store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF)
                                                         
                             ff += 1
                             interTime1 = 0.0
@@ -1174,34 +1104,13 @@ def runModel(TestName):
        endt = time.time()
        print('Solve the system: DONE!')
        print('Elapsed time: ', endt - start)
-       
-       #% Make a database for restart
-       if toRestart:
-              rdb = shelve.open(restart_file, flag='n')
-              rdb['qdex'] = (udex, wdex, pdex, tdex)
-              rdb['INIT'] = INIT
-              rdb['DSOL'] = SOLT[:,1]
-              rdb['SOLT'] = SOLT[:,0]
-              rdb['LMS'] = LMS
-              rdb['NX'] = NX
-              rdb['NZ'] = NZ
-              rdb['ET'] = TOPT[4]
-              rdb['PHYS'] = PHYS
-              rdb['DIMS'] = DIMS
               
-              if StaticSolve:
-                     rdb['REFS'] = REFS
-              else:
-                     rdb['DCF1'] = CRES[:,0,0]
-                     rdb['DCF2'] = CRES[:,1,0]
-              rdb.close()
-       
        #%% Recover the solution (or check the residual)
        GS = ZTL.shape
-       uxz = np.reshape(SOLT[udex,0], GS, order='F') 
-       wxz = np.reshape(SOLT[wdex,0], GS, order='F')
-       pxz = np.reshape(SOLT[pdex,0], GS, order='F') 
-       txz = np.reshape(SOLT[tdex,0], GS, order='F')
+       uxz = np.reshape(fields[:,0], GS, order='F') 
+       wxz = np.reshape(fields[:,1], GS, order='F')
+       pxz = np.reshape(fields[:,2], GS, order='F') 
+       txz = np.reshape(fields[:,3], GS, order='F')
        
        #%% Make some plots for static or transient solutions
        if makePlots and StaticSolve:
@@ -1223,7 +1132,7 @@ def runModel(TestName):
               plt.ylim(0.0, 1.0E-3*DIMS[2])
               plt.title('Change W - (m/s)')
               
-              flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[uBotDex] + uxz[0,:]))
+              flowAngle = np.arctan(wxz[0,:] * np.reciprocal(hydroState[ebcDex[2],0] + uxz[0,:]))
               slopeAngle = np.arctan(dHdX)
               
               plt.subplot(2,2,2)
@@ -1281,7 +1190,7 @@ def runModel(TestName):
               plt.show()
               
               # Check W at the boundaries...
-              return (XL, ZTL, rhs)
+              return (XL, ZTL, rhsVec)
        
 if __name__ == '__main__':
        

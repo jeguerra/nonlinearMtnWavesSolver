@@ -93,10 +93,6 @@ def computeAdjust4CBC(shape, numVar, varDex, bcType):
        wbcDex = rowsAll.difference(rowsOutW); wbcDex = sorted(wbcDex)
        pbcDex = rowsAll.difference(rowsOutP); pbcDex = sorted(pbcDex)
        tbcDex = rowsAll.difference(rowsOutT); tbcDex = sorted(tbcDex)
-       
-       # W is treated as an essential BC at terrain in solution by direct substitution
-       rowsOutBC_transient = (sorted(rowsOutU), sorted(rowsOutW), \
-                              sorted(rowsOutP), sorted(rowsOutT))
               
        # All DOF for all variables
        rowsAll = set(np.array(range(0,numVar*OPS)))
@@ -104,4 +100,4 @@ def computeAdjust4CBC(shape, numVar, varDex, bcType):
        sysDex = rowsAll.difference(rowsOutBC)
        sysDex = sorted(sysDex)
        
-       return uldex1, urdex1, ubdex, utdex, ubdex + iW*OPS, ubcDex, wbcDex, pbcDex, tbcDex, rowsOutBC_transient, sysDex, diffDex
+       return ubcDex, wbcDex, pbcDex, tbcDex, sysDex, diffDex
