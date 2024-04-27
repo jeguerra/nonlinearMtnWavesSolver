@@ -1052,6 +1052,8 @@ def runModel(TestName):
                             state, dfields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
                                                                     DLD, TOPT, state, hydroState, rhsVec, dfields, \
                                                                     DCF, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
+                            
+                            fields = state - hydroState
                             '''
                             # Update normalizations for vertical velocity
                             state = np.copy(fields)
@@ -1085,7 +1087,7 @@ def runModel(TestName):
                             displayResiduals(message, resVec, thisTime, TOPT[0], OPS)
                                    
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF)
+                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, DCF)
                                                         
                             ff += 1
                             interTime1 = 0.0
@@ -1195,11 +1197,11 @@ def runModel(TestName):
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
-       TestName = 'ClassicalScharIter'
+       #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
        #TestName = 'UniformTestTransient'
-       #TestName = '3LayerTestTransient'
+       TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

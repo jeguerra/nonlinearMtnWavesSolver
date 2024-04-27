@@ -85,30 +85,30 @@ class TestCase:
                             
                      # HIGH RESOLUTION
                      #self.setUserData(1796, 212, 140.0, 32.0, 300.0, \
-                     #                 7000.0, 20000.0, 1.0,
+                     #                 7000.0, 20000.0, 1.0E+0,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
                      self.setUserData(1258, 166, 140.0, 33.0, 300.0, \
-                                      8000.0, 20000.0, 1.0E-1,
+                                      8000.0, 20000.0, 1.0E+0,
                                       6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
                      self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
-                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'VerticalSpectral': False, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(1796, 256, 140.0, 38.0, 300.0, \
-                                      8000.0, 20000.0, 1.0E-1,
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
-                            
-                     #self.setUserData(1258, 192, 140.0, 40.0, 300.0, \
-                     #                 8000.0, 20000.0, 1.0,
+                     #self.setUserData(1796, 256, 140.0, 38.0, 300.0, \
+                     #                 8000.0, 20000.0, 1.0E+0,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     self.setUserData(1258, 192, 140.0, 40.0, 300.0, \
+                                      8000.0, 20000.0, 1.0E+0,
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
