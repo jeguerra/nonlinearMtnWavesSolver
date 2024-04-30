@@ -127,7 +127,10 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -1.0 * L2
+              if self.solType['StaticSolve']:
+                     L1 = -1.0 * L2
+              else:
+                     L1 = -0.8 * L2
               ZH = 1.0E+3 * ZF # In km
               AD = ZH * (L2 - L1) # domain total area
               iU = 0

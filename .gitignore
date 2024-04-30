@@ -58,3 +58,4 @@ python results/
 *.mp4
 
 *.py~
+.DS_Store

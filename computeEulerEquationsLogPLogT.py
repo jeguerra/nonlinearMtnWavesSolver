@@ -25,14 +25,16 @@ def enforceBC_RHS(PHYS, rhs, ebcDex):
        #rhs[ldex,0] = 0.0
        #rhs[ldex,1] = 0.0
        
-       rhs[rdex,1:3] = 0.0
-       #rhs[rdex,1] = 0.0
+       #rhs[rdex,1:3] = 0.0
+       rhs[rdex,1] = 0.0
+       rhs[rdex,2] = 0.0
        
        rhs[bdex,0:2] = 0.0
        rhs[bdex,3] = 0.0
        
-       rhs[tdex,1:3] = 0.0
-       #rhs[tdex,2] = 0.0
+       #rhs[tdex,0:2] = 0.0
+       rhs[tdex,1] = 0.0
+       rhs[tdex,2] = 0.0
        
        return rhs
 

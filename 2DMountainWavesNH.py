@@ -315,24 +315,25 @@ def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
        try:
               m_fid = Dataset(newFname, 'a', format="NETCDF4")
               m_fid.variables['time'][ff] = thisTime
+              
+              dq1 = np.reshape(DCF[:,0,0], (NZ, NX), order='F')
+              dq2 = np.reshape(DCF[:,1,0], (NZ, NX), order='F')
+              m_fid.variables['DC1'][ff,:,:,0] = dq1
+              m_fid.variables['DC2'][ff,:,:,0] = dq2
        
               for pp in range(numVar):
                      q = np.reshape(fields[:,pp], (NZ, NX), order='F')
                      #dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
                      #rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
-                     dq1 = np.reshape(DCF[:,0,0], (NZ, NX), order='F')
-                     dq2 = np.reshape(DCF[:,1,0], (NZ, NX), order='F')
 
                      if pp == 0:
                             m_fid.variables['u'][ff,:,:,0] = q
                             #m_fid.variables['DuDt'][ff,:,:,0] = dqdt
                             #m_fid.variables['Ru'][ff,:,:,0] = rq
-                            m_fid.variables['DC1'][ff,:,:,0] = dq1
                      elif pp == 1:
                             m_fid.variables['w'][ff,:,:,0] = q
                             #m_fid.variables['DwDt'][ff,:,:,0] = dqdt
                             #m_fid.variables['Rw'][ff,:,:,0] = rq
-                            m_fid.variables['DC2'][ff,:,:,0] = dq2
                      elif pp == 2:
                             m_fid.variables['ln_p'][ff,:,:,0] = q
                             #m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
@@ -1087,7 +1088,10 @@ def runModel(TestName):
                             displayResiduals(message, resVec, thisTime, TOPT[0], OPS)
                                    
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, DCF)
+                            plot_fields = np.copy(fields)
+                            plot_fields[:,0] += hydroState[:,0]
+                            store2NC(newFname, thisTime, ff, numVar, ZTL, plot_fields, rhsVec, resVec, DCF)
+                            del(plot_fields)
                                                         
                             ff += 1
                             interTime1 = 0.0
@@ -1200,8 +1204,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       #TestName = 'UniformTestTransient'
-       TestName = '3LayerTestTransient'
+       TestName = 'UniformTestTransient'
+       #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):
