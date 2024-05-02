@@ -742,6 +742,7 @@ def runModel(TestName):
                      del(m_fid)
               except:
                      print('Could NOT read restart NC file!', fname2Restart)
+              isInitialStep = False
        else:
               hydroState[:,0] = np.reshape(UZ, (OPS,), order='F')
               hydroState[:,1] = 0.0
@@ -753,6 +754,7 @@ def runModel(TestName):
               # Set the initial time
               IT = 0.0
               thisTime = IT
+              isInitialStep = True
               
        # Compute the terrain boundary condition
        dWBC = fields[ebcDex[2],1] - dHdX * state[ebcDex[2],0]
@@ -1021,7 +1023,6 @@ def runModel(TestName):
               DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, DA / DIMS[-1], regDex, regDms)
               
               # Compute sound speed and initial time step
-              isInitialStep = True
               RdT, T_ratio = eqs.computeRdT(PHYS, state, fields, REFS[9][0])
               TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, state, DLD, isInitial=isInitialStep)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
@@ -1052,7 +1053,7 @@ def runModel(TestName):
                      try:   
                             state, dfields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
                                                                     DLD, TOPT, state, hydroState, rhsVec, dfields, \
-                                                                    DCF, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
+                                                                    DCF.shape, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             
                             fields = state - hydroState
                             '''

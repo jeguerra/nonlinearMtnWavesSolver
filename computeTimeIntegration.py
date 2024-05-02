@@ -39,8 +39,12 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
-                             sol0, init0, rhs0, dsol0, CRES, ebcDex, \
+                             sol0, init0, rhs0, dsol0, CRES_SIZE, ebcDex, \
                              RSBops, VWAV_ref, res_norm, isInitialStep):
+       
+       rhs = 0.0
+       res = 0.0
+       CRES = 0.0
        
        OPS = sol0.shape[0]
        DT = TOPT[0]
@@ -62,16 +66,11 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        DD1 = REFS[12] # First derivatives for advection/dynamics
        DD2 = REFS[13] # First derivatives for diffusion gradient
        
-       rhs = 0.0
-       res = 0.0
-       DynSGS_Update = True
-       Residual_Update = True
-       Timestep_Update = True
+       Auxilary_Updates = True
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              nonlocal DynSGS_Update,Residual_Update,Timestep_Update,\
-                       rhs,res,CRES,DT
+              nonlocal Auxilary_Updates,rhs,res,CRES,DT
               
               # Compute time dependent state about initial conditions
               pertbA = solA - init0
@@ -88,40 +87,31 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               DqDzA = (PqPzA - DQDZ)
               
               # Apply Neumman BC here...
-              PqPxA[ebcDex[1],2] = 0.0
+              PqPxA[ebcDex[1],:] = 0.0
                
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
                                                                        RdT, T_ratio, solA)
               
-              if Residual_Update:
-                     rhs = np.copy(rhsDyn)
-                     res = 0.5 * ((rhs - rhs0) + (dsol0 / TOPT[0] - 0.5 * (rhs0 + rhs)))
-                     res *= res_norm
-                     Residual_Update = False
-                     
-              if Timestep_Update:
+              if Auxilary_Updates:
                      
                      DT, VWAV_fld, VFLW_adv = tendency.computeNewTimeStep(PHYS, RdT, solA,
                                                                           DLD, isInitial=isInitialStep)
-
-                     Timestep_Update = False
-              
-              #%% Compute the DynSGS coefficients at the top update
-              if DynSGS_Update:
-                     sbnd = 0.5 * DT * VWAV_ref**2
-                     CRES *= 0.0
+                     
+                     sbnd = 0.5 * DT * VWAV_ref**2                     
+                     res = 0.5 * ((rhsDyn - rhs0) + (dsol0 / TOPT[0] - 0.5 * (rhs0 + rhsDyn)))
+                     res *= res_norm
                      
                      # Define residual as the timestep change in the RHS
                      CRES = rescf.computeResidualViscCoeffs(np.abs(res), DLD, DT, 
-                                                            bdex, sbnd, CRES)
+                                                            bdex, sbnd, np.zeros(CRES_SIZE))
                                                             
                      # Residual contribution vanishes in the sponge layers
                      CRES[:,:,0] *= (1.0 - RLMA)
                      # Add in smooth diffusion field in the sponge layers
                      CRES[:,:,0] += sbnd * RLMA
        
-                     DynSGS_Update = False
+                     Auxilary_Updates = False
               
               #%% Compute diffusive update
 
