@@ -201,15 +201,21 @@ def computeRayleighEquations(DIMS, X, Z, depth, RLOPT):
        # Compute the diagonal for full Rayleigh field as matrices    
        OPS = RL[0].shape[0] * RL[0].shape[1]
        
-       RLML = np.reshape(RL[0], (OPS,), order='F')
-       RLMR = np.reshape(RL[1], (OPS,), order='F')
-       RLMT = np.reshape(RL[2], (OPS,), order='F')
+       rl1 = np.reshape(RL[0], (OPS,1), order='F')
+       RLML = np.hstack((rl1,rl1,rl1,rl1))
+       
+       rl2 = np.reshape(RL[1], (OPS,1), order='F')
+       RLMR = np.hstack((rl2,rl2,rl2,rl2))
+       
+       rl3 = np.reshape(RL[2], (OPS,1), order='F')
+       RLMT = np.hstack((rl3,rl3,rl3,rl3))
+       
        RLMA = np.reshape(RL[3], (OPS,1), order='F')
        
        GLM = sps.spdiags(np.reshape(GL[0], (OPS,), order='F'), 0, OPS, OPS)
        GLMX = sps.spdiags(np.reshape(GL[1], (OPS,), order='F'), 0, OPS, OPS)
        GLMZ = sps.spdiags(np.reshape(GL[2], (OPS,), order='F'), 0, OPS, OPS)
        
-       return (RLML, RLMR, RLMT, RLMA), (GLM, GLMX, GLMZ)
+       return [RLML, RLMR, RLMT, RLMA], (GLM, GLMX, GLMZ)
        
                             

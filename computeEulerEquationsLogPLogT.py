@@ -13,7 +13,7 @@ import scipy.sparse as sps
 # Change floating point errors
 np.seterr(all='ignore', divide='raise', over='raise', invalid='raise')
 
-def enforceBC_RHS(PHYS, rhs, ebcDex):
+def enforceBC_RHS(rhs, ebcDex):
        
        ldex = ebcDex[0]
        rdex = ebcDex[1]
@@ -122,7 +122,7 @@ def computeRHS(state, fields, DDX, DDZ, PHYS, REFS, REFG, withRay, isTFOpX):
        else:
               PqPx = DqDx - REFS[14] * DqDz
        
-       PqPz = DqDz + REFG[2]
+       PqPz = DqDz + REFG[3]
        rhsVec = computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz, 
                                                        RdT, T_ratio, state)
        if withRay:
@@ -146,8 +146,8 @@ def computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, fields, U, botdex, topdex):
        DZDXM = sps.diags(DZDX, offsets=0, format='csr')
        PPXM = DDXM - DZDXM.dot(DDZM)
        
-       DLTDZ = REFG[1]
-       DQDZ = REFG[2]
+       DLTDZ = REFG[2]
+       DQDZ = REFG[3]
        
        # Compute terrain following terms (two way assignment into fields)
        wxz = np.array(fields[:,1])
@@ -264,8 +264,8 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
        PORZM = sps.diags_array(PORZ, offsets=0, format='csr')
        
        # Compute hydrostatic state diagonal operators
-       DLTDZ = REFG[1]
-       DQDZ = REFG[2]
+       DLTDZ = REFG[2]
+       DQDZ = REFG[3]
        DLTDZM = sps.diags_array(DLTDZ[:,0], offsets=0, format='csr')
        DUDZM = sps.diags_array(DQDZ[:,0], offsets=0, format='csr')
        DLPDZM = sps.diags_array(DQDZ[:,2], offsets=0, format='csr')
@@ -350,7 +350,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz,
 def computeRayleighTendency(REFG, fields):
        
        # Get the Rayleight operators
-       ROP = REFG[4][-1]
+       ROP = REFG[0][-1]
        DqDt = -ROP * fields
               
        return DqDt

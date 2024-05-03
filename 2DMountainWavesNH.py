@@ -601,9 +601,14 @@ def runModel(TestName):
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        RLM, GML = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
+              
+       # Impose RHS boundary conditions on Rayleigh damping
+       RLM[0] = eqs.enforceBC_RHS(RLM[0], ebcDex)
+       RLM[1] = eqs.enforceBC_RHS(RLM[1], ebcDex)
+       RLM[2] = eqs.enforceBC_RHS(RLM[2], ebcDex)
        
        # Make a collection for background field derivatives
-       REFG = [GML, DLTDZ, DQDZ, RLOPT[4], RLM]
+       REFG = [RLM, GML, DLTDZ, DQDZ, RLOPT[4]]
                      
        #%% PREPARE DERIVATIVE OPERATORS              
        if HermFunc:
