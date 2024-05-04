@@ -329,6 +329,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
        # Rayleigh factor to inflow boundary implicitly
        RayD = np.reciprocal(1.0 + DT * mu * RLML)
+       RayD[:,0] = 1.0
+       RayD[:,3] = 1.0
        sol = RayD * sol + (1.0 - RayD) * init0
        '''
        sol[:,0] = RayD[:,0] * sol[:,0] + (1.0 - RayD[:,0]) * init0[:,0]
