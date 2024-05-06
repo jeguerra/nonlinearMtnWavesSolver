@@ -145,11 +145,35 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               rhsDif = tendency.computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, \
                                                          ebcDex)
               
-              # Compute total RHS and apply BC
-              rhs = tendency.enforceBC_RHS((rhsDyn + rhsDif), ebcDex)
-              
               # Apply stage update
-              solB = sol2Update + coeff * DT * rhs
+              solB = sol2Update + coeff * DT * (rhsDyn + rhsDif)
+              
+              # Rayleigh factor to inflow boundary implicitly
+              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLML)
+              #RayD[:,0] = 1.0
+              #RayD[:,1] = 1.0
+              #RayD[:,2] = 1.0
+              #RayD[:,3] = 1.0
+              solB = RayD * solB + (1.0 - RayD) * init0
+
+              # Rayleigh factor to outflow boundary implicitly
+              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMR)
+              #RayD[:,0] = 1.0
+              #RayD[:,1] = 1.0
+              #RayD[:,2] = 1.0
+              #RayD[:,3] = 1.0
+              solB = RayD * solB + (1.0 - RayD) * init0
+              
+              # Rayleigh factor to top boundary implicitly
+              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMT)
+              RayD[:,0] = 1.0
+              #RayD[:,1] = 1.0
+              RayD[:,2] = 1.0
+              RayD[:,3] = 1.0
+              solB = RayD * solB + (1.0 - RayD) * init0
+              
+              # Compute total RHS and apply BC
+              solB = tendency.enforceBC_SOL(solB, ebcDex, init0)
               
               return solB
        
@@ -326,38 +350,5 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        else:
               print('Invalid time integration order. Going with 2.')
               sol = ketchesonM2(sol0)
-              
-       # Rayleigh factor to inflow boundary implicitly
-       RayD = np.reciprocal(1.0 + DT * mu * RLML)
-       RayD[:,0] = 1.0
-       RayD[:,3] = 1.0
-       sol = RayD * sol + (1.0 - RayD) * init0
-       '''
-       sol[:,0] = RayD[:,0] * sol[:,0] + (1.0 - RayD[:,0]) * init0[:,0]
-       sol[:,1] *= RayD[:,1]
-       sol[:,2] = RayD[:,2] * sol[:,2] + (1.0 - RayD[:,2]) * init0[:,2]
-       sol[:,3] = RayD[:,3] * sol[:,3] + (1.0 - RayD[:,3]) * init0[:,3]
-       '''
-       # Rayleigh factor to outflow boundary implicitly
-       RayD = np.reciprocal(1.0 + DT * mu * RLMR)
-       RayD[:,0] = 1.0
-       RayD[:,3] = 1.0
-       sol = RayD * sol + (1.0 - RayD) * init0
-       '''
-       #sol[:,0] = RayD[:,0] * solB[:,0] + (1.0 - RayD[:,0]) * init0[:,0]
-       sol[:,1] *= RayD[:,1]
-       sol[:,2] = RayD[:,2] * sol[:,2] + (1.0 - RayD[:,2]) * init0[:,2]
-       #sol[:,3] = RayD[:,3] * solB[:,3] + (1.0 - RayD[:,3]) * init0[:,3]
-       '''
-       # Rayleigh factor to top boundary implicitly
-       RayD = np.reciprocal(1.0 + DT * mu * RLMT)
-       RayD[:,0] = 1.0
-       RayD[:,3] = 1.0
-       sol = RayD * sol + (1.0 - RayD) * init0
-       '''
-       #sol[:,0] = RayD[:,0] * solB[:,0] + (1.0 - RayD[:,0]) * init0[:,0]
-       sol[:,1] *= RayD[:,1]
-       sol[:,2] = RayD[:,2] * sol[:,2] + (1.0 - RayD[:,2]) * init0[:,2]
-       #sol[:,3] = RayD[:,3] * sol[:,3] + (1.0 - RayD[:,3]) * init0[:,3
-       '''       
+           
        return sol, sol-sol0, rhs, res, CRES, DT

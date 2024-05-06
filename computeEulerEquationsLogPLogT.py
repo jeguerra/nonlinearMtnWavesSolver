@@ -24,29 +24,39 @@ def enforceBC_RHS(rhs, ebcDex):
        rhs[ldex,:] = 0.0
        #rhs[ldex,0] = 0.0
        #rhs[ldex,1] = 0.0
+       #rhs[ldex,3] = 0.0
        
        #rhs[rdex,1:3] = 0.0
-       rhs[rdex,1] = 0.0
-       rhs[rdex,2] = 0.0
+       #rhs[rdex,1] = 0.0
+       #rhs[rdex,2] = 0.0
        
        rhs[bdex,0:2] = 0.0
        rhs[bdex,3] = 0.0
        
-       #rhs[tdex,0:2] = 0.0
+       #rhs[tdex,:] = 0.0
+       #rhs[tdex,0] = 0.0
        rhs[tdex,1] = 0.0
-       rhs[tdex,2] = 0.0
+       #rhs[tdex,3] = 0.0
        
        return rhs
 
-def enforceBC_SOL(sol, ebcDex):
+def enforceBC_SOL(sol, ebcDex, init):
        
+       ldex = ebcDex[0]
+       rdex = ebcDex[1]
        bdex = ebcDex[2]
        tdex = ebcDex[3]
-       vdex = np.concatenate((bdex, tdex))
        
-       # Top and bottom conditions on velocity
-       sol[bdex,0] = 0.0
-       sol[vdex,1] = 0.0
+       # BC conditions on tendencies
+       sol[ldex,:] = init[ldex,:]
+       
+       #sol[rdex,:] = 0.0
+       
+       sol[bdex,0:2] = 0.0
+       #sol[bdex,3] = 0.0
+       
+       #sol[tdex,:] = 0.0
+       sol[tdex,1] = 0.0
        
        return sol
 
