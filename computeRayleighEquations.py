@@ -11,6 +11,8 @@ Works the old fashioned way with lots of nested loops... so sue me!
 
 import math as mt
 import numpy as np
+import bottleneck as bn
+import scipy.special as ssp
 import scipy.sparse as sps
 checkPlots = False
 def computeRayleighField(DIMS, X, Z, height, width, applyTop, applyLateral):
@@ -120,7 +122,16 @@ def computeRayleighField(DIMS, X, Z, height, width, applyTop, applyLateral):
                      # Absorption to the model top boundary
                      RL_top[ii,jj] = RFZ
                      # Complete absorption frame
-                     RL_all[ii,jj] = np.amax([RFX1, RFX2, RFZ])
+                     #RL_all[ii,jj] = ssp.logsumexp([RFX1, RFX2, RFZ])
+                     rlyr = np.array([0.0, RFX1, RFX2, RFZ])
+                     rmax = bn.nanmax(rlyr)
+                     '''
+                     if rmax > 0.0:
+                            RL_all[ii,jj] = rmax + mt.log(np.exp(rlyr - rmax).sum())
+                     else:
+                            RL_all[ii,jj] = rmax
+                     '''       
+                     RL_all[ii,jj] = rmax
                             
        # Assemble the Grid Matching Layer field X and Z directions
        GML = np.ones((NZ, NX))

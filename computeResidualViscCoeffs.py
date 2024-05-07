@@ -7,7 +7,10 @@ Created on Sun Aug  4 13:59:02 2019
 """
 
 import numpy as np
-from numba import njit, prange, set_num_threads
+import bottleneck as bn
+from numba import njit, prange
+
+useMaxFilter = True
 
 @njit(parallel=True)
 def computeRegionFilter(QR, DLD, LVAR, sbnd):
@@ -18,7 +21,13 @@ def computeRegionFilter(QR, DLD, LVAR, sbnd):
         
        for ii in prange(LVAR):
               # Compute the given filter over the region
-              gval = np.nanmax(fltKrl[ii] @ QR[fltDex[ii],:])
+              vals = QR[fltDex[ii]]
+              if useMaxFilter:                     
+                     rsmx = vals.max()
+                     rsum = (np.exp(vals - rsmx)).sum()                     
+                     gval = rsmx #+ np.log(rsum)
+              else:
+                     gval = vals.T @ fltKrl[ii]
               
               Q[ii,0,0] = min(DLD[2] * gval, sbnd)
               Q[ii,1,0] = min(DLD[3] * gval, sbnd)
@@ -31,6 +40,7 @@ def computeResidualViscCoeffs(RES, DLD, DT, bdex, sbnd, CRES):
        LVAR = RES.shape[0]
        
        # Set DynSGS values
+       RES = bn.nanmax(RES,axis=1)
        CRES += computeRegionFilter(RES, DLD, LVAR, sbnd)
               
        return CRES

@@ -601,11 +601,6 @@ def runModel(TestName):
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        RLM, GML = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
-              
-       # Impose RHS boundary conditions on Rayleigh damping
-       RLM[0] = eqs.enforceBC_RHS(RLM[0], ebcDex)
-       RLM[1] = eqs.enforceBC_RHS(RLM[1], ebcDex)
-       RLM[2] = eqs.enforceBC_RHS(RLM[2], ebcDex)
        
        # Make a collection for background field derivatives
        REFG = [RLM, GML, DLTDZ, DQDZ, RLOPT[4]]
@@ -991,8 +986,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = mt.pi * DX_max
-              DL2 = mt.pi * DZ_max
+              DL1 = 0.5 * mt.pi * DX_max
+              DL2 = 0.5 * mt.pi * DZ_max
               
               print('Diffusion regions dimensions (m): ', DL1, DL2)
               

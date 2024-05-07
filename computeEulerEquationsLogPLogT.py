@@ -22,21 +22,12 @@ def enforceBC_RHS(rhs, ebcDex):
        
        # BC conditions on tendencies
        rhs[ldex,:] = 0.0
-       #rhs[ldex,0] = 0.0
-       #rhs[ldex,1] = 0.0
-       #rhs[ldex,3] = 0.0
-       
-       #rhs[rdex,1:3] = 0.0
-       #rhs[rdex,1] = 0.0
-       #rhs[rdex,2] = 0.0
        
        rhs[bdex,0:2] = 0.0
        rhs[bdex,3] = 0.0
        
        #rhs[tdex,:] = 0.0
-       #rhs[tdex,0] = 0.0
        rhs[tdex,1] = 0.0
-       #rhs[tdex,3] = 0.0
        
        return rhs
 
@@ -47,15 +38,14 @@ def enforceBC_SOL(sol, ebcDex, init):
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
-       # BC conditions on tendencies
+       # BC conditions on solution fields
        sol[ldex,:] = init[ldex,:]
        
        #sol[rdex,:] = 0.0
        
        sol[bdex,0:2] = 0.0
-       #sol[bdex,3] = 0.0
+       sol[bdex,3] = init[bdex,3]
        
-       #sol[tdex,:] = 0.0
        sol[tdex,1] = 0.0
        
        return sol
@@ -66,7 +56,8 @@ def computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=False):
        VWAV_fld = np.sqrt(PHYS[6] * RdT)
        VFLW_adv = np.sqrt(bn.ss(fields[:,0:2], axis=1))
        #VWAV_max = bn.nanmax(VWAV_fld + VFLW_adv)
-       VWAV_max = np.nanquantile(VWAV_fld + VFLW_adv, 0.9)
+       #VWAV_max = np.nanquantile(VWAV_fld + VFLW_adv, 0.9)
+       VWAV_max = DLD[-3] @ (VWAV_fld + VFLW_adv)
                             
        # Perform some checks before setting the new DT
        if np.isfinite(VWAV_max) and VWAV_max > 0.0:
