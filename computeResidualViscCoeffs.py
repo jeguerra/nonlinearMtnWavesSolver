@@ -26,12 +26,17 @@ def computeRegionFilter(QR, DLD, LVAR, sbnd):
                      rsmx = vals.max()
                      
                      rsum = 0.0
-                     nv = vals.shape[0]
+                     nv = 0
                      for val in vals:
-                            arg = val - rsmx
-                            rsum += np.exp(arg)
+                            if val > 0.0:
+                                   arg = val - rsmx
+                                   rsum += np.exp(arg)
+                                   nv += 1
 
-                     gval = rsmx + np.log(rsum / nv)
+                     if nv > 0:
+                            gval = rsmx + np.log(rsum / nv)
+                     else:
+                            gval = rsmx
                      #print(rsmx, np.log(rsum / nv), gval)
                      #input(vals - rsmx)
               else:
