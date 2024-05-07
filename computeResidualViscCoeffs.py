@@ -28,8 +28,8 @@ def computeRegionFilter(QR, DLD, LVAR, sbnd):
                      rsum = 0.0
                      nv = 0
                      for val in vals:
-                            if val > 0.0:
-                                   arg = val - rsmx
+                            arg = val - rsmx
+                            if arg < 0.0:
                                    rsum += np.exp(arg)
                                    nv += 1
 
