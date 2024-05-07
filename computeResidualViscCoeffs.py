@@ -24,10 +24,21 @@ def computeRegionFilter(QR, DLD, LVAR, sbnd):
               vals = QR[fltDex[ii]]
               if useMaxFilter:                     
                      rsmx = vals.max()
-                     rsum = (np.exp(vals - rsmx)).sum()                     
-                     gval = rsmx #+ np.log(rsum)
+                     
+                     rsum = 0.0
+                     nv = vals.shape[0]
+                     for val in vals:
+                            arg = val - rsmx
+                            rsum += np.exp(arg)
+
+                     gval = rsmx + np.log(rsum / nv)
+                     #print(rsmx, np.log(rsum / nv), gval)
+                     #input(vals - rsmx)
               else:
                      gval = vals.T @ fltKrl[ii]
+                     
+              if gval < 1.0E-16:
+                     gval = 0.0
               
               Q[ii,0,0] = min(DLD[2] * gval, sbnd)
               Q[ii,1,0] = min(DLD[3] * gval, sbnd)
