@@ -6,11 +6,10 @@ Created on Wed Jul 17 14:12:01 2019
 @author: TempestGuerra
 """
 
-import math as mt
 import numpy as np
 import HerfunChebNodesWeights as qxw
 
-def computeGrid(DIMS, RLOPT, Herm, Four, ChebCol, LegCol):
+def computeGrid(DIMS, Herm, Four, ChebCol, LegCol):
        # Get the domain dimensions
        L1 = DIMS[0]
        L2 = DIMS[1]

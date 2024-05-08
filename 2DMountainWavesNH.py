@@ -41,15 +41,15 @@ import matplotlib.pyplot as plt
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
-import computePartialDerivativesXZ as devop
 from computeTopographyOnGrid import computeTopographyOnGrid
-import computeGuellrichDomain2D as coords
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeRayleighEquations import computeRayleighEquations
 
 # Numerical stuff
+import computePartialDerivativesXZ as devop
+import computeGuellrichDomain2D as coords
 import computeDiskPartSchur as dsolver
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
@@ -456,7 +456,7 @@ def runModel(TestName):
        chebHydro = False
        legrHydro = True
        DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
-       REF0 = computeGrid(DIM0, RLOPT, HermFunc, FourierLin, chebHydro, legrHydro)
+       REF0 = computeGrid(DIM0, HermFunc, FourierLin, chebHydro, legrHydro)
        
        DDXP, dummy = derv.computeCubicSplineDerivativeMatrix(REF0[0], False, True, None)
        
@@ -497,7 +497,7 @@ def runModel(TestName):
        
        #%% SET UP THE GRID AND INDEX VECTORS
        zRay = DIMS[2] - RLOPT[0]
-       REFS = computeGrid(DIMS, RLOPT, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
+       REFS = computeGrid(DIMS, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
        
        # Update OPS to the actual grid
        NX = REFS[0].shape[0]
