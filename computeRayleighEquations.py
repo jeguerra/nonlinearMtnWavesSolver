@@ -25,7 +25,6 @@ def computeRayleighField(DIMS, X, Z, height, width, applyTop, applyLateral):
        RP = 2.0
        T1 = 0.1
        S1 = 0.25 / (1.0 - T1)
-       C1 = 20.0
        
        # Get domain data
        NX = X.shape[1]
@@ -122,16 +121,20 @@ def computeRayleighField(DIMS, X, Z, height, width, applyTop, applyLateral):
                      # Absorption to the model top boundary
                      RL_top[ii,jj] = RFZ
                      # Complete absorption frame
-                     #RL_all[ii,jj] = ssp.logsumexp([RFX1, RFX2, RFZ])
-                     rlyr = np.array([0.0, RFX1, RFX2, RFZ])
-                     rmax = bn.nanmax(rlyr)
+                     RL_all[ii,jj] = bn.nanmax([RFX1, RFX2, RFZ])
                      '''
-                     if rmax > 0.0:
-                            RL_all[ii,jj] = rmax + mt.log(np.exp(rlyr - rmax).sum())
+                     RL_all[ii,jj] = ssp.logsumexp([RFX1, RFX2, RFZ]) - mt.log(3.0)
+                     rlyr = np.array([RFX1, RFX2, RFZ])
+                     rmax = bn.nanmax(rlyr)
+                     
+                     nnz = np.flatnonzero(rlyr)
+                     if nnz.shape[0] > 1:
+                            RL_all[ii,jj] = rmax + \
+                                   mt.log(np.exp(rlyr[nnz] - rmax).sum()) - \
+                                   mt.log(nnz.shape[0])
                      else:
                             RL_all[ii,jj] = rmax
-                     '''       
-                     RL_all[ii,jj] = rmax
+                     '''
                             
        # Assemble the Grid Matching Layer field X and Z directions
        GML = np.ones((NZ, NX))

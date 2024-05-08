@@ -37,8 +37,6 @@ def computeRegionFilter(QR, DLD, LVAR, sbnd):
                             gval = rsmx + np.log(rsum / nv)
                      else:
                             gval = rsmx
-                     #print(rsmx, np.log(rsum / nv), gval)
-                     #input(vals - rsmx)
               else:
                      gval = vals.T @ fltKrl[ii]
                      
