@@ -943,7 +943,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
               
        hn = abs(dom[-1] - dom[-2])
        
-       C[N-1,N-1] = -1.0 / 3.0 * hn
+       C[N-1,N-1] = +1.0 / 3.0 * hn
        C[N-1,N-2] = -1.0 / 6.0 * hn
        
        D[N-1,N-1] = +1.0 / hn
@@ -993,16 +993,23 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
 # Computes standard 4th order compact finite difference 1st derivative matrix
 def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        
-       end3 = False
-       if order == 4:
+       if order == 3:
+              end3 = True
+              end4 = False
+              end6 = False
+              end8 = False
+       elif order == 4:
+              end3 = False
               end4 = True
               end6 = False
               end8 = False
        elif order == 6:
+              end3 = False
               end4 = False
               end6 = True
               end8 = False
        elif order > 6:
+              end3 = False
               end4 = False
               end6 = False
               end8 = True
@@ -1488,8 +1495,6 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
               hp1 = dom[1] - dom[0]
               hp2 = dom[2] - dom[1]
               hp3 = dom[3] - dom[2]
-              hp4 = dom[4] - dom[3]
-              hp5 = dom[5] - dom[4]
        
               # Compute the stencil coefficients
               CME = endMatrix4(hp1, hp2, hp3)
