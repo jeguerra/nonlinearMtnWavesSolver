@@ -986,8 +986,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 0.5 * mt.pi * DX_max
-              DL2 = 0.5 * mt.pi * DZ_max
+              DL1 = 2.0 * DX_max
+              DL2 = 2.0 * DZ_max
               
               print('Diffusion regions dimensions (m): ', DL1, DL2)
               

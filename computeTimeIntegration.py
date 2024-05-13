@@ -63,8 +63,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        bdex = ebcDex[2]
 
        # Stacked derivative operators
-       DD1 = REFS[12] # First derivatives for advection/dynamics
-       DD2 = REFS[13] # First derivatives for diffusion gradient
+       DD1 = REFS[13] # First derivatives for advection/dynamics
+       DD2 = REFS[12] # First derivatives for diffusion gradient
        
        Auxilary_Updates = True
        
