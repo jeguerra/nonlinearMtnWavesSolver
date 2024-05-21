@@ -5,38 +5,38 @@ Created on Wed Mar 31 08:25:38 2021
 
 @author: jeg
 """
-import os
-import time
-from PIL import Image, ImageFile
+from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import numpy as np
-#import bottleneck as bn
-#import scipy.linalg as scl
-#import scipy.ndimage as scm
-import matplotlib as mpl
-from matplotlib import cm
 import matplotlib.pyplot as plt
-import proplot as pplt
+import matplotlib.colors as colors
+import scipy.ndimage as scm
+#import proplot as pplt
 from netCDF4 import Dataset
 from joblib import Parallel, delayed
 
 plt.rcParams.update({'font.size': 16})
 
-NF = 1540
+NF = 1600
+TIME2STOP = 3.0
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = '3Layer_150mXZ.nc'
+fname = '3Layer_200mXZ_SVD-FILT.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
+timesH = times / 3600.0
 X = m2k * m_fid.variables['Xlon'][:,:,0]
 Z = m2k * m_fid.variables['Zhgt'][:,:,0]
 
-zdex = np.nonzero(Z <= 21.0)
-xdex = np.nonzero((-30.0 <= X) & (X <= +50.0))
+zbound = 20.0
+xbound1 = -30.0
+xbound2 = +50.0
+zdex = np.nonzero(Z <= zbound)
+xdex = np.nonzero((xbound1 <= X) & (X <= xbound2))
 
 #U = m_fid.variables['U'][:,:,0]
 #LNP = m_fid.variables['LNP'][:,:,0]
@@ -48,25 +48,25 @@ LNT = m_fid.variables['LNT'][:,:,0]
 lnt = m_fid.variables['ln_t'][:NF,:,:,0]
 
 # Compute the total and perturbation potential temperature
-TH = np.exp(lnt)
+TH = np.exp(lnt + LNT)
 th = TH - np.exp(LNT)
 
+cmp2plot = 'gist_ncar_r'
 if runPertb:
        var2plot = th
-       cmp2plot = 'nipy_spectral'
-       out_name = 'PerturbationPT01.gif'
+       #cmp2plot = 'nipy_spectral'
 else:
        var2plot = TH
        #cmp2plot = sns.color_palette('Spectral_r', as_cmap=True)
        #cmp2plot = pplt.Colormap('vikO')
-       cmp2plot = pplt.Colormap(
-              'YlGnBu_r', 'YlOrRd', 'RdYlGn', 'PRGn_r',
-              ratios=(1,1,3,3), name='SciVisColorEven', save=True)
-       out_name = 'TotalPT01.gif'
-
+       #cmp2plot = pplt.Colormap(
+       #       'YlGnBu_r', 'YlOrRd', 'RdYlGn', 'PRGn_r',
+       #       ratios=(1,1,3,3), name='SciVisColorEven', save=True)
+       
 # Get the upper and lower bounds for TH
 clim1 = 300.0
 clim2 = 550.0
+cline = np.linspace(clim1, clim2, num=36)
 print('Plot bounds: ', clim1, clim2)
 
 # Initialize figure
@@ -79,19 +79,25 @@ def plotPertb(tt):
        th2plot = np.ma.getdata(var2plot[tt,:zdex[0].max(),:])
        
        # Median spatial filter
-       #th2plot = scm.median_filter(th2plot, size=(4,3))
+       th2plot = scm.median_filter(th2plot, size=(6,6))
        
        cflow = plt.contourf(X[:zdex[0].max(),:], 
                             Z[:zdex[0].max(),:], 
-                            th2plot, 512, cmap=cmp2plot, vmin=clim1, vmax=clim2)
+                            th2plot, 256, 
+                            cmap=cmp2plot, 
+                            norm=colors.PowerNorm(gamma=0.5),
+                            vmin=clim1, vmax=clim2)
+       
        plt.contour(X[:zdex[0].max(),:], 
                    Z[:zdex[0].max(),:], 
-                   th2plot, 36, colors='k', vmin=clim1, vmax=clim2)
+                   th2plot, cline, colors='k',
+                   norm=colors.PowerNorm(gamma=0.5),
+                   vmin=clim1, vmax=clim2)
        
        plt.fill_between(X[0,:], Z[0,:], color='black')
        plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-       plt.xlim(-25.0, 50.0)
-       plt.ylim(0.0, 20.0)
+       plt.xlim(xbound1, xbound2)
+       plt.ylim(0.0, zbound)
        plt.xlabel('Distance (km)')
        plt.ylabel('Elevation (km)')
        plt.title('Total ' + r'$\theta$ (K)' + \
@@ -114,77 +120,16 @@ def plotPertb(tt):
        #image = Image.open(save_file)
                      
        # Delete stuff
-       print('Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
+       print('Hour: {thisTime:.2f}'.format(thisTime = timesH[tt]))
        
-       return save_file
-       
-#%% Contour animation of the normalized SGS
-if runSGS:
-       imglist = []
-       for tt in range(len(times)):
-              
-              if tt == 0:
-                     dt = times[tt+1] - times[tt]
-              else:
-                     dt = times[tt] - times[tt-1]
-                     
-              if dt < 1.0E-10:
-                     continue
-              
-              # Compute the SGS
-              if tt == 0:
-                     q = np.zeros(th[tt,:,:].shape)
-                     norm = 1.0
-              elif tt == 1:
-                     q = 1.0 / dt * (th[tt,:,:] - th[tt-1,:,:]) - \
-                            0.5 * (dlnt[tt-1,:,:] + dlnt[tt+1,:,:])
-                     norm = 1.0 / np.amax(np.abs(q))
-              elif tt == len(times)-1:
-                     q = 1.0 / dt * (th[tt,:,:] - th[tt-1,:,:]) - dlnt[tt,:,:]
-                     norm = 1.0 / np.amax(np.abs(q))
-              else:
-                     q = 0.5 / dt * (3.0 * th[tt,:,:] - 4.0 * th[tt-1,:,:] + th[tt-2,:,:]) - \
-                            0.5 * (dlnt[tt-1,:,:] + dlnt[tt+1,:,:])
-                     norm = 1.0 / np.amax(np.abs(q))
-                     
-              qSGS = norm * q
-              
-              fig = plt.figure(figsize=(16.0, 8.0))
-              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.25)
-              
-              cc = plt.contourf(1.0E-3*X, 1.0E-3*Z, qSGS[:,:], 64, cmap=cm.seismic, vmin=-1.0, vmax=1.0)
-              
-              norm = mpl.colors.Normalize(vmin=-1.0, vmax=1.0)
-              plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.seismic), format='%.2e')
-              
-              plt.fill_between(m2k * X[0,:], m2k * Z[0,:], color='black')
-              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-              plt.xlim(-50.0, 50.0)
-              plt.ylim(0.0, 25.0)
-              plt.title('Normalized SGS: ' + r'$\theta$' + \
-                        ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
-              plt.tight_layout()
-              # Save out the image
-              plt.savefig(imgname)
-              time.sleep(0.01)
-              
-              # Get the current image and add to gif list
-              image = Image.open(imgname)
-              imglist.append(image)
-                            
-              # Delete stuff
-              os.remove(imgname)
-              plt.close('all')
-              del(fig)
+       return save_file     
+
 #%% Contour animation of perturbation potential temperatures
-else:    
-       # Parallel processing
-       if runPar:
-              print('Attempt parallel processing...')
-              imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
-       else:
-              print('Run serial processing...')
-              #imglist = [plotPertb(tt) for tt in range(len(times))]
-              imglist = [plotPertb(tt) for tt in range(NF)]
+if runPar:
+       print('Attempt parallel processing...')
+       imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
+else:
+       print('Run serial processing...')
+       #imglist = [plotPertb(tt) for tt in range(len(times))]
+       imglist = [plotPertb(tt) for tt in range(NF) if timesH[tt] < TIME2STOP]
        
-#imglist[0].save(out_name,append_images=imglist[1:], save_all=True, optimize=True, duration=30, loop=0)

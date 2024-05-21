@@ -725,13 +725,8 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        # Compute the 1st derivative matrix
        DDM = C.dot(AIB) + D
 
-       # Set boundary derivatives from specified
-       #if isClamped:
-       #       DDM[0,:] = D1A
-       #       DDM[-1,:] = D1B
-              
-       DDM = numericalCleanUp(DDM)
-       #DDM = removeLeastSingularValue(DDM)
+       #DDM = numericalCleanUp(DDM)
+       DDM = removeLeastSingularValue(DDM)
        return DDM, AIB
    
 # Compute Quartic Spline 1st derivative matrix
@@ -986,8 +981,9 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        # Compute the 1st derivative matrix
        DDM = C.dot(AIB) + D
               
-       DDM = numericalCleanUp(DDM)
-       #DDM = removeLeastSingularValue(DDM)
+       #DDM = numericalCleanUp(DDM)
+       DDM = removeLeastSingularValue(DDM)
+       
        return DDM, AIB
 
 # Computes standard 4th order compact finite difference 1st derivative matrix

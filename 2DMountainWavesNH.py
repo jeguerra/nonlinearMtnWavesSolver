@@ -234,7 +234,7 @@ def displayResiduals(message, rhs, thisTime, DT, OPS):
        
        return err
 
-def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState):
+def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState, senseTemp):
        
        NX = XL.shape[1]
        NZ = ZTL.shape[0]
@@ -274,10 +274,12 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState):
        zgvar[:,:,0] = ZTL
        # Create variables (background static fields)
        UVAR = m_fid.createVariable('U', 'f8', ('z', 'x', 'y'))
+       GVAR = m_fid.createVariable('TZ', 'f8', ('z', 'x', 'y'))
        PVAR = m_fid.createVariable('LNP', 'f8', ('z', 'x', 'y'))
        TVAR = m_fid.createVariable('LNT', 'f8', ('z', 'x', 'y'))
        # Store variables
        UVAR[:,:,0] = np.reshape(hydroState[:,0], (NZ,NX), order='F')
+       GVAR[:,:,0] = np.reshape(senseTemp, (NZ,NX), order='F')
        PVAR[:,:,0] = np.reshape(hydroState[:,2], (NZ,NX), order='F')
        TVAR[:,:,0] = np.reshape(hydroState[:,3], (NZ,NX), order='F')
        # Create variables (transient fields)
@@ -373,7 +375,7 @@ def runModel(TestName):
        if StaticSolve:
               RSBops = False
        else:
-              RSBops = False # Turn off PyRSB SpMV
+              RSBops = True # Turn off PyRSB SpMV
               if RSBops:
                      from rsb import rsb_matrix
        
@@ -488,7 +490,7 @@ def runModel(TestName):
        REF0.append(sig)
        
        tz, dtz = \
-              computeTemperatureProfileOnGrid(PHYS, REF0, Z_in, T_in, smooth3Layer, uniformStrat, RLOPT)
+              computeTemperatureProfileOnGrid(PHYS, REF0, Z_in, T_in, smooth3Layer, uniformStrat)
               
        dlpz, lpz, pz, dlptz, lpt, pt, rho = \
               computeThermoMassFields(PHYS, DIM0, REF0, tz, dtz, 'sensible', RLOPT)
@@ -760,7 +762,7 @@ def runModel(TestName):
        dWBC = fields[ebcDex[2],1] - dHdX * state[ebcDex[2],0]
               
        # Initialize output to NetCDF
-       newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState)
+       newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState, TZ)
               
        start = time.time()
        
@@ -1205,8 +1207,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       TestName = 'UniformTestTransient'
-       #TestName = '3LayerTestTransient'
+       #TestName = 'UniformTestTransient'
+       TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

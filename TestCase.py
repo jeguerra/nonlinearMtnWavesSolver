@@ -37,7 +37,7 @@ class TestCase:
                             
                      self.setUserData(184, 86, 70.0, 22.0, 280.0, 
                                       7000.0, 10000.0, 1.0E-2, \
-                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
+                                      250.0, 0.01, 0.0065, 0.001, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
@@ -49,7 +49,7 @@ class TestCase:
                             
                      self.setUserData(184, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0E-2, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
+                                      25.0, 0.01, 0.0065, 0.001, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'UniformStratStatic':
                      # Newton iteration with smooth stratification
@@ -61,7 +61,7 @@ class TestCase:
                             
                      self.setUserData(192, 96, 75.0, 32.0, 300.0, \
                                       7000.0, 10000.0, 1.0E-2, \
-                                      25.0, 0.01, 0.0065, 0.003, 3, 1.2E+4, 'uwpt_static') 
+                                      25.0, 0.01, 0.0065, 0.001, 3, 1.2E+4, 'uwpt_static') 
                             
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
@@ -73,7 +73,7 @@ class TestCase:
                             
                      self.setUserData(192, 96, 75.0, 32.0, 300.0, \
                                       7000.0, 10000.0, 1.0E-2, \
-                                      25.0, 0.01, 0.0065, 0.003, 3, 1.2E+4, 'uwpt_static')
+                                      25.0, 0.01, 0.0065, 0.001, 3, 1.2E+4, 'uwpt_static')
               
               elif TestName == "UniformTestTransient":
                      # Wave breaking in uniform stratification
@@ -91,7 +91,7 @@ class TestCase:
                      # LOW RESOLUTION
                      self.setUserData(1258, 166, 140.0, 33.0, 300.0, \
                                       8000.0, 20000.0, 1.0E+0,
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                                      6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -102,13 +102,13 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     #self.setUserData(1796, 256, 140.0, 38.0, 300.0, \
-                     #                 8000.0, 20000.0, 1.0E+0,
+                     #self.setUserData(1678, 266, 140.0, 40.0, 300.0, \
+                     #                 10000.0, 20000.0, 1.0E+0,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
-                     self.setUserData(1258, 192, 140.0, 40.0, 300.0, \
-                                      8000.0, 20000.0, 1.0E+0,
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                     self.setUserData(1348, 200, 150.0, 40.0, 300.0, \
+                                      10000.0, 20000.0, 1.0E+0,
+                                      6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')

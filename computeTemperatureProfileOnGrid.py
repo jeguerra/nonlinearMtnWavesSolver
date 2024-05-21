@@ -8,7 +8,7 @@ Created on Sat Jul 20 12:58:27 2019
 import numpy as np
 import scipy.interpolate as spi
 
-def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform, RLOPT):
+def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform):
        
        # Get REFS data
        Z = REFS[1]
@@ -32,7 +32,7 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform,
                      
               # Loop over each column and evaluate interpolant
               TZ = T_int(Z)
-              DTDZ = T_int(Z, nu=1)
+              DTDZ = np.gradient(TZ, Z, edge_order=2)
                                                                                                    
               '''
               # Make profile dry adiabatic near the top boundary (unsupportive of waves)
