@@ -117,65 +117,40 @@ plt.legend()
 #plt.savefig("DerivativeErrorTestZ_SCSE.png")
 '''
 #%% CUBIC and QUINTIC spline derivatives
-xv = REFS[0]
-# Set the terrain options0
-h0 = 2500.0
-aC = 5000.0
-lC = 2.0 * mt.pi * 1.0E3
-kC = 1.5E+4
-HOPT = [h0, aC, lC, kC, False, 2]
+xv = np.linspace(-1.0, +1.0, num=NX)
 
-DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+fp3 = np.power(xv,3) + np.power(xv,2) - np.power(xv,1)
+dfp3 = 3 * np.power(xv,2) + 2 * np.power(xv,1) - 1.0
 
-HofX, dHdX = top.computeTopographyOnGrid(REFS, HOPT)
-DYD_SPT = DDX_1D.dot(HofX)    
+fp5 = np.power(xv,5) + np.power(xv,4) + np.power(xv,3) + np.power(xv,2) - np.power(xv,1)
+dfp5 = 5 * np.power(xv,4) + 4 * np.power(xv,3) + 3 * np.power(xv,2) + 2 * np.power(xv,1) - 1.0
 
-DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, 0.0)
-DDX_RS, DDX3A_RS = derv.computeQuarticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
-DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
+DDZ_CFD4 = derv.computeCompactFiniteDiffDerivativeMatrix1(xv, 4)
+DDZ_CFD6 = derv.computeCompactFiniteDiffDerivativeMatrix1(xv, 6)
+DDX_CS, DDX2A_CS = derv.computeCubicSplineDerivativeMatrix(xv, True, False, DDZ_CFD4)
+DDX_QS, DDX4A_QS = derv.computeQuinticSplineDerivativeMatrix(xv, True, False, DDZ_CFD4)
 
-DYD_CS = DDX_CS.dot(HofX)
-DYD_RS = DDX_RS.dot(HofX)
-DYD_QS = DDX_QS.dot(HofX)
+DYD_CS = DDX_CS.dot(fp3)
+DYD_QS = DDX_QS.dot(fp5)
 
-'''
-DDX_SEM1, xe1 = derv.computeSpectralElementDerivativeMatrix(REFS_EL[0], NEX, True, (True, True), 10)
-#DDX_SEM1, xe1 = derv.computeSpectralElementDerivativeMatrix5E(REFS_EL[0], NEX, False, 10)
-#DDX_SEM2, xe2 = derv.computeSpectralElementDerivativeMatrix5E(REFS_EL[0], NEX, True, 10)
-#DDX_SEM2 = derv.computeAdjustedOperatorNBC_ends(DDX_SEM2, DDX_SEM2)
-#DDX_SEM2 = derv.computeAdjustedOperatorNBC(DDX_SEM2, DDX_SEM2, -1)
-
-REFS[0] = xe1
-HofX1, dHdX1 = top.computeTopographyOnGrid(REFS, HOPT, None)
-DYD_SEM1 = DDX_SEM1.dot(HofX1)
-'''
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(xv, dHdX, 'r-', label='Analytical Derivative')
-plt.plot(xv, DYD_SPT, 'r--', label='Spectral Derivative')
+plt.plot(xv, dfp3, 'b--', label='Analytical Derivative')
+plt.plot(xv, dfp5, 'g--', label='Analytical Derivative')
 plt.plot(xv, DYD_CS, 'bs-', label='Cubic Spline Derivative')
-plt.plot(xv, DYD_RS, 's-', label='Quartic Spline Derivative', color='orange')
 plt.plot(xv, DYD_QS, 'gs-', label='Quintic Derivative')
-#plt.xlim(-12500.0, 12500.0)
-plt.xlabel('Domain')
-plt.ylabel('Slope')
-plt.title('Hermite Function Derivative Test')
+plt.title('Spline Function Derivative Test')
 plt.grid(visible=True, which='both', axis='both')
 plt.legend()
 #plt.savefig("DerivativeTestX.png")
 
 plt.figure(figsize=(8, 6), tight_layout=True)
-plt.semilogy(xv, np.abs(DYD_SPT - dHdX), 'r--', label='Spectral Derivative')
-plt.semilogy(xv, np.abs(DYD_CS - dHdX), 'bs-', label='CS Derivative Error')
-plt.semilogy(xv, np.abs(DYD_RS - dHdX), 's-', label='RS Derivative Error', color='orange')
-plt.semilogy(xv, np.abs(DYD_QS - dHdX), 'gs-', label='QS Derivative Error')
+plt.semilogy(xv, np.abs(DYD_CS - dfp3), 'bs-', label='CS Derivative Error')
+plt.semilogy(xv, np.abs(DYD_QS - dfp5), 'gs-', label='QS Derivative Error')
 plt.grid(visible=True, which='both', axis='both')
 plt.legend()
-#plt.savefig("DerivativeErrorTestX.png")
 
 plt.show()
-print('Spectral Derivative: ', np.count_nonzero(DDX_1D))
 print('Cubic Spline Derivative: ', np.count_nonzero(DDX_CS))
-print('Quartic Spline Derivative: ', np.count_nonzero(DDX_RS))
 print('Quintic Spline Derivative: ', np.count_nonzero(DDX_QS))
 
 #%% SPECTRAL TRANSFORM TESTS

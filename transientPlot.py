@@ -18,13 +18,13 @@ from joblib import Parallel, delayed
 plt.rcParams.update({'font.size': 16})
 
 NF = 1600
-TIME2STOP = 3.0
+TIME2STOP = 4.0
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = '3Layer_200mXZ_SVD-FILT.nc'
+fname = 'Uniform_200mXZ_SVD-FILT.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
@@ -65,7 +65,7 @@ else:
        
 # Get the upper and lower bounds for TH
 clim1 = 300.0
-clim2 = 550.0
+clim2 = 380.0
 cline = np.linspace(clim1, clim2, num=36)
 print('Plot bounds: ', clim1, clim2)
 

@@ -939,7 +939,7 @@ def computeCubicSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
        hn = abs(dom[-1] - dom[-2])
        
        C[N-1,N-1] = +1.0 / 3.0 * hn
-       C[N-1,N-2] = -1.0 / 6.0 * hn
+       C[N-1,N-2] = +1.0 / 6.0 * hn
        
        D[N-1,N-1] = +1.0 / hn
        D[N-1,N-2] = -1.0 / hn
