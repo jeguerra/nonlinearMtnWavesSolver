@@ -457,7 +457,7 @@ def runModel(TestName):
        #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
        chebHydro = False
        legrHydro = True
-       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 256, DIMS[5]]
+       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 255, DIMS[5]]
        REF0 = computeGrid(DIM0, HermFunc, FourierLin, chebHydro, legrHydro)
        
        DDXP, dummy = derv.computeCubicSplineDerivativeMatrix(REF0[0], False, True, None)

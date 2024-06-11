@@ -24,7 +24,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = 'Uniform_200mXZ_SVD-FILT.nc'
+fname = '3Layer_200mXZ_SVD-FILT_continuous.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
@@ -65,7 +65,8 @@ else:
        
 # Get the upper and lower bounds for TH
 clim1 = 300.0
-clim2 = 380.0
+#clim2 = 380.0 # UNIFORM STRATIFICATION
+clim2 = 510.0 # 3LAYER STRATIFICATION
 cline = np.linspace(clim1, clim2, num=36)
 print('Plot bounds: ', clim1, clim2)
 
@@ -79,7 +80,7 @@ def plotPertb(tt):
        th2plot = np.ma.getdata(var2plot[tt,:zdex[0].max(),:])
        
        # Median spatial filter
-       th2plot = scm.median_filter(th2plot, size=(6,6))
+       th2plot = scm.median_filter(th2plot, size=(4,4))
        
        cflow = plt.contourf(X[:zdex[0].max(),:], 
                             Z[:zdex[0].max(),:], 
