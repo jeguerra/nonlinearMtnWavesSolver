@@ -38,14 +38,20 @@ def enforceBC_SOL(sol, ebcDex, init):
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
-       # BC conditions on solution fields
+       # INFLOW LEFT      
        sol[ldex,:] = init[ldex,:]
        
-       #sol[rdex,:] = 0.0
+       # OUTFLOW RIGHT
+       sol[rdex,0] = 0.0 #init[rdex,0]
+       sol[rdex,1] = 0.0 #init[rdex,1]
+       sol[rdex,2] = init[rdex,2]
+       sol[rdex,3] = init[rdex,3]
        
+       # TERRAIN
        sol[bdex,0:2] = 0.0
        sol[bdex,3] = init[bdex,3]
        
+       # MODEL TOP
        sol[tdex,1] = 0.0
        
        return sol
@@ -330,8 +336,8 @@ def computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt):
        # Horizontal momentum equation
        DqDt[:,0] -= RdT * PqPx[:,2]
        # Vertical momentum equation
-       DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
-       #DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
+       #DqDt[:,1] -= (RdT * PqPz[:,2] - gc * T_ratio)
+       DqDt[:,1] -= (RdT * PqPz[:,2] + gc)
        # Divergence
        DqDt[:,2] -= gam * (PqPx[:,0] + PqPz[:,1])
        # Potential temperature equation (material derivative)
@@ -344,7 +350,7 @@ def computeEulerEquationsLogPLogT_Explicit(PHYS, PqPx, PqPz, DqDz,
        
        DqDt = computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, state)
        
-       DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, DqDz, RdT, T_ratio, DqDt)
+       DqDt = computeInternalForceLogPLogT_Explicit(PHYS, PqPx, PqPz, RdT, T_ratio, DqDt)
        
        return DqDt
 

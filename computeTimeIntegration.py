@@ -60,7 +60,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        #GMLZ = REFG[0][2]
        
        S = DLD[5]
+       ldex = ebcDex[0]
+       rdex = ebcDex[1]
        bdex = ebcDex[2]
+       tdex = ebcDex[3]
 
        # Stacked derivative operators
        DD1 = REFS[13] # First derivatives for advection/dynamics
@@ -82,12 +85,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               Dq = tendency.computeFieldDerivative(solA, DD1, RSBops)
               DqDxA = Dq[:OPS,:]
               PqPzA = Dq[OPS:,:]
-              
               PqPxA = DqDxA - REFS[14] * PqPzA
               DqDzA = (PqPzA - DQDZ)
-              
-              # Apply Neumman BC here...
-              PqPxA[ebcDex[1],:] = 0.0
                
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
@@ -150,27 +149,18 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Rayleigh factor to inflow boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLML)
-              #RayD[:,0] = 1.0
-              #RayD[:,1] = 1.0
-              #RayD[:,2] = 1.0
-              #RayD[:,3] = 1.0
+              RayD[:,1] = 1.0
               solB = RayD * solB + (1.0 - RayD) * init0
 
               # Rayleigh factor to outflow boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMR)
-              #RayD[:,0] = 1.0
-              #RayD[:,1] = 1.0
-              #RayD[:,2] = 1.0
-              #RayD[:,3] = 1.0
-              solB = RayD * solB + (1.0 - RayD) * init0
+              solB[:,0:2] = RayD[:,0:2] * solB[:,0:2]
+              solB[:,2:] = RayD[:,2:] * solB[:,2:] +\
+                           (1.0 - RayD)[:,2:] * init0[:,2:]
               
               # Rayleigh factor to top boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMT)
-              RayD[:,0] = 1.0
-              #RayD[:,1] = 1.0
-              RayD[:,2] = 1.0
-              RayD[:,3] = 1.0
-              solB = RayD * solB + (1.0 - RayD) * init0
+              solB[:,1] = RayD[:,1] * solB[:,1]
               
               # Compute total RHS and apply BC
               solB = tendency.enforceBC_SOL(solB, ebcDex, init0)

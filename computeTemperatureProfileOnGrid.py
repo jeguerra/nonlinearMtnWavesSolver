@@ -5,21 +5,21 @@ Created on Sat Jul 20 12:58:27 2019
 
 @author: TempestGuerra
 """
+import math as mt
 import numpy as np
-import scipy.linalg as scl
-import bottleneck as bn
 import matplotlib.pyplot as plt
-import scipy.ndimage as sni
 import scipy.interpolate as spi
 
 def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform):
        
        # Get REFS data
        Z = REFS[1]
-       NZ = Z.shape[0]
        
        TZ = np.zeros(Z.shape)
        DTDZ = np.zeros(Z.shape)
+       
+       DZ_AVG = np.mean(np.diff(Z))
+       LT = 8 * DZ_AVG # transition length scale in meters
        
        if isUniform:
               # Loop over each column and evaluate termperature for uniform N
@@ -39,25 +39,15 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
               if isSmooth:                     
                      
                      # Temperature changes one K over this length scale
-                     m2km = 1000.0 # meters
-                     LT = 1000.0 # transition length scale in meters
-                     
                      for kk in np.arange(len(Z_in)):
                             
                             if kk >= 1 and kk < len(Z_in) - 1:
                                    
                                    ZI = Z_in[kk]
                                    
-                                   # Get the left/right gradients at this interface
-                                   dtdz_left = abs((T_in[kk] - T_in[kk-1]) / (ZI - Z_in[kk-1]))
-                                   dtdz_rigt = abs((T_in[kk+1] - T_in[kk]) / (Z_in[kk+1] - ZI))
-                                   
-                                   # Compute transitions at L meters per 1K of change
-                                   span = 0.5 * m2km * max(dtdz_left, dtdz_rigt)
-                                   
                                    # Get indices for the transition layer
-                                   slayr = np.nonzero((Z >= ZI-LT * span) & \
-                                                      (Z <= ZI+LT * span))
+                                   slayr = np.nonzero((Z >= ZI-LT) & \
+                                                      (Z <= ZI+LT))
                                    
                                    # Index the end points
                                    sdex = slayr[0]
