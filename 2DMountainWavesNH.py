@@ -747,17 +747,20 @@ def runModel(TestName):
               isInitialStep = False
               
               # Compute the terrain boundary condition
-              dWBC = fields[ebcDex[2],1] - dHdX * state[ebcDex[2],0]
+              dUBC = state[ebcDex[2],0]
+              dWBC = fields[ebcDex[2],1] - dHdX * dUBC
        else:
               hydroState[:,0] = np.reshape(UZ, (OPS,), order='F')
               hydroState[:,1] = 0.0
               hydroState[:,2] = np.reshape(LOGP, (OPS,), order='F')
               hydroState[:,3] = np.reshape(LOGT, (OPS,), order='F')
               
-              state[:,2:] = fields[:,2:] + hydroState[:,2:]
+              state = fields + hydroState
+              #state[:,2:] = fields[:,2:] + hydroState[:,2:]
               
               # Compute the terrain boundary condition
-              dWBC = fields[ebcDex[2],1] - dHdX * hydroState[ebcDex[2],0]
+              dUBC = hydroState[ebcDex[2],0]
+              dWBC = fields[ebcDex[2],1] - dHdX * dUBC
               
               # Set the initial time
               IT = 0.0
@@ -1033,8 +1036,6 @@ def runModel(TestName):
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
               # Normalization for vertical velocity
-              rw = np.abs(dWBC)
-              rw = rw[rw > 0.0]
                      
               # compute function average of initial fields
               sol_avrg = DLD[-3] @ hydroState
@@ -1042,8 +1043,8 @@ def runModel(TestName):
               res_norm = DLD[-3] @ np.abs(hydroState - sol_avrg)
               
               # Fix the kinematic norms
-              #res_norm[0] = bn.nanmedian(rw)
-              res_norm[1] = bn.nanmedian(rw)
+              rw = np.abs(dWBC)
+              res_norm[1] = bn.nanmean(rw[rw > 0.0])
               
               print('Residual Norms:')
               print(res_norm)
@@ -1056,6 +1057,11 @@ def runModel(TestName):
               
               interTime1 = 0.0
               interTime2 = 0.0
+              
+              # Impose BC's on all states
+              hydroState = eqs.enforceBC_SOL(hydroState, ebcDex, hydroState)
+              state = eqs.enforceBC_SOL(state, ebcDex, hydroState)
+              
               while thisTime <= TOPT[4]:
                             
                      # Compute the solution within a time step
@@ -1064,7 +1070,6 @@ def runModel(TestName):
                                                                     DLD, TOPT, state, hydroState, rhsVec, dfields, \
                                                                     DCF.shape, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             
-                            #fields = state - hydroState
                             '''
                             # Update normalizations for vertical velocity
                             state = np.copy(fields)

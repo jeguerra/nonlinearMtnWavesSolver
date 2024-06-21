@@ -146,11 +146,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Apply stage update
               solB = sol2Update + coeff * DT * (rhsDyn + rhsDif)
+              solB = tendency.enforceBC_SOL(solB, ebcDex, init0)
               
               # Rayleigh factor to inflow boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLML)
-              RayD[:,1] = 1.0
-              solB = RayD * solB + (1.0 - RayD) * init0
+              solB[:,2:] = RayD[:,2:] * solB[:,2:] +\
+                           (1.0 - RayD)[:,2:] * init0[:,2:]
 
               # Rayleigh factor to outflow boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMR)
@@ -162,7 +163,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMT)
               solB[:,1] = RayD[:,1] * solB[:,1]
               
-              # Compute total RHS and apply BC
+              # Apply BC
               solB = tendency.enforceBC_SOL(solB, ebcDex, init0)
               
               return solB

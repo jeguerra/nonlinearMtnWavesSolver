@@ -26,7 +26,6 @@ def enforceBC_RHS(rhs, ebcDex):
        rhs[bdex,0:2] = 0.0
        rhs[bdex,3] = 0.0
        
-       #rhs[tdex,:] = 0.0
        rhs[tdex,1] = 0.0
        
        return rhs

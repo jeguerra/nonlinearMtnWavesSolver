@@ -24,7 +24,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = '3Layer_200mXZ_SVD-FILT_continuous.nc'
+fname = '3Layer_200mXZ_SVD-FILT_continuous2.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
@@ -32,9 +32,9 @@ timesH = times / 3600.0
 X = m2k * m_fid.variables['Xlon'][:,:,0]
 Z = m2k * m_fid.variables['Zhgt'][:,:,0]
 
-zbound = 20.0
-xbound1 = -30.0
-xbound2 = +50.0
+zbound = 16.0
+xbound1 = -20.0
+xbound2 = +30.0
 zdex = np.nonzero(Z <= zbound)
 xdex = np.nonzero((xbound1 <= X) & (X <= xbound2))
 
@@ -48,26 +48,20 @@ LNT = m_fid.variables['LNT'][:,:,0]
 lnt = m_fid.variables['ln_t'][:NF,:,:,0]
 
 # Compute the total and perturbation potential temperature
-TH = np.exp(lnt + LNT)
+TH = np.exp(lnt)
 th = TH - np.exp(LNT)
 
 cmp2plot = 'gist_ncar_r'
 if runPertb:
        var2plot = th
-       #cmp2plot = 'nipy_spectral'
 else:
        var2plot = TH
-       #cmp2plot = sns.color_palette('Spectral_r', as_cmap=True)
-       #cmp2plot = pplt.Colormap('vikO')
-       #cmp2plot = pplt.Colormap(
-       #       'YlGnBu_r', 'YlOrRd', 'RdYlGn', 'PRGn_r',
-       #       ratios=(1,1,3,3), name='SciVisColorEven', save=True)
        
 # Get the upper and lower bounds for TH
 clim1 = 300.0
 #clim2 = 380.0 # UNIFORM STRATIFICATION
 clim2 = 510.0 # 3LAYER STRATIFICATION
-cline = np.linspace(clim1, clim2, num=36)
+cline = np.linspace(clim1, clim2, num=40)
 print('Plot bounds: ', clim1, clim2)
 
 # Initialize figure
@@ -80,7 +74,7 @@ def plotPertb(tt):
        th2plot = np.ma.getdata(var2plot[tt,:zdex[0].max(),:])
        
        # Median spatial filter
-       th2plot = scm.median_filter(th2plot, size=(4,4))
+       #th2plot = scm.median_filter(th2plot, size=(4,4))
        
        cflow = plt.contourf(X[:zdex[0].max(),:], 
                             Z[:zdex[0].max(),:], 
@@ -107,18 +101,9 @@ def plotPertb(tt):
        if tt == 0:
               thisFigure.colorbar(cflow, location='bottom')
        
-       plt.tight_layout()
-       #plt.show()
-       
+       plt.tight_layout()       
        save_file = imgname + f'{tt:04}' + '.jpg'
-       #input('Image Check')
-       
-       # Save out the image
        thisFigure.savefig(save_file, dpi=200)
-       #plt.close(fig=thisFigure)
-       
-       # Get the current image
-       #image = Image.open(save_file)
                      
        # Delete stuff
        print('Hour: {thisTime:.2f}'.format(thisTime = timesH[tt]))
@@ -131,6 +116,5 @@ if runPar:
        imglist = Parallel(n_jobs=8)(delayed(plotPertb)(tt) for tt in range(len(times)))
 else:
        print('Run serial processing...')
-       #imglist = [plotPertb(tt) for tt in range(len(times))]
        imglist = [plotPertb(tt) for tt in range(NF) if timesH[tt] < TIME2STOP]
        
