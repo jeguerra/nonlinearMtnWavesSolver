@@ -23,8 +23,8 @@ m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
-imgname = '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/toanimate'
-fname = '3Layer_200mXZ_SVD-FILT_continuous2.nc'
+imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
+fname = 'Uniform_200m.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
@@ -32,7 +32,7 @@ timesH = times / 3600.0
 X = m2k * m_fid.variables['Xlon'][:,:,0]
 Z = m2k * m_fid.variables['Zhgt'][:,:,0]
 
-zbound = 16.0
+zbound = 20.0
 xbound1 = -20.0
 xbound2 = +30.0
 zdex = np.nonzero(Z <= zbound)
@@ -51,7 +51,7 @@ lnt = m_fid.variables['ln_t'][:NF,:,:,0]
 TH = np.exp(lnt)
 th = TH - np.exp(LNT)
 
-cmp2plot = 'gist_ncar_r'
+cmp2plot = 'nipy_spectral'
 if runPertb:
        var2plot = th
 else:
@@ -59,8 +59,8 @@ else:
        
 # Get the upper and lower bounds for TH
 clim1 = 300.0
-#clim2 = 380.0 # UNIFORM STRATIFICATION
-clim2 = 510.0 # 3LAYER STRATIFICATION
+clim2 = 380.0 # UNIFORM STRATIFICATION
+#clim2 = 510.0 # 3LAYER STRATIFICATION
 cline = np.linspace(clim1, clim2, num=40)
 print('Plot bounds: ', clim1, clim2)
 
@@ -80,13 +80,14 @@ def plotPertb(tt):
                             Z[:zdex[0].max(),:], 
                             th2plot, 256, 
                             cmap=cmp2plot, 
-                            norm=colors.PowerNorm(gamma=0.5),
+                            norm=colors.PowerNorm(gamma=0.4),
                             vmin=clim1, vmax=clim2)
        
        plt.contour(X[:zdex[0].max(),:], 
                    Z[:zdex[0].max(),:], 
-                   th2plot, cline, colors='k',
-                   norm=colors.PowerNorm(gamma=0.5),
+                   th2plot, 128,
+                   colors='k',
+                   norm=colors.PowerNorm(gamma=0.4),
                    vmin=clim1, vmax=clim2)
        
        plt.fill_between(X[0,:], Z[0,:], color='black')
@@ -99,11 +100,11 @@ def plotPertb(tt):
                  ' Hour: {timeH:.2f}'.format(timeH = times[tt] / 3600.0))
        
        if tt == 0:
-              thisFigure.colorbar(cflow, location='bottom')
+              thisFigure.colorbar(cflow, orientation='vertical')
        
        plt.tight_layout()       
        save_file = imgname + f'{tt:04}' + '.jpg'
-       thisFigure.savefig(save_file, dpi=200)
+       thisFigure.savefig(save_file, dpi=200, bbox_inches='tight')
                      
        # Delete stuff
        print('Hour: {thisTime:.2f}'.format(thisTime = timesH[tt]))

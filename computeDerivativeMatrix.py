@@ -1538,8 +1538,8 @@ def computeCompactFiniteDiffDerivativeMatrix1(dom, order):
        PLU = scl.lu_factor(LDM)
        DDM = scl.lu_solve(PLU, RDM)
        
-       #DDM1 = removeLeastSingularValue(DDM)
-       DDM = numericalCleanUp(DDM)
+       DDM = removeLeastSingularValue(DDM)
+       #DDM = numericalCleanUp(DDM)
        
        return DDM
 

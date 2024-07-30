@@ -27,7 +27,7 @@ def computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, isSmooth, isUniform)
               A = PHYS[7]**2 / PHYS[0]
               C = PHYS[0] / PHYS[2]
               EXPF = np.exp(A * Z)
-              TZ = T0 * EXPF + (C / A) * (1.0 - EXPF)
+              TZS = T0 * EXPF + (C / A) * (1.0 - EXPF)
               DTDZ = (A * T0 - C) * EXPF
        else:
               T_int = spi.interp1d(Z_in, T_in, kind='linear')

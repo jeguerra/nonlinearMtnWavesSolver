@@ -539,18 +539,26 @@ def runModel(TestName):
               DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
               DDZ_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_BC)
        
-       # Derivative operators from 3 and 5 spline expansions
-       DDX_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
-       DDZ_CS, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
-       DDX_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_CS)
-       DDZ_QS, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_CS)
+       # Derivative operators
+       useSplineDerivatives = True
+       
+       if useSplineDerivatives:
+              DDXL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
+              DDZL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
+              DDXH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDXL)
+              DDZH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZL)
+       else:
+              DDXL, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
+              DDZL, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
+              DDXH, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+              DDZH, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D)
        DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, sigma, 
-                                                              DDX_CS, DDZ_CS)
+                                                              DDXL, DDZL)
        DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, sigma, 
-                                                              DDX_QS, DDZ_QS)
+                                                              DDXH, DDZH)
        
        #%% MAKE THE INITIAL/BACKGROUND STATE ON COMPUTATIONAL GRID
        
@@ -611,7 +619,7 @@ def runModel(TestName):
        if HermFunc:
               PPXMA = DDXMS1
        else:
-              PPXMA = DDXMS_LO# - DZTM @ DDZMS_HO
+              PPXMA = DDXMS_HO# - DZTM @ DDZMS_HO
               
        if verticalChebGrid or verticalLegdGrid:
               #advtOps = (REFG[0][1].dot(PPXMD),
@@ -620,10 +628,10 @@ def runModel(TestName):
        else:
               #advtOps = (REFG[0][1].dot(PPXMD),
               #           REFG[0][2].dot(DDZMS_HO))
-              advtOps = (PPXMA,DDZMS_LO)
+              advtOps = (PPXMA,DDZMS_HO)
        
-       PPXMD = DDXMS_HO #- DZTM @ DDZMS_HO
-       diffOps = (PPXMD,DDZMS_HO)
+       PPXMD = DDXMS_LO #- DZTM @ DDZMS_HO
+       diffOps = (PPXMD,DDZMS_LO)
        
        # Update the REFS collection
        REFS.append(DDX_1D) # index 2
@@ -1215,9 +1223,9 @@ if __name__ == '__main__':
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
-       #TestName = 'DiscreteStratStatic'
+       TestName = 'DiscreteStratStatic'
        #TestName = 'UniformTestTransient'
-       TestName = '3LayerTestTransient'
+       #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

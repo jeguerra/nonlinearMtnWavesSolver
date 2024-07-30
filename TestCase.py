@@ -66,7 +66,7 @@ class TestCase:
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'VerticalSpectral': False, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
@@ -84,12 +84,12 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # HIGH RESOLUTION
-                     #self.setUserData(1796, 212, 140.0, 32.0, 300.0, \
-                     #                 7000.0, 20000.0, 1.0E+0,
+                     #self.setUserData(1796, 212, 140.0, 33.0, 300.0, \
+                     #                 8000.0, 20000.0, 1.0E-1,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     self.setUserData(1258, 166, 140.0, 33.0, 300.0, \
+                     self.setUserData(1260, 166, 140.0, 33.0, 300.0, \
                                       8000.0, 20000.0, 1.0E-1,
                                       6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
@@ -102,13 +102,13 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     #self.setUserData(1678, 266, 140.0, 40.0, 300.0, \
-                     #                 10000.0, 20000.0, 1.0E+0,
-                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
-                            
-                     self.setUserData(1348, 200, 150.0, 40.0, 300.0, \
+                     self.setUserData(1680, 266, 140.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 1.0E-1,
-                                      6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     #self.setUserData(1260, 200, 140.0, 40.0, 300.0, \
+                     #                 10000.0, 20000.0, 1.0E-1,
+                     #                 6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -179,9 +179,9 @@ class TestCase:
               
               #% Transient solve parameters
               DT = 0.01 # seconds
-              HR = 12.0 #/ 3600.0 # hours              
+              HR = 6.0 #/ 3600.0 # hours              
               DTF = 0.75 # scale time step              
-              intMethodOrder = 4
+              intMethodOrder = 3
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
               OTI = 10.0 # Time for diagnostic output

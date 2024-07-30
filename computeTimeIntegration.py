@@ -150,8 +150,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               
               # Rayleigh factor to inflow boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLML)
-              solB[:,2:] = RayD[:,2:] * solB[:,2:] +\
-                           (1.0 - RayD)[:,2:] * init0[:,2:]
+              solB[:,1:] = RayD[:,1:] * solB[:,1:] +\
+                           (1.0 - RayD)[:,1:] * init0[:,1:]
 
               # Rayleigh factor to outflow boundary implicitly
               RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMR)
@@ -242,90 +242,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
               sol = computeUpdate(0.1, sol1, sol)
               
               return sol
-       
-       def ssprk54(sol):
-              
-              # Stage 1 predictor
-              b10 = 0.391752226571890
-              sol1 = computeUpdate(b10, sol, sol)
-              # Stage 1 corrector
-              solp = sol + 0.5 * (sol1 - sol)
-              sol1  = computeUpdate(0.5 * b10, sol1, solp)
-              
-              # Stage 2
-              a0 = 0.444370493651235
-              a1 = 0.555629506348765
-              sols = a0 * sol + a1 * sol1
-              b21 = 0.368410593050371
-              sol2 = computeUpdate(b21, sol1, sols)
-              
-              # Stage 3
-              a0 = 0.620101851488403
-              a2 = 0.379898148511597
-              sols = a0 * sol + a2 * sol2
-              b32 = 0.251891774271694
-              sol3 = computeUpdate(b32, sol2, sols)
-              
-              # Stage 4
-              a0 = 0.178079954393132
-              a3 = 0.821920045606868
-              sols = a0 * sol + a3 * sol3
-              b43 = 0.544974750228521
-              sol4 = computeUpdate(b43, sol3, sols)
-              fun3 = (sol4 - sols) / b43
-              
-              # Stage corrector
-              solp = sols + 0.5 * (sol4 - sols)
-              sol4 = computeUpdate(0.5 * b43, sol4, solp)
-              
-              # Stage 5
-              a2 = 0.517231671970585
-              a3 = 0.096059710526147
-              a4 = 0.386708617503269
-              b53 = 0.063692468666290
-              b54 = 0.226007483236906
-              sols = a2 * sol2 + a3 * sol3 + a4 * sol4 + b53 * fun3
-              sol5 = computeUpdate(b54, sol4, sols)
-              
-              return sol5
-       
-       def ssprk63(sol):
-              
-              # Stage 1
-              b10 = 0.284220721334261
-              sol1 = computeUpdate(b10, sol, sol)
-              # Stage 1 corrector
-              solp = sol + 0.5 * (sol1 - sol)
-              sol1 = computeUpdate(0.5 * b10, sol1, solp)
-              
-              # Stage 2
-              b21 = 0.284220721334261
-              sol2 = computeUpdate(b21, sol1, sol1)
-              
-              # Stage 3
-              b32 = 0.284220721334261
-              sol3 = computeUpdate(b32, sol2, sol2)
-              
-              # Stage 4
-              a0 = 0.476769811285196
-              a1 = 0.098511733286064
-              a3 = 0.424718455428740
-              sols = a0 * sol + a1 * sol1 + a3 * sol3
-              b43 =  0.120713785765930
-              sol4 = computeUpdate(b43, sol3, sols)
-              
-              # Stage 5
-              b54 = 0.284220721334261
-              sol5 = computeUpdate(b54, sol4, sol4)
-              
-              # Stage 6
-              a2 = 0.155221702560091
-              a5 = 0.844778297439909
-              sols = a2 * sol2 + a5 * sol5
-              b65 =  0.240103497065900
-              sol6 = computeUpdate(b65, sol5, sols)
-       
-              return sol6
 
        #%% THE MAIN TIME INTEGRATION STAGES
        
@@ -333,7 +249,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        if order == 2:
               sol = ketchesonM2(sol0)
        elif order == 3:
-              #sol1 = ssprk63(sol0) 
+              #sol = ssprk43(sol0) 
               sol = ketcheson93(sol0)
        elif order == 4:
               #sol1 = ssprk54(sol0) 
