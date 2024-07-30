@@ -769,7 +769,7 @@ def runModel(TestName):
               isInitialStep = True
               
        # Compute the terrain boundary condition
-       dUBC = hydroState[ebcDex[2],0]
+       dUBC = state[ebcDex[2],0]
        dWBC = fields[ebcDex[2],1] - dHdX * dUBC
               
        # Initialize output to NetCDF
