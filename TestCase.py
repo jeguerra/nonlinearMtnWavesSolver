@@ -66,7 +66,7 @@ class TestCase:
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
                      self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'VerticalSpectral': False, 'SolveSchur': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}

@@ -528,6 +528,7 @@ def runModel(TestName):
        elif FourierLin and not HermFunc:
               DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
+              print('NON-SPECTRAL derivative in the horizontal.')
               DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
               DDX_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
                             
@@ -536,6 +537,7 @@ def runModel(TestName):
        elif verticalLegdGrid and not verticalChebGrid:
               DDZ_1D, VTRANS = derv.computeLegendreDerivativeMatrix(DIMS)
        else:
+              print('NON-SPECTRAL derivative in the verticals.')
               DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
               DDZ_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_BC)
        
@@ -630,8 +632,8 @@ def runModel(TestName):
               #           REFG[0][2].dot(DDZMS_HO))
               advtOps = (PPXMA,DDZMS_HO)
        
-       PPXMD = DDXMS_LO #- DZTM @ DDZMS_HO
-       diffOps = (PPXMD,DDZMS_LO)
+       #PPXMD = DDXMS_LO - DZTM @ DDZMS_HO
+       diffOps = (DDXMS_LO,DDZMS_LO)
        
        # Update the REFS collection
        REFS.append(DDX_1D) # index 2
@@ -753,10 +755,6 @@ def runModel(TestName):
               except:
                      print('Could NOT read restart NC file!', fname2Restart)
               isInitialStep = False
-              
-              # Compute the terrain boundary condition
-              dUBC = state[ebcDex[2],0]
-              dWBC = fields[ebcDex[2],1] - dHdX * dUBC
        else:
               hydroState[:,0] = np.reshape(UZ, (OPS,), order='F')
               hydroState[:,1] = 0.0
@@ -764,16 +762,15 @@ def runModel(TestName):
               hydroState[:,3] = np.reshape(LOGT, (OPS,), order='F')
               
               state = fields + hydroState
-              #state[:,2:] = fields[:,2:] + hydroState[:,2:]
-              
-              # Compute the terrain boundary condition
-              dUBC = hydroState[ebcDex[2],0]
-              dWBC = fields[ebcDex[2],1] - dHdX * dUBC
               
               # Set the initial time
               IT = 0.0
               thisTime = IT
               isInitialStep = True
+              
+       # Compute the terrain boundary condition
+       dUBC = hydroState[ebcDex[2],0]
+       dWBC = fields[ebcDex[2],1] - dHdX * dUBC
               
        # Initialize output to NetCDF
        newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState, TZ)
@@ -1222,8 +1219,8 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       #TestName = 'UniformStratStatic'
-       TestName = 'DiscreteStratStatic'
+       TestName = 'UniformStratStatic'
+       #TestName = 'DiscreteStratStatic'
        #TestName = 'UniformTestTransient'
        #TestName = '3LayerTestTransient'
        
