@@ -550,10 +550,10 @@ def runModel(TestName):
               DDXH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDXL)
               DDZH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZL)
        else:
-              DDXL, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-              DDZL, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
-              DDXH, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-              DDZH, dummy = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+              DDXL = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
+              DDZL = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
+              DDXH = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+              DDZH = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
        
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D)
@@ -610,6 +610,11 @@ def runModel(TestName):
        DLPDZ = np.reshape(DLPDZ, (OPS,1), order='F')
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
+       
+       if StaticSolve:
+              UZ += JETOPS[0]
+       else:
+              UZ += 0.0
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
        RLM, GML = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
@@ -1043,9 +1048,9 @@ def runModel(TestName):
               # Normalization for vertical velocity
                      
               # compute function average of initial fields
-              sol_avrg = DLD[-3] @ hydroState
+              sol_avrg = DLD[-3] @ state
               # compute state relative to average
-              res_norm = DLD[-3] @ np.abs(hydroState - sol_avrg)
+              res_norm = DLD[-3] @ np.abs(state - sol_avrg)
               
               # Fix the kinematic norms
               rw = np.abs(dWBC)
@@ -1219,9 +1224,9 @@ if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       TestName = 'UniformStratStatic'
+       #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       #TestName = 'UniformTestTransient'
+       TestName = 'UniformTestTransient'
        #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...

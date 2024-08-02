@@ -18,13 +18,13 @@ from joblib import Parallel, delayed
 plt.rcParams.update({'font.size': 16})
 
 NF = 1600
-TIME2STOP = 4.0
+TIME2STOP = 5.0
 m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
-fname = 'Uniform_200m.nc'
+fname = 'Uniform_200m_CS53_SSP104.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
