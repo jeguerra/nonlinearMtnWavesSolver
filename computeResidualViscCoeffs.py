@@ -6,65 +6,55 @@ Created on Sun Aug  4 13:59:02 2019
 @author: TempestGuerra
 """
 
-import math as mt
 import numpy as np
 import bottleneck as bn
+from numba import njit, prange
 
-# This approach blends by maximum residuals on each variable
-def computeResidualViscCoeffs(RES, QM, VFLW, DX, DZ, DXD, DZD, DX2, DZ2):
+useMaxFilter = True
+
+@njit(parallel=True)
+def computeRegionFilter(QR, DLD, LVAR, sbnd):
        
-       # Compute a filter length...
-       DXZ = DXD * DZD
-       DL = mt.sqrt(DXZ)
+       fltDex = DLD[-2]
+       fltKrl = DLD[-1]
+       Q = np.empty((LVAR,2,1))
+        
+       for ii in prange(LVAR):
+              # Compute the given filter over the region
+              vals = QR[fltDex[ii]]
+              if useMaxFilter:                     
+                     rsmx = vals.max()
+                     
+                     rsum = 0.0
+                     nv = 0
+                     for val in vals:
+                            arg = val - rsmx
+                            if arg < 0.0:
+                                   rsum += np.exp(arg)
+                                   nv += 1
+
+                     if nv > 0:
+                            gval = rsmx + np.log(rsum / nv)
+                     else:
+                            gval = rsmx
+              else:
+                     gval = vals.T @ fltKrl[ii]
+                     
+              if gval < 1.0E-16:
+                     gval = 0.0
+              
+              Q[ii,0,0] = min(DLD[2] * gval, sbnd)
+              Q[ii,1,0] = min(DLD[3] * gval, sbnd)
+                            
+       return Q
+
+def computeResidualViscCoeffs(RES, DLD, DT, bdex, sbnd, CRES):
        
        # Compute absolute value of residuals
-       ARES = np.abs(RES)
+       LVAR = RES.shape[0]
        
-       # Normalize the residuals (U and W only!)
-       for vv in range(2):
-              if QM[vv] > 0.0:
-                     ARES[:,vv] *= (1.0 / QM[vv])
-              else:
-                     ARES[:,vv] *= 0.0
-                     
-       # Get the maximum in the residuals (unit = 1/s)
-       QRES_MAX = DXZ * bn.nanmax(ARES, axis=1)
-       
-       # Compute flow speed plus sound speed coefficients
-       QMAX = 0.5 * DL * VFLW
-       
-       # Limit DynSGS to upper bound
-       compare = np.stack((QRES_MAX, QMAX),axis=1)
-       QRES_CF = bn.nanmin(compare, axis=1)
-
-       return (np.expand_dims(QRES_CF,1), np.expand_dims(QMAX,1))
-
-def computeCellAveragingOperator(DIMS):
-       
-       # Get the dimensions
-       NX = DIMS[3] + 1
-       NZ = DIMS[4]
-       OPS = NX * NZ
-       
-       # Initialize matrix
-       CAM = np.zeros((OPS, OPS))
-       
-       # Compute edge indices
-       bdex = np.array(range(0, OPS, NZ))
-       tdex = np.array(range(NZ-1, OPS, NZ))
-       ldex = np.array(range(bdex[0], NZ))
-       rdex = np.array(range(bdex[-1], OPS))
-       
-       # Compute interior indices
-       adex = np.array(range(OPS))
-       
-       rowsAll = set(adex)
-       rowsInt = rowsAll.difference(set(np.concatenate(bdex, ldex, tdex, rdex)))
-       '''
-       # Loop over the rows (2D FORTRAN ORDER TARGET VECTOR)
-       stencil = []
-       for ii in ldex:
-              loc = range()
-              CAM[ii,]
-       '''      
-       return CAM
+       # Set DynSGS values
+       RES = bn.nanmax(RES,axis=1)
+       CRES += computeRegionFilter(RES, DLD, LVAR, sbnd)
+              
+       return CRES

@@ -15,92 +15,72 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 
 @author: Jorge E. Guerra
 """
+import os
+
+os.environ["OMP_NUM_THREADS"] = "12" # export OMP_NUM_THREADS=4
+os.environ["OPENBLAS_NUM_THREADS"] = "12" # export OPENBLAS_NUM_THREADS=4 
+os.environ["MKL_NUM_THREADS"] = "12" # export MKL_NUM_THREADS=6
+os.environ["VECLIB_MAXIMUM_THREADS"] = "8" # export VECLIB_MAXIMUM_THREADS=4
+os.environ["NUMEXPR_NUM_THREADS"] = "8" # export NUMEXPR_NUM_THREADS=6
+
 import sys
 import time
 import shelve
-import numpy as np
+import shutil
 import math as mt
+import numpy as np
+import numba as nb
 import bottleneck as bn
 import scipy.sparse as sps
 import scipy.sparse.linalg as spl
-import scipy.linalg as dsl
+import matplotlib.path as pth
 from matplotlib import cm
 import matplotlib.pyplot as plt
+
 # Import from the local library of routines
 from computeGrid import computeGrid
 from computeAdjust4CBC import computeAdjust4CBC
 from computeColumnInterp import computeColumnInterp
-import computePartialDerivativesXZ as devop
 from computeTopographyOnGrid import computeTopographyOnGrid
-import computeGuellrichDomain2D as coords
 from computeTemperatureProfileOnGrid import computeTemperatureProfileOnGrid
 from computeThermoMassFields import computeThermoMassFields
 from computeShearProfileOnGrid import computeShearProfileOnGrid
 from computeRayleighEquations import computeRayleighEquations
-from computeInterpolatedFields import computeInterpolatedFields
 
 # Numerical stuff
+import computePartialDerivativesXZ as devop
+import computeGuellrichDomain2D as coords
+import computeDiskPartSchur as dsolver
 import computeDerivativeMatrix as derv
 import computeEulerEquationsLogPLogT as eqs
 import computeTimeIntegration as tint
 
 import faulthandler; faulthandler.enable()
 
+from netCDF4 import Dataset
+
 # Disk settings
-#localDir = '/scratch/opbuffer/' # NOAA laptop
-localDir = '/home/jeg/scratch/' # Home super desktop
-#localDir = '/Users/TempestGuerra/scratch/' # Davis Macbook Pro
-#localDir = '/home/jeguerra/scratch/'
+localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
+fname2Restart = 'Simulation2Restart.nc'
+fname4Restart = 'SimulationTemp.nc'       
 
-def makeTemperatureBackgroundPlots(Z_in, T_in, ZTL, TZ, DTDZ):
+def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, dca, dcb, NX, NZ, numVar):
        
-       # Make a figure of the temperature background
-       plt.figure(figsize=(12.0, 6.0))
-       plt.subplot(1,2,1)
-       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
-       plt.title('Discrete Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.ylabel('Height (km)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(1,2,2)
-       plt.plot(TZ, 1.0E-3*ZTL, 'k-')
-       plt.title('Smooth Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.tight_layout()
-       plt.savefig('python results/Temperature_Background.png')
-       plt.show()
-       # Make a figure of the temperature lapse rates background
-       plt.figure(figsize=(12.0, 6.0))
-       plt.subplot(1,2,1)
-       plt.plot(T_in, 1.0E-3*np.array(Z_in), 'ko-')
-       plt.title('Discrete Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.ylabel('Height (km)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.subplot(1,2,2)
-       plt.plot(DTDZ, 1.0E-3*ZTL, 'k-')
-       plt.title('Smooth Temperature Profile (K)')
-       plt.xlabel('Temperature (K)')
-       plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-       plt.tight_layout()
-       plt.savefig('python results/Temperature_Background.png')
-       plt.show()
-       sys.exit(2)
-
-       return       
-
-def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
-       plt.close('all')
-       plt.figure(figsize=(26.0, 18.0))
+       keepHistory = False
+       
+       xlims = [-50.0, 50.0]
+       ylims = [0.0, 25.0]
+       
+       fig = plt.figure(num=1, clear=True, figsize=(13.0, 9.0)) 
        for pp in range(numVar):
-              q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
-              dqdt = np.reshape(rhs[:,pp], (NZ, NX+1), order='F')
+              q = np.reshape(fields[:,pp], (NZ+1, NX+1), order='F')
+              dqdt = np.reshape(rhs[:,pp], (NZ+1, NX+1), order='F')
+              residual = np.reshape(res[:,pp], (NZ+1, NX+1), order='F')
               rowDex = 1 + 3*pp
               
-              # Plot of the full field
+              #%% Plot of the full field
               plt.subplot(4,3,rowDex)
               if np.abs(q.max()) > np.abs(q.min()):
                      clim = np.abs(q.max())
@@ -110,9 +90,7 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
                      clim = np.abs(q.max())
              
               ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, q, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-              #plt.xlim(-30.0, 30.0)
-              #plt.ylim(0.0, 20.0)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               if pp < (numVar - 1):
                      plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -126,33 +104,15 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
               elif pp == 1:
                      plt.title('w (m/s): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
               elif pp == 2:
-                     plt.title('ln-p (Pa)')
+                     plt.title('(ln$p$)\' (Pa)')
               else:
-                     plt.title('ln-theta (K)')
+                     plt.title(r'(ln$\theta$)' + '\' (K)')
                      
-              # Plot the terrain and level 1 response
+              plt.xlim(xlims[0], xlims[1])
+              plt.ylim(ylims[0], ylims[1])
+                     
+              #%% Plot the full tendencies
               plt.subplot(4,3,rowDex + 1)
-              plt.plot(1.0E-3*XL[0,:], q[0,:], 'r')
-              plt.plot(1.0E-3*XL[1,:], q[1,:], 'b--')
-              plt.legend(('z = h(x)', 'level 1'))
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-              
-              if pp < (numVar - 1):
-                     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-              else:
-                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-              
-              if pp == 0:
-                     plt.title('u (m/s)')
-              elif pp == 1:
-                     plt.title('w (m/s)')
-              elif pp == 2:
-                     plt.title('ln-p (Pa)')
-              else:
-                     plt.title('ln-theta (K)')
-                     
-              # Plot the full tendencies
-              plt.subplot(4,3,rowDex + 2)
               if np.abs(dqdt.max()) > np.abs(dqdt.min()):
                      clim = np.abs(dqdt.max())
               elif np.abs(dqdt.max()) < np.abs(dqdt.min()):
@@ -161,9 +121,7 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
                      clim = np.abs(dqdt.max())
              
               ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
-              plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
-              #plt.xlim(-30.0, 30.0)
-              #plt.ylim(0.0, 20.0)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               if pp < (numVar - 1):
                      plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
@@ -177,147 +135,291 @@ def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, NX, NZ, numVar):
               elif pp == 1:
                      plt.title('dw/dt (m/s2): ' + 'dT = {:.5f} (sec)'.format(TOPT[0]))
               elif pp == 2:
-                     plt.title('dln-p/dt (Pa/s)')
+                     plt.title('d(ln$p$)\'' + '/dt' + ' (Pa/s)')
               else:
-                     plt.title('dln-theta/dt (K/s)')
+                     plt.title(r'd(ln$\theta$)' + '\'/dt' + ' (K/s)')
+                     
+              plt.xlim(xlims[0], xlims[1])
+              plt.ylim(ylims[0], ylims[1])
+                     
+              #%% Plot the full residuals
+              plt.subplot(4,3,rowDex + 2)
+              if np.abs(residual.max()) > np.abs(residual.min()):
+                     clim = np.abs(residual.max())
+              elif np.abs(residual.max()) < np.abs(residual.min()):
+                     clim = np.abs(residual.min())
+              else:
+                     clim = np.abs(residual.max())
+                 
+              normr = 1.0
+              ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, normr * residual, 101, cmap=cm.seismic, vmin=-clim, vmax=clim)
+              plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+              
+              if pp < (numVar - 1):
+                     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+              else:
+                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+                     
+              plt.colorbar(ccheck, format='%.2e')
+              
+              if pp == 0:
+                     plt.title('Residual: u')
+              elif pp == 1:
+                     plt.title('Residual: w')
+              elif pp == 2:
+                     plt.title('Residual: ' + '(ln$p$)\'')
+              else:
+                     plt.title('Residual: ' + r'(ln$\theta$)' + '\'')
+                     
+              plt.xlim(xlims[0], xlims[1])
+              plt.ylim(ylims[0], ylims[1])
                      
        plt.tight_layout()
-       plt.show(block=False)
-       #plt.savefig('transient_diagnostic.png', format='png')
-              
+       if keepHistory:
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions' + '{:0>6d}'.format(int(thisTime)) +  '.pdf')
+       else:
+              shutil.copyfile('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions.pdf', \
+                              '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions0.pdf')
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/solutions.pdf')
+       fig.clear()
+       del(fig)
+       
+       #%% PLOT DIFFUCION COEFFICIENTS
+       fig = plt.figure(num=1, clear=True, figsize=(13.0, 9.0)) 
+       d1_rhs = np.reshape(dca[0], (NZ+1, NX+1), order='F')
+       d2_rhs = np.reshape(dca[1], (NZ+1, NX+1), order='F')
+       d1_res = np.reshape(dcb[0], (NZ+1, NX+1), order='F')
+       d2_res = np.reshape(dcb[1], (NZ+1, NX+1), order='F')
+       
+       plt.subplot(2,2,1)
+       cc1 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d1_rhs, 51, cmap=cm.afmhot)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc1, format='%.2e')
+       plt.title('RHS Coefficients X')
+       plt.subplot(2,2,2)
+       cc2 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d2_rhs, 51, cmap=cm.afmhot)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc2, format='%.2e')
+       plt.title('RHS Coefficients Z')
+       plt.subplot(2,2,3)
+       cc3 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d1_res, 51, cmap=cm.afmhot,)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc3, format='%.2e')
+       plt.title('RES Coefficients X')
+       plt.subplot(2,2,4)
+       cc4 = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, d2_res, 51, cmap=cm.afmhot)
+       plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+       plt.colorbar(cc4, format='%.2e')
+       plt.title('RES Coefficients Z')
+       
+       plt.tight_layout()
+       if keepHistory:
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions' + '{:0>6d}'.format(int(thisTime)) +  '.pdf')
+       else:
+              shutil.copyfile('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions.pdf', \
+                              '/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions0.pdf')
+              plt.savefig('/media/jeguerra/FastDATA/linearMtnWavesSolver/animations/diffusions.pdf')
+       fig.clear()
+       del(fig)
+       
        return
 
-def displayResiduals(message, RHS, thisTime, udex, wdex, pdex, tdex):
-       err = np.linalg.norm(RHS)
-       err1 = np.linalg.norm(RHS[udex])
-       err2 = np.linalg.norm(RHS[wdex])
-       err3 = np.linalg.norm(RHS[pdex])
-       err4 = np.linalg.norm(RHS[tdex])
+def displayResiduals(message, rhs, thisTime, DT, OPS):
+       RHSA = np.abs(rhs)
+       err = bn.nanmax(RHSA, axis=0)# / mt.sqrt(OPS)
        if message != '':
               print(message)
-       print('Time: %d, Residuals: %10.4E, %10.4E, %10.4E, %10.4E, %10.4E' \
-             % (thisTime, err1, err2, err3, err4, err))
+       print('Time (min): %4.2f, DT (sec): %4.3E, Residuals: %10.4E, %10.4E, %10.4E, %10.4E' \
+             % (thisTime / 60.0, DT, err[0], err[1], err[2], err[3]))
        
        return err
 
-def getFromRestart(name, TOPT, NX, NZ, StaticSolve):
-       rdb = shelve.open(restart_file, flag='r')
+def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState, senseTemp):
        
-       NX_in = rdb['NX']
-       NZ_in = rdb['NZ']
-       if NX_in != NX or NZ_in != NZ:
-              print('ERROR: RESTART DATA IS INVALID')
-              print(NX, NX_in)
-              print(NZ, NZ_in)
-              sys.exit(2)
+       NX = XL.shape[1]
+       NZ = ZTL.shape[0]
        
-       SOLT = rdb['SOLT']
-       DCF = rdb['DCF']
-       IT = rdb['ET']
-       LMS = rdb['LMS']
-       if TOPT[4] <= IT and not StaticSolve:
-              print('ERROR: END TIME LEQ INITIAL TIME ON RESTART')
-              sys.exit(2)
-              
-       rdb.close()
-       
-       return np.array(SOLT), LMS, DCF, NX_in, NZ_in, IT
-
-# Store a matrix to disk in column wise chucks
-def storeColumnChunks(MM, Mname, dbName):
-       # Set up storage and store full array
-       mdb = shelve.open(dbName, flag='n')
-       # Get the number of cpus
-       import multiprocessing as mtp
-       NCPU = mtp.cpu_count()
-       # Partition CS into NCPU column wise chuncks
-       NC = MM.shape[1] # Number of columns in MM
-       RC = NC % NCPU # Remainder of columns when dividing by NCPU
-       SC = int((NC - RC) / NCPU) # Number of columns in each chunk
-       
-       # Loop over NCPU column chunks and store
-       cranges = []
-       for cc in range(NCPU):
-              cbegin  = cc * SC
-              if cc < NCPU - 1:
-                     crange = range(cbegin,cbegin + SC)
-              elif cc == NCPU - 1:
-                     crange = range(cbegin,cbegin + SC + RC)
-              
-              cranges.append(crange)
-              mdb[Mname + str(cc)] = MM[:,crange]
-              
-       mdb.close()
-              
-       return NCPU, cranges
-
-def computeSchurBlock(dbName, blockName):
-       # Open the blocks database
-       bdb = shelve.open(dbName, flag='r')
-       
-       if blockName == 'AS':
-              SB = sps.bmat([[bdb['LDIA'], bdb['LNA'], bdb['LOA']], \
-                             [bdb['LDA'], bdb['A'], bdb['B']], \
-                             [bdb['LHA'], bdb['E'], bdb['F']]], format='csr')
-       elif blockName == 'BS':
-              SB = sps.bmat([[bdb['LPA'], bdb['LQAR']], \
-                             [bdb['C'], bdb['D']], \
-                             [bdb['G'], bdb['H']]], format='csr')
-       elif blockName == 'CS':
-              SB = sps.bmat([[bdb['LMA'], bdb['I'], bdb['J']], \
-                             [bdb['LQAC'], bdb['N'], bdb['O']]], format='csr')
-       elif blockName == 'DS':
-              SB = sps.bmat([[bdb['K'], bdb['M']], \
-                             [bdb['P'], bdb['Q']]], format='csr')
+       # Rename output file to the current time for subsequent storage
+       if thisTime > 0.0:
+              newFname = fname[0:-3] + str(int(thisTime)) + '.nc'
        else:
-              print('INVALID SCHUR BLOCK NAME!')
+              newFname = fname
+       
+       try:
+              m_fid = Dataset(newFname, 'w', format="NETCDF4")
+              print('Data output to: ', newFname)
+       except PermissionError:
+              print('Deleting corrupt NC file... from failed run.')
+              os.remove(fname)
+              m_fid = Dataset(newFname, 'w', format="NETCDF4")
               
-       bdb.close()
+       # Make dimensions
+       m_fid.createDimension('time', None)
+       m_fid.createDimension('x', NX)
+       m_fid.createDimension('y', 1)
+       m_fid.createDimension('z', NZ)
+       # Create variables (time and grid)
+       tmvar = m_fid.createVariable('time', 'f8', ('time',))
+       tmvar.units = 'seconds'
+       tmvar.axis = 'T'
+       xgvar = m_fid.createVariable('Xlon', 'f8', ('z', 'x', 'y'))
+       xgvar.units = 'm'
+       ygvar = m_fid.createVariable('Ylat', 'f8', ('z', 'x', 'y'))
+       ygvar.units = 'm'
+       zgvar = m_fid.createVariable('Zhgt', 'f8', ('z', 'x', 'y'))
+       zgvar.units = 'm'
+       # Store variables
+       xgvar[:,:,0] = XL
+       ygvar[:,:,0] = 0.0 * XL
+       zgvar[:,:,0] = ZTL
+       # Create variables (background static fields)
+       UVAR = m_fid.createVariable('U', 'f8', ('z', 'x', 'y'))
+       GVAR = m_fid.createVariable('TZ', 'f8', ('z', 'x', 'y'))
+       PVAR = m_fid.createVariable('LNP', 'f8', ('z', 'x', 'y'))
+       TVAR = m_fid.createVariable('LNT', 'f8', ('z', 'x', 'y'))
+       # Store variables
+       UVAR[:,:,0] = np.reshape(hydroState[:,0], (NZ,NX), order='F')
+       GVAR[:,:,0] = np.reshape(senseTemp, (NZ,NX), order='F')
+       PVAR[:,:,0] = np.reshape(hydroState[:,2], (NZ,NX), order='F')
+       TVAR[:,:,0] = np.reshape(hydroState[:,3], (NZ,NX), order='F')
+       # Create variables (transient fields)
+       m_fid.createVariable('u', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('w', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('ln_p', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('ln_t', 'f8', ('time', 'z', 'x', 'y'))
+       # Create variables (field tendencies)
+       '''
+       m_fid.createVariable('DuDt', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('DwDt', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('Dln_pDt', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('Dln_tDt', 'f8', ('time', 'z', 'x', 'y'))
+       # Create variables (field residuals)
+       m_fid.createVariable('Ru', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('Rw', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('Rln_p', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('Rln_t', 'f8', ('time', 'z', 'x', 'y'))
+       '''
+       # Create variables for diffusion coefficients
+       m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
+       
+       m_fid.close()
+       del(m_fid)
+       
+       return newFname
 
-       return SB.toarray()
+def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
+       
+       NX = ZTL.shape[1]
+       NZ = ZTL.shape[0]
+       
+       # Store in the NC file
+       try:
+              m_fid = Dataset(newFname, 'a', format="NETCDF4")
+              m_fid.variables['time'][ff] = thisTime
+              
+              dq1 = np.reshape(DCF[:,0,0], (NZ, NX), order='F')
+              dq2 = np.reshape(DCF[:,1,0], (NZ, NX), order='F')
+              m_fid.variables['DC1'][ff,:,:,0] = dq1
+              m_fid.variables['DC2'][ff,:,:,0] = dq2
+       
+              for pp in range(numVar):
+                     q = np.reshape(fields[:,pp], (NZ, NX), order='F')
+                     #dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
+                     #rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
+
+                     if pp == 0:
+                            m_fid.variables['u'][ff,:,:,0] = q
+                            #m_fid.variables['DuDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Ru'][ff,:,:,0] = rq
+                     elif pp == 1:
+                            m_fid.variables['w'][ff,:,:,0] = q
+                            #m_fid.variables['DwDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Rw'][ff,:,:,0] = rq
+                     elif pp == 2:
+                            m_fid.variables['ln_p'][ff,:,:,0] = q
+                            #m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Rln_p'][ff,:,:,0] = rq
+                     else:
+                            m_fid.variables['ln_t'][ff,:,:,0] = q
+                            #m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
+                            #m_fid.variables['Rln_t'][ff,:,:,0] = rq
+                            
+              m_fid.close()
+              del(m_fid)
+       except Exception as e:
+              print(e)
+              print('Could NOT store state to NC file!', newFname)
+              print('At time (min): ', thisTime / 60)
+              
+       return
 
 def runModel(TestName):
-       import TestCase
        
+       import TestCase
        thisTest = TestCase.TestCase(TestName)
        
-       # Set the solution type (MUTUALLY EXCLUSIVE)
+       # Set the solution type
        StaticSolve = thisTest.solType['StaticSolve']
-       NonLinSolve = thisTest.solType['NLTranSolve']
        NewtonLin = thisTest.solType['NewtonLin']
        ExactBC = thisTest.solType['ExactBC']
+       
+       # Set the grid type
+       HermFunc = thisTest.solType['HermFuncGrid']
+       VertSpec = thisTest.solType['VerticalSpectral']
+       
+       useGuellrich = True
+       useUniformSt = False
        
        # Switch to use the PyRSB multithreading module (CPU multithreaded SpMV)
        if StaticSolve:
               RSBops = False
-              ApplyGML = False
        else:
               RSBops = True # Turn off PyRSB SpMV
-              ApplyGML = True
+              if RSBops:
+                     from rsb import rsb_matrix
        
-       # Set the grid type
-       HermCheb = thisTest.solType['HermChebGrid']
        # Use the uniform grid fourier solution if not Hermite Functions
-       if not HermCheb:
-              FourCheb = True
+       if HermFunc:
+              FourierLin = False
+              print('Hermite Function grid in the horizontal.')
        else:
-              FourCheb = False
+              FourierLin = False
+              if FourierLin == True:
+                     print('Uniform Fourier grid in the horizontal.')
+              else:
+                     print('Uniform INTERIOR grid in the horizontal')
+                     
+       if VertSpec:
+              verticalChebGrid = False
+              verticalLegdGrid = True
+       else:
+              verticalChebGrid = False
+              verticalLegdGrid = False
+       
+       if verticalChebGrid:
+              print('Chebyshev spectral derivative in the vertical.')
+       elif verticalLegdGrid:
+              print('Legendre spectral derivative in the vertical.')
+       else:
+              print('Uniform INTERIOR grid in the vertical')
               
        # Set residual diffusion switch
-       ResDiff = thisTest.solType['DynSGS']
-       if ResDiff:
-              print('DynSGS Diffusion Model.')
+       DynSGS_RES = True
+       if DynSGS_RES:
+              print('Diffusion coefficients by residual estimate.')
        else:
-              print('Flow-Dependent Diffusion Model.')
+              print('Diffusion coefficients by RHS evaluation.')
        
-       # Set direct solution method (MUTUALLY EXCLUSIVE)
-       SolveFull = thisTest.solType['SolveFull']
+       # Set direct solution method
        SolveSchur = thisTest.solType['SolveSchur']
        
        # Set Newton solve initial and restarting parameters
-       toRestart = thisTest.solType['ToRestart'] # Saves resulting state to restart database
        isRestart = thisTest.solType['IsRestart'] # Initializes from a restart database
        makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
+       
+       if isRestart:
+              rdex = -1
        
        # Various background options
        smooth3Layer = thisTest.solType['Smooth3Layer']
@@ -333,6 +435,9 @@ def runModel(TestName):
        HOPT = thisTest.HOPT # Terrain profile options
        TOPT = thisTest.TOPT # Time integration options
        
+       # Time step scaling depending on RK solver
+       DTF = TOPT[2]
+        
        if RLOPT[5] == 'uwpt_static':
               bcType = 1
               print('BC profile: ' + RLOPT[5])
@@ -344,116 +449,161 @@ def runModel(TestName):
               print('DEFAULT BC profile: ' + RLOPT[5])
        
        # Make the equation index vectors for all DOF
-       numVar = 4
-       NX = DIMS[3]
-       NZ = DIMS[4]
-       OPS = DIMS[5]
-       udex = np.arange(OPS)
-       wdex = np.add(udex, OPS)
-       pdex = np.add(wdex, OPS)
-       tdex = np.add(pdex, OPS)
+       numVar = len(varDex)
        
        Z_in = thisTest.Z_in
        T_in = thisTest.T_in
+              
+       #%% COMPUTE STRATIFICATION AT HIGH RESOLUTION SPECTRAL
+       chebHydro = False
+       legrHydro = True
+       DIM0 = [DIMS[0], DIMS[1], DIMS[2], DIMS[3], 255, DIMS[5]]
+       REF0 = computeGrid(DIM0, HermFunc, FourierLin, chebHydro, legrHydro)
+       
+       DDXP, dummy = derv.computeCubicSplineDerivativeMatrix(REF0[0], False, True, None)
+       
+       # Get the spectral resolution operator here
+       if chebHydro:
+              DDZP, ITRANS = derv.computeChebyshevDerivativeMatrix(DIM0)
+       elif legrHydro:
+              DDZP, ITRANS = derv.computeLegendreDerivativeMatrix(DIM0)
+       else:
+              DDZP = derv.computeCompactFiniteDiffDerivativeMatrix1(REF0[1], 6)
+                     
+       REF0.append(DDXP)
+       REF0.append(DDZP)
+       
+       hx, dhx = computeTopographyOnGrid(REF0, HOPT)
+       zRay = DIMS[2] - RLOPT[0]
+       
+       if useGuellrich:
+              xl, ztl, dzt, sig, ZRL = \
+                     coords.computeGuellrichDomain2D(DIM0, REF0[0], REF0[1], zRay, hx, dhx, StaticSolve)
+       
+       if useUniformSt:
+              xl, ztl, dzt, sig, ZRL = \
+                     coords.computeStretchedDomain2D(DIM0, REF0, zRay, hx, dhx)
+       
+       REF0.append(xl)
+       REF0.append(ztl)
+       REF0.append(dhx)
+       REF0.append(sig)
+       
+       tz, dtz = \
+              computeTemperatureProfileOnGrid(PHYS, REF0, Z_in, T_in, smooth3Layer, uniformStrat)
+              
+       dlpz, lpz, pz, dlptz, lpt, pt, rho = \
+              computeThermoMassFields(PHYS, DIM0, REF0, tz, dtz, 'sensible', RLOPT)
+              
+       uz, duz = computeShearProfileOnGrid(REF0, JETOPS, PHYS[1], pz, dlpz, uniformWind, linearShear)
        
        #%% SET UP THE GRID AND INDEX VECTORS
-       #% Define the computational and physical grids+
-       verticalChebGrid = True
-       REFS = computeGrid(DIMS, HermCheb, FourCheb, verticalChebGrid)
-      
-       # Compute the raw derivative matrix operators in alpha-xi computational space
-       if HermCheb and not FourCheb:
-              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
-       elif FourCheb and not HermCheb:
-              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
-       else:
-              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
-              
-       DDZ_1D, CH_TRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
-         
-       # Turn on compact finite difference...
-       DDX_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[0])
-       DDZ_D4 = derv.computeCompactFiniteDiffDerivativeMatrix1(DIMS, REFS[1])
-       # Turn on cubic spline derivatives...
-       DDX_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[0], False)
-       DDZ_CS, DDX2_CS = derv.computeCubicSplineDerivativeMatrix(DIMS, REFS[1], True)
-       
-       # Update the REFS collection
-       REFS.append(DDX_1D)
-       REFS.append(DDZ_1D)
-       
-       #% Read in topography profile or compute from analytical function
-       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT, DDX_1D)
-       
-       # Compute DX and DZ grid length scales
-       DX_min = 1.0 * np.min(np.abs(np.diff(REFS[0])))
-       DZ_min = 1.0 * np.min(np.abs(np.diff(REFS[1])))
-       print('Minimum grid lengths:',DX_min,DZ_min)
-       DX_avg = 1.0 * np.mean(np.abs(np.diff(REFS[0])))
-       DZ_avg = 1.0 * np.mean(np.abs(np.diff(REFS[1])))
-       print('Average grid lengths:',DX_avg,DZ_avg)
-       DX_max = 1.0 * np.max(np.abs(np.diff(REFS[0])))
-       DZ_max = 1.0 * np.max(np.abs(np.diff(REFS[1])))
-       print('Maximum grid lengths:',DX_max,DZ_max)
-       DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
-       DZ_wav = 1.0 * abs(DIMS[2]) / (NZ)
-       print('Wavelength grid lengths:',DX_wav,DZ_wav)
-              
-       # Make the 2D physical domains from reference grids and topography
        zRay = DIMS[2] - RLOPT[0]
-       # USE THE GUELLRICH TERRAIN DECAY
-       XL, ZTL, DZT, sigma, ZRL, DXM, DZM = \
-              coords.computeGuellrichDomain2D(DIMS, REFS, zRay, HofX, dHdX, StaticSolve)
-       # USE UNIFORM STRETCHING
-       #XL, ZTL, DZT, sigma, ZRL = coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
+       REFS = computeGrid(DIMS, HermFunc, FourierLin, verticalChebGrid, verticalLegdGrid)
        
-       # Update the REFS collection
-       REFS.append(XL)
-       REFS.append(ZTL)
-       REFS.append(dHdX)
-       REFS.append(sigma)
+       # Update OPS to the actual grid
+       NX = REFS[0].shape[0]
+       NZ = REFS[1].shape[0]
+       OPS = NX * NZ
+       physDOF = numVar * OPS
+       
+       #%% Read in topography profile or compute from analytical function
+       HofX, dHdX = computeTopographyOnGrid(REFS, HOPT)
+       
+       if useGuellrich:
+              XL, ZTL, DZT, sigma, ZRL = \
+                     coords.computeGuellrichDomain2D(DIMS, REFS[0], REFS[1], zRay, HofX, dHdX, StaticSolve)
+       
+       if useUniformSt:
+              XL, ZTL, DZT, sigma, ZRL = \
+                     coords.computeStretchedDomain2D(DIMS, REFS, zRay, HofX, dHdX)
        
        #% Compute the BC index vector
-       uldex, urdex, ubdex, utdex, wbdex, \
-       ubcDex, wbcDex, pbcDex, tbcDex, \
-       zeroDex, sysDex, ebcDex = \
-              computeAdjust4CBC(DIMS, numVar, varDex, bcType)
-              
-       # Index to interior of terrain boundary
-       hdex = range(0,NX+1)
-       # Index to the entire bottom boundary on U
-       uBotDex = np.array(range(0, OPS, NZ))
-       
-       #%% MAKE THE INITIAL/BACKGROUND STATE
-       # Map the sounding to the computational vertical 2D grid [0 H]
-       TZ, DTDZ, D2TDZ2 = \
-              computeTemperatureProfileOnGrid(PHYS, REFS, Z_in, T_in, smooth3Layer, uniformStrat)
-
-       # Compute background fields on the reference column
-       dlnPdz, LPZ, PZ, dlnPTdz, LPT, PT, RHO = \
-              computeThermoMassFields(PHYS, DIMS, REFS, TZ[:,0], DTDZ[:,0], 'sensible', uniformStrat)
-       
-       # Read in or compute background horizontal wind profile
-       U, dUdz = computeShearProfileOnGrid(REFS, JETOPS, PHYS[1], PZ, dlnPdz, uniformWind, linearShear)
-       
-       if verticalChebGrid:
-              interpolationType = '1DtoTerrainFollowingCheb'
+       ubcDex, wbcDex, pbcDex, tbcDex, sysDex, ebcDex = \
+              computeAdjust4CBC(ZTL.shape, numVar, varDex, bcType)
+      
+       #%% Compute the raw derivative matrix operators in alpha-xi computational space
+       if HermFunc and not FourierLin:
+              DDX_1D, HF_TRANS = derv.computeHermiteFunctionDerivativeMatrix(DIMS)
+       elif FourierLin and not HermFunc:
+              DDX_1D, HF_TRANS = derv.computeFourierDerivativeMatrix(DIMS)
        else:
-              interpolationType = '1DtoTerrainFollowingCheb2Lin'
+              print('NON-SPECTRAL derivative in the horizontal.')
+              DDX_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
+              DDX_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[0], True, False, DDX_BC)
+                            
+       if verticalChebGrid and not verticalLegdGrid:
+              DDZ_1D, VTRANS = derv.computeChebyshevDerivativeMatrix(DIMS)
+       elif verticalLegdGrid and not verticalChebGrid:
+              DDZ_1D, VTRANS = derv.computeLegendreDerivativeMatrix(DIMS)
+       else:
+              print('NON-SPECTRAL derivative in the verticals.')
+              DDZ_BC = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
+              DDZ_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_BC)
        
-       #% Compute the background gradients in physical 2D space
-       dUdz = np.expand_dims(dUdz, axis=1)
-       DUDZ = np.tile(dUdz, NX+1)
-       DUDZ = computeColumnInterp(DIMS, REFS[1], dUdz, 0, ZTL, DUDZ, CH_TRANS, interpolationType)
+       # Derivative operators
+       useSplineDerivatives = True
+       
+       if useSplineDerivatives:
+              DDXL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
+              DDZL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
+              DDXH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDXL)
+              DDZH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZL)
+       else:
+              DDXL = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
+              DDZL = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
+              DDXH = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+              DDZH = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       
+       # Derivative operators from global spectral methods
+       DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D)
+       DDXMS_LO, DDZMS_LO = devop.computePartialDerivativesXZ(DIMS, sigma, 
+                                                              DDXL, DDZL)
+       DDXMS_HO, DDZMS_HO = devop.computePartialDerivativesXZ(DIMS, sigma, 
+                                                              DDXH, DDZH)
+       
+       #%% MAKE THE INITIAL/BACKGROUND STATE ON COMPUTATIONAL GRID
+       
+       # Compute the initial fields by interolation
+       '''
+       import scipy.interpolate as spi
+       Uz = spi.interp1d(REF0[1], uz, kind='cubic')
+       dUdz = spi.interp1d(REF0[1], duz, kind='cubic')
+       LPZ = spi.interp1d(REF0[1], lpz, kind='cubic')
+       LPT = spi.interp1d(REF0[1], lpt, kind='cubic')
+       
+       UZ = np.zeros(ZTL.shape)
+       DUDZ = np.zeros(ZTL.shape)
+       LOGP = np.zeros(ZTL.shape)
+       LOGT = np.zeros(ZTL.shape)
+       for cc in range(ZTL.shape[1]):
+              UZ[:,cc] = Uz(ZTL[:,cc])
+              DUDZ[:,cc] = dUdz(ZTL[:,cc])
+              LOGP[:,cc] = LPZ(ZTL[:,cc])
+              LOGT[:,cc] = LPT(ZTL[:,cc])
+       '''      
+       #'''
+       # Compute the background (initial) fields
+       TZ = np.expand_dims(tz, axis=1)
+       TZ = computeColumnInterp(DIM0, REF0[1], TZ, ZTL, ITRANS)
+       DTDZ = np.expand_dims(dtz, axis=1)
+       DTDZ = computeColumnInterp(DIM0, REF0[1], DTDZ, ZTL, ITRANS)
+       U = np.expand_dims(uz, axis=1)
+       UZ = computeColumnInterp(DIM0, REF0[1], U, ZTL, ITRANS)
+       dUdz = np.expand_dims(duz, axis=1)
+       DUDZ = computeColumnInterp(DIM0, REF0[1], dUdz, ZTL, ITRANS)
+       LPZ = np.expand_dims(lpz, axis=1)
+       LOGP = computeColumnInterp(DIM0, REF0[1], LPZ, ZTL, ITRANS)
+       LPT = np.expand_dims(lpt, axis=1)
+       LOGT = computeColumnInterp(DIM0, REF0[1], LPT, ZTL, ITRANS)       
+       #'''
        # Compute thermodynamic gradients (no interpolation!)
        PORZ = PHYS[3] * TZ
-       DLPDZ = -PHYS[0] / PHYS[3] * np.reciprocal(TZ)
+       PBAR = np.exp(LOGP) # Hydrostatic pressure
+       DLPDZ = -PHYS[0] / (PHYS[3] * TZ)
        DLTDZ = np.reciprocal(TZ) * DTDZ
        DLPTDZ = DLTDZ - PHYS[4] * DLPDZ
-       # Compute 2nd derivatives
-       D2LPDZ2 = - DLTDZ * DLPDZ
-       D2LPTDZ2 = np.reciprocal(TZ) * D2TDZ2 - DLTDZ * DLPTDZ
-       
+
        # Get the static vertical gradients and store
        DUDZ = np.reshape(DUDZ, (OPS,1), order='F')
        DLTDZ = np.reshape(DLTDZ, (OPS,1), order='F')
@@ -461,180 +611,200 @@ def runModel(TestName):
        DLPTDZ = np.reshape(DLPTDZ, (OPS,1), order='F')
        DQDZ = np.hstack((DUDZ, np.zeros((OPS,1)), DLPDZ, DLPTDZ))
        
-       # Compute the background (initial) fields
-       U = np.expand_dims(U, axis=1)
-       UZ = np.tile(U, NX+1)
-       UZ = computeColumnInterp(DIMS, REFS[1], U, 0, ZTL, UZ, CH_TRANS, interpolationType)
-       LPZ = np.expand_dims(LPZ, axis=1)
-       LOGP = np.tile(LPZ, NX+1)
-       LOGP = computeColumnInterp(DIMS, REFS[1], LPZ, 0, ZTL, LOGP, CH_TRANS, interpolationType)
-       LPT = np.expand_dims(LPT, axis=1)
-       LOGT = np.tile(LPT, NX+1)
-       LOGT = computeColumnInterp(DIMS, REFS[1], LPT, 0, ZTL, LOGT, CH_TRANS, interpolationType)       
-       PBAR = np.exp(LOGP) # Hydrostatic pressure
+       if StaticSolve:
+              UZ += JETOPS[0]
+       else:
+              UZ += 0.0
        
        #%% RAYLEIGH AND GML WEIGHT OPERATORS
-       ROPS, RLM, GML, SBR = computeRayleighEquations(DIMS, REFS, ZRL, RLOPT, ubdex, utdex)
-       if ApplyGML:
-              GMLOP = sps.diags(np.reshape(GML[0], (OPS,), order='F'), offsets=0, format='csr')
-              GMLOX = sps.diags(np.reshape(GML[1], (OPS,), order='F'), offsets=0, format='csr')
-              GMLOZ = sps.diags(np.reshape(GML[2], (OPS,), order='F'), offsets=0, format='csr')
-       else:
-              GMLOP = sps.identity(OPS, format='csr')
-              GMLOX = sps.identity(OPS, format='csr')
-              GMLOZ = sps.identity(OPS, format='csr')
+       RLM, GML = computeRayleighEquations(DIMS, XL, ZTL, ZRL, RLOPT)
        
-       SBROP = sps.diags(np.reshape(SBR, (OPS,), order='F'), offsets=0, format='csr')
        # Make a collection for background field derivatives
-       REFG = [(GMLOP, GMLOX, GMLOZ), DLTDZ, DQDZ, RLOPT[4], RLM, SBROP]
+       REFG = [RLM, GML, DLTDZ, DQDZ, RLOPT[4]]
+                     
+       #%% PREPARE DERIVATIVE OPERATORS              
+       if HermFunc:
+              PPXMA = DDXMS1
+       else:
+              PPXMA = DDXMS_HO# - DZTM @ DDZMS_HO
+              
+       if verticalChebGrid or verticalLegdGrid:
+              #advtOps = (REFG[0][1].dot(PPXMD),
+              #           REFG[0][2].dot(DDZMS1))
+              advtOps = (PPXMA,DDZMS1)
+       else:
+              #advtOps = (REFG[0][1].dot(PPXMD),
+              #           REFG[0][2].dot(DDZMS_HO))
+              advtOps = (PPXMA,DDZMS_HO)
+       
+       #PPXMD = DDXMS_LO - DZTM @ DDZMS_HO
+       diffOps = (DDXMS_HO,DDZMS_HO)
        
        # Update the REFS collection
-       REFS.append(np.reshape(UZ, (OPS,), order='F'))
-       REFS.append((np.reshape(PORZ, (OPS,), order='F'), np.reshape(PBAR, (OPS,), order='F')))
+       REFS.append(DDX_1D) # index 2
+       REFS.append(DDZ_1D) # index 3
+       REFS.append(XL) # index 4
+       REFS.append(ZTL) # index 5
+       REFS.append((dHdX, HofX)) # index 6
+       REFS.append(sigma) # index 7
+       REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
+       REFS.append((np.reshape(PORZ, (OPS,), order='F'), 
+                    np.reshape(PBAR, (OPS,), order='F'))) #index 9
+       REFS.append(advtOps) # index 10
+       REFS.append(diffOps) # index 11
        
-       # Get some memory back here
+       #%% Store operators for use
+       if StaticSolve:
+              # Native sparse
+              DDOP = sps.vstack(advtOps)
+              REFS.append(DDOP) # index 12
+              DDOP = sps.vstack(diffOps)
+              REFS.append(DDOP) # index 13
+       else:
+              # Multithreaded enabled for transient solution
+              if RSBops:
+                     DDOP = sps.vstack(advtOps, format='csr')
+                     DDOP = rsb_matrix(sps.csr_array(DDOP), shape=DDOP.shape)
+                     DDOP.autotune(nrhs=numVar)
+                     REFS.append(DDOP) # index 12
+                     
+                     DDOP = sps.vstack(diffOps, format='csr')
+                     DDOP = rsb_matrix(sps.csr_array(DDOP), shape=DDOP.shape)
+                     DDOP.autotune(nrhs=2*numVar)
+                     REFS.append(DDOP) # index 13
+              else:
+                     import torch
+                     DDOP = sps.vstack(advtOps, format='coo') 
+                     ind = np.vstack((DDOP.row, DDOP.col))
+                     val = DDOP.data
+                     DDOP = torch.sparse_coo_tensor(ind, val)
+                     DDOP = DDOP.to_sparse_csr()
+                     
+                     REFS.append(DDOP) # index 12
+                     del(DDOP)
+                     
+                     DDOP = sps.vstack(diffOps, format='coo')
+                     ind = np.vstack((DDOP.row, DDOP.col))
+                     val = DDOP.data
+                     DDOP = torch.sparse_coo_tensor(ind, val)
+                     DDOP = DDOP.to_sparse_csr()
+                     
+                     REFS.append(DDOP) # index 13
+                     del(val)
+                     del(ind)
+              
+       # Store the terrain profile and operators used on the terrain (diffusion)
+       REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 14
+              
+       #%% Get some memory back here
        del(PORZ)
        del(DUDZ)
        del(DLTDZ)
        del(DLPDZ)
        del(DLPTDZ)
        del(GML)
-       
-       #%% DIFFERENTIATION OPERATORS
-       
-       # Quality control on derivative matrices
-       #DDX_1D[np.isclose(DDX_1D, 0.0, atol=1.0E-15)] = 0.0
-       #DDZ_1D[np.isclose(DDZ_1D, 0.0, atol=1.0E-15)] = 0.0
-       
-       DDXMS, DDZMS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_1D, DDZ_1D)
-       # 4th order compact finite difference (Gamet, 1999)
-       DDXM_D4, DDZM_D4 = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_D4, DDZ_D4)
-       # Cubic Spline first derivative matrix
-       DDXM_CS, DDZM_CS = devop.computePartialDerivativesXZ(DIMS, REFS, DDX_CS, DDZ_CS)
-       
-       #DDXMA = 0.5 * (DDXMS + DDXM_CS)
-       #DDZMA = 0.5 * (DDZMS + DDZM_CS)
-       '''
-       DDXM = sps.bmat([[DDXMS, None, None, None], \
-                     [None, DDXMS, None, None], \
-                     [None, None, DDXMS, None], \
-                     [None, None, None, DDXMS]], format='csr')
-              
-       DDZM = sps.bmat([[DDZMS, None, None, None], \
-                     [None, DDZMS, None, None], \
-                     [None, None, DDZMS, None], \
-                     [None, None, None, DDZMS]], format='csr')
-       '''
-       REFS.append(DDXMS) # index 10
-       REFS.append(DDZMS) # index 11
-       
-       if not StaticSolve and RSBops:
-              from rsb import rsb_matrix
-              # Multithreaded enabled for transient solution
-              REFS.append((rsb_matrix(DDXMS), rsb_matrix(DDZMS)))
-              REFS.append((rsb_matrix(DDXM_CS), rsb_matrix(DDZM_CS)))
-       elif not StaticSolve and not RSBops:
-              # Native sparsr
-              REFS.append((DDXMS, DDZMS))
-              REFS.append((DDXM_CS, DDZM_CS))
-       else: 
-              # Matrix operators for Jacobian assembly
-              REFS.append(DDXM_CS)
-              REFS.append(DDZM_CS)
-              
-       # Store the terrain profile
-       REFS.append(DZT)
-       DZDX = np.reshape(DZT, (OPS,1), order='F')
-       REFS.append(DZDX)
-       
-       # Compute and store the 2nd derivatives of background quantities
-       D2QDZ2 = DDZM_CS.dot(DQDZ)
-       D2QDZ2[:,2] = np.reshape(D2LPDZ2, (OPS,), order='F')
-       D2QDZ2[:,3] = np.reshape(D2LPTDZ2, (OPS,), order='F')
-       REFG.append(D2QDZ2)
-       
-       if not StaticSolve:
-              # Time stepping grid lengths
-              '''
-              DX = DX_min
-              DZ = DZ_min
-              # Diffusion grid lengths
-              DXD = 1.0 * DX_avg#np.reshape(DXM, (OPS,), order='F') #1.0 * DX_avg
-              DZD = 1.0 * DZ_avg#np.reshape(DZM, (OPS,), order='F') #1.0 * DZ_avg
-              '''
-              #'''
-              print('Computing spectral radii of derivative operators...')
-              PPXMS = DDXMS - sps.diags(np.reshape(DZT, (OPS,), order='F'), offsets=0, format='csr') * DDZMS
-              DX_spr = 1.0 / np.abs(spl.eigs(PPXMS[np.ix_(ubdex,ubdex)], k=1, which='LM', return_eigenvectors=False))
-              DZ_spr = 1.0 / np.abs(spl.eigs(DDZMS[np.ix_(uldex[1:],uldex[1:])], k=1, which='LM', return_eigenvectors=False))
-              print('Spectral radii of 1st derivative matrices: ', DX_spr, DZ_spr)
-              DX = 1.0 * DX_spr[0]
-              DZ = 1.0 * DZ_spr[0]
-              DXD = 1.0 * DX_avg
-              DZD = 1.0 * DZ_avg
-              
-              DX2 = DXD * DXD
-              DZ2 = DZD * DZD
-              DXZ = DXD * DZD
-              
-              DLS = min(DX, DZ)
-              #'''
-              
-       del(DDXMS); del(DDXM_D4); del(DDXM_CS)
-       del(DDZMS); del(DDZM_D4); del(DDZM_CS)
-       del(DZDX)
-       del(GMLOP)
+       del(REF0)
+       del(DIM0)
+       del(DDOP)
+       del(advtOps); del(diffOps)
+       del(DDXMS1); del(DDZMS1)
+       del(DDXMS_LO); del(DDZMS_LO)
+       del(DDXMS_HO); del(DDZMS_HO)
+       del(dummy)
        
        #%% SOLUTION INITIALIZATION
-       physDOF = numVar * OPS
-       lmsDOF = len(ubdex)
+
+       hydroState = np.empty((OPS,numVar))
+       fields = np.zeros((OPS,numVar))
+       state = np.empty((OPS,numVar))
+       dfields = np.empty((OPS,numVar))
+       rhsVec = np.empty((OPS,numVar))
+       resVec = np.empty((OPS,numVar))
        
-       # Initialize solution storage
-       SOLT = np.zeros((physDOF, 2))
-       
-       # Initialize Lagrange Multiplier storage
-       LMS = np.zeros(lmsDOF)
-       
-       # Initialize hydrostatic background
-       INIT = np.zeros((physDOF,))
-       RHS = np.zeros((physDOF,))
-       
-       # Initialize the Background fields
-       INIT[udex] = np.reshape(UZ, (OPS,), order='F')
-       INIT[wdex] = np.zeros((OPS,))
-       INIT[pdex] = np.reshape(LOGP, (OPS,), order='F')
-       INIT[tdex] = np.reshape(LOGT, (OPS,), order='F')
-       
-       # Initialize diffusion coefficients
-       DCF = (np.zeros((OPS, 1)), np.zeros((OPS, 1)))
+       # Initialize residual coefficient storage
+       DCF = np.zeros((fields.shape[0],2,1))
        
        if isRestart:
-              print('Restarting from previous solution...')
-              SOLT, LMS, DCF, NX_in, NZ_in, IT = getFromRestart(restart_file, TOPT, NX, NZ, StaticSolve)
-              
-              # Updates nolinear boundary condition to next Newton iteration
-              dWBC = SOLT[wbdex,0] - dHdX[hdex] * (INIT[ubdex] + SOLT[ubdex,0])  
+              print('Restarting from: ', fname2Restart)
+              try:
+                     m_fid = Dataset(fname2Restart, 'r', format="NETCDF4")
+                     thisTime = m_fid.variables['time'][rdex]
+                     
+                     hydroState[:,0] = np.reshape(m_fid.variables['U'][rdex,:,:,0], (OPS,), order='F')
+                     hydroState[:,1] = 0.0
+                     hydroState[:,2] = np.reshape(m_fid.variables['LNP'][rdex,:,:,0], (OPS,), order='F')
+                     hydroState[:,3] = np.reshape(m_fid.variables['LNT'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     state[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:,0], (OPS,), order='F')
+                     state[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:,0], (OPS,), order='F')
+                     state[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:,0], (OPS,), order='F')
+                     state[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     fields = state - hydroState
+                     
+                     rhsVec[:,0] = np.reshape(m_fid.variables['DuDt'][rdex,:,:,0], (OPS,), order='F')
+                     rhsVec[:,1] = np.reshape(m_fid.variables['DwDt'][rdex,:,:,0], (OPS,), order='F')
+                     rhsVec[:,2] = np.reshape(m_fid.variables['Dln_pDt'][rdex,:,:,0], (OPS,), order='F')
+                     rhsVec[:,3] = np.reshape(m_fid.variables['Dln_tDt'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     resVec[:,0] = np.reshape(m_fid.variables['Ru'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,1] = np.reshape(m_fid.variables['Rw'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,2] = np.reshape(m_fid.variables['Rln_p'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,3] = np.reshape(m_fid.variables['Rln_t'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     DCF[:,0,0] = np.reshape(m_fid.variables['DC1'][rdex,:,:,0], (OPS,), order='F')
+                     DCF[:,1,0] = np.reshape(m_fid.variables['DC2'][rdex,:,:,0], (OPS,), order='F')
+                     
+                     m_fid.close()
+                     del(m_fid)
+              except:
+                     print('Could NOT read restart NC file!', fname2Restart)
+              isInitialStep = False
        else:
+              hydroState[:,0] = np.reshape(UZ, (OPS,), order='F')
+              hydroState[:,1] = 0.0
+              hydroState[:,2] = np.reshape(LOGP, (OPS,), order='F')
+              hydroState[:,3] = np.reshape(LOGT, (OPS,), order='F')
+              
+              state = fields + hydroState
+              
               # Set the initial time
               IT = 0.0
+              thisTime = IT
+              isInitialStep = True
               
-              # Initial change in vertical velocity at boundary
-              dWBC = -dHdX[hdex] * INIT[ubdex]
-            
-       # Prepare the current fields (TO EVALUATE CURRENT JACOBIAN)
-       currentState = np.array(SOLT[:,0])
-       fields, U, W = \
-              eqs.computePrepareFields(REFS, currentState, INIT, udex, wdex, pdex, tdex)
+       # Compute the terrain boundary condition
+       dUBC = state[ebcDex[2],0]
+       dWBC = fields[ebcDex[2],1] - dHdX * dUBC
               
-       #% Compute the global LHS operator and RHS
+       # Initialize output to NetCDF
+       newFname = initializeNetCDF(fname4Restart, thisTime, XL, ZTL, hydroState, TZ)
+              
+       start = time.time()
+       
+       #%% STATIC OR TRANSIENT SOLVERS
        if StaticSolve:
+              
+              # Initialize solution storage
+              SOLT = np.zeros((physDOF, 2))
+              SOLT[:,0] = np.reshape(fields, (physDOF,), order='F')
+              
+              # Initialize Lagrange Multiplier storage (bottom boundary)
+              LMS = np.zeros(NX)
+                     
+              # Compute the RHS for this iteration
+              rhsVec, DqDx, DqDz = eqs.computeRHS(state, fields, REFS[10][0], REFS[10][1], \
+                                                  PHYS, REFS, REFG, True, False)
+              displayResiduals('Current function evaluation residual: ', rhsVec, thisTime, TOPT[0], OPS)
+              
               if NewtonLin:
                      # Full Newton linearization with TF terms
                      DOPS_NL = eqs.computeJacobianMatrixLogPLogT(PHYS, REFS, REFG, \
-                                   np.array(fields), U, ubdex, utdex)
+                                   fields, state[:,0], ebcDex[2], ebcDex[3])
               else:
                      # Classic linearization without TF terms
-                     DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG)
+                     DOPS_NL = eqs.computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, 
+                                                                           REFS, REFG)
 
               print('Compute Jacobian operator blocks: DONE!')
               
@@ -647,30 +817,18 @@ def runModel(TestName):
                             DOPS.append(DOPS_NL[dd])
               del(DOPS_NL)
               
-              #'''
-              # Compute the RHS for this iteration
-              DqDx, DqDz = \
-                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
-              rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
-              
-              RHS = np.reshape(rhs, (physDOF,), order='F')
-              err = displayResiduals('Current function evaluation residual: ', RHS, 0.0, udex, wdex, pdex, tdex)
-              del(U); del(fields); del(rhs)
-              
-              #%% Compute Lagrange Multiplier column augmentation matrices (terrain equation)
-              C1 = -1.0 * sps.diags(dHdX[hdex], offsets=0, format='csr')
-              C2 = +1.0 * sps.eye(len(ubdex), format='csr')
+              # Compute Lagrange Multiplier column augmentation matrices (terrain equation)
+              C1 = -1.0 * sps.diags(dHdX, offsets=0, format='csr')
+              C2 = +1.0 * sps.eye(NX, format='csr')
        
-              colShape = (OPS,len(ubdex))
-              LD = sps.lil_matrix(colShape)
+              colShape = (OPS,NX)
+              LD = sps.lil_array(colShape)
               if ExactBC:
-                     LD[ubdex,:] = C1
-              LH = sps.lil_matrix(colShape)
-              LH[ubdex,:] = C2
-              LM = sps.lil_matrix(colShape)
-              LQ = sps.lil_matrix(colShape)
+                     LD[ebcDex[2],:] = C1
+              LH = sps.lil_array(colShape)
+              LH[ebcDex[2],:] = C2
+              LM = sps.lil_array(colShape)
+              LQ = sps.lil_array(colShape)
               
               #%% Apply BC adjustments and indexing block-wise (Lagrange blocks)
               LDA = LD[ubcDex,:]
@@ -683,7 +841,7 @@ def runModel(TestName):
               LOA = LHA.T
               LPA = LMA.T
               LQAR = LQAC.T
-              LDIA = sps.lil_matrix((lmsDOF,lmsDOF))
+              LDIA = sps.lil_array((NX,NX))
               
               # Apply BC adjustments and indexing block-wise (LHS operator)
               A = DOPS[0][np.ix_(ubcDex,ubcDex)]              
@@ -707,21 +865,16 @@ def runModel(TestName):
               Q = DOPS[15][np.ix_(tbcDex,tbcDex)]
               
               # The Rayleigh operators are block diagonal
-              R1 = (ROPS[0].tolil())[np.ix_(ubcDex,ubcDex)]
-              R2 = (ROPS[1].tolil())[np.ix_(wbcDex,wbcDex)]
-              R3 = (ROPS[2].tolil())[np.ix_(pbcDex,pbcDex)]
-              R4 = (ROPS[3].tolil())[np.ix_(tbcDex,tbcDex)]
-               
+              ROPS = sps.spdiags(RLOPT[4] * RLM[-1][:,0], 0, OPS, OPS).tolil()
+              A += ROPS[np.ix_(ubcDex,ubcDex)]
+              F += ROPS[np.ix_(wbcDex,wbcDex)]
+              K += ROPS[np.ix_(pbcDex,pbcDex)]
+              Q += ROPS[np.ix_(tbcDex,tbcDex)]
+              
               del(DOPS)
               
               # Set up Schur blocks or full operator...
-              if (StaticSolve and SolveSchur):
-                     # Add Rayleigh damping terms
-                     A += R1
-                     F += R2
-                     K += R3
-                     Q += R4
-                     
+              if SolveSchur:
                      # Store the operators...
                      opdb = shelve.open(schurName, flag='n')
                      opdb['A'] = A; opdb['B'] = B; opdb['C'] = C; opdb['D'] = D
@@ -734,29 +887,24 @@ def runModel(TestName):
                      opdb.close()
                       
                      # Compute the partitions for Schur Complement solution
-                     fu = RHS[udex]
-                     fw = RHS[wdex]
+                     fu = rhsVec[:,0]
+                     fw = rhsVec[:,1]
                      f1 = np.concatenate((-dWBC, fu[ubcDex], fw[wbcDex]))
-                     fp = RHS[pdex]
-                     ft = RHS[tdex]
-                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))
-                     
-              if (StaticSolve and SolveFull):
-                     # Add Rayleigh damping terms
-                     A += R1
-                     F += R2
-                     K += R3
-                     Q += R4
-                     
+                     fp = rhsVec[:,2]
+                     ft = rhsVec[:,3]
+                     f2 = np.concatenate((fp[pbcDex], ft[tbcDex]))   
+              else:
                      # Compute the global linear operator
-                     AN = sps.bmat([[A, B, C, D, LDA], \
-                              [E, F, G, H, LHA], \
-                              [I, J, K, M, LMA], \
-                              [N, O, P, Q, LQAC], \
-                              [LNA, LOA, LPA, LQAR, LDIA]], format='csc')
+                     
+                     AN = sps.bmat([[LDIA, LNA, LOA, LPA, LQAR], \
+                              [LDA, A, B, C, D], \
+                              [LHA, E, F, G, H], \
+                              [LMA, I, J, K, M], \
+                              [LQAC, N, O, P, Q]], format='csc')
               
                      # Compute the global linear force vector
-                     bN = np.concatenate((RHS[sysDex], -dWBC))
+                     RHS = np.reshape(rhsVec, (physDOF,), order='F')
+                     bN = np.concatenate((-dWBC, RHS[sysDex]))
               
               # Get memory back
               del(A); del(B); del(C); del(D)
@@ -765,12 +913,12 @@ def runModel(TestName):
               del(N); del(O); del(P); del(Q)
               print('Set up global linear operators: DONE!')
        
-       #%% Solve the system - Static or Transient Solution
-       start = time.time()
-       if StaticSolve:
               print('Starting Linear to Nonlinear Static Solver...')
               
-              if SolveFull and not SolveSchur:
+              if SolveSchur:
+                     # Call the 4 way partitioned Schur block solver
+                     dsol = dsolver.solveDiskPartSchur(localDir, schurName, f1, f2)
+              else:
                      print('Solving linear system by full operator SuperLU...')
                      # Direct solution over the entire operator (better for testing BC's)
                      opts = dict(Equil=True, IterRefine='DOUBLE')
@@ -779,110 +927,10 @@ def runModel(TestName):
                      dsol = factor.solve(bN)
                      del(bN)
                      del(factor)
-              if SolveSchur and not SolveFull:
-                     print('Solving linear system by Schur Complement...')
-                     # Factor DS and compute the Schur Complement of DS
-                     DS = computeSchurBlock(schurName,'DS')
-                     factorDS = dsl.lu_factor(DS, overwrite_a=True, check_finite=False)
-                     del(DS)
-                     print('Factor D... DONE!')
                      
-                     # Store factor_DS for a little bit...
-                     FDS = shelve.open(localDir + 'factorDS', flag='n', protocol=4)
-                     FDS['factorDS'] = factorDS
-                     FDS.close()
-                     print('Store LU factor of D... DONE!')
-                     
-                     # Compute f2_hat = DS^-1 * f2 and f1_hat
-                     BS = computeSchurBlock(schurName,'BS')
-                     f2_hat = dsl.lu_solve(factorDS, f2)
-                     f1_hat = f1 - BS.dot(f2_hat)
-                     del(f1)
-                     del(BS) 
-                     del(f2_hat)
-                     print('Compute modified force vectors... DONE!')
-                     
-                     # Get CS block and store in column chunks
-                     CS = computeSchurBlock(schurName, 'CS')
-                     fileCS = localDir + 'CS'
-                     NCPU, CS_cranges = storeColumnChunks(CS, 'CS', fileCS)
-                     print('Partition block C into chunks and store... DONE!')
-                     del(CS)
-                     
-                     # Get AS block and store in column chunks
-                     AS = computeSchurBlock(schurName, 'AS')
-                     fileAS = localDir + 'AS'
-                     NCPU, AS_cranges = storeColumnChunks(AS, 'AS', fileAS)
-                     print('Partition block A into chunks and store... DONE!')
-                     del(AS)
-                     
-                     # Loop over the chunks from disk
-                     #AS = computeSchurBlock(schurName, 'AS')
-                     BS = computeSchurBlock(schurName, 'BS')
-                     ASmdb = shelve.open(fileAS)
-                     CSmdb = shelve.open(fileCS, flag='r')
-                     print('Computing DS^-1 * CS in chunks: ', NCPU)
-                     for cc in range(NCPU):
-                            # Get CS chunk
-                            #CS_crange = CS_cranges[cc] 
-                            CS_chunk = CSmdb['CS' + str(cc)]
-                            
-                            DS_chunk = dsl.lu_solve(factorDS, CS_chunk, overwrite_b=True, check_finite=False) # LONG EXECUTION
-                            del(CS_chunk)
-                            
-                            # Get AS chunk
-                            #AS_crange = AS_cranges[cc] 
-                            AS_chunk = ASmdb['AS' + str(cc)]
-                            #AS[:,crange] -= BS.dot(DS_chunk) # LONG EXECUTION
-                            ASmdb['AS' + str(cc)] = AS_chunk - BS.dot(DS_chunk)
-                            del(AS_chunk)
-                            del(DS_chunk)
-                            print('Computed chunk: ', cc+1)
-                            
-                     CSmdb.close()
-                     del(BS)
-                     del(factorDS)
-                     
-                     # Reassemble Schur complement of DS from AS chunk storage
-                     print('Computing Schur Complement of D from chunks.')
-                     DS_SC = ASmdb['AS0']
-                     for cc in range(1,NCPU):
-                            DS_SC = np.hstack((DS_SC, ASmdb['AS' + str(cc)]))
-                     ASmdb.close()
-                     print('Solve DS^-1 * CS... DONE!')
-                     print('Compute Schur Complement of D... DONE!')
-                     #'''
-                     # Apply Schur C. solver on block partitioned DS_SC
-                     factorDS_SC = dsl.lu_factor(DS_SC, overwrite_a=True)
-                     del(DS_SC)
-                     print('Factor Schur Complement of D... DONE!')
-                     #'''
-                     sol1 = dsl.lu_solve(factorDS_SC, f1_hat, overwrite_b=True, check_finite=False)
-                     del(factorDS_SC)
-                     #sol1, icode = spl.bicgstab(AS, f1_hat)
-                     del(f1_hat)
-                     print('Solve for u and w... DONE!')
-                     
-                     CS = computeSchurBlock(schurName, 'CS')
-                     f2_hat = f2 - CS.dot(sol1)
-                     del(f2)
-                     del(CS)
-                     FDS = shelve.open(localDir + 'factorDS', flag='r', protocol=4)
-                     factorDS = FDS['factorDS']
-                     FDS.close()
-                     sol2 = dsl.lu_solve(factorDS, f2_hat, overwrite_b=True, check_finite=False)
-                     del(f2_hat)
-                     del(factorDS)
-                     print('Solve for ln(p) and ln(theta)... DONE!')
-                     dsol = np.concatenate((sol1, sol2))
-                     
-                     # Get memory back
-                     del(sol1); del(sol2)
-                     
-              #%% Update the interior and boundary solution
               # Store the Lagrange Multipliers
-              LMS += dsol[0:lmsDOF]
-              dsolQ = dsol[lmsDOF:]
+              LMS += dsol[0:NX]
+              dsolQ = dsol[NX:]
               
               SOLT[sysDex,0] += dsolQ
 
@@ -892,299 +940,242 @@ def runModel(TestName):
               print('Recover full linear solution vector... DONE!')
               
               # Prepare the fields
-              fields, U, W = \
-                     eqs.computePrepareFields(REFS, np.array(SOLT[:,0]), INIT, udex, wdex, pdex, tdex)
+              fields[:] = np.reshape(SOLT[:,0], (OPS,numVar), order='F')
+              state[:] = fields + hydroState
               
               #%% Set the output residual and check
               message = 'Residual 2-norm BEFORE Newton step:'
-              err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              DqDx, DqDz = \
-                     eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
-              rhs = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
-                                                         REFS[15], REFS[9][0], fields, U, W, ebcDex, zeroDex)
-              rhs += eqs.computeRayleighTendency(REFG, fields, zeroDex)
-              RHS = np.reshape(rhs, (physDOF,), order='F')
-              message = 'Residual 2-norm AFTER Newton step:'
-              err = displayResiduals(message, RHS, 0.0, udex, wdex, pdex, tdex)
-              del(rhs)
-              
-              # Check the change in the solution
-              DSOL = np.array(SOLT[:,1])
-              print('Norm of change in solution: ', np.linalg.norm(DSOL))
-       #%% Transient solutions       
-       elif NonLinSolve:
-              print('Starting Nonlinear Transient Solver...')
-                            
-              # Reshape main solution vectors and initialize
-              hydroState = np.reshape(INIT, (OPS, numVar), order='F')
-              
-              # Initialize damping coefficients
-              DCF = (np.zeros((OPS,1)), np.zeros((OPS,1)))
-              
-              # Initialize vertical velocity
-              fields[ubdex,1] = -dWBC
-              
-              # Initialize time constants
-              ti = 0
-              ff = 1
-              thisTime = IT
-              
-              # Initialize netcdf output
-              from netCDF4 import Dataset
-              
-              isRestartFromNC = False
-              if isRestartFromNC:
-                     try:
-                            rdex = 140
-                            fname = 'transientNL0.nc'
-                            m_fid = Dataset(fname, 'r', format="NETCDF4")
-                            fields[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:], (OPS,), order='F')
-                            fields[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:], (OPS,), order='F')
-                            fields[:,2] = np.reshape(m_fid.variables['ln_p'][rdex,:,:], (OPS,), order='F')
-                            fields[:,3] = np.reshape(m_fid.variables['ln_t'][rdex,:,:], (OPS,), order='F')
-                            
-                            DCF[0][:,0] = np.reshape(m_fid.variables['QRES'][rdex,:,:], (OPS,), order='F')
-                            DCF[1][:,0] = np.reshape(m_fid.variables['QMAX'][rdex,:,:], (OPS,), order='F')
-                            
-                            thisTime = m_fid.variables['t'][rdex]
-                     except:
-                            print('Could NOT read restart NC file!', fname)       
-              
-              # Rename output file to the current time for subsequent storage
-              fname = 'transientNL' + str(int(thisTime)) + '.nc'
+              displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
               try:
-                     m_fid = Dataset(fname, 'w', format="NETCDF4")
-              except PermissionError:
-                     print('Deleting corrupt NC file... from failed run.')
-                     import os
-                     os.remove(fname)
-                     m_fid = Dataset(fname, 'w', format="NETCDF4")
+                     rhsVec, DqDx, DqDz = eqs.computeRHS(state, fields, REFS[10][0], REFS[10][1], \
+                                                  PHYS, REFS, REFG, True, False)
+              except:
+                     rhsVec = np.zeros(fields.shape)
                      
-              # Make dimensions
-              taxis = m_fid.createDimension('time', None)
-              xaxis = m_fid.createDimension('xlon', NX+1)
-              zaxis = m_fid.createDimension('zlev', NZ)
-              # Create variables (time and grid)
-              tmvar = m_fid.createVariable('t', 'f8', ('time',))
-              xgvar = m_fid.createVariable('XL', 'f8', ('zlev', 'xlon'))
-              zgvar = m_fid.createVariable('ZTL', 'f8', ('zlev', 'xlon'))
-              # Store variables
-              xgvar[:] = XL
-              zgvar[:] = ZTL
-              # Create variables (background static fields)
-              UVAR = m_fid.createVariable('U', 'f8', ('zlev', 'xlon'))
-              PVAR = m_fid.createVariable('LNP', 'f8', ('zlev', 'xlon'))
-              TVAR = m_fid.createVariable('LNT', 'f8', ('zlev', 'xlon'))
-              # Store variables
-              UVAR[:] = np.reshape(hydroState[:,0], (NZ,NX+1), order='F')
-              PVAR[:] = np.reshape(hydroState[:,2], (NZ,NX+1), order='F')
-              TVAR[:] = np.reshape(hydroState[:,3], (NZ,NX+1), order='F')
-              # Create variables (transient fields)
-              uvar = m_fid.createVariable('u', 'f8', ('time', 'zlev', 'xlon'))
-              wvar = m_fid.createVariable('w', 'f8', ('time', 'zlev', 'xlon'))
-              pvar = m_fid.createVariable('ln_p', 'f8', ('time', 'zlev', 'xlon'))
-              tvar = m_fid.createVariable('ln_t', 'f8', ('time', 'zlev', 'xlon'))
-              # Create variables (field tendencies)
-              duvar = m_fid.createVariable('DuDt', 'f8', ('time', 'zlev', 'xlon'))
-              dwvar = m_fid.createVariable('DwDt', 'f8', ('time', 'zlev', 'xlon'))
-              dpvar = m_fid.createVariable('Dln_pDt', 'f8', ('time', 'zlev', 'xlon'))
-              dtvar = m_fid.createVariable('Dln_tDt', 'f8', ('time', 'zlev', 'xlon'))
-              # Create variables (diffusion coefficients)
-              dvar0 = m_fid.createVariable('QRES', 'f8', ('time', 'zlev', 'xlon'))
-              dvar1 = m_fid.createVariable('QMAX', 'f8', ('time', 'zlev', 'xlon'))
+              message = 'Residual 2-norm AFTER Newton step:'
+              displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
               
-              # Initialize local sound speed and time step
-              #'''
-              UD = fields[:,0] + hydroState[:,0]
-              WD = fields[:,1]
-              VSND = np.sqrt(PHYS[6] * REFS[9][0])
-              VWAV_max = bn.nanmax(VSND)
-              DT0 = DLS / VWAV_max
-              TOPT[0] = DT0
-              print('Initial time step by sound speed: ', str(DT0) + ' (sec)')
+              store2NC(newFname, thisTime, 0, numVar, ZTL, fields, rhsVec, resVec, DCF)
+       
+       # Transient solution
+       else:
+              print('Starting Nonlinear Transient Solver...')
               
-              OTI = int(TOPT[5] / DT0)
-              ITI = int(TOPT[6] / DT0)
-              #'''
-              import computeResidualViscCoeffs as rescf
+              # Compute DX and DZ grid length scales
+              DXV = np.diff(REFS[0])
+              DZV = np.diff(REFS[1])
+              DX_min = 1.0 * np.min(DXV)
+              DZ_min = 1.0 * np.min(DZV)
+              print('Minimum grid lengths:',DX_min,DZ_min)
+              DX_avg = 1.0 * np.mean(DXV)
+              DZ_avg = 1.0 * np.mean(DZV)
+              print('Average grid lengths:',DX_avg,DZ_avg)
+              DX_max = 1.0 * np.max(DXV)
+              DZ_max = 1.0 * np.max(DZV)
+              print('Maximum grid lengths:',DX_max,DZ_max)
+              DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
+              DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
+              print('Uniform grid lengths (m):',DX_wav,DZ_wav)
+                     
+              dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
+              S2 = np.reciprocal(dS2)
+              S = np.sqrt(S2)
+                            
+              # Smallest physical grid spacing in the 2D mesh
+              DX = DX_wav
+              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_wav
+              DLS = min(DX, DZ)
+              
+              # Compute filtering regions by KDtree lookups
+              XMV = np.reshape(XL, (OPS,1), order='F')
+              ZMV = np.reshape(ZTL, (OPS,1), order='F')
+              XZV = np.hstack((XMV, ZMV))
+              
+              # Forward differences
+              DXV1 = np.diff(XL, axis=1, append=np.expand_dims(XL[:,-1],axis=1))
+              DZV1 = np.diff(ZTL, axis=0, append=np.expand_dims(ZTL[-1,:],axis=0))
+              # Backward differences
+              DXV2 = np.diff(np.flip(XL, axis=1), axis=1, append=np.expand_dims(XL[:,0],axis=1))
+              DZV2 = np.diff(np.flip(ZTL, axis=0), axis=0, append=np.expand_dims(ZTL[0,:],axis=0))
+              # Average F-B differences to center at nodes
+              DXV = 0.5 * (DXV1 + np.abs(DXV2))
+              DZV = 0.5 * (DZV1 + np.abs(DZV2))
+              
+              DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
+              
+              # DynSGS filter scale lengths
+              DL1 = 2.0 * DX_max
+              DL2 = 2.0 * DZ_max
+              
+              print('Diffusion regions dimensions (m): ', DL1, DL2)
+              
+              def searchRegions(nn):
+                     node = XZV[nn,:]
+                     #'''
+                     verts = np.array([(node[0] + DL1, node[1] - DL2), \
+                              (node[0] + DL1, node[1] + DL2), \
+                              (node[0] - DL1, node[1] + DL2), \
+                              (node[0] - DL1, node[1] - DL2)])
+                     rectangle = pth.Path(verts)
+                     region = rectangle.contains_points(XZV)
+                     regDex = np.nonzero(region == True)[0].tolist()
+                     
+                     return regDex
+              
+              fltDex = [searchRegions(ii) for ii in np.arange(XZV.shape[0])]
+              
+              def meanRegions(regDex):
+                     # Function mean kernel
+                     mkernel = DA[regDex] / bn.nansum(DA[regDex])                     
+                     
+                     return mkernel
+              
+              fltDms = [meanRegions(regDex) for regDex in fltDex]
+
+              # Manipulate arrays to enable numba acceleration for DynSGS
+              nb_list = nb.typed.List
+              regDex = nb_list(np.array(dex, dtype=np.int32) for dex in fltDex)
+              regDms = nb_list(np.array(dms, dtype=np.float64) for dms in fltDms)
+
+              # Create a container for DynSGS scaling and region parameters
+              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, DA / DIMS[-1], regDex, regDms)
+              
+              # Compute sound speed and initial time step
+              RdT, T_ratio = eqs.computeRdT(PHYS, state, fields, REFS[9][0])
+              TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, state, DLD, isInitial=isInitialStep)
+              print('Initial Sound Speed (m/s): ', VWAV_ref)
+              
+              # Normalization for vertical velocity
+                     
+              # compute function average of initial fields
+              sol_avrg = DLD[-3] @ state
+              # compute state relative to average
+              res_norm = DLD[-3] @ np.abs(state - sol_avrg)
+              
+              # Fix the kinematic norms
+              rw = np.abs(dWBC)
+              res_norm[1] = bn.nanmean(rw[rw > 0.0])
+              
+              print('Residual Norms:')
+              print(res_norm)
+              res_norm = 1.0 / res_norm
+       
+              # Initialize parameters
+              ti = 0; ff = 0
+              print('Time stepper order: ', TOPT[3])
+              print('Initial time step:', str(TOPT[0]))
+              
+              interTime1 = 0.0
+              interTime2 = 0.0
+              
+              # Impose BC's on all states
+              hydroState = eqs.enforceBC_SOL(hydroState, ebcDex, hydroState)
+              state = eqs.enforceBC_SOL(state, ebcDex, hydroState)
+              
               while thisTime <= TOPT[4]:
-                     
-                     if ti == 0:
-                            isFirstStep = True
-                                   
-                            DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[10], REFS[11])
-                            rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, REFS[15], REFS[9][0], \
-                                                                          fields, UD, WD, ebcDex, zeroDex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
-                            error = [np.linalg.norm(rhsVec)]
-                            
-                            prevFields = np.array(fields)
-                            prevRhsVec = np.array(rhsVec)
-                     else:
-                            isFirstStep = False
-                            
-                     # Print out diagnostics every TOPT[5] steps
-                     if ti % OTI == 0:
-                            message = ''
-                            err = displayResiduals(message, np.reshape(rhsVec, (OPS*numVar,), order='F'), thisTime, udex, wdex, pdex, tdex)
-                            error.append(err)
-                     
-                     if ti % ITI == 0:
-                            # Store current time
-                            tmvar[ff-1] = thisTime
-                            # Check the fields or tendencies
-                            for pp in range(numVar):
-                                   q = np.reshape(fields[:,pp], (NZ, NX+1), order='F')
-                                   dqdt = np.reshape(rhsVec[:,pp], (NZ, NX+1), order='F')
-                                   
-                                   if pp == 0:
-                                          uvar[ff-1,:,:] = q
-                                          duvar[ff-1,:,:] = dqdt
-                                   elif pp == 1:
-                                          wvar[ff-1,:,:] = q
-                                          dwvar[ff-1,:,:] = dqdt
-                                   elif pp == 2:
-                                          pvar[ff-1,:,:] = q
-                                          dpvar[ff-1,:,:] = dqdt
-                                   else:
-                                          tvar[ff-1,:,:] = q
-                                          dtvar[ff-1,:,:] = dqdt
-                                          
-                            dvar0[ff-1,:,:] = np.reshape(DCF[0][:,0], (NZ, NX+1), order='F')
-                            dvar1[ff-1,:,:] = np.reshape(DCF[1][:,0], (NZ, NX+1), order='F')
-                                          
-                            if makePlots:
-                                   makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, NX, NZ, numVar)
-                                   
-                            ff += 1
                             
                      # Compute the solution within a time step
-                     try:
-                            # Compute a time step
-                            fields, thisTime = tint.computeTimeIntegrationNL2(PHYS, REFS, REFG, \
-                                                                    DX2, DZ2, DXZ,\
-                                                                    TOPT, prevFields, hydroState, \
-                                                                    zeroDex, ebcDex, \
-                                                                    ResDiff, DCF, thisTime, isFirstStep)
+                     try:   
+                            state, dfields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
+                                                                    DLD, TOPT, state, hydroState, rhsVec, dfields, \
+                                                                    DCF.shape, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             
-                            # Compute flow speed
-                            UD = fields[:,0] + hydroState[:,0]
-                            WD = fields[:,1]
-                            vel = np.stack((UD, WD),axis=1)
-                            VFLW = np.linalg.norm(vel, axis=1)
-                            
-                            # Compute the RHS at the new time level
-                            DqDx, DqDz = \
-                                   eqs.computeFieldDerivatives(fields, REFS[13][0], REFS[13][1])
-                            rhsVec = eqs.computeEulerEquationsLogPLogT_NL(PHYS, DqDx, DqDz, REFG, \
-                                                                       REFS[15], REFS[9][0], fields, UD, WD, ebcDex, zeroDex)
-                            rhsVec += eqs.computeRayleighTendency(REFG, fields, zeroDex)
-                            
-                            # Compute residual
-                            dqdt = (1.0 / TOPT[0]) * (fields - prevFields)
-                            resVec = dqdt - 0.5 * (rhsVec + prevRhsVec)
-                            
-                            # Compute DynSGS or Flow Dependent diffusion coefficients
-                            QM = bn.nanmax(np.abs(fields - bn.nanmean(fields)), axis=0)
-                            DCF = rescf.computeResidualViscCoeffs(resVec, QM, VFLW, DX, DZ, DXD, DZD, DX2, DZ2)
-                            
-                            # Compute sound speed
-                            T_ratio = np.expm1(PHYS[4] * fields[:,2] + fields[:,3])
-                            RdT = REFS[9][0] * (1.0 + T_ratio)
-                            VSND = np.sqrt(PHYS[6] * RdT)
-                            
-                            # Compute new time step based on updated sound speed
-                            DTN = DLS / bn.nanmax(VSND)
-                            
-                            # Store the new solution
-                            prevFields = fields
-                            prevRhsVec = rhsVec
-                            
-                            # Update the local time step
-                            TOPT[0] = DTN
-                     except:
+                            '''
+                            # Update normalizations for vertical velocity
+                            state = np.copy(fields)
+                            state[:,2] += hydroState[:,2]
+                            sol_norm = bn.nanmax(np.abs(state), axis=0)
+                            # compute function average of initial fields
+                            sol_avrg = DLD[-3] @ state
+                            # compute state relative to average
+                            res_norm = DLD[-3] @ np.abs(state - sol_avrg)
+                            res_norm = 1.0 / res_norm
+                            '''
+                     except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
-                            m_fid.close() 
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, resVec, NX, NZ, numVar)
+                            
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, state, rhsVec, resVec, DCF)
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, state, rhsVec, resVec, DCF[0], DCF[1], NX, NZ, numVar)
+                            import traceback
+                            traceback.print_exc()
                             sys.exit(2)
-                     #'''
+                            
+                     # Print out diagnostics every TOPT[5] seconds
+                     if interTime1 >= TOPT[5] or ti == 0:
+                            
+                            #print(rhsVec[ebcDex[3],2])
+                            #print(fields[ebcDex[3],2])
+                            
+                            if isInitialStep:
+                                   isInitialStep = False
+                            
+                            message = ''
+                            displayResiduals(message, resVec, thisTime, TOPT[0], OPS)
+                                   
+                            # Store in the NC file
+                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, DCF)
+                                                        
+                            ff += 1
+                            interTime1 = 0.0
+                     
+                     # Make a diagnostic plot                            
+                     if interTime2 >= TOPT[6] and makePlots:
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
+                            interTime2 = 0.0
+                     
                      ti += 1
-                     
-              # Close the output data file
-              m_fid.close()
-                     
-              # Reshape back to a column vector after time loop
-              SOLT[:,0] = np.reshape(fields, (OPS*numVar, ), order='F')
-              RHS = np.reshape(rhsVec, (OPS*numVar, ), order='F')
+                     thisTime += TOPT[0]
+                     interTime1 += TOPT[0]
+                     interTime2 += TOPT[0]
               
-              # Copy state instance 0 to 1
-              SOLT[:,1] = np.array(SOLT[:,0])
-              DSOL = SOLT[:,1] - SOLT[:,0]
        #%%       
        endt = time.time()
        print('Solve the system: DONE!')
        print('Elapsed time: ', endt - start)
-       
-       #% Make a database for restart
-       if toRestart:
-              rdb = shelve.open(restart_file, flag='n')
-              rdb['DSOL'] = DSOL
-              rdb['SOLT'] = SOLT
-              rdb['LMS'] = LMS
-              rdb['DCF'] = DCF
-              rdb['NX'] = NX
-              rdb['NZ'] = NZ
-              rdb['ET'] = TOPT[4]
-              rdb['PHYS'] = PHYS
-              rdb['DIMS'] = DIMS
-              if StaticSolve:
-                     rdb['REFS'] = REFS
-              rdb.close()
-       
+              
        #%% Recover the solution (or check the residual)
-       uxz = np.reshape(SOLT[udex,0], (NZ,NX+1), order='F') 
-       wxz = np.reshape(SOLT[wdex,0], (NZ,NX+1), order='F')
-       pxz = np.reshape(SOLT[pdex,0], (NZ,NX+1), order='F') 
-       txz = np.reshape(SOLT[tdex,0], (NZ,NX+1), order='F')
+       GS = ZTL.shape
+       uxz = np.reshape(fields[:,0], GS, order='F') 
+       wxz = np.reshape(fields[:,1], GS, order='F')
+       pxz = np.reshape(fields[:,2], GS, order='F') 
+       txz = np.reshape(fields[:,3], GS, order='F')
        
        #%% Make some plots for static or transient solutions
-       if makePlots:
-              if StaticSolve:
-                     fig = plt.figure(figsize=(12.0, 6.0))
-                     # 1 X 3 subplot of W for linear, nonlinear, and difference
-                     
-                     plt.subplot(2,2,1)
-                     ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, uxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-                     fig.colorbar(ccheck)
-                     plt.xlim(-30.0, 50.0)
-                     plt.ylim(0.0, 1.0E-3*DIMS[2])
-                     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-                     plt.title('Change U - (m/s)')
-                     
-                     plt.subplot(2,2,3)
-                     ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, wxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
-                     fig.colorbar(ccheck)
-                     plt.xlim(-30.0, 50.0)
-                     plt.ylim(0.0, 1.0E-3*DIMS[2])
-                     plt.title('Change W - (m/s)')
-                     
-                     flowAngle = np.arctan(wxz[0,:] * np.reciprocal(INIT[uBotDex] + uxz[0,:]))
-                     slopeAngle = np.arctan(dHdX)
-                     
-                     plt.subplot(2,2,2)
-                     plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
-                     plt.xlim(-20.0, 20.0)
-                     plt.title('Flow vector angle and terrain angle')
-                     
-                     plt.subplot(2,2,4)
-                     plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
-                     plt.title('Boundary Constraint |Delta| - (m/s)')
-                     
-                     plt.tight_layout()
-                     #plt.savefig('IterDelta_BoundaryCondition.png')
-                     plt.show()
-                     
+       if makePlots and StaticSolve:
+              fig = plt.figure(figsize=(12.0, 6.0))
+              # 1 X 3 subplot of W for linear, nonlinear, and difference
+              
+              plt.subplot(2,2,1)
+              ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, uxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              fig.colorbar(ccheck)
+              plt.xlim(-30.0, 50.0)
+              plt.ylim(0.0, 1.0E-3*DIMS[2])
+              plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
+              plt.title('Change U - (m/s)')
+              
+              plt.subplot(2,2,3)
+              ccheck = plt.contourf(1.0E-3 * XL, 1.0E-3 * ZTL, wxz, 101, cmap=cm.seismic)#, vmin=0.0, vmax=20.0)
+              fig.colorbar(ccheck)
+              plt.xlim(-30.0, 50.0)
+              plt.ylim(0.0, 1.0E-3*DIMS[2])
+              plt.title('Change W - (m/s)')
+              
+              flowAngle = np.arctan(wxz[0,:] * np.reciprocal(hydroState[ebcDex[2],0] + uxz[0,:]))
+              slopeAngle = np.arctan(dHdX)
+              
+              plt.subplot(2,2,2)
+              plt.plot(1.0E-3 * REFS[0], flowAngle, 'b-', 1.0E-3 * REFS[0], slopeAngle, 'k--')
+              plt.xlim(-20.0, 20.0)
+              plt.title('Flow vector angle and terrain angle')
+              
+              plt.subplot(2,2,4)
+              plt.plot(1.0E-3 * REFS[0], np.abs(flowAngle - slopeAngle), 'k')              
+              plt.title('Boundary Constraint |Delta| - (m/s)')
+              
+              plt.tight_layout()
+              #plt.savefig('IterDelta_BoundaryCondition.png')
+              plt.show()
+              
               fig = plt.figure(figsize=(12.0, 6.0))
               # 2 X 2 subplot with all fields at the final time
               for pp in range(4):
@@ -1209,7 +1200,7 @@ def runModel(TestName):
                             
                      fig.colorbar(ccheck, format='%.3E')
                      plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-                     plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                     plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
               
               plt.tight_layout()
               #plt.savefig('SolutionFields.png')
@@ -1218,33 +1209,25 @@ def runModel(TestName):
               fig = plt.figure(figsize=(12.0, 6.0))
               for pp in range(4):
                      plt.subplot(2,2,pp+1)
-                     if pp == 0:
-                            qdex = udex
-                     elif pp == 1:
-                            qdex = wdex
-                     elif pp == 2:
-                            qdex = pdex
-                     else:
-                            qdex = tdex
-                     dqdt = np.reshape(RHS[qdex], (NZ, NX+1), order='F')
+                     dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
                      ccheck = plt.contourf(1.0E-3*XL, 1.0E-3*ZTL, dqdt, 201, cmap=cm.seismic)
                      plt.colorbar(ccheck, format='%+.3E')
                      plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)
-                     plt.grid(b=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
+                     plt.grid(visible=None, which='major', axis='both', color='k', linestyle='--', linewidth=0.5)
                      plt.tight_layout()
               plt.show()
               
               # Check W at the boundaries...
-              dwdt = np.reshape(RHS[wdex], (NZ, NX+1), order='F')
-              return (XL, ZTL, dwdt)
+              return (XL, ZTL, rhsVec)
        
 if __name__ == '__main__':
        
        #TestName = 'ClassicalSchar01'
        #TestName = 'ClassicalScharIter'
-       #TestName = 'SmoothStratScharIter'
-       #TestName = 'DiscreteStratScharIter'
-       TestName = 'CustomTest'
+       #TestName = 'UniformStratStatic'
+       #TestName = 'DiscreteStratStatic'
+       TestName = 'UniformTestTransient'
+       #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

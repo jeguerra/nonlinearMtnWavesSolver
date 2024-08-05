@@ -5,7 +5,7 @@ Created on Thu Jan 30 08:35:16 2020
 
 @author: TempestGuerra
 """
-import numpy as np
+import math as mt
 
 class TestCase:
        
@@ -29,69 +29,91 @@ class TestCase:
        def __init__(self, TestName):
               if TestName == 'ClassicalSchar01':
                      # Reproduction of the Classical Schar case (one solve)
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': False, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 86, 70.0, 22.0, 280.0, 
-                                      7000.0, 10000.0, 1.0, \
-                                      250.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
+                     self.setUserData(184, 86, 70.0, 22.0, 280.0, 
+                                      7000.0, 10000.0, 1.0E-2, \
+                                      250.0, 0.01, 0.0065, 0.001, 2, 1.2E+4, 'uwpt_static')
                      
               elif TestName == 'ClassicalScharIter':
                      # Newton iteration with Classical Schar as initial guess
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': True, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 86, 70.0, 22.0, 280.0, \
-                                      7000.0, 10000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
+                     self.setUserData(184, 86, 70.0, 22.0, 280.0, \
+                                      7000.0, 10000.0, 1.0E-2, \
+                                      25.0, 0.01, 0.0065, 0.001, 2, 1.2E+4, 'uwpt_static')
                      
-              elif TestName == 'SmoothStratScharIter':
+              elif TestName == 'UniformStratStatic':
                      # Newton iteration with smooth stratification
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True,\
-                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True,\
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
                             
-                     self.setUserData(191, 86, 75.0, 32.0, 300.0, \
-                                      6000.0, 10000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static') 
+                     self.setUserData(192, 96, 75.0, 32.0, 300.0, \
+                                      7000.0, 10000.0, 1.0E-2, \
+                                      25.0, 0.01, 0.0065, 0.001, 3, 1.2E+4, 'uwpt_static') 
                             
-              elif TestName == 'DiscreteStratScharIter':
+              elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
-                     self.solType = {'StaticSolve': True, 'NLTranSolve': False, 'HermChebGrid': True, \
-                                'DynSGS': False, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': True, 'NewtonLin': True, \
-                                'Smooth3Layer': False, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
-                            
-                     self.setUserData(191, 148, 75.0, 32.0, 300.0, \
-                                      7000.0, 15000.0, 1.0, \
-                                      25.0, 0.01, 0.0065, 0.003, 2, 1.2E+4, 'uwpt_static')
-              
-              elif TestName == "CustomTest":
-                     # Used for... testing purposes =)
-                     self.solType = {'StaticSolve': False, 'NLTranSolve': True, 'HermChebGrid': True, \
-                                'DynSGS': True, 'SolveFull': False, 'SolveSchur': True, \
-                                'ToRestart': True, 'IsRestart': False, 'NewtonLin': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
+                                'VerticalSpectral': True, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                            
+                     self.setUserData(192, 96, 75.0, 32.0, 300.0, \
+                                      7000.0, 10000.0, 1.0E-2, \
+                                      25.0, 0.01, 0.0065, 0.001, 3, 1.2E+4, 'uwpt_static')
+              
+              elif TestName == "UniformTestTransient":
+                     # Wave breaking in uniform stratification
+                     self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
+                                'VerticalSpectral': False, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
+                                'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
+                            
+                     # HIGH RESOLUTION
+                     #self.setUserData(1796, 212, 140.0, 33.0, 300.0, \
+                     #                 8000.0, 20000.0, 1.0E-1,
+                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     # LOW RESOLUTION
+                     self.setUserData(1260, 166, 140.0, 33.0, 300.0, \
+                                      8000.0, 20000.0, 1.0E-1,
+                                      6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
+              
+              elif TestName == "3LayerTestTransient":
+                     # Wave breaking in 3 layer stratified atmosphere
+                     self.solType = {'StaticSolve': False, 'HermFuncGrid': False, \
+                                'VerticalSpectral': False, 'SolveSchur': True, \
+                                'IsRestart': False, 'NewtonLin': True, \
+                                'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
+                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(583, 100, 150, 42.0, 300.0, \
-                                      10000.0, 30000.0, 5.0, \
-                                      2000.0, 0.01, 0.0065, 0.003, 3, 1.25E+4, 'uwpt_transient')
-                     
+                     self.setUserData(1680, 266, 140.0, 40.0, 300.0, \
+                                      10000.0, 20000.0, 1.0E-1,
+                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     #self.setUserData(1260, 200, 140.0, 40.0, 300.0, \
+                     #                 10000.0, 20000.0, 1.0E-1,
+                     #                 6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
+              
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
                      
-       def setUserData(self, NX, NZ, XF, ZF, T0, depth, width, rlf, h0, NBVF, GAMT, GAMS, Mountain, kC, latBC):
+       def setUserData(self, NX, NZ, XF, ZF, T0, depth, width, mu, h0, NBVF, GAMT, GAMS, Mountain, kC, latBC):
               
               # Set physical constants (dry air)
               gc = 9.80601
@@ -105,31 +127,31 @@ class TestCase:
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
-              L1 = -L2
+              if self.solType['StaticSolve']:
+                     L1 = -1.0 * L2
+              else:
+                     L1 = -0.8 * L2
               ZH = 1.0E+3 * ZF # In km
-              OPS = (NX + 1) * NZ
+              AD = ZH * (L2 - L1) # domain total area
               iU = 0
               iW = 1
               iP = 2
               iT = 3
               self.varDex = [iU, iW, iP, iT]
-              self.DIMS = (L1, L2, ZH, NX, NZ, OPS)
+              self.DIMS = [L1, L2, ZH, NX, NZ, AD]
               
               # Background temperature profile
               self.Z_in = [0.0, 1.1E4, 2.5E4, ZH]
-              #GAMS = 0.003 # Lapse rate in the stratosphere
-              #GAMT = 0.0065 # Lapse rate in the troposphere
               TTP = T0 - GAMT * (self.Z_in[1] - self.Z_in[0])
               TH = TTP + GAMS * (self.Z_in[3] - self.Z_in[2])
               self.T_in = (T0, TTP, TTP, TH)
               
-              # Background wind profil e
-              self.JETOPS = (10.0, 16.822, 1.386, 15.0)
+              # Background wind profile (10 m/s max jet)
+              self.JETOPS = (10.0, 3 * 16.822, 1.386, 15.0)
               
               # Set the Rayleigh options
               applyTop = True
               applyLateral = True
-              mu = rlf * 1.0E-2
               self.RLOPT = (depth, width, applyTop, applyLateral, mu, latBC)
               
               # Set the terrain options
@@ -141,19 +163,29 @@ class TestCase:
               EXPPOL = 4 # Even exponential and even polynomial product
               INFILE = 5 # Data from a file (equally spaced points)
               '''
-              aC = 5000.0
-              lC = 4000.0
+              if Mountain == 2:
+                     aC = 5000.0
+                     lC = 4000.0
+              elif Mountain == 3:
+                     aC = 5000.0
+                     lC = 2.0 * mt.pi * 1.0E3
+                     #aC = 500.0
+                     #lC = 2.0 * mt.pi * 2.0E2
+              else:
+                     aC = 5000.0
+                     lC = 4000.0
+                     
               self.HOPT = [h0, aC, lC, kC, withWindow, Mountain]
               
               #% Transient solve parameters
-              DT = 0.05 # seconds
-              HR = 2.0 # hours
-              rampTime = 0.0  # 10 minute to ramp up U_bar, DUDZ_bar, and w_BC
-              intMethodOrder = 3
+              DT = 0.01 # seconds
+              HR = 6.0 #/ 3600.0 # hours              
+              DTF = 0.5 # scale time step              
+              intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 20.0 # Time for diagnostic output
-              ITI = 20.0 # Time for image output
-              RTI = 1 # Stride for residual visc update
-              self.TOPT = [DT, HR, rampTime, intMethodOrder, ET, OTI, ITI, RTI]
+              OTI = 10.0 # Time for diagnostic output
+              ITI = 10.0 # Time for image output
+              
+              self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI]
        

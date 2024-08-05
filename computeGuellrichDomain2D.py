@@ -39,35 +39,31 @@ def computeTerrainDecayFunctions(xi, ang, StaticSolve):
        
        return dzdh, d_dzdh_dxi
 
-def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
+def computeGuellrichDomain2D(DIMS, x, z, zRay, hx, dhdx, StaticSolve):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
-       NX = DIMS[3] + 1
-       NZ = DIMS[4]
-       
-       # input REFS = [x, z, HFM, whf, CPM, wcp]
-       x = REFS[0]
-       z = REFS[1]
+       NX = x.shape[0]
+       NZ = z.shape[0]
        
        # Compute the flat XZ mesh (computational domain)
-       HTZL, dummy = np.meshgrid(hx / ZH,z)
+       HTZL, dummy = np.meshgrid(hx, z)
        XL, ZL = np.meshgrid(x,z)
+       
+       # Make the global array of terrain height and slope features
+       ZTL = np.zeros((NZ,NX))
+       DZT = np.zeros((NZ,NX))
        
        # High Order Improved Guellrich coordinate 3 parameter function
        xi = 1.0 / ZH * ZL
        ang = 1.0 / 3.0 * mt.pi * xi
        dzdh, d_dzdh_dxi = computeTerrainDecayFunctions(xi, ang, StaticSolve)
        
-       dxidz = 1.0 + (HTZL * d_dzdh_dxi)
-       sigma = np.reciprocal(dxidz)
-       
-       # Make the global array of terrain height and slope features
-       ZTL = np.zeros((NZ,NX))
-       DZT = np.zeros((NZ,NX))
-       
        for rr in range(NZ):
               ZTL[rr,:] = (dzdh[rr,0] * hx) + ZL[rr,:]
               DZT[rr,:] = dzdh[rr,0] * dhdx
+       
+       dxidz = (1.0 + (HTZL / ZH * d_dzdh_dxi))
+       sigma = np.reciprocal(dxidz)
               
        #plt.plot(z, dzdh[:,0])
        
@@ -78,25 +74,13 @@ def computeGuellrichDomain2D(DIMS, REFS, zRay, hx, dhdx, StaticSolve):
        
        ZRL = (dzdh * hx) + zRay
        
-       # Compute the local grid lengths at each node
-       DXM = np.zeros((NZ,NX))
-       DZM = np.zeros((NZ,NX))
-       
-       for ii in range(NZ):
-              xdiff = np.diff(XL[ii,:])
-              DXM[ii,:] = np.concatenate((np.expand_dims(xdiff[0],0), xdiff)) 
-       
-       for jj in range(NX):
-              zdiff = np.diff(ZTL[:,jj])
-              DZM[:,jj] = np.concatenate((np.expand_dims(zdiff[0],0), zdiff)) 
-       
-       return XL, ZTL, DZT, sigma, ZRL, DXM, DZM
+       return XL, ZTL, DZT, sigma, ZRL
 
 def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
        # Get data from DIMS and REFS
        ZH = DIMS[2]
        NX = DIMS[3] + 1
-       NZ = DIMS[4]
+       NZ = DIMS[4] + 1
        
        # Get REFS data
        x = REFS[0]
@@ -115,7 +99,7 @@ def computeStretchedDomain2D(DIMS, REFS, zRay, hx, dhdx):
               thisZH = ZH - hx[cc]
               sigma[:,cc] *= (ZH / thisZH)
               ZTL[:,cc] = ZL[:,cc] * thisZH / ZH
-              ZTL[:,cc] += hx[cc]
+              ZTL[:,cc] += (ZH - ZTL[-1,cc])
        
        # Compute the terrain derivatives       
        for rr in range(1,NZ):

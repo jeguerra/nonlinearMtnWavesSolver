@@ -42,3 +42,20 @@ SchurOps
 *.gz
 
 *.nc
+
+animations/
+
+*.dump
+
+*.gif
+
+*.jpg
+
+*.txt
+
+python results/
+
+*.mp4
+
+*.py~
+.DS_Store
