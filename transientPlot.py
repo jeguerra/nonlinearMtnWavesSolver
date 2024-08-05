@@ -24,7 +24,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
-fname = 'Uniform_200m_CS53_SSP104.nc'
+fname = 'Uniform_200m_CS55_SSP104.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]

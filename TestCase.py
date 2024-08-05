@@ -180,7 +180,7 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.01 # seconds
               HR = 6.0 #/ 3600.0 # hours              
-              DTF = 0.75 # scale time step              
+              DTF = 0.5 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

@@ -638,7 +638,7 @@ def runModel(TestName):
               advtOps = (PPXMA,DDZMS_HO)
        
        #PPXMD = DDXMS_LO - DZTM @ DDZMS_HO
-       diffOps = (DDXMS_LO,DDZMS_LO)
+       diffOps = (DDXMS_HO,DDZMS_HO)
        
        # Update the REFS collection
        REFS.append(DDX_1D) # index 2
