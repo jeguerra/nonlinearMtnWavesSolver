@@ -33,7 +33,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': False, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
-                                'UnifWind': True, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': True, 'LinShear': False, 'UpdateSGS': False}
                             
                      self.setUserData(184, 86, 70.0, 22.0, 280.0, 
                                       7000.0, 10000.0, 1.0E-2, \
@@ -45,7 +45,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': True, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': True, 'LinShear': False, 'UpdateSGS': False}
                             
                      self.setUserData(184, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0E-2, \
@@ -57,7 +57,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
                             
                      self.setUserData(192, 96, 75.0, 32.0, 300.0, \
                                       7000.0, 10000.0, 1.0E-2, \
@@ -69,7 +69,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': True}
+                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
                             
                      self.setUserData(192, 96, 75.0, 32.0, 300.0, \
                                       7000.0, 10000.0, 1.0E-2, \
@@ -81,15 +81,15 @@ class TestCase:
                                 'VerticalSpectral': False, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
+                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
                             
                      # HIGH RESOLUTION
-                     #self.setUserData(1796, 212, 140.0, 33.0, 300.0, \
+                     #self.setUserData(1796, 212, 120.0, 33.0, 300.0, \
                      #                 8000.0, 20000.0, 1.0E-1,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     self.setUserData(1260, 166, 140.0, 33.0, 300.0, \
+                     self.setUserData(1260, 166, 120.0, 33.0, 300.0, \
                                       8000.0, 20000.0, 1.0E-1,
                                       6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
@@ -99,16 +99,16 @@ class TestCase:
                                 'VerticalSpectral': False, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'MakePlots': False}
+                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
-                     self.setUserData(1680, 266, 140.0, 40.0, 300.0, \
-                                      10000.0, 20000.0, 1.0E-1,
-                                      6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
-                            
-                     #self.setUserData(1260, 200, 140.0, 40.0, 300.0, \
+                     #self.setUserData(1680, 266, 120.0, 40.0, 300.0, \
                      #                 10000.0, 20000.0, 1.0E-1,
-                     #                 6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
+                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                            
+                     self.setUserData(1260, 200, 120.0, 40.0, 300.0, \
+                                      10000.0, 20000.0, 1.0E-1,
+                                      6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -180,12 +180,12 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.01 # seconds
               HR = 6.0 #/ 3600.0 # hours              
-              DTF = 0.5 # scale time step              
+              DTF = 0.75 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 10.0 # Time for diagnostic output
-              ITI = 10.0 # Time for image output
+              OTI = 10.0 # Time for diagnostic output (sec)
+              ITI = 60.0 # Time for re-normalization (sec)
               
               self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI]
        

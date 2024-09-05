@@ -17,11 +17,11 @@ ALSQR Multigrid. Solves transient problem with Ketchenson SSPRK93 low storage me
 """
 import os
 
-os.environ["OMP_NUM_THREADS"] = "12" # export OMP_NUM_THREADS=4
-os.environ["OPENBLAS_NUM_THREADS"] = "12" # export OPENBLAS_NUM_THREADS=4 
-os.environ["MKL_NUM_THREADS"] = "12" # export MKL_NUM_THREADS=6
-os.environ["VECLIB_MAXIMUM_THREADS"] = "8" # export VECLIB_MAXIMUM_THREADS=4
-os.environ["NUMEXPR_NUM_THREADS"] = "8" # export NUMEXPR_NUM_THREADS=6
+os.environ["OMP_NUM_THREADS"] = "14" # export OMP_NUM_THREADS=4
+os.environ["OPENBLAS_NUM_THREADS"] = "14" # export OPENBLAS_NUM_THREADS=4 
+os.environ["MKL_NUM_THREADS"] = "14" # export MKL_NUM_THREADS=6
+os.environ["VECLIB_MAXIMUM_THREADS"] = "10" # export VECLIB_MAXIMUM_THREADS=4
+os.environ["NUMEXPR_NUM_THREADS"] = "10" # export NUMEXPR_NUM_THREADS=6
 
 import sys
 import time
@@ -416,7 +416,7 @@ def runModel(TestName):
        
        # Set Newton solve initial and restarting parameters
        isRestart = thisTest.solType['IsRestart'] # Initializes from a restart database
-       makePlots = thisTest.solType['MakePlots'] # Switch for diagnostic plotting
+       updateSGS = thisTest.solType['UpdateSGS'] # Switch for diagnostic plotting
        
        if isRestart:
               rdex = -1
@@ -542,18 +542,19 @@ def runModel(TestName):
               DDZ_1D, DDX4_QS = derv.computeQuinticSplineDerivativeMatrix(REFS[1], True, False, DDZ_BC)
        
        # Derivative operators
-       useSplineDerivatives = True
+       useAverageDerivatives = False
+       DDXL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
+       DDZL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
+       DDXH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDXL)
+       DDZH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZL)
        
-       if useSplineDerivatives:
-              DDXL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
-              DDZL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
-              DDXH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDXL)
-              DDZH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZL)
-       else:
-              DDXL = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 4)
-              DDZL = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 4)
-              DDXH = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
-              DDZH = derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+       if useAverageDerivatives:
+              print('Average spline and compact FD derivatives.')
+              DDXL += derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 6)
+              DDZL += derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 6)
+              DDXH += derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[0], 8)
+              DDZH += derv.computeCompactFiniteDiffDerivativeMatrix1(REFS[1], 8)
+              DDXL *= 0.5; DDZL *= 0.5; DDXH *= 0.5; DDZH *= 0.5
        
        # Derivative operators from global spectral methods
        DDXMS1, DDZMS1 = devop.computePartialDerivativesXZ(DIMS, sigma, DDX_1D, DDZ_1D)
@@ -622,11 +623,11 @@ def runModel(TestName):
        # Make a collection for background field derivatives
        REFG = [RLM, GML, DLTDZ, DQDZ, RLOPT[4]]
                      
-       #%% PREPARE DERIVATIVE OPERATORS              
+       #%% PREPARE DERIVATIVE OPERATORS
        if HermFunc:
               PPXMA = DDXMS1
        else:
-              PPXMA = DDXMS_HO# - DZTM @ DDZMS_HO
+              PPXMA = DDXMS_LO
               
        if verticalChebGrid or verticalLegdGrid:
               #advtOps = (REFG[0][1].dot(PPXMD),
@@ -635,9 +636,8 @@ def runModel(TestName):
        else:
               #advtOps = (REFG[0][1].dot(PPXMD),
               #           REFG[0][2].dot(DDZMS_HO))
-              advtOps = (PPXMA,DDZMS_HO)
+              advtOps = (PPXMA,DDZMS_LO)
        
-       #PPXMD = DDXMS_LO - DZTM @ DDZMS_HO
        diffOps = (DDXMS_HO,DDZMS_HO)
        
        # Update the REFS collection
@@ -1065,32 +1065,33 @@ def runModel(TestName):
               print('Time stepper order: ', TOPT[3])
               print('Initial time step:', str(TOPT[0]))
               
-              interTime1 = 0.0
-              interTime2 = 0.0
+              # Output time global accumulators
+              diagTime = 0.0
+              resnTime = 0.0
               
               # Impose BC's on all states
               hydroState = eqs.enforceBC_SOL(hydroState, ebcDex, hydroState)
               state = eqs.enforceBC_SOL(state, ebcDex, hydroState)
               
+              integrateOnGPU = False
+              if integrateOnGPU:
+                     import cupy as cu
+                     stateG = cu.array(state)
+                     dfieldsG = cu.array(dfields)
+                     rhsVecG = cu.array(rhsVec)
+                     DCFG = cu.array(DCF)
+                     thisDt = cu.array(TOPT[0])
+              else:
+                     thisDt = TOPT[0]
+              
               while thisTime <= TOPT[4]:
                             
                      # Compute the solution within a time step
                      try:   
-                            state, dfields, rhsVec, resVec, DCF, TOPT[0] = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
-                                                                    DLD, TOPT, state, hydroState, rhsVec, dfields, \
+                            state, dfields, rhsVec, resVec, DCF, thisDt = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
+                                                                    DLD, thisDt, TOPT, state, hydroState, rhsVec, dfields, \
                                                                     DCF.shape, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             
-                            '''
-                            # Update normalizations for vertical velocity
-                            state = np.copy(fields)
-                            state[:,2] += hydroState[:,2]
-                            sol_norm = bn.nanmax(np.abs(state), axis=0)
-                            # compute function average of initial fields
-                            sol_avrg = DLD[-3] @ state
-                            # compute state relative to average
-                            res_norm = DLD[-3] @ np.abs(state - sol_avrg)
-                            res_norm = 1.0 / res_norm
-                            '''
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             
@@ -1100,33 +1101,37 @@ def runModel(TestName):
                             traceback.print_exc()
                             sys.exit(2)
                             
-                     # Print out diagnostics every TOPT[5] seconds
-                     if interTime1 >= TOPT[5] or ti == 0:
+                     # Update DynSGS Normalizations                            
+                     if resnTime >= TOPT[6] and updateSGS:
+                            # compute function average of initial fields
+                            sol_avrg = DLD[-3] @ state
+                            # compute state relative to average
+                            res_norm = DLD[-3] @ np.abs(state - sol_avrg)
                             
-                            #print(rhsVec[ebcDex[3],2])
-                            #print(fields[ebcDex[3],2])
+                            print('Updated Residual Norms:')
+                            print(res_norm)
+                            res_norm = 1.0 / res_norm
+                            resnTime = 0.0
+                            
+                     # Print out diagnostics every TOPT[5] seconds
+                     if diagTime >= TOPT[5] or ti == 0:
                             
                             if isInitialStep:
                                    isInitialStep = False
                             
                             message = ''
-                            displayResiduals(message, resVec, thisTime, TOPT[0], OPS)
+                            displayResiduals(message, resVec, thisTime, thisDt, OPS)
                                    
                             # Store in the NC file
                             store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, DCF)
                                                         
                             ff += 1
-                            interTime1 = 0.0
-                     
-                     # Make a diagnostic plot                            
-                     if interTime2 >= TOPT[6] and makePlots:
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhsVec, resVec, DCF, DCF, NX, NZ, numVar)
-                            interTime2 = 0.0
+                            diagTime = 0.0
                      
                      ti += 1
-                     thisTime += TOPT[0]
-                     interTime1 += TOPT[0]
-                     interTime2 += TOPT[0]
+                     thisTime += thisDt
+                     diagTime += thisDt
+                     resnTime += thisDt
               
        #%%       
        endt = time.time()
@@ -1141,7 +1146,7 @@ def runModel(TestName):
        txz = np.reshape(fields[:,3], GS, order='F')
        
        #%% Make some plots for static or transient solutions
-       if makePlots and StaticSolve:
+       if StaticSolve:
               fig = plt.figure(figsize=(12.0, 6.0))
               # 1 X 3 subplot of W for linear, nonlinear, and difference
               

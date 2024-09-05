@@ -24,7 +24,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
-fname = 'Uniform_200m_CS55_SSP104.nc'
+fname = '3Layer_200m_CS55.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 times = m_fid.variables['time'][:NF]
@@ -59,8 +59,8 @@ else:
        
 # Get the upper and lower bounds for TH
 clim1 = 300.0
-clim2 = 380.0 # UNIFORM STRATIFICATION
-#clim2 = 510.0 # 3LAYER STRATIFICATION
+#clim2 = 380.0 # UNIFORM STRATIFICATION
+clim2 = 510.0 # 3LAYER STRATIFICATION
 cline = np.linspace(clim1, clim2, num=40)
 print('Plot bounds: ', clim1, clim2)
 

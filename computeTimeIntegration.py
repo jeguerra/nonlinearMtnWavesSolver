@@ -38,7 +38,7 @@ def plotRHS(x, rhs, ebcDex, label):
        
        return
        
-def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
+def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                              sol0, init0, rhs0, dsol0, CRES_SIZE, ebcDex, \
                              RSBops, VWAV_ref, res_norm, isInitialStep):
        
@@ -47,7 +47,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        CRES = 0.0
        
        OPS = sol0.shape[0]
-       DT = TOPT[0]
        order = TOPT[3]
        DQDZ = REFG[3]
        
@@ -60,10 +59,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
        #GMLZ = REFG[0][2]
        
        S = DLD[5]
-       ldex = ebcDex[0]
-       rdex = ebcDex[1]
        bdex = ebcDex[2]
-       tdex = ebcDex[3]
 
        # Stacked derivative operators
        DD1 = REFS[13] # First derivatives for advection/dynamics
@@ -98,11 +94,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, TOPT, \
                                                                           DLD, isInitial=isInitialStep)
                      
                      sbnd = 0.5 * DT * VWAV_ref**2                     
-                     res = 0.5 * ((rhsDyn - rhs0) + (dsol0 / TOPT[0] - 0.5 * (rhs0 + rhsDyn)))
-                     res *= res_norm
+                     res = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
                      
                      # Define residual as the timestep change in the RHS
-                     CRES = rescf.computeResidualViscCoeffs(np.abs(res), DLD, DT, 
+                     CRES = rescf.computeResidualViscCoeffs(res_norm, np.abs(res), DLD, DT, 
                                                             bdex, sbnd, np.zeros(CRES_SIZE))
                                                             
                      # Residual contribution vanishes in the sponge layers
