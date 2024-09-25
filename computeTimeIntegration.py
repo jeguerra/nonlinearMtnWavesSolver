@@ -42,9 +42,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                              sol0, init0, rhs0, dsol0, CRES_SIZE, ebcDex, \
                              RSBops, VWAV_ref, res_norm, isInitialStep):
        
-       rhs = 0.0
-       res = 0.0
        CRES = 0.0
+       rhsDyn = 0.0
+       rhsDif = 0.0
        
        OPS = sol0.shape[0]
        order = TOPT[3]
@@ -69,7 +69,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              nonlocal Auxilary_Updates,rhs,res,CRES,DT
+              nonlocal Auxilary_Updates,rhsDyn,rhsDif,CRES,DT
               
               # Compute time dependent state about initial conditions
               pertbA = solA - init0
@@ -253,4 +253,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               print('Invalid time integration order. Going with 2.')
               sol = ketchesonM2(sol0)
            
-       return sol, sol-sol0, rhs, res, CRES, DT
+       return sol, sol-sol0, rhsDyn, rhsDif, CRES, DT

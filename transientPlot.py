@@ -10,7 +10,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-import scipy.ndimage as scm
 #import proplot as pplt
 from netCDF4 import Dataset
 from joblib import Parallel, delayed
@@ -24,8 +23,13 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
-fname = '3Layer_200m_CS55.nc'
+fname = 'Uniform_170m_CS35.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
+
+# Get the upper and lower bounds for TH
+clim1 = 300.0
+clim2 = 380.0 # UNIFORM STRATIFICATION
+#clim2 = 510.0 # 3LAYER STRATIFICATION
 
 times = m_fid.variables['time'][:NF]
 timesH = times / 3600.0
@@ -56,11 +60,7 @@ if runPertb:
        var2plot = th
 else:
        var2plot = TH
-       
-# Get the upper and lower bounds for TH
-clim1 = 300.0
-#clim2 = 380.0 # UNIFORM STRATIFICATION
-clim2 = 510.0 # 3LAYER STRATIFICATION
+
 cline = np.linspace(clim1, clim2, num=40)
 print('Plot bounds: ', clim1, clim2)
 

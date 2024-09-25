@@ -9,7 +9,9 @@ Created on Sun Aug  4 13:59:02 2019
 import numpy as np
 from numba import njit, prange
 
-useMaxFilter = True
+# Default is the local maximum for DynSGS coefficient
+useSmoothMaxFilter = True
+useLocalAverage = False
 
 @njit(parallel=True)
 def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
@@ -19,26 +21,15 @@ def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
        Q = np.empty((LVAR,2,1))
         
        for ii in prange(LVAR):
-              '''
-              # Fetch the fields in this region
-              vals = state[fltDex[ii],:]
-              
-              # Compute the local normalization
-              vals_avg = fltKrl[ii] @ vals
-              res_norm = fltKrl[ii] @ np.abs(vals - vals_avg)
-                            
-              # Reduce across residual variables
-              res_norm = res_norm[res_norm > NORM_THRES]
-              vals = residual[fltDex[ii],:]
-              vals = vals[:,res_norm > NORM_THRES]
-              '''
+       
               vals = residual[fltDex[ii],:]
               resv = np.zeros((vals.shape[0]))
               for jj in prange(vals.shape[0]):
+                     # Use the maximum from all residuals
                      resv[jj] = (vals[jj,:] * res_norm).max()
               
               # Compute the given filter over the region
-              if useMaxFilter:                     
+              if useSmoothMaxFilter:                     
                      rsmx = resv.max()
                      
                      rsum = 0.0
@@ -54,13 +45,18 @@ def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
                      else:
                             gval = rsmx
               else:
-                     gval = fltKrl[ii] @ resv
+                     if useLocalAverage:
+                            # Function average in window
+                            gval = fltKrl[ii] @ resv
+                     else:
+                            # Function max in window
+                            gval = resv.max()
                      
-              if gval < 1.0E-16:
+              if gval < 1.0E-14:
                      gval = 0.0
               
-              Q[ii,0,0] = min(0.5 * DLD[2] * gval, sbnd)
-              Q[ii,1,0] = min(0.5 * DLD[3] * gval, sbnd)
+              Q[ii,0,0] = min(DLD[2] * gval, sbnd)
+              Q[ii,1,0] = min(DLD[3] * gval, sbnd)
                             
        return Q
 

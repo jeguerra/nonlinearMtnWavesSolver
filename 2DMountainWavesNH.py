@@ -287,21 +287,22 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState, senseTemp):
        m_fid.createVariable('w', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('ln_p', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('ln_t', 'f8', ('time', 'z', 'x', 'y'))
-       # Create variables (field tendencies)
        '''
+       # Create variables (field dynamical tendencies)
        m_fid.createVariable('DuDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('DwDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Dln_pDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Dln_tDt', 'f8', ('time', 'z', 'x', 'y'))
-       # Create variables (field residuals)
-       m_fid.createVariable('Ru', 'f8', ('time', 'z', 'x', 'y'))
-       m_fid.createVariable('Rw', 'f8', ('time', 'z', 'x', 'y'))
-       m_fid.createVariable('Rln_p', 'f8', ('time', 'z', 'x', 'y'))
-       m_fid.createVariable('Rln_t', 'f8', ('time', 'z', 'x', 'y'))
        '''
+       # Create variables (field DynSGS tendencies)
+       m_fid.createVariable('SGSu', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('SGSw', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('SGSln_p', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('SGSln_t', 'f8', ('time', 'z', 'x', 'y'))
+       
        # Create variables for diffusion coefficients
-       m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
-       m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
+       #m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
+       #m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
        
        m_fid.close()
        del(m_fid)
@@ -317,33 +318,33 @@ def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
        try:
               m_fid = Dataset(newFname, 'a', format="NETCDF4")
               m_fid.variables['time'][ff] = thisTime
-              
+              '''
               dq1 = np.reshape(DCF[:,0,0], (NZ, NX), order='F')
               dq2 = np.reshape(DCF[:,1,0], (NZ, NX), order='F')
               m_fid.variables['DC1'][ff,:,:,0] = dq1
               m_fid.variables['DC2'][ff,:,:,0] = dq2
-       
+              '''
               for pp in range(numVar):
                      q = np.reshape(fields[:,pp], (NZ, NX), order='F')
                      #dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
-                     #rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
+                     rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
 
                      if pp == 0:
                             m_fid.variables['u'][ff,:,:,0] = q
                             #m_fid.variables['DuDt'][ff,:,:,0] = dqdt
-                            #m_fid.variables['Ru'][ff,:,:,0] = rq
+                            m_fid.variables['SGSu'][ff,:,:,0] = rq
                      elif pp == 1:
                             m_fid.variables['w'][ff,:,:,0] = q
                             #m_fid.variables['DwDt'][ff,:,:,0] = dqdt
-                            #m_fid.variables['Rw'][ff,:,:,0] = rq
+                            m_fid.variables['SGSw'][ff,:,:,0] = rq
                      elif pp == 2:
                             m_fid.variables['ln_p'][ff,:,:,0] = q
                             #m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
-                            #m_fid.variables['Rln_p'][ff,:,:,0] = rq
+                            m_fid.variables['SGSln_p'][ff,:,:,0] = rq
                      else:
                             m_fid.variables['ln_t'][ff,:,:,0] = q
                             #m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
-                            #m_fid.variables['Rln_t'][ff,:,:,0] = rq
+                            m_fid.variables['SGSln_t'][ff,:,:,0] = rq
                             
               m_fid.close()
               del(m_fid)
@@ -1006,23 +1007,55 @@ def runModel(TestName):
               # DynSGS filter scale lengths
               DL1 = 2.0 * DX_max
               DL2 = 2.0 * DZ_max
+              DLR = mt.sqrt(DL1**2 + DL2**2)
               
               print('Diffusion regions dimensions (m): ', DL1, DL2)
               
+              isRectRegion = True
               def searchRegions(nn):
                      node = XZV[nn,:]
-                     #'''
-                     verts = np.array([(node[0] + DL1, node[1] - DL2), \
-                              (node[0] + DL1, node[1] + DL2), \
-                              (node[0] - DL1, node[1] + DL2), \
-                              (node[0] - DL1, node[1] - DL2)])
-                     rectangle = pth.Path(verts)
-                     region = rectangle.contains_points(XZV)
+                     
+                     if isRectRegion:
+                            if node[0] == DIMS[0]:
+                                   verts = np.array([(node[0] + 2*DL1, node[1] - DL2), \
+                                            (node[0] + 2*DL1, node[1] + DL2), \
+                                            (node[0] - 0.0, node[1] + DL2), \
+                                            (node[0] - 0.0, node[1] - DL2)])
+                            elif node[0] == DIMS[1]:
+                                   verts = np.array([(node[0] + 0.0, node[1] - DL2), \
+                                            (node[0] + 0.0, node[1] + DL2), \
+                                            (node[0] - 2*DL1, node[1] + DL2), \
+                                            (node[0] - 2*DL1, node[1] - DL2)])
+                            elif np.any(ZTL[0,:] == node[1]):
+                                   verts = np.array([(node[0] + DL1, node[1] - 0.0), \
+                                            (node[0] + DL1, node[1] + 2*DL2), \
+                                            (node[0] - DL1, node[1] + 2*DL2), \
+                                            (node[0] - DL1, node[1] - 0.0)])
+                            elif node[1] == DIMS[2]:
+                                   verts = np.array([(node[0] + DL1, node[1] - 2*DL2), \
+                                            (node[0] + DL1, node[1] + 0.0), \
+                                            (node[0] - DL1, node[1] + 0.0), \
+                                            (node[0] - DL1, node[1] - 2*DL2)])
+                            else:
+                                   verts = np.array([(node[0] + DL1, node[1] - DL2), \
+                                            (node[0] + DL1, node[1] + DL2), \
+                                            (node[0] - DL1, node[1] + DL2), \
+                                            (node[0] - DL1, node[1] - DL2)])
+                            rectangle = pth.Path(verts)
+                            region = rectangle.contains_points(XZV)
+                     else:
+                            circle = pth.Path.circle(center=(node[0],node[1]),
+                                                     radius=DLR)
+                            region = circle.contains_points(XZV)
+                     
                      regDex = np.nonzero(region == True)[0].tolist()
                      
                      return regDex
               
-              fltDex = [searchRegions(ii) for ii in np.arange(XZV.shape[0])]
+              from joblib import Parallel, delayed
+              fltDex = Parallel(n_jobs=8)(delayed(searchRegions)(ii) \
+                                          for ii in np.arange(XZV.shape[0]))
+              #fltDex = [searchRegions(ii) for ii in np.arange(XZV.shape[0])]
               
               def meanRegions(regDex):
                      # Function mean kernel
@@ -1056,9 +1089,9 @@ def runModel(TestName):
               rw = np.abs(dWBC)
               res_norm[1] = bn.nanmean(rw[rw > 0.0])
               
-              print('Residual Norms:')
-              print(res_norm)
+              print('Initial Residual Norms:')
               res_norm = 1.0 / res_norm
+              print(res_norm)
        
               # Initialize parameters
               ti = 0; ff = 0
@@ -1067,7 +1100,6 @@ def runModel(TestName):
               
               # Output time global accumulators
               diagTime = 0.0
-              resnTime = 0.0
               
               # Impose BC's on all states
               hydroState = eqs.enforceBC_SOL(hydroState, ebcDex, hydroState)
@@ -1101,37 +1133,34 @@ def runModel(TestName):
                             traceback.print_exc()
                             sys.exit(2)
                             
-                     # Update DynSGS Normalizations                            
-                     if resnTime >= TOPT[6] and updateSGS:
-                            # compute function average of initial fields
-                            sol_avrg = DLD[-3] @ state
-                            # compute state relative to average
-                            res_norm = DLD[-3] @ np.abs(state - sol_avrg)
-                            
-                            print('Updated Residual Norms:')
-                            print(res_norm)
-                            res_norm = 1.0 / res_norm
-                            resnTime = 0.0
-                            
                      # Print out diagnostics every TOPT[5] seconds
                      if diagTime >= TOPT[5] or ti == 0:
                             
-                            if isInitialStep:
-                                   isInitialStep = False
-                            
                             message = ''
-                            displayResiduals(message, resVec, thisTime, thisDt, OPS)
+                            displayResiduals(message, rhsVec, thisTime, thisDt, OPS)
                                    
                             # Store in the NC file
                             store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, DCF)
+                            
+                            if thisTime > 60.0 and updateSGS and not isInitialStep:
+                                   # compute function average of initial fields
+                                   sol_avrg = DLD[-3] @ state
+                                   # compute state relative to average
+                                   rnorm = DLD[-3] @ np.abs(state - sol_avrg)
+                                   
+                                   print('Updated Residual Norms:')
+                                   res_norm = 1.0 / rnorm
+                                   print(res_norm)
                                                         
                             ff += 1
                             diagTime = 0.0
+                            
+                            if isInitialStep:
+                                   isInitialStep = False
                      
                      ti += 1
                      thisTime += thisDt
                      diagTime += thisDt
-                     resnTime += thisDt
               
        #%%       
        endt = time.time()

@@ -89,7 +89,7 @@ class TestCase:
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     self.setUserData(1260, 166, 120.0, 33.0, 300.0, \
+                     self.setUserData(1262, 194, 120.0, 33.0, 300.0, \
                                       8000.0, 20000.0, 1.0E-1,
                                       6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
@@ -106,7 +106,7 @@ class TestCase:
                      #                 10000.0, 20000.0, 1.0E-1,
                      #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
-                     self.setUserData(1260, 200, 120.0, 40.0, 300.0, \
+                     self.setUserData(1262, 236, 120.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 1.0E-1,
                                       6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
@@ -184,8 +184,7 @@ class TestCase:
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds
-              OTI = 10.0 # Time for diagnostic output (sec)
-              ITI = 60.0 # Time for re-normalization (sec)
+              OTI = 10.0 # Time for output and renormalization (sec)
               
-              self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI, ITI]
+              self.TOPT = [DT, HR, DTF, intMethodOrder, ET, OTI]
        
