@@ -36,6 +36,7 @@ import scipy.sparse.linalg as spl
 import matplotlib.path as pth
 from matplotlib import cm
 import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
 
 # Import from the local library of routines
 from computeGrid import computeGrid
@@ -1005,9 +1006,10 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 2.0 * DX_max
-              DL2 = 2.0 * DZ_max
+              DL1 = mt.pi * DX_max
+              DL2 = mt.pi * DZ_max
               DLR = mt.sqrt(DL1**2 + DL2**2)
+              #DLR = 0.5 * (DL1 + DL2)
               
               print('Diffusion regions dimensions (m): ', DL1, DL2)
               
@@ -1016,33 +1018,38 @@ def runModel(TestName):
                      node = XZV[nn,:]
                      
                      if isRectRegion:
-                            if node[0] == DIMS[0]:
-                                   verts = np.array([(node[0] + 2*DL1, node[1] - DL2), \
-                                            (node[0] + 2*DL1, node[1] + DL2), \
-                                            (node[0] - 0.0, node[1] + DL2), \
-                                            (node[0] - 0.0, node[1] - DL2)])
-                            elif node[0] == DIMS[1]:
-                                   verts = np.array([(node[0] + 0.0, node[1] - DL2), \
-                                            (node[0] + 0.0, node[1] + DL2), \
-                                            (node[0] - 2*DL1, node[1] + DL2), \
-                                            (node[0] - 2*DL1, node[1] - DL2)])
-                            elif np.any(ZTL[0,:] == node[1]):
-                                   verts = np.array([(node[0] + DL1, node[1] - 0.0), \
-                                            (node[0] + DL1, node[1] + 2*DL2), \
-                                            (node[0] - DL1, node[1] + 2*DL2), \
-                                            (node[0] - DL1, node[1] - 0.0)])
-                            elif node[1] == DIMS[2]:
-                                   verts = np.array([(node[0] + DL1, node[1] - 2*DL2), \
-                                            (node[0] + DL1, node[1] + 0.0), \
-                                            (node[0] - DL1, node[1] + 0.0), \
-                                            (node[0] - DL1, node[1] - 2*DL2)])
+                            '''
+                            if np.any(XL[:,0] == node[0]) or np.any(XL[:,-1] == node[0]):
+                                   DLO = 2*DL1
+                                   verts = np.array([(node[0] + DLO, node[1] - DL2), \
+                                            (node[0] + DLO, node[1] + DL2), \
+                                            (node[0] - DLO, node[1] + DL2), \
+                                            (node[0] - DLO, node[1] - DL2)])
+                                   
+                                   region = pth.Path(verts).contains_points(XZV)
+                                   
+                            elif np.any(ZTL[0,:] == node[1]) or np.any(ZTL[-1,:] == node[1]):
+                                   DLO = 2*DL2
+                                   verts = np.array([(node[0] + DL1, node[1] - DLO), \
+                                            (node[0] + DL1, node[1] + DLO), \
+                                            (node[0] - DL1, node[1] + DLO), \
+                                            (node[0] - DL1, node[1] - DLO)])
+                                   
+                                   region = pth.Path(verts).contains_points(XZV)
                             else:
                                    verts = np.array([(node[0] + DL1, node[1] - DL2), \
                                             (node[0] + DL1, node[1] + DL2), \
                                             (node[0] - DL1, node[1] + DL2), \
                                             (node[0] - DL1, node[1] - DL2)])
-                            rectangle = pth.Path(verts)
-                            region = rectangle.contains_points(XZV)
+                                   
+                                   region = pth.Path(verts).contains_points(XZV)
+                            '''
+                            verts = np.array([(node[0] + DL1, node[1] - DL2), \
+                                     (node[0] + DL1, node[1] + DL2), \
+                                     (node[0] - DL1, node[1] + DL2), \
+                                     (node[0] - DL1, node[1] - DL2)])
+                            
+                            region = pth.Path(verts).contains_points(XZV)
                      else:
                             circle = pth.Path.circle(center=(node[0],node[1]),
                                                      radius=DLR)
@@ -1052,8 +1059,8 @@ def runModel(TestName):
                      
                      return regDex
               
-              from joblib import Parallel, delayed
-              fltDex = Parallel(n_jobs=8)(delayed(searchRegions)(ii) \
+              ncores = os.cpu_count() - 2
+              fltDex = Parallel(n_jobs=ncores)(delayed(searchRegions)(ii) \
                                           for ii in np.arange(XZV.shape[0]))
               #fltDex = [searchRegions(ii) for ii in np.arange(XZV.shape[0])]
               
@@ -1122,7 +1129,7 @@ def runModel(TestName):
                      try:   
                             state, dfields, rhsVec, resVec, DCF, thisDt = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
                                                                     DLD, thisDt, TOPT, state, hydroState, rhsVec, dfields, \
-                                                                    DCF.shape, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
+                                                                    DCF, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
@@ -1141,16 +1148,6 @@ def runModel(TestName):
                                    
                             # Store in the NC file
                             store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, DCF)
-                            
-                            if thisTime > 60.0 and updateSGS and not isInitialStep:
-                                   # compute function average of initial fields
-                                   sol_avrg = DLD[-3] @ state
-                                   # compute state relative to average
-                                   rnorm = DLD[-3] @ np.abs(state - sol_avrg)
-                                   
-                                   print('Updated Residual Norms:')
-                                   res_norm = 1.0 / rnorm
-                                   print(res_norm)
                                                         
                             ff += 1
                             diagTime = 0.0

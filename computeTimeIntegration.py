@@ -39,7 +39,7 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
-                             sol0, init0, rhs0, dsol0, CRES_SIZE, ebcDex, \
+                             sol0, init0, rhs0, dsol0, dcf0, ebcDex, \
                              RSBops, VWAV_ref, res_norm, isInitialStep):
        
        CRES = 0.0
@@ -69,7 +69,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              nonlocal Auxilary_Updates,rhsDyn,rhsDif,CRES,DT
+              nonlocal Auxilary_Updates,rhsDyn,rhsDif,res_norm,CRES,DT
               
               # Compute time dependent state about initial conditions
               pertbA = solA - init0
@@ -87,25 +87,43 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               # Compute local RHS
               rhsDyn = tendency.computeEulerEquationsLogPLogT_Explicit(PHYS, PqPxA, PqPzA, DqDzA, 
                                                                        RdT, T_ratio, solA)
-              
               if Auxilary_Updates:
+                     '''
+                     if not isInitialStep:
+                            # compute function average of initial fields
+                            sol_avrg = DLD[-3] @ solA
+                            # compute state relative to average
+                            rnorm = DLD[-3] @ np.abs(solA - sol_avrg)
+                            res_norm += 1.0 / rnorm
+                            res_norm *= 0.5
+                     '''
                      
-                     DT, VWAV_fld, VFLW_adv = tendency.computeNewTimeStep(PHYS, RdT, solA,
-                                                                          DLD, isInitial=isInitialStep)
-                     
-                     sbnd = 0.5 * DT * VWAV_ref**2                     
+                     # Compute residual estimate
+                     sbnd = 0.5 * DT * VWAV_ref**2
+                     #res = 0.5 * (rhs0 + rhsDyn)
                      res = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
                      
-                     # Define residual as the timestep change in the RHS
-                     CRES = rescf.computeResidualViscCoeffs(res_norm, np.abs(res), DLD, DT, 
-                                                            bdex, sbnd, np.zeros(CRES_SIZE))
+                     # Compute new DynSGS coefficients
+                     CRES = rescf.computeResidualViscCoeffs(res_norm, 
+                                                            np.abs(res), 
+                                                            DLD, DT, 
+                                                            bdex, sbnd)
                                                             
                      # Residual contribution vanishes in the sponge layers
                      CRES[:,:,0] *= (1.0 - RLMA)
                      # Add in smooth diffusion field in the sponge layers
                      CRES[:,:,0] += sbnd * RLMA
+                     
+                     # Time average with previous coefficient field
+                     dcf1 = 0.5 * (CRES + dcf0)
+                     
+                     # Compute the new incoming time step
+                     DT, VWAV_fld, VFLW_adv = tendency.computeNewTimeStep(PHYS, RdT, solA,
+                                                                          DLD, isInitial=isInitialStep)
        
                      Auxilary_Updates = False
+              else:
+                     dcf1 = 0.5 * (CRES + dcf0)
               
               #%% Compute diffusive update
 
@@ -114,8 +132,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               PqPzA = np.copy(DqDzA)
               
               # Compute diffusive fluxes
-              PqPxA *= CRES[:,0,:]
-              PqPzA *= CRES[:,1,:]
+              PqPxA *= dcf1[:,0,:]
+              PqPzA *= dcf1[:,1,:]
               
               # Compute derivatives of diffusive flux
               Dq = np.column_stack((PqPxA,PqPzA))
