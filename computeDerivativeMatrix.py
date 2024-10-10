@@ -78,7 +78,7 @@ def computeAdjustedOperatorPeriodic(D2A):
 def numericalCleanUp(DDM):
        
        N = DDM.shape
-       ZTOL = 2.0E-16
+       ZTOL = 1.0E-16
        DDMC = np.zeros(DDM.shape)
        # Clean up numerical zeros
        for ii in range(N[0]):
