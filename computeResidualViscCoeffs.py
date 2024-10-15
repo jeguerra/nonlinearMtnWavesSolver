@@ -52,7 +52,7 @@ def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
                             # Function max in window
                             gval = resv.max()
                      
-              if gval < 2.0E-16:
+              if gval < 1.0E-16:
                      gval = 0.0
               
               Q[ii,0,0] = min(DLD[2] * gval, sbnd)

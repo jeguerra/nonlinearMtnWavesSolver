@@ -1006,8 +1006,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = mt.pi * DX_max
-              DL2 = mt.pi * DZ_max
+              DL1 = 2.1 * DX_max
+              DL2 = 2.1 * DZ_max
               DLR = mt.sqrt(DL1**2 + DL2**2)
               #DLR = 0.5 * (DL1 + DL2)
               
