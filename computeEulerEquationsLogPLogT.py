@@ -20,12 +20,20 @@ def enforceBC_RHS(rhs, ebcDex):
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
-       # BC conditions on tendencies
+       # INFLOW LEFT      
        rhs[ldex,:] = 0.0
        
+       # OUTFLOW RIGHT
+       rhs[rdex,0] = 0.0 
+       rhs[rdex,1] = 0.0 
+       rhs[rdex,2] = 0.0
+       rhs[rdex,3] = 0.0
+       
+       # TERRAIN
        rhs[bdex,0:2] = 0.0
        rhs[bdex,3] = 0.0
        
+       # MODEL TOP
        rhs[tdex,1] = 0.0
        
        return rhs

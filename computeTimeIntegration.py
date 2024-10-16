@@ -39,7 +39,7 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
-                             sol0, init0, rhs0, dsol0, dcf0_size, ebcDex, \
+                             sol0, init0, rhs0, dsol0, ebcDex, \
                              RSBops, VWAV_ref, res_norm, isInitialStep):
        
        dcf1 = 0.0
@@ -96,15 +96,15 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                      sbnd = 0.5 * DT * VWAV_ref**2
                      
                      # Compute residual estimate
-                     #res = 0.5 * (rhs0 + rhsDyn)
+                     #resVec = 0.5 * (rhs0 + rhsDyn)
                      resVec = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
+                     resVec = tendency.enforceBC_RHS(resVec, ebcDex)
                      
                      # Compute new DynSGS coefficients
                      dcf1 = rescf.computeResidualViscCoeffs(res_norm, 
                                                             np.abs(resVec), 
                                                             DLD, DT, 
-                                                            bdex, sbnd,
-                                                            np.zeros(dcf0_size))
+                                                            bdex, sbnd)
                                        
                      # Residual contribution vanishes in the sponge layers
                      dcf1[:,:,0] *= (1.0 - RLMA)
