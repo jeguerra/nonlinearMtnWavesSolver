@@ -89,23 +89,20 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                                                                        RdT, T_ratio, solA)
               if Auxilary_Updates:
                      
-                     # Compute residual estimate
-                     sbnd = 0.5 * DT * VWAV_ref**2
-                     #res = 0.5 * (rhs0 + rhsDyn)
-                     res = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
-                     
-                     # Compute the new incoming time step
+                     # Compute the new incoming time step and energy bound
                      DT, VWAV_fld, VFLW_adv = tendency.computeNewTimeStep(PHYS, RdT, solA,
                                                                           DLD, isInitial=isInitialStep)
+                     sbnd = 0.5 * DT * VWAV_ref**2
+                     
+                     # Compute residual estimate
+                     #res = 0.5 * (rhs0 + rhsDyn)
+                     res = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
                      
                      # Compute new DynSGS coefficients
                      dcf1 = rescf.computeResidualViscCoeffs(res_norm, 
                                                             np.abs(res), 
                                                             DLD, DT, 
                                                             bdex, sbnd)
-                     # Time average to previous field
-                     dcf1 += dcf0
-                     dcf1 *= 0.5                     
                                        
                      # Residual contribution vanishes in the sponge layers
                      dcf1[:,:,0] *= (1.0 - RLMA)

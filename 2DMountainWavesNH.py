@@ -1017,38 +1017,11 @@ def runModel(TestName):
                      node = XZV[nn,:]
                      
                      if isRectRegion:
-                            #'''
-                            if np.any(XL[:,0] == node[0]) or np.any(XL[:,-1] == node[0]):
-                                   DLO = 2*DL1
-                                   verts = np.array([(node[0] + DLO, node[1] - DL2), \
-                                            (node[0] + DLO, node[1] + DL2), \
-                                            (node[0] - DLO, node[1] + DL2), \
-                                            (node[0] - DLO, node[1] - DL2)])
-                                   
-                                   region = pth.Path(verts).contains_points(XZV)
-                                   
-                            elif np.any(ZTL[0,:] == node[1]) or np.any(ZTL[-1,:] == node[1]):
-                                   DLO = 2*DL2
-                                   verts = np.array([(node[0] + DL1, node[1] - DLO), \
-                                            (node[0] + DL1, node[1] + DLO), \
-                                            (node[0] - DL1, node[1] + DLO), \
-                                            (node[0] - DL1, node[1] - DLO)])
-                                   
-                                   region = pth.Path(verts).contains_points(XZV)
-                            else:
-                                   verts = np.array([(node[0] + DL1, node[1] - DL2), \
-                                            (node[0] + DL1, node[1] + DL2), \
-                                            (node[0] - DL1, node[1] + DL2), \
-                                            (node[0] - DL1, node[1] - DL2)])
-                                   
-                                   region = pth.Path(verts).contains_points(XZV)
-                            #'''
-                            '''
                             verts = np.array([(node[0] + DL1, node[1] - DL2), \
                                      (node[0] + DL1, node[1] + DL2), \
                                      (node[0] - DL1, node[1] + DL2), \
                                      (node[0] - DL1, node[1] - DL2)])
-                            '''
+
                             region = pth.Path(verts).contains_points(XZV)
                      else:
                             circle = pth.Path.circle(center=(node[0],node[1]),
@@ -1058,10 +1031,11 @@ def runModel(TestName):
                      regDex = np.nonzero(region == True)[0].tolist()
                      
                      return regDex
-              
+              #'''
               ncores = os.cpu_count() - 2
               fltDex = Parallel(n_jobs=ncores)(delayed(searchRegions)(ii) \
                                           for ii in np.arange(XZV.shape[0]))
+              #'''
               #fltDex = [searchRegions(ii) for ii in np.arange(XZV.shape[0])]
               
               def meanRegions(regDex):
