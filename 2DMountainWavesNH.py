@@ -302,15 +302,15 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState, senseTemp):
        m_fid.createVariable('SGSln_t', 'f8', ('time', 'z', 'x', 'y'))
        
        # Create variables for diffusion coefficients
-       #m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
-       #m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
+       m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
        
        m_fid.close()
        del(m_fid)
        
        return newFname
 
-def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
+def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, dcf):
        
        NX = ZTL.shape[1]
        NZ = ZTL.shape[0]
@@ -319,12 +319,12 @@ def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, DCF):
        try:
               m_fid = Dataset(newFname, 'a', format="NETCDF4")
               m_fid.variables['time'][ff] = thisTime
-              '''
-              dq1 = np.reshape(DCF[:,0,0], (NZ, NX), order='F')
-              dq2 = np.reshape(DCF[:,1,0], (NZ, NX), order='F')
+              #'''
+              dq1 = np.reshape(dcf[:,0,0], (NZ, NX), order='F')
+              dq2 = np.reshape(dcf[:,1,0], (NZ, NX), order='F')
               m_fid.variables['DC1'][ff,:,:,0] = dq1
               m_fid.variables['DC2'][ff,:,:,0] = dq2
-              '''
+              #'''
               for pp in range(numVar):
                      q = np.reshape(fields[:,pp], (NZ, NX), order='F')
                      #dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
@@ -418,7 +418,6 @@ def runModel(TestName):
        
        # Set Newton solve initial and restarting parameters
        isRestart = thisTest.solType['IsRestart'] # Initializes from a restart database
-       updateSGS = thisTest.solType['UpdateSGS'] # Switch for diagnostic plotting
        
        if isRestart:
               rdex = -1
@@ -724,7 +723,7 @@ def runModel(TestName):
        resVec = np.empty((OPS,numVar))
        
        # Initialize residual coefficient storage
-       DCF = np.zeros((fields.shape[0],2,1))
+       dcf = np.zeros((fields.shape[0],2,1))
        
        if isRestart:
               print('Restarting from: ', fname2Restart)
@@ -754,8 +753,8 @@ def runModel(TestName):
                      resVec[:,2] = np.reshape(m_fid.variables['Rln_p'][rdex,:,:,0], (OPS,), order='F')
                      resVec[:,3] = np.reshape(m_fid.variables['Rln_t'][rdex,:,:,0], (OPS,), order='F')
                      
-                     DCF[:,0,0] = np.reshape(m_fid.variables['DC1'][rdex,:,:,0], (OPS,), order='F')
-                     DCF[:,1,0] = np.reshape(m_fid.variables['DC2'][rdex,:,:,0], (OPS,), order='F')
+                     dcf[:,0,0] = np.reshape(m_fid.variables['DC1'][rdex,:,:,0], (OPS,), order='F')
+                     dcf[:,1,0] = np.reshape(m_fid.variables['DC2'][rdex,:,:,0], (OPS,), order='F')
                      
                      m_fid.close()
                      del(m_fid)
@@ -957,7 +956,7 @@ def runModel(TestName):
               message = 'Residual 2-norm AFTER Newton step:'
               displayResiduals(message, rhsVec, thisTime, TOPT[0], OPS)
               
-              store2NC(newFname, thisTime, 0, numVar, ZTL, fields, rhsVec, resVec, DCF)
+              store2NC(newFname, thisTime, 0, numVar, ZTL, fields, rhsVec, resVec, dcf)
        
        # Transient solution
        else:
@@ -1119,7 +1118,7 @@ def runModel(TestName):
                      stateG = cu.array(state)
                      dfieldsG = cu.array(dfields)
                      rhsVecG = cu.array(rhsVec)
-                     DCFG = cu.array(DCF)
+                     dcfG = cu.array(dcf)
                      thisDt = cu.array(TOPT[0])
               else:
                      thisDt = TOPT[0]
@@ -1128,15 +1127,15 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
-                            state, dfields, rhsVec, resVec, DCF, thisDt = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
+                            state, dfields, rhsVec, resVec, dcf, thisDt = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
                                                                     DLD, thisDt, TOPT, state, hydroState, rhsVec, dfields, \
-                                                                    DCF, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
+                                                                    dcf, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, state, rhsVec, resVec, DCF)
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, state, rhsVec, resVec, DCF[0], DCF[1], NX, NZ, numVar)
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, state, rhsVec, resVec, dcf)
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, state, rhsVec, resVec, dcf[0], dcf[1], NX, NZ, numVar)
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
@@ -1148,7 +1147,7 @@ def runModel(TestName):
                             displayResiduals(message, rhsVec, thisTime, thisDt, OPS)
                                    
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, DCF)
+                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, dcf)
                                                         
                             ff += 1
                             diagTime = 0.0

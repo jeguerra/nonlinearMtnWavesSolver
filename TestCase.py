@@ -33,7 +33,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': False, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': False, \
-                                'UnifWind': True, 'LinShear': False, 'UpdateSGS': False}
+                                'UnifWind': True, 'LinShear': False}
                             
                      self.setUserData(184, 86, 70.0, 22.0, 280.0, 
                                       7000.0, 10000.0, 1.0E-2, \
@@ -45,7 +45,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': True, 'LinShear': False, 'UpdateSGS': False}
+                                'UnifWind': True, 'LinShear': False}
                             
                      self.setUserData(184, 86, 70.0, 22.0, 280.0, \
                                       7000.0, 10000.0, 1.0E-2, \
@@ -57,7 +57,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True,\
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
+                                'UnifWind': False, 'LinShear': False}
                             
                      self.setUserData(192, 96, 75.0, 32.0, 300.0, \
                                       7000.0, 10000.0, 1.0E-2, \
@@ -69,7 +69,7 @@ class TestCase:
                                 'VerticalSpectral': True, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
+                                'UnifWind': False, 'LinShear': False}
                             
                      self.setUserData(192, 96, 75.0, 32.0, 300.0, \
                                       7000.0, 10000.0, 1.0E-2, \
@@ -81,7 +81,7 @@ class TestCase:
                                 'VerticalSpectral': False, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': False, 'UnifStrat': True, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
+                                'UnifWind': False, 'LinShear': False}
                             
                      # HIGH RESOLUTION
                      #self.setUserData(1796, 212, 120.0, 33.0, 300.0, \
@@ -99,7 +99,7 @@ class TestCase:
                                 'VerticalSpectral': False, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
-                                'UnifWind': False, 'LinShear': False, 'UpdateSGS': False}
+                                'UnifWind': False, 'LinShear': False}
                             
                      # STRATIFICATION BY TEMPERATURE SOUNDING
                      #self.setUserData(1680, 266, 120.0, 40.0, 300.0, \
