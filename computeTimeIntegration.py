@@ -39,12 +39,13 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
-                             sol0, init0, rhs0, dsol0, dcf0, ebcDex, \
+                             sol0, init0, rhs0, dsol0, dcf0_size, ebcDex, \
                              RSBops, VWAV_ref, res_norm, isInitialStep):
        
        dcf1 = 0.0
        rhsDyn = 0.0
        rhsDif = 0.0
+       resVec = 0.0
        
        OPS = sol0.shape[0]
        order = TOPT[3]
@@ -69,7 +70,7 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
        
        def computeUpdate(coeff, solA, sol2Update):
               
-              nonlocal Auxilary_Updates,rhsDyn,rhsDif,res_norm,dcf1,DT
+              nonlocal Auxilary_Updates,rhsDyn,rhsDif,resVec,dcf1,DT
               
               # Compute time dependent state about initial conditions
               pertbA = solA - init0
@@ -96,13 +97,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                      
                      # Compute residual estimate
                      #res = 0.5 * (rhs0 + rhsDyn)
-                     res = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
+                     resVec = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
                      
                      # Compute new DynSGS coefficients
                      dcf1 = rescf.computeResidualViscCoeffs(res_norm, 
-                                                            np.abs(res), 
+                                                            np.abs(resVec), 
                                                             DLD, DT, 
-                                                            bdex, sbnd)
+                                                            bdex, sbnd,
+                                                            np.zeros(dcf0_size))
                                        
                      # Residual contribution vanishes in the sponge layers
                      dcf1[:,:,0] *= (1.0 - RLMA)
@@ -257,4 +259,4 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               print('Invalid time integration order. Going with 2.')
               sol = ketchesonM2(sol0)
            
-       return sol, sol-sol0, rhsDyn, rhsDif, dcf1, DT
+       return sol, sol-sol0, rhsDyn, rhsDif, resVec, dcf1, DT

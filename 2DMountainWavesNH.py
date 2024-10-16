@@ -720,6 +720,7 @@ def runModel(TestName):
        state = np.empty((OPS,numVar))
        dfields = np.empty((OPS,numVar))
        rhsVec = np.empty((OPS,numVar))
+       rhsSGS = np.empty((OPS,numVar))
        resVec = np.empty((OPS,numVar))
        
        # Initialize residual coefficient storage
@@ -1101,15 +1102,20 @@ def runModel(TestName):
                             
                      # Compute the solution within a time step
                      try:   
-                            state, dfields, rhsVec, resVec, dcf, thisDt = tint.computeTimeIntegrationNL(PHYS, REFS, REFG, \
-                                                                    DLD, thisDt, TOPT, state, hydroState, rhsVec, dfields, \
-                                                                    dcf, ebcDex, RSBops, VWAV_ref, res_norm, isInitialStep)
+                            state, dfields, \
+                            rhsVec, rhsSGS, resVec, \
+                            dcf, thisDt = tint.computeTimeIntegrationNL(PHYS, REFS, REFG,
+                                                                    DLD, thisDt, TOPT, 
+                                                                    state, hydroState, rhsVec, 
+                                                                    dfields, dcf.shape, ebcDex, 
+                                                                    RSBops, VWAV_ref, res_norm, 
+                                                                    isInitialStep)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, state, rhsVec, resVec, dcf)
-                            makeFieldPlots(TOPT, thisTime, XL, ZTL, state, rhsVec, resVec, dcf[0], dcf[1], NX, NZ, numVar)
+                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, state, rhsVec, rhsSGS, dcf)
+                            makeFieldPlots(TOPT, thisTime, XL, ZTL, state, rhsVec, rhsSGS, dcf[0], dcf[1], NX, NZ, numVar)
                             import traceback
                             traceback.print_exc()
                             sys.exit(2)
@@ -1121,7 +1127,7 @@ def runModel(TestName):
                             displayResiduals(message, rhsVec, thisTime, thisDt, OPS)
                                    
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, resVec, dcf)
+                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, rhsSGS, dcf)
                                                         
                             ff += 1
                             diagTime = 0.0

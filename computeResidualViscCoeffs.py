@@ -11,14 +11,14 @@ from numba import njit, prange
 
 # Default is the local maximum for DynSGS coefficient
 useSmoothMaxFilter = True
-useLocalAverage = False
+#useLocalAverage = True
 
 @njit(parallel=True)
 def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
        
        fltDex = DLD[-2]
        fltKrl = DLD[-1]
-       Q = np.zeros((LVAR,2,1))
+       Q = np.empty((LVAR,2,1))
         
        for ii in prange(LVAR):
        
@@ -45,13 +45,16 @@ def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
                      else:
                             gval = rsmx
               else:
+                     # Function average in window
+                     gval = fltKrl[ii] @ resv
+                     '''
                      if useLocalAverage:
                             # Function average in window
                             gval = fltKrl[ii] @ resv
                      else:
                             # Function max in window
                             gval = resv.max()
-                     
+                     '''
               if gval < 1.0E-16:
                      gval = 0.0
               
@@ -60,12 +63,12 @@ def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
                             
        return Q
 
-def computeResidualViscCoeffs(res_norm, RES, DLD, DT, bdex, sbnd):
+def computeResidualViscCoeffs(res_norm, RES, DLD, DT, bdex, sbnd, dcf):
        
        # Compute absolute value of residuals
        LVAR = RES.shape[0]
        
        # Set DynSGS values averaged with previous 
-       CRES = computeRegionFilter(res_norm, RES, DLD, LVAR, sbnd)
+       dcf += computeRegionFilter(res_norm, RES, DLD, LVAR, sbnd)
               
-       return CRES
+       return dcf
