@@ -68,8 +68,8 @@ def computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=False):
        # Compute new time step based on median local sound speed
        VWAV_fld = np.sqrt(PHYS[6] * RdT)
        VFLW_adv = np.sqrt(bn.ss(fields[:,0:2], axis=1))
-       #VWAV_max = bn.nanmax(VWAV_fld + VFLW_adv)
-       VWAV_max = np.nanquantile(VWAV_fld + VFLW_adv, 0.9)
+       VWAV_max = bn.nanmax(VWAV_fld + VFLW_adv)
+       #VWAV_max = np.nanquantile(VWAV_fld + VFLW_adv, 0.9)
        #VWAV_max = DLD[-3] @ (VWAV_fld + VFLW_adv)
                             
        # Perform some checks before setting the new DT

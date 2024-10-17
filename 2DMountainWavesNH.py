@@ -1006,8 +1006,8 @@ def runModel(TestName):
               DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
               
               # DynSGS filter scale lengths
-              DL1 = 2.1 * DX_max
-              DL2 = 2.1 * DZ_max
+              DL1 = 1.0 * mt.pi * DX_max
+              DL2 = 1.0 * mt.pi * DZ_max
               DLR = mt.sqrt(DL1**2 + DL2**2)
               #DLR = 0.5 * (DL1 + DL2)
               
@@ -1085,7 +1085,8 @@ def runModel(TestName):
               
               # Compute sound speed and initial time step
               RdT, T_ratio = eqs.computeRdT(PHYS, state, fields, REFS[9][0])
-              TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, state, DLD, isInitial=isInitialStep)
+              TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, state, 
+                                                                   DLD, isInitial=isInitialStep)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
               # Normalization for vertical velocity
@@ -1135,7 +1136,7 @@ def runModel(TestName):
                             dcf, thisDt = tint.computeTimeIntegrationNL(PHYS, REFS, REFG,
                                                                     DLD, thisDt, TOPT, 
                                                                     state, hydroState, rhsVec, 
-                                                                    dfields, ebcDex, RSBops,
+                                                                    dfields, dcf, ebcDex, RSBops,
                                                                     VWAV_ref, res_norm, isInitialStep)
                             
                      except Exception:

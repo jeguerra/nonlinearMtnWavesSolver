@@ -39,7 +39,7 @@ def plotRHS(x, rhs, ebcDex, label):
        return
        
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
-                             sol0, init0, rhs0, dsol0, ebcDex, \
+                             sol0, init0, rhs0, dsol0, dcf0, ebcDex, \
                              RSBops, VWAV_ref, res_norm, isInitialStep):
        
        dcf1 = 0.0
@@ -110,6 +110,9 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                      dcf1[:,:,0] *= (1.0 - RLMA)
                      # Add in smooth diffusion field in the sponge layers
                      dcf1[:,:,0] += sbnd * RLMA
+                     
+                     dcf1 += dcf0
+                     dcf1 *= 0.5
        
                      Auxilary_Updates = False
               
