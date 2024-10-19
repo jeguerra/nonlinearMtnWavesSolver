@@ -409,7 +409,7 @@ def runModel(TestName):
        # Set residual diffusion switch
        DynSGS_RES = True
        if DynSGS_RES:
-              print('Diffusion coefficients by residual estimate.')
+              print('Diffusion coefficients by RES estimate.')
        else:
               print('Diffusion coefficients by RHS evaluation.')
        
@@ -1137,7 +1137,8 @@ def runModel(TestName):
                                                                     DLD, thisDt, TOPT, 
                                                                     state, hydroState, rhsVec, 
                                                                     dfields, dcf, ebcDex, RSBops,
-                                                                    VWAV_ref, res_norm, isInitialStep)
+                                                                    VWAV_ref, res_norm, 
+                                                                    isInitialStep, DynSGS_RES)
                             
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)

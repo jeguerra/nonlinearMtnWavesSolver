@@ -23,7 +23,7 @@ runPertb = False
 runSGS = False
 runPar = False
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
-fname = 'Uniform_170m_CS35.nc'
+fname = 'Uniform_170m_CS35_RES.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 # Get the upper and lower bounds for TH

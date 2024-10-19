@@ -40,7 +40,8 @@ def plotRHS(x, rhs, ebcDex, label):
        
 def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                              sol0, init0, rhs0, dsol0, dcf0, ebcDex, \
-                             RSBops, VWAV_ref, res_norm, isInitialStep):
+                             RSBops, VWAV_ref, res_norm, \
+                             isInitialStep, DynSGS_RES):
        
        dcf1 = 0.0
        rhsDyn = 0.0
@@ -96,8 +97,10 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                      sbnd = 0.5 * DT * VWAV_ref**2
                      
                      # Compute residual estimate
-                     #resVec = 0.5 * (rhs0 + rhsDyn)
-                     resVec = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
+                     if DynSGS_RES:
+                            resVec = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
+                     else:
+                            resVec = 0.5 * (rhs0 + rhsDyn)
                      resVec = tendency.enforceBC_RHS(resVec, ebcDex)
                      
                      # Compute new DynSGS coefficients
