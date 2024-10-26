@@ -77,19 +77,9 @@ def computeAdjustedOperatorPeriodic(D2A):
 
 def numericalCleanUp(DDM):
        
-       ZTOL = 1.0E-16
+       ZTOL = 1.0E-15
        DDMC = np.where(np.abs(DDM) >= ZTOL, DDM, 0.0)
-       '''
-       N = DDM.shape
-       DDMC = np.zeros(DDM.shape)
-       # Clean up numerical zeros
-       for ii in range(N[0]):
-              for jj in range(N[1]):
-                     if abs(DDM[ii,jj]) >= ZTOL:
-                            DDMC[ii,jj] = DDM[ii,jj]
-                     else:
-                            DDMC[ii,jj] = 0.0
-       '''
+       
        return DDMC
 
 def removeLeastSingularValue(DDM):
