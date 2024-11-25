@@ -20,8 +20,8 @@ import os
 os.environ["OMP_NUM_THREADS"] = "14" # export OMP_NUM_THREADS=4
 os.environ["OPENBLAS_NUM_THREADS"] = "14" # export OPENBLAS_NUM_THREADS=4 
 os.environ["MKL_NUM_THREADS"] = "14" # export MKL_NUM_THREADS=6
-os.environ["VECLIB_MAXIMUM_THREADS"] = "10" # export VECLIB_MAXIMUM_THREADS=4
-os.environ["NUMEXPR_NUM_THREADS"] = "10" # export NUMEXPR_NUM_THREADS=6
+os.environ["VECLIB_MAXIMUM_THREADS"] = "12" # export VECLIB_MAXIMUM_THREADS=4
+os.environ["NUMEXPR_NUM_THREADS"] = "12" # export NUMEXPR_NUM_THREADS=6
 
 import sys
 import time
@@ -64,8 +64,8 @@ from netCDF4 import Dataset
 localDir = '/home/jeguerra/scratch/'
 restart_file = localDir + 'restartDB'
 schurName = localDir + 'SchurOps'
-fname2Restart = 'Simulation2Restart.nc'
-fname4Restart = 'SimulationTemp.nc'       
+fname2Restart = '/media/jeguerra/DataBuffer/Simulation2Restart.nc'
+fname4Restart = '/media/jeguerra/DataBuffer/SimulationTemp.nc'       
 
 def makeFieldPlots(TOPT, thisTime, XL, ZTL, fields, rhs, res, dca, dcb, NX, NZ, numVar):
        
@@ -288,23 +288,25 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState, senseTemp):
        m_fid.createVariable('w', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('ln_p', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('ln_t', 'f8', ('time', 'z', 'x', 'y'))
-       '''
+       #'''
        # Create variables (field dynamical tendencies)
        m_fid.createVariable('DuDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('DwDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Dln_pDt', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('Dln_tDt', 'f8', ('time', 'z', 'x', 'y'))
-       '''
+       #'''
+       #'''
        # Create variables (field DynSGS tendencies)
        m_fid.createVariable('SGSu', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('SGSw', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('SGSln_p', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('SGSln_t', 'f8', ('time', 'z', 'x', 'y'))
-       
+       #'''
+       '''
        # Create variables for diffusion coefficients
        m_fid.createVariable('DC1', 'f8', ('time', 'z', 'x', 'y'))
        m_fid.createVariable('DC2', 'f8', ('time', 'z', 'x', 'y'))
-       
+       '''
        m_fid.close()
        del(m_fid)
        
@@ -319,32 +321,32 @@ def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, dcf):
        try:
               m_fid = Dataset(newFname, 'a', format="NETCDF4")
               m_fid.variables['time'][ff] = thisTime
-              #'''
+              '''
               dq1 = np.reshape(dcf[:,0,0], (NZ, NX), order='F')
               dq2 = np.reshape(dcf[:,1,0], (NZ, NX), order='F')
               m_fid.variables['DC1'][ff,:,:,0] = dq1
               m_fid.variables['DC2'][ff,:,:,0] = dq2
-              #'''
+              '''
               for pp in range(numVar):
                      q = np.reshape(fields[:,pp], (NZ, NX), order='F')
-                     #dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
+                     dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
                      rq = np.reshape(resVec[:,pp], (NZ, NX), order='F')
 
                      if pp == 0:
                             m_fid.variables['u'][ff,:,:,0] = q
-                            #m_fid.variables['DuDt'][ff,:,:,0] = dqdt
+                            m_fid.variables['DuDt'][ff,:,:,0] = dqdt
                             m_fid.variables['SGSu'][ff,:,:,0] = rq
                      elif pp == 1:
                             m_fid.variables['w'][ff,:,:,0] = q
-                            #m_fid.variables['DwDt'][ff,:,:,0] = dqdt
+                            m_fid.variables['DwDt'][ff,:,:,0] = dqdt
                             m_fid.variables['SGSw'][ff,:,:,0] = rq
                      elif pp == 2:
                             m_fid.variables['ln_p'][ff,:,:,0] = q
-                            #m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
+                            m_fid.variables['Dln_pDt'][ff,:,:,0] = dqdt
                             m_fid.variables['SGSln_p'][ff,:,:,0] = rq
                      else:
                             m_fid.variables['ln_t'][ff,:,:,0] = q
-                            #m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
+                            m_fid.variables['Dln_tDt'][ff,:,:,0] = dqdt
                             m_fid.variables['SGSln_t'][ff,:,:,0] = rq
                             
               m_fid.close()
@@ -963,55 +965,49 @@ def runModel(TestName):
        else:
               print('Starting Nonlinear Transient Solver...')
               
+              # Forward differences
+              DXV1 = np.diff(XL, axis=1, append=np.expand_dims(XL[:,-2],axis=1))
+              DZV1 = np.diff(ZTL, axis=0, append=np.expand_dims(ZTL[-2,:],axis=0))
+              # Backward differences
+              DXV2 = np.diff(np.flip(XL, axis=1), axis=1, append=np.expand_dims(XL[:,1],axis=1))
+              DZV2 = np.diff(np.flip(ZTL, axis=0), axis=0, append=np.expand_dims(ZTL[1,:],axis=0))
+              # Average F-B differences to center at nodes
+              DXV = 0.5 * (np.abs(DXV1) + np.abs(DXV2))
+              DZV = 0.5 * (np.abs(DZV1) + np.abs(DZV2))
+              
+              # Estimate grid point areas
+              DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
+              
               # Compute DX and DZ grid length scales
-              DXV = np.diff(REFS[0])
-              DZV = np.diff(REFS[1])
-              DX_min = 1.0 * np.min(DXV)
-              DZ_min = 1.0 * np.min(DZV)
+              DX_min = 1.0 * bn.nanmin(DXV)
+              DZ_min = 1.0 * bn.nanmin(DZV)
               print('Minimum grid lengths:',DX_min,DZ_min)
-              DX_avg = 1.0 * np.mean(DXV)
-              DZ_avg = 1.0 * np.mean(DZV)
+              DX_avg = 1.0 * bn.nanmean(DXV)
+              DZ_avg = 1.0 * bn.nanmean(DZV)
               print('Average grid lengths:',DX_avg,DZ_avg)
-              DX_max = 1.0 * np.max(DXV)
-              DZ_max = 1.0 * np.max(DZV)
+              DX_max = 1.0 * bn.nanmax(DXV)
+              DZ_max = 1.0 * bn.nanmax(DZV)
               print('Maximum grid lengths:',DX_max,DZ_max)
-              DX_wav = 1.0 * abs(DIMS[1] - DIMS[0]) / (NX+1)
-              DZ_wav = 1.0 * abs(DIMS[2]) / (NZ+1)
-              print('Uniform grid lengths (m):',DX_wav,DZ_wav)
                      
               dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
               S2 = np.reciprocal(dS2)
               S = np.sqrt(S2)
                             
               # Smallest physical grid spacing in the 2D mesh
-              DX = DX_wav
-              DZ = (DIMS[2] - HOPT[0]) / DIMS[2] * DZ_wav
-              DLS = min(DX, DZ)
+              DLS = min(DX_min, DZ_min)
               
               # Compute filtering regions by KDtree lookups
               XMV = np.reshape(XL, (OPS,1), order='F')
               ZMV = np.reshape(ZTL, (OPS,1), order='F')
               XZV = np.hstack((XMV, ZMV))
               
-              # Forward differences
-              DXV1 = np.diff(XL, axis=1, append=np.expand_dims(XL[:,-1],axis=1))
-              DZV1 = np.diff(ZTL, axis=0, append=np.expand_dims(ZTL[-1,:],axis=0))
-              # Backward differences
-              DXV2 = np.diff(np.flip(XL, axis=1), axis=1, append=np.expand_dims(XL[:,0],axis=1))
-              DZV2 = np.diff(np.flip(ZTL, axis=0), axis=0, append=np.expand_dims(ZTL[0,:],axis=0))
-              # Average F-B differences to center at nodes
-              DXV = 0.5 * (DXV1 + np.abs(DXV2))
-              DZV = 0.5 * (DZV1 + np.abs(DZV2))
-              
-              DA = np.reshape(np.abs(DXV * DZV), (OPS,), order='F')
-              
               # DynSGS filter scale lengths
-              DL1 = 1.0 * mt.pi * DX_max
-              DL2 = 1.0 * mt.pi * DZ_max
-              DLR = mt.sqrt(DL1**2 + DL2**2)
+              D_fil1 = 2.0 * DX_max
+              D_fil2 = 2.0 * DZ_max
+              D_mag1 = 2.0 * D_fil1
+              D_mag2 = 2.0 * D_fil2
+              DLR = mt.sqrt(D_fil1**2 + D_fil2**2)
               #DLR = 0.5 * (DL1 + DL2)
-              
-              print('Diffusion regions dimensions (m): ', DL1, DL2)
               
               isRectRegion = True
               def searchRegions(nn):
@@ -1020,37 +1016,25 @@ def runModel(TestName):
                      if isRectRegion:
                             #'''
                             if np.any(XL[:,0] == node[0]) or np.any(XL[:,-1] == node[0]):
-                                   DLO = 2*DL1
-                                   verts = np.array([(node[0] + DLO, node[1] - DL2), \
-                                            (node[0] + DLO, node[1] + DL2), \
-                                            (node[0] - DLO, node[1] + DL2), \
-                                            (node[0] - DLO, node[1] - DL2)])
-                                   
-                                   region = pth.Path(verts).contains_points(XZV)
-                                   
+                                   DLO = 2*D_fil1
+                                   verts = np.array([(node[0] + DLO, node[1] - D_fil2), \
+                                            (node[0] + DLO, node[1] + D_fil2), \
+                                            (node[0] - DLO, node[1] + D_fil2), \
+                                            (node[0] - DLO, node[1] - D_fil2)])
+                                                                      
                             elif np.any(ZTL[0,:] == node[1]) or np.any(ZTL[-1,:] == node[1]):
-                                   DLO = 2*DL2
-                                   verts = np.array([(node[0] + DL1, node[1] - DLO), \
-                                            (node[0] + DL1, node[1] + DLO), \
-                                            (node[0] - DL1, node[1] + DLO), \
-                                            (node[0] - DL1, node[1] - DLO)])
+                                   DLO = 2*D_fil2
+                                   verts = np.array([(node[0] + D_fil1, node[1] - DLO), \
+                                            (node[0] + D_fil1, node[1] + DLO), \
+                                            (node[0] - D_fil1, node[1] + DLO), \
+                                            (node[0] - D_fil1, node[1] - DLO)])
                                    
-                                   region = pth.Path(verts).contains_points(XZV)
                             else:
-                                   verts = np.array([(node[0] + DL1, node[1] - DL2), \
-                                            (node[0] + DL1, node[1] + DL2), \
-                                            (node[0] - DL1, node[1] + DL2), \
-                                            (node[0] - DL1, node[1] - DL2)])
-                                   
-                                   region = pth.Path(verts).contains_points(XZV)
-                            #'''
-                            '''
-                            verts = np.array([(node[0] + DL1, node[1] - DL2), \
-                                     (node[0] + DL1, node[1] + DL2), \
-                                     (node[0] - DL1, node[1] + DL2), \
-                                     (node[0] - DL1, node[1] - DL2)])
-                            '''
-
+                                   verts = np.array([(node[0] + D_fil1, node[1] - D_fil2), \
+                                            (node[0] + D_fil1, node[1] + D_fil2), \
+                                            (node[0] - D_fil1, node[1] + D_fil2), \
+                                            (node[0] - D_fil1, node[1] - D_fil2)])
+              
                             region = pth.Path(verts).contains_points(XZV)
                      else:
                             circle = pth.Path.circle(center=(node[0],node[1]),
@@ -1081,7 +1065,11 @@ def runModel(TestName):
               regDms = nb_list(np.array(dms, dtype=np.float64) for dms in fltDms)
 
               # Create a container for DynSGS scaling and region parameters
-              DLD = (DL1, DL2, DL1**2, DL2**2, DTF * DLS, S, DA / DIMS[-1], regDex, regDms)
+              DLD = (D_mag1, D_mag2, D_mag1**2, D_mag2**2,
+                     DTF * DLS, S, DA / DIMS[-1], regDex, regDms)
+              
+              print('Diffusion regions dimensions (m): ', D_fil1, D_fil2)
+              print('Diffusion magnitude scale (m): ', D_mag1, D_mag2)
               
               # Compute sound speed and initial time step
               RdT, T_ratio = eqs.computeRdT(PHYS, state, fields, REFS[9][0])

@@ -84,14 +84,14 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False}
                             
                      # HIGH RESOLUTION
-                     #self.setUserData(1796, 212, 120.0, 33.0, 300.0, \
-                     #                 8000.0, 20000.0, 1.0E-1,
-                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
+                     self.setUserData(1436, 220, 120.0, 33.0, 300.0, \
+                                      8000.0, 20000.0, 2.0E-1,
+                                      6500.0, 0.01, 0.0065, 0.002, 3, 2.0E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     self.setUserData(1262, 194, 120.0, 33.0, 300.0, \
-                                      8000.0, 20000.0, 1.0E-1,
-                                      6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
+                     #self.setUserData(1262, 194, 120.0, 33.0, 300.0, \
+                     #                 8000.0, 20000.0, 1.0E-1,
+                     #                 6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
               elif TestName == "3LayerTestTransient":
                      # Wave breaking in 3 layer stratified atmosphere
@@ -101,14 +101,15 @@ class TestCase:
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False}
                             
-                     # STRATIFICATION BY TEMPERATURE SOUNDING
-                     #self.setUserData(1680, 266, 120.0, 40.0, 300.0, \
+                     # HIGH RESOLUTION
+                     self.setUserData(1680, 266, 120.0, 40.0, 300.0, \
+                                      10000.0, 20000.0, 2.0E-1,
+                                      6500.0, 0.01, 0.0065, 0.002, 3, 2.0E+4, 'uwpt_static')
+                     
+                     # LOW RESOLUTION
+                     #self.setUserData(1262, 236, 120.0, 40.0, 300.0, \
                      #                 10000.0, 20000.0, 1.0E-1,
-                     #                 6000.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
-                            
-                     self.setUserData(1262, 236, 120.0, 40.0, 300.0, \
-                                      10000.0, 20000.0, 1.0E-1,
-                                      6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
+                     #                 6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
               else:
                      print('INVALID/UNIMPLEMENTED TEST CASE CONFIGURATION!')
@@ -180,7 +181,7 @@ class TestCase:
               #% Transient solve parameters
               DT = 0.01 # seconds
               HR = 6.0 #/ 3600.0 # hours              
-              DTF = 0.75 # scale time step              
+              DTF = 0.9 # scale time step              
               intMethodOrder = 4
               # 3rd or 4th order time integrator
               ET = HR * 60 * 60 # End time in seconds

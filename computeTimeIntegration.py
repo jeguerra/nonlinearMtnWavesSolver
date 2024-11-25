@@ -91,17 +91,17 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                                                                        RdT, T_ratio, solA)
               if Auxilary_Updates:
                      
+                     # Compute residual estimate
+                     if DynSGS_RES:
+                            resVec = (dsol0 / DT - 0.5 * (rhs0 + rhsDyn))
+                     else:
+                            resVec = 0.5 * (rhs0 + rhsDyn)
+                     resVec = tendency.enforceBC_RHS(resVec, ebcDex)
+                     
                      # Compute the new incoming time step and energy bound
                      DT, VWAV_fld, VFLW_adv = tendency.computeNewTimeStep(PHYS, RdT, solA,
                                                                           DLD, isInitial=isInitialStep)
                      sbnd = 0.5 * DT * VWAV_ref**2
-                     
-                     # Compute residual estimate
-                     if DynSGS_RES:
-                            resVec = 0.5 * ((rhsDyn - rhs0) + (dsol0 / DT - 0.5 * (rhs0 + rhsDyn)))
-                     else:
-                            resVec = 0.5 * (rhs0 + rhsDyn)
-                     resVec = tendency.enforceBC_RHS(resVec, ebcDex)
                      
                      # Compute new DynSGS coefficients
                      dcf1 = rescf.computeResidualViscCoeffs(res_norm, 
@@ -113,9 +113,6 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                      dcf1[:,:,0] *= (1.0 - RLMA)
                      # Add in smooth diffusion field in the sponge layers
                      dcf1[:,:,0] += sbnd * RLMA
-                     
-                     dcf1 += dcf0
-                     dcf1 *= 0.5
        
                      Auxilary_Updates = False
               

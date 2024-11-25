@@ -25,8 +25,11 @@ runSGS = False
 runPar = False
 #test_type = 'Uniform'
 test_type = '3Layer'
+sgs_type = 'RES'
+plot_type = 'RES'
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
-fname = test_type + '_170m_CS35_1Em15_RES.nc'
+dname = '/media/jeguerra/DataBuffer/'
+fname = dname + test_type + '_150m_CS35_1Em15_' + sgs_type + '.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 zbound = 20.0
@@ -48,7 +51,11 @@ Z = ZT[:zdex.max(),xdex[0]:xdex[-1]]
 u = m_fid.variables['u'][tdex,:zdex.max(),xdex[0]:xdex[-1],0]
 w = m_fid.variables['w'][tdex,:zdex.max(),xdex[0]:xdex[-1],0]
 lnt = m_fid.variables['ln_t'][tdex,:zdex.max(),xdex[0]:xdex[-1],0]
-lnt_sgs = m_fid.variables['SGSln_t'][tdex,:zdex.max(),xdex[0]:xdex[-1],0]
+
+if plot_type == 'RES':
+       lnt_ten = m_fid.variables['SGSln_t'][tdex,:zdex.max(),xdex[0]:xdex[-1],0]
+elif plot_type == 'RHS':
+       lnt_ten = m_fid.variables['Dln_tDt'][tdex,:zdex.max(),xdex[0]:xdex[-1],0]
 
 # Compute the total and perturbation potential temperature
 TH = np.exp(lnt)
@@ -66,8 +73,12 @@ if test_type == 'Uniform':
 else:
        tlim1 = 299.0
        tlim2 = 510.0
-       slim1 = -5.0E-4
-       slim2 = +5.0E-4
+       if plot_type == 'RES':
+              slim1 = -5.0E-4
+              slim2 = +5.0E-4
+       else:
+              slim1 = -3.0E-3
+              slim2 = +3.0E-3
        dlim1 = -25.0
        dlim2 = +25.0
        vlim1 = -160.0
@@ -110,7 +121,7 @@ def plotPertb(tt):
               
        # Theta DynSGS plot
        theseAxes[0,1].clear()
-       sg2plot = np.ma.getdata(lnt_sgs[tt,:,:])
+       sg2plot = np.ma.getdata(lnt_ten[tt,:,:])
        cflow2 = theseAxes[0,1].contourf(X, Z, 
                             sg2plot, 128, 
                             cmap='seismic',
@@ -118,7 +129,7 @@ def plotPertb(tt):
        
        theseAxes[0,1].fill_between(X[0,:], Z[0,:], color='black')
        theseAxes[0,1].tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-       theseAxes[0,1].set_title('SGS Tendency ' + r'$\frac{\partial \theta}{\partial t}$ (K/t)' + \
+       theseAxes[0,1].set_title(plot_type + ' Tendency ' + r'$\frac{\partial \theta}{\partial t}$ (K/t)' + \
                  ' Hour: {timeH:.2f}'.format(timeH = timesH[tt]))
               
        # Divergence plot
@@ -192,7 +203,9 @@ def plotPertb(tt):
        
        thisFigure.tight_layout()       
        save_file = imgname + f'{tt:04}' + '.jpg'
-       thisFigure.savefig(save_file, dpi=180, bbox_inches='tight')
+       thisFigure.savefig(save_file, dpi=128, 
+                          bbox_inches='tight',
+                          pad_inches=0.0)
                      
        # Delete stuff
        print('Hour: {thisTime:.2f}'.format(thisTime = timesH[tt]))
