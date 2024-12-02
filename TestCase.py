@@ -86,7 +86,7 @@ class TestCase:
                      # HIGH RESOLUTION
                      self.setUserData(1436, 220, 120.0, 33.0, 300.0, \
                                       8000.0, 20000.0, 2.0E-1,
-                                      6500.0, 0.01, 0.0065, 0.002, 3, 2.0E+4, 'uwpt_static')
+                                      6500.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
                      #self.setUserData(1262, 194, 120.0, 33.0, 300.0, \
@@ -102,9 +102,9 @@ class TestCase:
                                 'UnifWind': False, 'LinShear': False}
                             
                      # HIGH RESOLUTION
-                     self.setUserData(1680, 266, 120.0, 40.0, 300.0, \
+                     self.setUserData(1436, 266, 120.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 2.0E-1,
-                                      6500.0, 0.01, 0.0065, 0.002, 3, 2.0E+4, 'uwpt_static')
+                                      6500.0, 0.01, 0.0065, 0.002, 3, 1.5E+4, 'uwpt_static')
                      
                      # LOW RESOLUTION
                      #self.setUserData(1262, 236, 120.0, 40.0, 300.0, \

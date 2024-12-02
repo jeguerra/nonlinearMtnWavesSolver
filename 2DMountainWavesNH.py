@@ -1089,7 +1089,7 @@ def runModel(TestName):
               res_norm[1] = bn.nanmean(rw[rw > 0.0])
               
               print('Initial Residual Norms:')
-              res_norm = 1.0 / res_norm
+              res_norm = np.diag(1.0 / res_norm)
               print(res_norm)
        
               # Initialize parameters

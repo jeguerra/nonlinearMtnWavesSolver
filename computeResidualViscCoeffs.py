@@ -14,28 +14,27 @@ useSmoothMaxFilter = True
 useLocalAverage = True
 
 @njit(parallel=True)
-def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
+def computeRegionFilter(residual, DLD, LVAR, sbnd):
        
        fltDex = DLD[-2]
        fltKrl = DLD[-1]
        Q = np.empty((LVAR,2,1))
         
        for ii in prange(LVAR):
-       
-              vals = residual[fltDex[ii],:]
-              resv = np.zeros((vals.shape[0]))
-              for jj in prange(vals.shape[0]):
-                     # Use the maximum from all residuals
-                     resv[jj] = (vals[jj,:] * res_norm).max()
+              
+              # Get the target region values
+              resv = residual[fltDex[ii]]
+              rsmx = resv.max()
               
               # Compute the given filter over the region
               if useSmoothMaxFilter:                     
-                     rsmx = resv.max()
-                     
+                     args = resv - rsmx
+                     eargs = np.exp(args)
+                     gval = rsmx + np.log(eargs.mean())
+                     '''
                      rsum = 0.0
                      nv = 0
-                     for val in resv:
-                            arg = val - rsmx
+                     for arg in args:
                             if arg < 0.0:
                                    rsum += np.exp(arg)
                                    nv += 1
@@ -44,13 +43,14 @@ def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
                             gval = rsmx + np.log(rsum / nv)
                      else:
                             gval = rsmx
+                     '''
               else:
                      if useLocalAverage:
                             # Function average in window
                             gval = fltKrl[ii] @ resv
                      else:
                             # Function max in window
-                            gval = resv.max()
+                            gval = rsmx
                             
               if gval < 1.0E-16:
                      gval = 0.0
@@ -60,12 +60,12 @@ def computeRegionFilter(res_norm, residual, DLD, LVAR, sbnd):
                             
        return Q
 
-def computeResidualViscCoeffs(res_norm, RES, DLD, DT, bdex, sbnd):
+def computeResidualViscCoeffs(RES, DLD, DT, bdex, sbnd):
        
        # Compute absolute value of residuals
        LVAR = RES.shape[0]
        
        # Set DynSGS values averaged with previous 
-       dcf = computeRegionFilter(res_norm, RES, DLD, LVAR, sbnd)
+       dcf = computeRegionFilter(RES, DLD, LVAR, sbnd)
               
        return dcf

@@ -6,7 +6,7 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
-import torch
+import bottleneck as bn
 import matplotlib.pyplot as plt
 import computeResidualViscCoeffs as rescf
 import computeEulerEquationsLogPLogT as tendency
@@ -104,8 +104,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                      sbnd = 0.5 * DT * VWAV_ref**2
                      
                      # Compute new DynSGS coefficients
-                     dcf1 = rescf.computeResidualViscCoeffs(res_norm, 
-                                                            np.abs(resVec), 
+                     resVecAN = bn.nanmax(np.abs(resVec) @ res_norm, axis=1)
+                     dcf1 = rescf.computeResidualViscCoeffs(resVecAN, 
                                                             DLD, DT, 
                                                             bdex, sbnd)
                                        
