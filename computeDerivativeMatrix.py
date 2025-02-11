@@ -77,7 +77,7 @@ def computeAdjustedOperatorPeriodic(D2A):
 
 def numericalCleanUp(DDM):
        
-       ZTOL = 1.0E-15
+       ZTOL = 1.0E-16
        DDMC = np.where(np.abs(DDM) >= ZTOL, DDM, 0.0)
        
        return DDMC
@@ -722,6 +722,7 @@ def computeQuinticSplineDerivativeMatrix(dom, isClamped, isEssential, DDM_BC):
 
        #DDM = numericalCleanUp(DDM)
        DDM = removeLeastSingularValue(DDM)
+       
        return DDM, AIB
    
 # Compute Quartic Spline 1st derivative matrix

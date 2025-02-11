@@ -23,13 +23,13 @@ m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
-#test_type = 'Uniform'
-test_type = '3Layer'
+test_type = 'Uniform'
+#test_type = '3Layer'
 sgs_type = 'RES'
 plot_type = 'RES'
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
-dname = '/media/jeguerra/DataBuffer/'
-fname = dname + test_type + '_150m_CS35_1Em15_' + sgs_type + '.nc'
+dname = '/home/jeguerra/mtn_waves_mldata/'
+fname = dname + test_type + '_100m_CS53_mtn12km_' + sgs_type + '.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 zbound = 20.0

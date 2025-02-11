@@ -548,8 +548,8 @@ def runModel(TestName):
        useAverageDerivatives = False
        DDXL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[0], False, True, None)
        DDZL, dummy = derv.computeCubicSplineDerivativeMatrix(REFS[1], False, True, None)
-       DDXH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDXL)
-       DDZH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZL)
+       DDXH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[0], False, True, DDX_BC)
+       DDZH, dummy = derv.computeQuinticSplineDerivativeMatrix(REFS[1], False, True, DDZ_BC)
        
        if useAverageDerivatives:
               print('Average spline and compact FD derivatives.')
@@ -630,7 +630,7 @@ def runModel(TestName):
        if HermFunc:
               PPXMA = DDXMS1
        else:
-              PPXMA = DDXMS_LO
+              PPXMA = DDXMS_HO
               
        if verticalChebGrid or verticalLegdGrid:
               #advtOps = (REFG[0][1].dot(PPXMD),
@@ -639,7 +639,7 @@ def runModel(TestName):
        else:
               #advtOps = (REFG[0][1].dot(PPXMD),
               #           REFG[0][2].dot(DDZMS_HO))
-              advtOps = (PPXMA,DDZMS_LO)
+              advtOps = (PPXMA,DDZMS_HO)
        
        diffOps = (DDXMS_HO,DDZMS_HO)
        
@@ -734,10 +734,10 @@ def runModel(TestName):
                      m_fid = Dataset(fname2Restart, 'r', format="NETCDF4")
                      thisTime = m_fid.variables['time'][rdex]
                      
-                     hydroState[:,0] = np.reshape(m_fid.variables['U'][rdex,:,:,0], (OPS,), order='F')
+                     hydroState[:,0] = np.reshape(m_fid.variables['U'][:,:,0], (OPS,), order='F')
                      hydroState[:,1] = 0.0
-                     hydroState[:,2] = np.reshape(m_fid.variables['LNP'][rdex,:,:,0], (OPS,), order='F')
-                     hydroState[:,3] = np.reshape(m_fid.variables['LNT'][rdex,:,:,0], (OPS,), order='F')
+                     hydroState[:,2] = np.reshape(m_fid.variables['LNP'][:,:,0], (OPS,), order='F')
+                     hydroState[:,3] = np.reshape(m_fid.variables['LNT'][:,:,0], (OPS,), order='F')
                      
                      state[:,0] = np.reshape(m_fid.variables['u'][rdex,:,:,0], (OPS,), order='F')
                      state[:,1] = np.reshape(m_fid.variables['w'][rdex,:,:,0], (OPS,), order='F')
@@ -751,18 +751,16 @@ def runModel(TestName):
                      rhsVec[:,2] = np.reshape(m_fid.variables['Dln_pDt'][rdex,:,:,0], (OPS,), order='F')
                      rhsVec[:,3] = np.reshape(m_fid.variables['Dln_tDt'][rdex,:,:,0], (OPS,), order='F')
                      
-                     resVec[:,0] = np.reshape(m_fid.variables['Ru'][rdex,:,:,0], (OPS,), order='F')
-                     resVec[:,1] = np.reshape(m_fid.variables['Rw'][rdex,:,:,0], (OPS,), order='F')
-                     resVec[:,2] = np.reshape(m_fid.variables['Rln_p'][rdex,:,:,0], (OPS,), order='F')
-                     resVec[:,3] = np.reshape(m_fid.variables['Rln_t'][rdex,:,:,0], (OPS,), order='F')
-                     
-                     dcf[:,0,0] = np.reshape(m_fid.variables['DC1'][rdex,:,:,0], (OPS,), order='F')
-                     dcf[:,1,0] = np.reshape(m_fid.variables['DC2'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,0] = np.reshape(m_fid.variables['SGSu'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,1] = np.reshape(m_fid.variables['SGSw'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,2] = np.reshape(m_fid.variables['SGSln_p'][rdex,:,:,0], (OPS,), order='F')
+                     resVec[:,3] = np.reshape(m_fid.variables['SGSln_t'][rdex,:,:,0], (OPS,), order='F')
                      
                      m_fid.close()
                      del(m_fid)
-              except:
+              except Exception as e:
                      print('Could NOT read restart NC file!', fname2Restart)
+                     print(e)
               isInitialStep = False
        else:
               hydroState[:,0] = np.reshape(UZ, (OPS,), order='F')
@@ -1002,8 +1000,8 @@ def runModel(TestName):
               XZV = np.hstack((XMV, ZMV))
               
               # DynSGS filter scale lengths
-              D_fil1 = 2.0 * DX_max
-              D_fil2 = 2.0 * DZ_max
+              D_fil1 = mt.pi * DX_max
+              D_fil2 = mt.pi * DZ_max
               D_mag1 = 2.0 * D_fil1
               D_mag2 = 2.0 * D_fil2
               DLR = mt.sqrt(D_fil1**2 + D_fil2**2)
