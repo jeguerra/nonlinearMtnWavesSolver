@@ -23,13 +23,13 @@ m2k = 1.0E-3
 runPertb = False
 runSGS = False
 runPar = False
-test_type = 'Uniform'
-#test_type = '3Layer'
+#test_type = 'Uniform'
+test_type = '3Layer'
 sgs_type = 'RES'
 plot_type = 'RES'
 imgname = '/media/jeguerra/FastDATA/nonlinearMtnWavesSolver/animations/toanimate'
 dname = '/home/jeguerra/mtn_waves_mldata/'
-fname = dname + test_type + '_100m_CS53_mtn12km_' + sgs_type + '.nc'
+fname = dname + test_type + '_100m_CS55_mtn25km_' + sgs_type + '.nc'
 m_fid = Dataset(fname, 'r', format="NETCDF4")
 
 zbound = 20.0
@@ -155,7 +155,7 @@ def plotPertb(tt):
        # Vorticity plot
        PwPz = DDZP @ wp
        PwPx = (DDXP @ wp.T).T - DZDX * PwPz
-       VrtUW = (PuPz - PwPx)
+       VrtUW = (PwPx - PuPz)
        theseAxes[1,1].clear()
        theseAxes[1,1].contourf(X, Z, 
                             VrtUW, 128,

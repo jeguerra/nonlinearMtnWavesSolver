@@ -6,7 +6,7 @@ Created on Mon Jul 22 13:11:11 2019
 @author: -
 """
 import math as mt
-import torch 
+import torch as tch
 import numpy as np
 import bottleneck as bn
 import scipy.sparse as sps
@@ -65,50 +65,45 @@ def enforceBC_SOL(sol, ebcDex, init):
 
 def computeNewTimeStep(PHYS, RdT, fields, DLD, isInitial=False):
        
-       # Compute new time step based on median local sound speed
-       VWAV_fld = np.sqrt(PHYS[6] * RdT)
-       VFLW_adv = np.sqrt(bn.ss(fields[:,0:2], axis=1))
-       VWAV_max = bn.nanmax(VWAV_fld + VFLW_adv)
-       #VWAV_max = np.nanquantile(VWAV_fld + VFLW_adv, 0.9)
-       #VWAV_max = DLD[-3] @ (VWAV_fld + VFLW_adv)
+       # Compute new time step based on maximum local sound speed
+       if tch.is_tensor(RdT):
+              VWAV_max = (PHYS[6] * RdT).sqrt().max()
+       else:
+              VWAV_max = np.sqrt(PHYS[6] * RdT).max()
                             
        # Perform some checks before setting the new DT
-       if np.isfinite(VWAV_max) and VWAV_max > 0.0:
+       try:
               DT = DLD[4] / VWAV_max
+       except:
+              DT *= 0.5
       
        if isInitial:
               # Bisect time step on initialization
               DT *= 0.1
               
-       return DT, VWAV_fld, VWAV_max
+       return DT, VWAV_max
 
 def computeRdT(PHYS, sol, pert, RdT_bar):
        
-       Rd = PHYS[3]
-       lp0 = mt.log(PHYS[1])
        kap = PHYS[4]
        
        # Compute pressure gradient force scaling (buoyancy)              
        earg = kap * pert[:,2] + pert[:,3]
-       T_ratio = np.expm1(earg, dtype=np.longdouble)
+       if tch.is_tensor(earg):
+              T_ratio = tch.expm1(earg)
+       else:
+              T_ratio = np.expm1(earg)
        RdT = RdT_bar * (T_ratio + 1.0)                 
-              
-       #earg = sol[:,3] - kap * (sol[:,2] - lp0)
-       #RdT = Rd * np.exp(earg, dtype=np.longdouble)
-       #T_ratio = T_exp - 1.0
-       
-       #print(RdT1.max(), RdT2.max())
                      
-       return RdT.astype(np.float64), T_ratio.astype(np.float64)
-       #return RdT, T_ratio
+       return RdT, T_ratio
 
 def computeFieldDerivative(q, DD, RSBops):
-                     
+                            
        if RSBops:
               Dq = DD.dot(q)
        else:
-              Dq = torch.matmul(DD,
-                                torch.from_numpy(q)).numpy()
+              Dq = tch.matmul(DD,
+                                tch.from_numpy(q)).numpy()
               
        return Dq
 
@@ -326,8 +321,12 @@ def computeEulerEquationsLogPLogT_Classical(DIMS, PHYS, REFS, REFG):
 def computeAdvectionLogPLogT_Explicit(PHYS, PqPx, PqPz, state):
        
        # Compute advective (multiplicative) operators
-       UM = np.expand_dims(state[:,0], axis=1)
-       WM = np.expand_dims(state[:,1], axis=1)
+       if tch.is_tensor(state):
+              UM = tch.unsqueeze(state[:,0], dim=1)
+              WM = tch.unsqueeze(state[:,1], dim=1)
+       else:
+              UM = np.expand_dims(state[:,0], axis=1)
+              WM = np.expand_dims(state[:,1], axis=1)
        
        # Compute advection
        DqDt = -(UM * PqPx + WM * PqPz)
@@ -375,7 +374,10 @@ def computeDiffusionTendency(P2qPx2, P2qPz2, P2qPzx, P2qPxz, ebcDex):
        bdex = ebcDex[2]
        tdex = ebcDex[3]
        
-       DqDt = np.zeros(P2qPx2.shape)
+       if tch.is_tensor(P2qPx2):
+              DqDt = 0.0 * P2qPx2.clone()
+       else:
+              DqDt = 0.0 * np.copy(P2qPx2)
        
        #%% INTERIOR DIFFUSION
        # Diffusion of u-w vector

@@ -31,19 +31,6 @@ def computeRegionFilter(residual, DLD, LVAR, sbnd):
                      args = resv - rsmx
                      eargs = np.exp(args)
                      gval = rsmx + np.log(eargs.mean())
-                     '''
-                     rsum = 0.0
-                     nv = 0
-                     for arg in args:
-                            if arg < 0.0:
-                                   rsum += np.exp(arg)
-                                   nv += 1
-
-                     if nv > 0:
-                            gval = rsmx + np.log(rsum / nv)
-                     else:
-                            gval = rsmx
-                     '''
               else:
                      if useLocalAverage:
                             # Function average in window

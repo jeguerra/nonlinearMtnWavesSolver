@@ -312,7 +312,7 @@ def initializeNetCDF(fname, thisTime, XL, ZTL, hydroState, senseTemp):
        
        return newFname
 
-def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, dcf):
+def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec):
        
        NX = ZTL.shape[1]
        NZ = ZTL.shape[0]
@@ -321,12 +321,7 @@ def store2NC(newFname, thisTime, ff, numVar, ZTL, fields, rhsVec, resVec, dcf):
        try:
               m_fid = Dataset(newFname, 'a', format="NETCDF4")
               m_fid.variables['time'][ff] = thisTime
-              '''
-              dq1 = np.reshape(dcf[:,0,0], (NZ, NX), order='F')
-              dq2 = np.reshape(dcf[:,1,0], (NZ, NX), order='F')
-              m_fid.variables['DC1'][ff,:,:,0] = dq1
-              m_fid.variables['DC2'][ff,:,:,0] = dq2
-              '''
+              
               for pp in range(numVar):
                      q = np.reshape(fields[:,pp], (NZ, NX), order='F')
                      dqdt = np.reshape(rhsVec[:,pp], (NZ, NX), order='F')
@@ -379,9 +374,17 @@ def runModel(TestName):
        if StaticSolve:
               RSBops = False
        else:
-              RSBops = True # Turn off PyRSB SpMV
+              RSBops = False # Turn off PyRSB SpMV
               if RSBops:
                      from rsb import rsb_matrix
+              else:
+                     import torch as tch
+                     if tch.cuda.is_available():
+                            machine = tch.device('cuda')
+                            print("GPU is available")
+                     else:
+                            machine = tch.device('cpu')
+                            print("GPU not available, using CPU instead")
        
        # Use the uniform grid fourier solution if not Hermite Functions
        if HermFunc:
@@ -651,17 +654,17 @@ def runModel(TestName):
        REFS.append((dHdX, HofX)) # index 6
        REFS.append(sigma) # index 7
        REFS.append(np.reshape(UZ, (OPS,), order='F')) # index 8
-       REFS.append((np.reshape(PORZ, (OPS,), order='F'), 
-                    np.reshape(PBAR, (OPS,), order='F'))) #index 9
+       REFS.append([np.reshape(PORZ, (OPS,), order='F'), 
+                    np.reshape(PBAR, (OPS,), order='F')]) #index 9
        REFS.append(advtOps) # index 10
        REFS.append(diffOps) # index 11
        
        #%% Store operators for use
        if StaticSolve:
               # Native sparse
-              DDOP = sps.vstack(advtOps)
+              DDOP = sps.vstack(advtOps, format='csr')
               REFS.append(DDOP) # index 12
-              DDOP = sps.vstack(diffOps)
+              DDOP = sps.vstack(diffOps, format='csr')
               REFS.append(DDOP) # index 13
        else:
               # Multithreaded enabled for transient solution
@@ -676,11 +679,10 @@ def runModel(TestName):
                      DDOP.autotune(nrhs=2*numVar)
                      REFS.append(DDOP) # index 13
               else:
-                     import torch
                      DDOP = sps.vstack(advtOps, format='coo') 
                      ind = np.vstack((DDOP.row, DDOP.col))
                      val = DDOP.data
-                     DDOP = torch.sparse_coo_tensor(ind, val)
+                     DDOP = tch.sparse_coo_tensor(ind, val, device=machine)
                      DDOP = DDOP.to_sparse_csr()
                      
                      REFS.append(DDOP) # index 12
@@ -689,7 +691,7 @@ def runModel(TestName):
                      DDOP = sps.vstack(diffOps, format='coo')
                      ind = np.vstack((DDOP.row, DDOP.col))
                      val = DDOP.data
-                     DDOP = torch.sparse_coo_tensor(ind, val)
+                     DDOP = tch.sparse_coo_tensor(ind, val, device=machine)
                      DDOP = DDOP.to_sparse_csr()
                      
                      REFS.append(DDOP) # index 13
@@ -698,6 +700,11 @@ def runModel(TestName):
               
        # Store the terrain profile and operators used on the terrain (diffusion)
        REFS.append(np.reshape(DZT, (OPS,1), order='F')) # index 14
+       
+       dS2 = np.expand_dims(1.0 + np.power(dHdX,2), axis=1)
+       S2 = np.reciprocal(dS2)
+       S = np.sqrt(S2)
+       REFS.append(S)
               
        #%% Get some memory back here
        del(PORZ)
@@ -986,10 +993,6 @@ def runModel(TestName):
               DX_max = 1.0 * bn.nanmax(DXV)
               DZ_max = 1.0 * bn.nanmax(DZV)
               print('Maximum grid lengths:',DX_max,DZ_max)
-                     
-              dS2 = np.expand_dims(1.0 + np.power(REFS[6][0],2), axis=1)
-              S2 = np.reciprocal(dS2)
-              S = np.sqrt(S2)
                             
               # Smallest physical grid spacing in the 2D mesh
               DLS = min(DX_min, DZ_min)
@@ -1000,8 +1003,8 @@ def runModel(TestName):
               XZV = np.hstack((XMV, ZMV))
               
               # DynSGS filter scale lengths
-              D_fil1 = mt.pi * DX_max
-              D_fil2 = mt.pi * DZ_max
+              D_fil1 = 2.0 * DX_max
+              D_fil2 = 2.0 * DZ_max
               D_mag1 = 2.0 * D_fil1
               D_mag2 = 2.0 * D_fil2
               DLR = mt.sqrt(D_fil1**2 + D_fil2**2)
@@ -1071,7 +1074,7 @@ def runModel(TestName):
               
               # Compute sound speed and initial time step
               RdT, T_ratio = eqs.computeRdT(PHYS, state, fields, REFS[9][0])
-              TOPT[0], VWAV_fld, VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, state, 
+              TOPT[0], VWAV_ref = eqs.computeNewTimeStep(PHYS, RdT, state, 
                                                                    DLD, isInitial=isInitialStep)
               print('Initial Sound Speed (m/s): ', VWAV_ref)
               
@@ -1102,16 +1105,29 @@ def runModel(TestName):
               hydroState = eqs.enforceBC_SOL(hydroState, ebcDex, hydroState)
               state = eqs.enforceBC_SOL(state, ebcDex, hydroState)
               
-              integrateOnGPU = False
-              if integrateOnGPU:
-                     import cupy as cu
-                     stateG = cu.array(state)
-                     dfieldsG = cu.array(dfields)
-                     rhsVecG = cu.array(rhsVec)
-                     dcfG = cu.array(dcf)
-                     thisDt = cu.array(TOPT[0])
-              else:
+              if RSBops:
                      thisDt = TOPT[0]
+              else:
+                     PHYS = [tch.tensor(item, dtype=tch.double, device=machine) 
+                             for item in PHYS]
+                     state = tch.tensor(state, dtype=tch.double, device=machine)
+                     hydroState = tch.tensor(hydroState, dtype=tch.double, device=machine)
+                     dfields = tch.tensor(dfields, dtype=tch.double, device=machine)
+                     rhsVec = tch.tensor(rhsVec, dtype=tch.double, device=machine)
+                     res_norm = tch.tensor(res_norm, dtype=tch.double, device=machine)
+                     dcf = tch.tensor(dcf, dtype=tch.double, device=machine)
+                     thisDt = tch.tensor(TOPT[0], dtype=tch.double, device=machine)
+                     thisTime = tch.tensor(thisTime, dtype=tch.double, device=machine)
+                     
+                     REFG[0][:-1] = [tch.tensor(item, dtype=tch.double, device=machine) 
+                                     for item in REFG[0][:-1]]
+                     
+                     REFS[9] = [tch.tensor(item, dtype=tch.double, device=machine) 
+                                for item in REFS[9]]
+                     
+                     REFG[3] = tch.tensor(REFG[3], dtype=tch.double, device=machine)
+                     REFS[14] = tch.tensor(REFS[14], dtype=tch.double, device=machine)
+                     REFS[15] = tch.tensor(REFS[15], dtype=tch.double, device=machine)
               
               while thisTime <= TOPT[4]:
                             
@@ -1129,7 +1145,9 @@ def runModel(TestName):
                      except Exception:
                             print('Transient step failed! Closing out to NC file. Time: ', thisTime)
                             
-                            store2NC(newFname, thisTime, ff, numVar, NX, NZ, state, rhsVec, rhsSGS, dcf)
+                            store2NC(newFname, thisTime, ff, 
+                                     numVar, NX, NZ, 
+                                     state, rhsVec, rhsSGS)
                             makeFieldPlots(TOPT, thisTime, XL, ZTL, state, rhsVec, rhsSGS, dcf[0], dcf[1], NX, NZ, numVar)
                             import traceback
                             traceback.print_exc()
@@ -1139,10 +1157,23 @@ def runModel(TestName):
                      if diagTime >= TOPT[5] or ti == 0:
                             
                             message = ''
-                            displayResiduals(message, rhsVec, thisTime, thisDt, OPS)
                                    
                             # Store in the NC file
-                            store2NC(newFname, thisTime, ff, numVar, ZTL, state, rhsVec, rhsSGS, dcf)
+                            if RSBops:
+                                   displayResiduals(message, rhsVec, 
+                                                    thisTime, thisDt, OPS)
+                                   store2NC(newFname, thisTime, 
+                                            ff, numVar, ZTL, 
+                                            state, rhsVec, rhsSGS)
+                            else:
+                                   displayResiduals(message, rhsVec.cpu().numpy(), 
+                                                    thisTime.cpu().numpy(), 
+                                                    thisDt.cpu().numpy(), OPS)
+                                   store2NC(newFname, thisTime.cpu().numpy(), 
+                                            ff, numVar, ZTL, 
+                                            state.cpu().numpy(), 
+                                            rhsVec.cpu().numpy(), 
+                                            rhsSGS.cpu().numpy())
                                                         
                             ff += 1
                             diagTime = 0.0
@@ -1252,8 +1283,8 @@ if __name__ == '__main__':
        #TestName = 'ClassicalScharIter'
        #TestName = 'UniformStratStatic'
        #TestName = 'DiscreteStratStatic'
-       #TestName = 'UniformTestTransient'
-       TestName = '3LayerTestTransient'
+       TestName = 'UniformTestTransient'
+       #TestName = '3LayerTestTransient'
        
        # Run the model in a loop if needed...
        for ii in range(1):

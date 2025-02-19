@@ -6,6 +6,7 @@ Created on Tue Aug 13 10:09:52 2019
 @author: jorge.guerra
 """
 import numpy as np
+import torch as tch
 import bottleneck as bn
 import matplotlib.pyplot as plt
 import computeResidualViscCoeffs as rescf
@@ -60,12 +61,16 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
        #GMLX = REFG[0][1]
        #GMLZ = REFG[0][2]
        
-       S = DLD[5]
+       DZDX = REFS[14]
+       S = REFS[15]
        bdex = ebcDex[2]
 
        # Stacked derivative operators
-       DD1 = REFS[13] # First derivatives for advection/dynamics
-       DD2 = REFS[12] # First derivatives for diffusion gradient
+       DD1 = REFS[12] # First derivatives for advection/dynamics
+       DD2 = REFS[13] # First derivatives for diffusion gradient
+       
+       # reference Rd * T
+       RdT_bar = REFS[9][0]
        
        Auxilary_Updates = True
        
@@ -77,13 +82,16 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               pertbA = solA - init0
               
               # Compute pressure gradient force scaling (buoyancy)
-              RdT, T_ratio = tendency.computeRdT(PHYS, solA, pertbA, REFS[9][0])
+              RdT, T_ratio = tendency.computeRdT(PHYS, solA, pertbA, RdT_bar)
               
               #%% First dynamics update
-              Dq = tendency.computeFieldDerivative(solA, DD1, RSBops)
+              if tch.is_tensor(solA):
+                     Dq = DD1 @ solA
+              else:
+                     Dq = DD1.dot(solA)
               DqDxA = Dq[:OPS,:]
               PqPzA = Dq[OPS:,:]
-              PqPxA = DqDxA - REFS[14] * PqPzA
+              PqPxA = DqDxA - DZDX * PqPzA
               DqDzA = (PqPzA - DQDZ)
                
               # Compute local RHS
@@ -99,20 +107,28 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
                      resVec = tendency.enforceBC_RHS(resVec, ebcDex)
                      
                      # Compute the new incoming time step and energy bound
-                     DT, VWAV_fld, VFLW_adv = tendency.computeNewTimeStep(PHYS, RdT, solA,
-                                                                          DLD, isInitial=isInitialStep)
-                     sbnd = 0.5 * DT * VWAV_ref**2
+                     DT, VWAV_max = tendency.computeNewTimeStep(PHYS, RdT, solA,
+                                                                DLD, isInitial=isInitialStep)
                      
                      # Compute new DynSGS coefficients
-                     resVecAN = bn.nanmax(np.abs(resVec) @ res_norm, axis=1)
+                     if tch.is_tensor(resVec):
+                            sbnd = (0.5 * DT * VWAV_max**2).cpu().item()
+                            resVecAN = tch.max(resVec.abs() @ res_norm, 1).values.cpu().numpy()
+                     else:
+                            sbnd = 0.5 * DT * VWAV_max**2
+                            resVecAN = bn.nanmax(np.abs(resVec) @ res_norm, axis=1)
+                     
                      dcf1 = rescf.computeResidualViscCoeffs(resVecAN, 
-                                                            DLD, DT, 
-                                                            bdex, sbnd)
+                                                            DLD, DT, bdex, sbnd)
                                        
                      # Residual contribution vanishes in the sponge layers
                      dcf1[:,:,0] *= (1.0 - RLMA)
                      # Add in smooth diffusion field in the sponge layers
                      dcf1[:,:,0] += sbnd * RLMA
+                     
+                     if tch.is_tensor(resVec):
+                            dcf1 = tch.tensor(dcf1, dtype=tch.double)
+                            dcf1 = dcf1.to(resVec.device)
        
                      Auxilary_Updates = False
               
@@ -120,15 +136,22 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
 
               # Compute directional derivative along terrain
               PqPxA[bdex,:] = S * DqDxA[bdex,:]
-              PqPzA = np.copy(DqDzA)
+              if tch.is_tensor(PqPzA):
+                     PqPzA = DqDzA.clone()
+              else:
+                     PqPzA = np.copy(DqDzA)
               
               # Compute diffusive fluxes
               PqPxA *= dcf1[:,0,:]
               PqPzA *= dcf1[:,1,:]
               
               # Compute derivatives of diffusive flux
-              Dq = np.column_stack((PqPxA,PqPzA))
-              DDq = tendency.computeFieldDerivative(Dq, DD2, RSBops)
+              if tch.is_tensor(PqPxA) and tch.is_tensor(PqPzA):
+                     Dq = tch.column_stack((PqPxA,PqPzA))
+                     DDq = DD2 @ Dq
+              else:
+                     Dq = np.column_stack((PqPxA,PqPzA))
+                     DDq = DD2.dot(Dq) 
                      
               # Column 1
               D2qDx2 = DDq[:OPS,:4]
@@ -137,8 +160,8 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               D2qDzx = DDq[:OPS,4:]
               P2qPz2 = DDq[OPS:,4:]
               
-              P2qPx2 = D2qDx2 - REFS[14] * P2qPxz
-              P2qPzx = D2qDzx - REFS[14] * P2qPz2
+              P2qPx2 = D2qDx2 - DZDX * P2qPxz
+              P2qPzx = D2qDzx - DZDX * P2qPz2
               
               # Second directional derivatives (of the diffusive fluxes)
               P2qPx2[bdex,:] = S * D2qDx2[bdex,:]
@@ -153,38 +176,24 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               solB = tendency.enforceBC_SOL(solB, ebcDex, init0)
               
               # Rayleigh factor to inflow boundary implicitly
-              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLML)
+              RayD = 1.0 / (1.0 + coeff * DT * mu * RLML)
               solB[:,1:] = RayD[:,1:] * solB[:,1:] +\
                            (1.0 - RayD)[:,1:] * init0[:,1:]
 
               # Rayleigh factor to outflow boundary implicitly
-              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMR)
+              RayD = 1.0 / (1.0 + coeff * DT * mu * RLMR)
               solB[:,0:2] = RayD[:,0:2] * solB[:,0:2]
               solB[:,2:] = RayD[:,2:] * solB[:,2:] +\
                            (1.0 - RayD)[:,2:] * init0[:,2:]
               
               # Rayleigh factor to top boundary implicitly
-              RayD = np.reciprocal(1.0 + coeff * DT * mu * RLMT)
+              RayD = 1.0 / (1.0 + coeff * DT * mu * RLMT)
               solB[:,1] = RayD[:,1] * solB[:,1]
               
               # Apply BC
               solB = tendency.enforceBC_SOL(solB, ebcDex, init0)
               
               return solB
-       
-       def ketchesonM2(sol):
-              m = 5
-              c1 = 1 / (m-1)
-              c2 = 1 / m
-              sol1 = np.copy(sol)
-              for ii in range(m):
-                     if ii == m-1:
-                            sol1 = c2 * ((m-1) * sol + sol1)
-                            sol = computeUpdate(c2, sol, sol1)
-                     else:
-                            sol = computeUpdate(c1, sol, sol)
-                      
-              return sol
        
        def ssprk43(sol):
               # Stage 1
@@ -211,7 +220,11 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               c1 = 1.0 / 6.0
               
               sol = computeUpdate(c1, sol, sol)
-              sol1 = np.copy(sol)
+              
+              if tch.is_tensor(sol):
+                     sol1 = sol.clone()
+              else:
+                     sol1 = np.copy(sol)
               
               for ii in range(5):
                      sol = computeUpdate(c1, sol, sol)
@@ -228,8 +241,12 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
               # Ketchenson, 2008 10.1137/07070485X
               c1 = 1.0 / 6.0
               
-              sol1 = np.copy(sol)
-              sol2 = np.copy(sol)
+              if tch.is_tensor(sol):
+                     sol1 = sol.clone()
+                     sol2 = sol.clone()
+              else:
+                     sol1 = np.copy(sol)
+                     sol2 = np.copy(sol)
               
               sol1 = computeUpdate(c1, sol1, sol1)
               
@@ -250,16 +267,14 @@ def computeTimeIntegrationNL(PHYS, REFS, REFG, DLD, DT, TOPT, \
        #%% THE MAIN TIME INTEGRATION STAGES
        
        # Compute dynamics update
-       if order == 2:
-              sol = ketchesonM2(sol0)
-       elif order == 3:
+       if order == 3:
               #sol = ssprk43(sol0) 
               sol = ketcheson93(sol0)
        elif order == 4:
               #sol1 = ssprk54(sol0) 
               sol = ketcheson104(sol0)
        else:
-              print('Invalid time integration order. Going with 2.')
-              sol = ketchesonM2(sol0)
+              print('Invalid time integration order. Going with SSPRK43.')
+              sol = ssprk43(sol0)
            
        return sol, sol-sol0, rhsDyn, rhsDif, resVec, dcf1, DT

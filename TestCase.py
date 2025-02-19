@@ -65,8 +65,8 @@ class TestCase:
                             
               elif TestName == 'DiscreteStratStatic':
                      # Newton iteration with discrete stratification
-                     self.solType = {'StaticSolve': True, 'HermFuncGrid': True, \
-                                'VerticalSpectral': True, 'SolveSchur': True, \
+                     self.solType = {'StaticSolve': True, 'HermFuncGrid': False, \
+                                'VerticalSpectral': False, 'SolveSchur': True, \
                                 'IsRestart': False, 'NewtonLin': True, \
                                 'Smooth3Layer': True, 'UnifStrat': False, 'ExactBC': True, \
                                 'UnifWind': False, 'LinShear': False}
@@ -89,7 +89,7 @@ class TestCase:
                                       6500.0, 0.01, 0.0065, 0.002, 3, 1.25E+4, 'uwpt_static')
                             
                      # LOW RESOLUTION
-                     #self.setUserData(1262, 194, 120.0, 33.0, 300.0, \
+                     #self.setUserData(862, 166, 100.0, 33.0, 300.0, \
                      #                 8000.0, 20000.0, 1.0E-1,
                      #                 6000.0, 0.01, 0.0065, 0.001, 3, 1.5E+4, 'uwpt_static')
               
@@ -104,7 +104,7 @@ class TestCase:
                      # HIGH RESOLUTION
                      self.setUserData(1724, 400, 100.0, 40.0, 300.0, \
                                       10000.0, 20000.0, 2.0E-1,
-                                      6500.0, 0.01, 0.0065, 0.002, 3, 1.25E+4, 'uwpt_static')
+                                      6500.0, 0.01, 0.0065, 0.002, 3, 2.5E+4, 'uwpt_static')
                      
                      # LOW RESOLUTION
                      #self.setUserData(1262, 236, 120.0, 40.0, 300.0, \
@@ -124,7 +124,7 @@ class TestCase:
               Kp = Rd / cp
               cv = cp - Rd
               gam = cp / cv
-              self.PHYS = (gc, P0, cp, Rd, Kp, cv, gam, NBVF)
+              self.PHYS = [gc, P0, cp, Rd, Kp, cv, gam, NBVF]
               
               # Set grid dimensions and order
               L2 = 1.0E+3 * XF # In 10s of km
